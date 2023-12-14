@@ -1,3 +1,7 @@
+# TSD Ledger - Contribution Scoring
+This library utilized OpenAi to automatically score contribution submissions by DAO members in our WhatsApp channels
+
+
 ## Pre-requisites
   - Python version 3.11.6
   
