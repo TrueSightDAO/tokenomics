@@ -1,0 +1,2196 @@
+[2/9/23, 10:29:25 AM] [project] 🌐 Main DAO Website Development 🚧: ‎Messages and calls are end-to-end encrypted. No one outside of this chat, not even WhatsApp, can read or listen to them.
+[2/9/23, 10:29:25 AM] [project] 🌐 Main DAO Website Development 🚧: ‎You created group “Landing page 2023 draft”
+[2/9/23, 10:29:56 AM] Gary Teh: @918017107841 this is @16468233438 
+
+I have spoken with him about getting his help for the wordsmithing on the new landing page that you are planning to work on
+[2/9/23, 10:30:25 AM] Gary Teh: @16468233438 has proposed that you share with him a google doc with the sections you have in mind 
+
+He will try to find time to help with the words 🙂🙏
+[2/9/23, 6:14:41 PM] Anupa/diya: Hi ! Val ! Nice meeting
+[2/9/23, 6:14:45 PM] Anupa/diya: You
+[2/9/23, 6:19:22 PM] Anupa/diya: Just sketching out some directions 
+
+Landing page talks about the  true sight very briefly or maybe just the ethos 
+
+*We list the various projects with each having a learn more button 
+
+Once you click on project one it goes into the specific project giving the over all brief and a sign up form for new users 
+* secondary button for people within the dao to leave or migrate to another?
+[2/9/23, 6:20:04 PM] Anupa/diya: We definitely an onboarding section for new members or even existing members of exactly how True sight works
+[2/9/23, 6:22:09 PM] Anupa/diya: Some housekeeping guidelines
+[2/9/23, 6:27:20 PM] Anupa/diya: If we don't need to vet people for access in the whatsapp group we can do away with the sign up form idea  . We can just add a qrcode for the groups as a direct access on the project page 
+
+Does project group create their own house keeping rules ? 😁 and they self manage under true sight ? 
+
+That will affect the way we present it on the website
+[2/9/23, 6:27:45 PM] Anupa/diya: For now we can just list the projects and see how we want to proceed
+[2/9/23, 6:31:25 PM] Anupa/diya: Do we have a tab for submit an idea for new project?
+[2/9/23, 6:39:57 PM] Anupa/diya: We can have a governance section which can be an API coded by someone in True sight where we can Allocate> View> delegate roles> Vote
+[2/9/23, 8:08:38 PM] Val Lapidus: Yes project groups manage themselves
+[2/9/23, 8:09:19 PM] Val Lapidus: I don't understand what you mean or are asking?
+[2/9/23, 8:09:59 PM] Val Lapidus: We don't but should, @14153000019 confirm?
+[2/9/23, 8:10:39 PM] Gary Teh: Sure go for it 🙂👍
+[2/9/23, 8:12:07 PM] Anupa/diya: Asking . If it's a collective 🤣
+[2/9/23, 8:12:20 PM] Anupa/diya: Should we do a poll
+[2/9/23, 8:12:46 PM] Val Lapidus: Still don't understand.  Sorry
+[2/9/23, 8:12:55 PM] Gary Teh: My sense is the process would be once enough people submit the same idea, it should be surfaced to the governors for discussion and then voting 
+
+Once it gets approved governors should spend some time to figure out what the tokenizable actions are and then roll it out to the community. 
+
+Or maybe the community themselves can go figure out what tokenizable actions should be within the scope of each projects
+[2/9/23, 8:14:35 PM] Anupa/diya: As a current system, there is True sight,a parent body and within that they are sub system I e projects with their own whatsapp group
+
+How does the management work
+‎[2/9/23, 8:15:09 PM] Gary Teh: ‎image omitted
+‎[2/9/23, 8:15:09 PM] Gary Teh: ‎image omitted
+[2/9/23, 8:15:10 PM] Anupa/diya: This conversation needs to raised with in the other community managers as well
+[2/9/23, 8:15:38 PM] Anupa/diya: Not all
+[2/9/23, 8:15:49 PM] Anupa/diya: It's only the once they have access to
+[2/9/23, 8:16:00 PM] Gary Teh: To request to join the various project groups are surfaced to the admin (governors) and once they approve the request can join
+[2/9/23, 8:16:25 PM] Anupa/diya: Yes
+[2/9/23, 8:16:27 PM] Gary Teh: At least that is how WhatsApp community feature works
+[2/9/23, 8:17:01 PM] Gary Teh: So once the governors (community managers) approved a project scope a new chatroom is created and added to the community
+[2/9/23, 8:17:31 PM] Gary Teh: The process is pretty transparent
+
+Maybe it’s just not well explained
+[2/9/23, 8:18:52 PM] Anupa/diya: Then each community creating their own guidelines  makes sense which maybe we can ask the community members do and we put it as a link on the website.
+[2/9/23, 8:19:14 PM] Gary Teh: Sure. 🙂👍
+[2/9/23, 8:19:18 PM] Anupa/diya: I am speaking to Anita for something else. I can also update her about this and get some thoughts
+‎[2/9/23, 8:19:51 PM] Gary Teh: ‎image omitted
+[2/9/23, 8:20:20 PM] Gary Teh: Do remember to notarize the contributions so that governance tokens can be awarded appropriately 🙂👍
+[2/9/23, 8:20:32 PM] Anupa/diya: Yes! Sure
+[2/9/23, 8:21:14 PM] Anupa/diya: @16468233438 Once I am a bit more clearer about the flow and I have a tentative wireframw
+[2/9/23, 8:21:27 PM] Anupa/diya: We can have a short chat
+[2/9/23, 8:21:44 PM] Gary Teh: So funny, I was chatting with Tomas just now how community members should stop putting me in “boss” position by conferring this “founder” title
+
+It is a free space. Just help yourself. 🤣
+[2/9/23, 8:22:28 PM] Anupa/diya: We should actually tell all the groups
+
+Please write your own vision mission purpose for the website
+[2/9/23, 8:22:44 PM] Anupa/diya: For the group page
+[2/9/23, 8:22:44 PM] Gary Teh: The nomads in the desert just crash into the caravan wherever it might be and do what is appropriate
+[2/9/23, 8:22:58 PM] Gary Teh: True! So long as the values are aligned go for it 🤩
+[2/9/23, 8:25:28 PM] Anupa/diya: That's another conversation. What if they don't align.just saying. 
+
+I feel let the groups at aleast attempt to write. Even it's a Para. In this way we can also gage the level and intensity of the project
+[2/9/23, 8:26:09 PM] Gary Teh: Kind of hard not to aligned right. The values are very generalized 
+
+Autonomy, integrity and diversity 🤣
+[2/9/23, 8:26:41 PM] Gary Teh: Exercise your own autonomy
+
+Make sure you sure you act with integrity
+
+Respect diversity
+[2/9/23, 8:27:19 PM] Gary Teh: Overarching Purpose: build a better world based on verifiable truth
+[2/9/23, 8:27:25 PM] Anupa/diya: That's a good point. Is it a group submitting an idea or like an individual person looking for a group 
+
+This happens in hackathons There is one by Solana and they have this approach
+[2/9/23, 8:28:23 PM] Gary Teh: Either way works. 
+
+That is what the main chatroom is about
+
+Surfacing all these qualitative signals 
+
+Once the signal strength becomes strong I am sure one of the governors will submit it for voting and approval in our ecosystem
+[2/9/23, 8:29:09 PM] Anupa/diya: There is the governors group .
+[2/9/23, 8:29:16 PM] Anupa/diya: We can raise the topics there
+[2/9/23, 8:29:26 PM] Anupa/diya: Or the main room
+[2/9/23, 8:29:52 PM] Anupa/diya: It's best we have this conversation during the proposed meeting
+[2/9/23, 8:31:46 PM] Gary Teh: Governors group is restricted to the top 10 highest contributors in the prior season
+
+Governors get rotated every season
+
+During spring equinox, summer solistice, autumn equinox and winter solistice 
+
+You can already see who is in position to transition to become governor the forthcoming season in our ledger 
+
+https://TrueSight.me/ledger
+‎[2/9/23, 8:46:28 PM] Gary Teh: ‎image omitted
+[2/10/23, 2:02:42 AM] Anupa/diya: Just a thought.. once the project is finalized, the members in the group who are interested in formalized the project via finance, legal and so forth can go ahead while the others can be the "helpers"
+[2/10/23, 2:06:42 AM] Anupa/diya: I think If we should have a talk with Gunther before adding stuff to the website formally
+[2/10/23, 5:30:13 AM] Gary Teh: Do remember to tokenize the contents of that conversation  🙂👍
+[2/13/23, 9:00:03 PM] Anupa/diya: @14153000019 @16468233438 !! Hello
+[2/13/23, 9:04:34 PM] Anupa/diya: Since we are talking of integrity and diversity.
+
+I Am sure no one wants to wake up to execution videos. How is this chat adding value to the group ?
+[2/13/23, 9:05:10 PM] Anupa/diya: As you guys are group administrators of the True sight Dao, it might be a good time to raise this
+[2/15/23, 3:38:03 AM] Gary Teh: Huh?? 🤔
+
+Actually, @16468233438 is not governor right now. 
+
+Feel free to suggest or even raise this in the main chatroom 
+
+Just think of TrueSight DAO as space where you can freely exercise your autonomy and other can also freely exercise their autonomy in whatever way they feel is right for them 🙂👍
+[2/15/23, 3:39:29 AM] Anupa/diya: I thought Val was one of the group admins
+[2/15/23, 3:39:55 AM] Anupa/diya: Oh my God! You must have missed the post ! You just need to scroll up
+[2/15/23, 3:41:54 AM] Anupa/diya: I was like what the hell do I need to see this morning . I think tres commented
+[2/15/23, 3:41:57 AM] Anupa/diya: If I start exercising autonomy, I think there will be a block on my number soon. 🤣
+‎[2/15/23, 3:44:26 AM] Gary Teh: ‎image omitted
+[2/15/23, 3:44:47 AM] Anupa/diya: I think he will be the one blocking me 🤣🤣
+[2/15/23, 3:46:20 AM] Gary Teh: That will be against our values. You cannot stop someone from exercising her autonomy
+[2/15/23, 3:54:54 AM] Anupa/diya: 🤣🤣🤣
+[2/15/23, 3:58:11 AM] Gary Teh: Autonomy comes in two ways. To enagage and disengage 
+
+You can’t stop a member from freely engaging in the community 
+
+And you cannot stop a member freely disengaging from the community
+[2/15/23, 4:00:21 AM] Anupa/diya: That's what I was going to say as well. This is a point which has to be addressed at the governors meeting.
+[2/15/23, 4:00:57 AM] Gary Teh: People don’t usually bother with attending FaceTime meetings 🤣
+[2/15/23, 4:01:20 AM] Gary Teh: Just surface this topic in the main chatroom for discussion 🙂👍
+[2/15/23, 4:02:02 AM] Anupa/diya: I think there has to be a line when it comes violence, abuse, harassment related topics. Any thing else can be a just be a prespective of opinion, even politics to large extent
+[2/15/23, 4:05:22 AM] Gary Teh: True. That has been surfaced as a rule already 
+
+When you observe violence, abuse and harassment happening within the chatroom please raise that and flag it
+
+Violators are given three warnings
+
+Upon the third booted from the chatrooms
+‎[2/15/23, 4:05:40 AM] Gary Teh: ‎image omitted
+[2/27/23, 8:36:32 AM] Anita Lamprecht: ‎You added Anita Lamprecht
+[2/27/23, 5:49:01 PM] Gary Teh: Thought to include @41791555798 in this channel as she mentioned she is looking forward to working with @918017107841 on the landing page 🙂👍
+[2/27/23, 7:33:57 PM] Anupa/diya: @41791555798 Happy to have you in another chat group 🤣
+[2/27/23, 7:34:21 PM] Anupa/diya: Yes we were speaking and it makes sense to just align and she was writing the legal aspect
+[2/27/23, 7:34:49 PM] Anupa/diya: Can we all schedule a short  call sometime when we all are free
+[2/27/23, 7:36:39 PM] Anupa/diya: Can everyone put in their dates and preferred times.
+[2/27/23, 7:37:08 PM] Anupa/diya: It's normally early usa est morning that works for all
+[2/27/23, 8:20:19 PM] Val Lapidus: Sure
+[2/27/23, 8:24:30 PM] Val Lapidus: Sorry catching up on this thread.  I can be available at 1130pst most nights or 630am pst most mornings
+[2/27/23, 9:11:49 PM] Gary Teh: I am in hostel at Buenos Aires now 
+
+Should be ok normal hours here
+[2/28/23, 12:26:17 AM] Anupa/diya: I  can be available preferably for 11: 30 pst
+[2/28/23, 12:26:56 AM] Anupa/diya: I can do early morning or morning  Buenos aires time or  late evening
+[2/28/23, 3:52:32 AM] Gary Teh: I believe this timing is good
+[2/28/23, 5:09:36 AM] Anupa/diya: So can we look at this Thursday and Friday
+[2/28/23, 5:10:02 AM] Anupa/diya: Or maybe next week on Tuesday
+[2/28/23, 5:12:13 AM] Anita Lamprecht: i have a tight schedule on all 3 days. @Anupa: as we are meeting anyway. maybe we can talk about it separately. thank you.
+[2/28/23, 5:13:29 AM] Anupa/diya: In that case, I can feed in our conversation to this
+[2/28/23, 5:13:38 AM] Gary Teh: Actually no rush from my perspective. We can do at a later date 🙂
+[2/28/23, 5:15:37 AM] Anupa/diya: Anita and I are going to be meeting for a few things so we can add this. I think one starter chat can happen maybe next week sometime.
+[2/28/23, 5:26:46 AM] Gary Teh: Do remember to notarize the time the both of you spent for your meeting in exchange for governance tokens 🙂👍
+
+Also key important points surfaced during your discussions could also be tokenized in exchange for governance tokens 🙂👍
+
+https://TrueSight.me/submit-contribution
+[2/28/23, 7:01:10 AM] Anupa/diya: Yes ! We will
+[3/1/23, 12:27:49 PM] Tomas - Offchain: ‎You added Tomas - Offchain
+[3/1/23, 12:28:36 PM] Gary Teh: Hey folks, @5491125130580  is really good with content structuring
+
+He has expressed interest to help with our landing page
+[3/1/23, 5:25:13 PM] Anupa/diya: Hello Tomas ! Great
+[3/1/23, 5:25:29 PM] Anupa/diya: We just spoke about meeting next week
+[3/1/23, 5:52:08 PM] Tomas - Offchain: Hi anupa! Sure whenever works
+[3/1/23, 5:53:01 PM] Anupa/diya: This was one of the option 11 30 pst
+[3/1/23, 6:04:05 PM] Tomas - Offchain: That works good for me
+[3/7/23, 6:02:46 AM] Anupa/diya: Hi Everyone !!
+[3/7/23, 6:03:12 AM] Anupa/diya: Just wondering if we can meet wednesday night at 11 30 pst ?
+[3/7/23, 6:04:48 AM] Anupa/diya: Gary and I had a chat about few directions for the website ... Start the potential conversation
+[3/7/23, 6:05:31 AM] Gary Teh: It was a wonderful and deeply insightful chat @918017107841 thanks for leading the way 🤩
+[3/7/23, 6:11:19 AM] Gary Teh: Maybe if we used this, it would be easier for everyone
+https://lettucemeet.com/l/bq406
+[3/8/23, 6:39:02 PM] Anupa/diya: Please vote for the timing.
+[3/8/23, 6:39:21 PM] Anupa/diya: There are two options: Thursday and Friday
+[3/8/23, 6:41:11 PM] Tomas - Offchain: Tomorrow 11.30 pst works for me
+[3/8/23, 6:42:08 PM] Gary Teh: 1130am PST works for Me too! 👍
+‎[3/8/23, 6:47:38 PM] Anupa/diya: ‎image omitted
+[3/8/23, 6:48:08 PM] Anupa/diya: I can do 10 pm to 11 pm that's 10 am pst . Or 8 pm ist on Friday
+[3/8/23, 6:50:15 PM] Tomas - Offchain: 9 or 10am pst tomorrow works even better
+[3/8/23, 6:51:09 PM] Anupa/diya: Great. I can do 9 pm as well
+[3/8/23, 6:55:22 PM] Gary Teh: Seems 10pm Argentinian time has the most response let do that then
+[3/8/23, 6:59:20 PM] Tomas - Offchain: that´s 157pm pst? im getting lost in time zones
+[3/8/23, 7:03:11 PM] Gary Teh: I see what’s the problem
+
+Let’s do 10pm @918017107841 time, 10am PST and 3pm Argentinian time
+[3/8/23, 7:17:27 PM] Anupa/diya: 🤣 sounds good
+[3/8/23, 7:21:10 PM] Anupa/diya: This is for Friday 10th, 
+10pm ist  time, 10am PST and 3pm Argentinian time
+[3/8/23, 7:21:56 PM] Anupa/diya: I can update Anita later next week
+[3/8/23, 7:22:03 PM] Anupa/diya: If she can't make it
+[3/8/23, 7:33:19 PM] Tomas - Offchain: If it's less than an hour meeting it's fine. If not it might be better tomorrow
+[3/8/23, 7:33:39 PM] Gary Teh: For Thursday I think
+
+Schedule is too tight for Friday
+
+Or we could just do next week instead
+[3/8/23, 7:37:10 PM] Anupa/diya: I can do both days. 
+
+The agenda is to 
+1. Identify the current activities on the website 
+2. Align it to the position of the Tru sight Dao.
+
+There are a few things we have to speak about 
+
+Even if it is a short call. Let's do that 
+What is the purpose of Tru sight versus the expectation and motivation of the community
+[3/8/23, 7:37:52 PM] Gary Teh: Sure. Let’s chat tomorrow at 3pm Argentinian time then
+[3/8/23, 7:38:03 PM] Anupa/diya: Gary and I discussed a few things the other day which we can share
+[3/8/23, 7:40:16 PM] Anupa/diya: 1. Onboarding - invite or reference only 
+2. What is the intention and motivation of each project.
+3. How do we incentivise community members to be more participatory 
+4. Does the aim and vision of Trusight align with the community s behavior
+[3/8/23, 7:40:35 PM] Anupa/diya: @14153000019 please add if you feel I have missed out on anything
+[3/8/23, 7:41:09 PM] Anupa/diya: If anyone who cannot make it for the meeting like Val and Anita, please feel free to add your comments to the chat
+[3/9/23, 8:31:29 AM] Anupa/diya: ‎This message was deleted.
+[3/9/23, 8:32:31 AM] Anupa/diya: Hi everyone
+[3/9/23, 8:32:37 AM] Anupa/diya: The zoom is open
+[3/9/23, 8:32:51 AM] Anupa/diya: Was it for today or Tomorrow
+[3/9/23, 8:34:46 AM] Tomas - Offchain: Hi anupa! I scheduled it at 10am pst
+[3/9/23, 8:35:31 AM] Tomas - Offchain: In 1.5hs, did I got it wrong?
+[3/9/23, 8:35:39 AM] Anupa/diya: Ah. ok i thought it was 10 pm ist. its like in one and half hours..
+[3/9/23, 8:35:44 AM] Anupa/diya: you are right
+[3/9/23, 8:36:30 AM] Anupa/diya: I will try my utmost to stay awake . See you then. Please generate a zoom link just in case I dont make it
+[3/9/23, 8:42:20 AM] Tomas - Offchain: If not we can do it tomorrow
+[3/9/23, 8:44:14 AM] Anupa/diya: Lets just aim for today because we have planned this meeting finally. Its fine.
+[3/9/23, 10:02:40 AM] Gary Teh: Any idea where the link is?
+[3/9/23, 10:02:41 AM] Gary Teh: for Zoom?
+[3/9/23, 10:03:02 AM] Anupa/diya: I deleted it just in case I didn't wake up 🤣
+[3/9/23, 10:03:12 AM] Gary Teh: ok.
+[3/9/23, 10:03:41 AM] Gary Teh: Want to try this one?
+
+https://us05web.zoom.us/j/81511605808?pwd=U2NUSERlU0xqV2ozQ3hJOXpINFFRUT09
+[3/9/23, 10:44:56 AM] Gary Teh: let's use this one instead
+
+https://talk.brave.com/
+[3/9/23, 10:45:14 AM] Tomas - Offchain: poor anupa
+[3/9/23, 10:45:24 AM] Gary Teh: I started this session
+https://talk.brave.com/mldNQvWYwSM007j6YsOoIhgLUYo5mffA69b9i1sjuBs
+[3/9/23, 10:45:39 AM] Gary Teh: @918017107841 and @5491125130580
+[3/9/23, 10:46:27 AM] Anupa/diya: You guys carry on
+[3/9/23, 10:47:12 AM] Anupa/diya: Just to add to the last part. Every buyer wakes up in the morning to check world stock prices and the prices of farmer s produce
+[3/9/23, 10:48:08 AM] Anupa/diya: If there is an ai that can do that. 
+
+A simple ux that will allow the farmer upload basic details and the prices amd the buyer for requirements
+[3/10/23, 4:38:20 AM] Anupa/diya: Hi Everyone
+[3/10/23, 4:39:06 AM] Anupa/diya: There is a call with Alexa on Tuesday at 9 am Argentina Time. If you would like to join, please add your email addresses
+[3/10/23, 5:15:21 AM] Gary Teh: Wonderful! 🤩
+
+Will be there thanks for helping organize this 🙂👍
+[3/10/23, 5:54:43 AM] Tomas - Offchain: will be there
+[3/10/23, 6:00:53 AM] Anupa/diya: Please send your email address here
+[3/10/23, 6:33:14 AM] Gary Teh: garyjob@truesight.me
+[3/10/23, 6:33:44 AM] Gary Teh: I believe for the rest of the folks they should be listed on the contact details tab of our ledger
+[3/10/23, 6:35:25 AM] Anupa/diya: I can just add the link here
+[3/10/23, 6:41:19 AM] Tomas - Offchain: tomasbernabo@gmail.com
+[3/14/23, 5:00:50 AM] Gary Teh: WIX user ID: garyjob@truesight.me
+WIX password: hK@FscH&zx$3
+[3/14/23, 6:31:19 AM] Gary Teh: Opps.. we just had a blackout in the cafe 🤔🤣
+[3/14/23, 6:32:17 AM] Gary Teh: I should be back online in a few minutes 
+
+Power just got restored
+[3/16/23, 5:09:07 AM] Anupa/diya: Hello Everyone
+[3/16/23, 5:09:13 AM] Anupa/diya: Weekend is almost here
+[3/16/23, 5:10:10 AM] Anupa/diya: Anita and I had a very fruitful conversation about the website and the onboarding process
+[3/16/23, 5:10:25 AM] Anupa/diya: I suggest a collective group chat in let's 2 weeks
+[3/16/23, 5:11:34 AM] Anupa/diya: I have some time in thr morning tomorrow. I will look at the website. I was thinking if we can people who are good at developing, they can enhance the ux of the website. The wix is quite limited
+[3/16/23, 5:12:32 AM] Anupa/diya: @14153000019 let me know when you are online. I will create figma and miro boards
+[3/16/23, 5:13:37 AM] Anupa/diya: Accounts.
+
+I had a look at charmverse and it is looks good. Once Aleksa sends his details maybe we can meet him because it can feed into the website ux
+[3/17/23, 1:00:27 AM] Anupa/diya: https://app.charmverse.io/
+[3/17/23, 1:00:39 AM] Anupa/diya: I think we should connect it to a trusight account
+‎[3/17/23, 6:53:06 AM] Gary Teh: TrueSight Dao.pdf • ‎2 pages ‎document omitted
+[3/17/23, 6:54:17 AM] Gary Teh: Summary of our 9 hour long session with @5491125130580 
+
+I was mainly doing the observing. He was using his brain cells 🤩
+[3/17/23, 7:46:50 AM] Anupa/diya: Great !! This is fantastic !
+[3/17/23, 7:55:35 AM] Anupa/diya: I will add it to the miro board. @gary please send me the verification code
+[3/17/23, 7:56:24 AM] Gary Teh: Oops… don’t have access to that account handy at the moment 🤦‍♂️
+[3/17/23, 8:00:43 AM] Anupa/diya: No problem
+[3/17/23, 8:00:55 AM] Anupa/diya: Let me know whenever
+[3/22/23, 10:46:28 AM] Anupa/diya: Hey! Everyone
+[3/22/23, 10:47:26 AM] Anupa/diya: I have made strategy doc for the service proposition.. which will lead to the website
+[3/22/23, 10:47:41 AM] Anupa/diya: I want to add all this brainstorming stuff on to a platform called miro
+[3/22/23, 10:48:19 AM] Anupa/diya: I was thinking we can meet .. 9 am Gary s time zone
+[3/22/23, 10:48:25 AM] Anupa/diya: @5491125130580 can you make it
+[3/22/23, 10:50:22 AM] Gary Teh: Perfect, I am open to meeting on Friday 9am Argentinian time if you are available. @5491125130580
+[3/22/23, 11:10:24 AM] Fatima: ‎You added Fatima
+[3/22/23, 11:11:30 AM] Gary Teh: @5511982667030 I was speaking to @918017107841 yesterday 
+
+She mentioned since you are experienced incorporate governance and strategy, it might make sense to get your help to review our upcoming website’s content once it’s available to get inputs 🙂
+[3/22/23, 3:01:27 PM] Fatima: Sure! I’m glad to support you with it.
+[3/23/23, 2:22:29 PM] Gary Teh: @5491125130580 do you think you will be able to make it in the morning tomorrow?
+[3/23/23, 2:23:08 PM] Tomas - Offchain: Yes
+[3/23/23, 3:24:40 PM] Gary Teh: Wonderful! Let’s chat then! 
+
+Also let’s see if we could get that initial site structure up during tomorrow’s session 🙂👍
+[3/24/23, 5:07:22 AM] Gary Teh: hey folks ready to meet?
+[3/24/23, 5:07:37 AM] Gary Teh: https://talk.brave.com/FM9_GwpHbnBNBZzV7ZIgIQCy_QDNdf-Zao9OlJlW5W4
+[3/24/23, 8:55:03 AM] Anupa/diya: Just an update
+[3/24/23, 8:56:25 AM] Anupa/diya: Gary, Tomas and myself had a lengthy discussion of positioning trusight via an user perspective today
+
+This was basically for the website. We have identified a few user streams which we will clearly define and build through
+[3/24/23, 8:57:51 AM] Anupa/diya: @14153000019 I was thinking .. let's not use wix.. we should just a prototype pages and can you replicate it on to your website
+[3/24/23, 8:58:08 AM] Anupa/diya: 1. Having two user experiences will defeat the purpose
+[3/24/23, 8:58:25 AM] Anupa/diya: The user should just log in once
+[3/24/23, 8:58:32 AM] Gary Teh: Sure. Let’s do that 🙂👍
+
+So long as we know what needs to go in there we could just extend the system for those
+[3/24/23, 8:58:42 AM] Anupa/diya: The wix is just a smoke screen right
+[3/24/23, 8:58:50 AM] Gary Teh: Correct 🙂
+[3/24/23, 8:58:52 AM] Anupa/diya: Exactly
+[3/24/23, 8:59:33 AM] Anupa/diya: If we use wix we have to pay for it which is pointless
+[3/24/23, 9:00:04 AM] Gary Teh: Or we could simply use google sites 🤣
+[3/24/23, 9:00:24 AM] Tomas - Offchain: Smoke will go against integrity,,,,
+[3/24/23, 9:00:26 AM] Gary Teh: That FoC the last time I recall
+
+For quick prototyping
+[3/24/23, 9:00:54 AM] Gary Teh: Or we could just quickly prototype on Miro
+[3/24/23, 9:00:58 AM] Anupa/diya: Yes .. wix is easier. And it's free if you don't make it premium
+[3/24/23, 9:01:03 AM] Gary Teh: Like what we are already doing now
+[3/24/23, 9:01:25 AM] Anupa/diya: Wix is fine because it's free
+[3/24/23, 9:02:47 AM] Anupa/diya: We had some great points. Please add some post it's on the miro
+[3/24/23, 9:04:51 AM] Gary Teh: I took some notes
+
+So exhausted right now after having back to back meetings 
+
+Having a siesta first
+
+Will add more posts to Miro once I wake up
+[3/24/23, 9:05:00 AM] Anupa/diya: I forgot to tell you guys..
+[3/24/23, 9:05:20 AM] Anupa/diya: There is another DAO that is planning to buy land
+[3/24/23, 9:05:26 AM] Anupa/diya: Iamverse
+[3/24/23, 9:05:41 AM] Anupa/diya: They will build a spiritual convention centre
+[3/27/23, 10:46:21 AM] Gary Teh: Just now while having lunch here in the Paraguay free trade zone, I was thinking through the project management process utilized within our projects as well as the problem of generally unstructuredness in our open ended discussion when I suddenly recalled Valentine bringing up the business model canvas when another member complained about the similar problem during the house of balance core member meeting last week.
+‎[3/27/23, 10:48:23 AM] Gary Teh: ‎image omitted
+[3/27/23, 10:49:27 AM] Gary Teh: ‎You deleted this message.
+‎[3/27/23, 10:51:17 AM] Gary Teh: ‎image omitted
+‎[3/27/23, 10:51:35 AM] Gary Teh: ‎image omitted
+[3/27/23, 10:52:21 AM] Gary Teh: Fundraising will comprise not just of fiat but resources require to execute on the model described in the business model canvas
+[3/27/23, 10:54:38 AM] Gary Teh: @5511982667030 has more than a decade of experience teaching MBA classes to students here in the top university of Brazil
+
+Would be great if you could help provide some inputs on this new proposed process modification 
+
+By the way congratulations on the major Agro company you are consulting here in southern Brazil hitting its OKR (which you helped designed and maintain) for the third year 🤩
+[3/27/23, 10:58:13 AM] Anupa/diya: I have used the bcd for my other projects right in the beginning once we have used identified the key user as a brainstorming tool as well. Works well.
+[3/27/23, 10:58:56 AM] Gary Teh: Wonderful! Let’s should give our open ended discussions more focus on the various spaces
+[3/27/23, 10:59:01 AM] Anupa/diya: Hi @5511982667030 it would be great to have a chat with you. We have some questions regarding trusight and it's sub projects
+[3/27/23, 11:00:01 AM] Gary Teh: I believe she is generally busy during normal weekdays 
+
+I all goes as plan, I should be crashing over at her place by this weekend if not early next week 🤔
+[3/27/23, 11:00:23 AM] Anupa/diya: Which time zone is this ?
+[3/27/23, 11:00:45 AM] Gary Teh: Brazilian timezone 
+
+She is based on São Paulo
+[3/27/23, 11:01:11 AM] Anupa/diya: Whenever it's possible !
+[3/27/23, 11:02:58 AM] Anupa/diya: 🎊 congratulations!.
+‎[3/27/23, 12:01:23 PM] Gary Teh: ‎image omitted
+‎[3/27/23, 12:01:24 PM] Gary Teh: ‎image omitted
+‎[3/27/23, 12:02:59 PM] Gary Teh: ‎image omitted
+‎[3/27/23, 12:04:36 PM] Gary Teh: ‎image omitted
+[3/27/23, 12:04:40 PM] Tomas - Offchain: 🐱🤖
+[3/27/23, 12:34:48 PM] Gary Teh: ‎You deleted this message.
+‎[3/27/23, 12:37:52 PM] Gary Teh: ‎image omitted
+‎[3/27/23, 12:37:52 PM] Gary Teh: ‎image omitted
+‎[3/27/23, 3:06:28 PM] Gary Teh: ‎image omitted
+[3/27/23, 4:00:51 PM] Tomas - Offchain: I did some games with chatgpt... But the outcome is nothing ground breaking
+[3/28/23, 7:01:38 AM] Anupa/diya: https://techcrunch-com.cdn.ampproject.org/c/s/techcrunch.com/2023/03/20/pitchbooks-new-tool-uses-ai-to-predict-which-startups-will-successfully-exit/amp/
+[3/28/23, 7:02:07 AM] Anupa/diya: @14153000019 @5491125130580 to add to the conversation of project evaluation
+[3/28/23, 7:03:24 AM] Anupa/diya: I feel this can work for and against projects because data support or misout on emotional indicators that can turn around projects
+[3/29/23, 7:18:16 AM] Gary Teh: Chatting with Barbara now who used to work for this group
+
+https://oxfordbusinessgroup.com/
+
+They generate a report which they sell for GBP150 each
+
+One edition per year
+[3/29/23, 7:20:07 AM] Gary Teh: Zambia sales target for report sales GBP300k
+
+Palau New Guinea GBP500k
+[3/29/23, 7:26:44 AM] Gary Teh: Companies want exposure to investors 
+
+- give insights
+- buy advertising space in book
+
+Investors looking for insights 
+- buy the book
+[3/29/23, 7:47:42 AM] Gary Teh: Nothing preventing us from doing a showcase of the innovative farming techniques used by farmers who in regions being covered 🤔
+[3/29/23, 7:50:56 AM] Anupa/diya: That's what I am saying 🤣 data is gold. It's like monetizing our chats. 
+
+Getting qualitative data that helps build quantitative data in the agro world is huge
+[3/29/23, 7:52:19 AM] Barbara Sandini: ‎You added Barbara Sandini
+[3/29/23, 7:52:25 AM] Anupa/diya: Let's say an company wants to set up a produce grading plant In a region where it is not there and the produce quality is great.
+
+I know lots of Nordic companies invest in setting agro finance
+[3/29/23, 7:52:57 AM] Anupa/diya: And tech for small time farmers in India Africa south America southe east Asia
+[3/29/23, 7:53:07 AM] Anupa/diya: It's data driven
+‎[3/29/23, 7:53:25 AM] Gary Teh: ‎image omitted
+[3/29/23, 7:53:53 AM] Anupa/diya: Hello hello !
+[3/29/23, 7:54:03 AM] Anupa/diya: Barbara !
+[3/29/23, 7:55:18 AM] Anupa/diya: https://oxfordbusinessgroup.com/videos/leveraging-djibouti-sovereign-wealth-to-boost-economic-development-vidcast/
+[3/29/23, 7:55:40 AM] Anupa/diya: This is port in Ethiopia where all the Shipping happens from
+[3/29/23, 8:01:52 AM] Anupa/diya: If we can build like an advocacy platform where farmers add their comments and research feedback.  They can have a anonymous ID .. and that's linked to a wallet and they get incentivised. 
+
+We can also create like Data wallet which stores stuff about what they have written and only they can have access  like docuwallet ( i hope I have described it ) 
+
+Many farmers don't have id's not a bank account because they haven't made the criteria cut. Crazy Where is the idea of permissionless
+‎[3/29/23, 10:09:16 AM] Gary Teh: ‎image omitted
+[3/29/23, 11:03:23 AM] Anupa/diya: Is there an e copy
+‎[3/29/23, 11:12:26 AM] Gary Teh: ‎image omitted
+‎[3/29/23, 11:12:27 AM] Gary Teh: ‎image omitted
+‎[3/29/23, 11:12:27 AM] Gary Teh: ‎image omitted
+[3/29/23, 11:55:00 AM] Barbara Sandini: Hello . Nice to Meet you virtually
+[3/29/23, 11:55:36 AM] Barbara Sandini: Yes let me look into it and I’ll get back here
+[3/29/23, 7:23:03 PM] Anupa/diya: Fab !
+[3/30/23, 2:34:39 PM] Gary Teh: From the meeting I attended today with House of Balance and Communify, these are the three take always that were helpful
+
+
+- profile of the ideal member we went to attract 
+
+- behaviors we want to encourage 
+
+- values which each behavior is tied to
+
+There can be multiple different kinds of profiles in the ecosystem each with a different kind of behavior 
+
+We can start by listing those profiles. I believe @918017107841 has already listed those in the Miro board
+[3/30/23, 2:47:39 PM] Tomas - Offchain: Roles, Rules, Values
+‎[3/30/23, 2:48:57 PM] Gary Teh: ‎image omitted
+[3/30/23, 3:55:41 PM] Tomas - Offchain: There are a lot of material for traditional business and hr.. the challenge is to rethink that
+[3/30/23, 6:19:41 PM] Anupa/diya: We pretty much covered all of this other day. I was thinking of the profiles
+
+People who would like to develop projects 
+People who would like to invest 
+People who would like to network 
+
+And as Tomas said these can be assisted by actions that they carry out like having roles, guided by a set of rules and joins due to the values and purpose Trusight has
+[4/3/23, 9:02:48 AM] Anupa/diya: In ref to the other conversation :
+[4/3/23, 9:02:57 AM] Anupa/diya: SubDAOs
+A SubDAO is a new kind of DAO that is a subset of DAO members that are organized to manage specific functions such as operations, partnerships, marketing, treasury, and grants.
+
+Balancer Protocol saw an opportunity with its growing DAO membership and proposed to create subDAOs to manage DAO-related decision-making and facilitate execution, without requiring every proposal to be passed by the entire DAO.
+
+In a unanimous vote, Balancer DAO successfully integrated subDAOs into their structure and are now able to move more efficiently as a Decentralized Autonomous Organization.
+
+The creativity of the community is truly the limit of what can be built within the DAO framework.
+[4/3/23, 9:03:09 AM] Anupa/diya: Spotted on the net
+[4/3/23, 9:03:27 AM] Anupa/diya: This is what we were saying in " add your project"
+[4/4/23, 8:14:43 AM] Anupa/diya: Just a thought.. in the project page... we can have these kpis
+
+Legal
+Process methodology
+Tokenomics 
+Etc 
+
+People can also see what level the project is at
+[4/4/23, 8:49:55 AM] Anupa/diya: @14153000019 what kind of Dao are we .... social ? Or investment..
+
+I was thinking of people who want investment.. that particular project can work as a collector sub Dao  .. people  . People can pool in money... can invest .. spilt the roi with trusight
+[4/4/23, 8:50:14 AM] Gary Teh: We are a social DAO with investment features
+[4/4/23, 8:50:58 AM] Anita Lamprecht: Yes, that’s what we discussed in Zürich. The individual projects can be commercial.
+[4/4/23, 8:52:20 AM] Anita Lamprecht: I think we are in a very good way. Once all is more or less in a good shape, we consult Gunther again. Aleksa did a great job. We just need to amend the details we discussed.
+[4/4/23, 8:52:36 AM] Anita Lamprecht: ..on a good way.
+[4/4/23, 8:53:54 AM] Anupa/diya: In Dao can we do a mix and match feature    for Huddle Doa I think we fall under two
+[4/4/23, 8:54:22 AM] Gary Teh: Maybe someone else will have better luck reaching out to Gunther
+
+He has not responded to my outreach 
+
+Perhaps @41791555798 you might have better luck 🙂👍
+[4/4/23, 8:56:03 AM] Anupa/diya: They will all have different missions .. not all will be socials. 
+I think they key is .. is a project or a sub Dao.
+
+If it's a projects... it's more involvement..  if it's a sub Dao..  is it like outsourcing 🤣
+[4/4/23, 9:01:31 AM] Anita Lamprecht: Let’s wait a bit. Once we are ready, I will try.
+[4/5/23, 5:00:30 AM] Anupa/diya: @16468233438 Hi Val. Would you please upgrade Miro. Thanks
+[4/5/23, 5:00:34 AM] Anupa/diya: Details in your email
+‎[4/5/23, 5:00:39 AM] Gary Teh: ‎image omitted
+[4/5/23, 5:01:40 AM] Anupa/diya: I can't read anything 🫣
+[4/5/23, 5:02:11 AM] Gary Teh: https://en.wikipedia.org/wiki/Business_Model_Canvas
+[4/5/23, 5:02:36 AM] Anupa/diya: Ah 🤣 i thought you filled stuff out
+[4/5/23, 5:03:09 AM] Gary Teh: Nope 🤣
+[4/5/23, 5:03:28 AM] Gary Teh: Does Miro have a business model canvas template?
+[4/5/23, 5:05:02 AM] Anupa/diya: We don't a template
+[4/5/23, 5:05:11 AM] Anupa/diya: Need
+[4/5/23, 5:05:18 AM] Anupa/diya: Super easy to create
+‎[4/5/23, 5:05:38 AM] Anupa/diya: ‎image omitted
+‎[4/5/23, 5:06:19 AM] Anupa/diya: ‎image omitted
+[4/5/23, 5:06:40 AM] Anupa/diya: https://www.figma.com/community/file/1059529402849710140
+[4/5/23, 5:06:54 AM] Anupa/diya: can you add this on your figma account
+[4/5/23, 5:08:25 AM] Gary Teh: Will do!
+[4/5/23, 5:08:52 AM] Anupa/diya: Send us a link
+[4/5/23, 5:09:04 AM] Anupa/diya: I have a version for the community which I created
+[4/5/23, 5:09:07 AM] Anupa/diya: I will add that
+[4/5/23, 5:09:13 AM] Anupa/diya: We should a stakeholders map
+[4/5/23, 5:09:32 AM] Anupa/diya: A customer journey for the potential users
+[4/5/23, 5:10:07 AM] Anupa/diya: And once we are sort of good to go...  there is something called service blueprint  . That outlines the whole ecosystem... user to front end back end .. various capacities
+[4/5/23, 5:10:23 AM] Anupa/diya: All this stuff is great for us and also investors
+‎[4/5/23, 5:17:54 AM] Gary Teh: ‎image omitted
+‎[4/5/23, 5:17:55 AM] Gary Teh: ‎image omitted
+[4/5/23, 5:31:43 AM] Anupa/diya: It happens .. its amazing. Also of the nature .. kundalini yoga activates the third eye> manifestation>quantum meditation
+[4/6/23, 2:04:08 AM] Anupa/diya: I had a long chat with Aga. She has given some great insights for a members journeys which can feed into the process and also ui
+[4/6/23, 6:56:20 AM] Anupa/diya: https://www-coindesk-com.cdn.ampproject.org/c/s/www.coindesk.com/web3/2023/03/30/argentinian-airline-issues-every-ticket-as-an-nft/?outputType=amp
+[4/6/23, 7:46:38 AM] Anupa/diya: For the ecoverse conversation. Are we having section for people who can apply for funding?
+[4/6/23, 7:47:06 AM] Anupa/diya: Or can people apply for a project which ecoverse takes on
+[4/6/23, 7:48:09 AM] Anupa/diya: We need clarity on their route
+[4/6/23, 7:51:42 AM] Gary Teh: Let’s explore that. 🙂👍
+
+I am personally open to that route
+[4/6/23, 7:51:54 AM] Anupa/diya: In that case
+[4/6/23, 7:52:00 AM] Anupa/diya: That should be your personal journey
+[4/6/23, 7:52:07 AM] Anupa/diya: Till DAO decides
+[4/6/23, 7:55:40 AM] Gary Teh: Let’s put out a vote on https://TrueSight.me/vault 
+
+That should help resolve if our DAO is keen in such funding arrangements
+[4/6/23, 7:57:25 AM] Anupa/diya: If a group is actively working on a project, can we start a parallel conversation.  In ecoverse we are yet to figure 
+
+The funding a different project is a separate conversation
+[4/6/23, 7:57:27 AM] Gary Teh: Perhaps it will be helpful if we identify the various methods our DAO can engage in the field of sustainable agriculture production and distribution
+[4/6/23, 7:58:59 AM] Gary Teh: Sure. Let’s bring this parallel conversation to the EcoVerse21 chatroom 🙂
+[4/6/23, 7:59:08 AM] Anupa/diya: Another insight from DAO members that I heard about is that they want give consent before being added in a group.
+[4/6/23, 7:59:13 AM] Anupa/diya: Yes
+[4/6/23, 7:59:55 AM] Gary Teh: Make total sense
+[4/6/23, 7:59:56 AM] Anupa/diya: I think this has to be addressed in all groups. People don't have time to invest in  multiple agendas in group
+[4/6/23, 8:02:36 AM] Gary Teh: That is totally aligned with preserving personal autonomy 🙂👍
+[4/6/23, 8:04:59 AM] Anupa/diya: For sure
+[4/6/23, 8:05:16 AM] Gary Teh: From my perspective anytime any DAO member is put in a situation that has compromised against his/her personal autonomy, the member has every right to rectify it
+
+- this includes leaving a group that he/she does not feel like he/she belongs to
+
+- at a meta level, ignoring and rejecting any incoming request that he/she does not feel is aligned with his/her personal truth
+[4/6/23, 8:05:38 AM] Anupa/diya: I believe people feel bad to leave 🤣
+[4/6/23, 8:05:59 AM] Anupa/diya: Consent is also valid
+[4/6/23, 8:08:07 AM] Gary Teh: Be strong and stand your ground! That is autonomy!! 🤩
+[4/6/23, 8:08:13 AM] Anupa/diya: Another thing ... if in a group.. we have multiple conversations with different vested interested around the same topic .how do we manage that.
+[4/6/23, 8:08:19 AM] Anupa/diya: Can we create your own chat
+[4/6/23, 8:08:26 AM] Anupa/diya: 🤣🤣
+[4/6/23, 8:08:39 AM] Anupa/diya: I know we have some talented people in this group
+[4/6/23, 8:08:55 AM] Gary Teh: Do what we did with the beer hall 
+
+Bifurcate. Create a separate town hall
+[4/6/23, 8:09:48 AM] Anupa/diya: And get evil eyes from people 🤣🤣🤣
+‎[4/6/23, 8:11:28 AM] Anupa/diya: ‎image omitted
+[4/6/23, 8:12:08 AM] Gary Teh: Have courage!!  🤩
+[4/6/23, 8:12:55 AM] Anupa/diya: I hope Tru Sight Dao gifts me a new phone for my courageous heart and phone space 🤣🤣🤣🤣
+[4/6/23, 8:13:16 AM] Anupa/diya: I think we can be a game changer
+[4/6/23, 8:14:06 AM] Gary Teh: Have faith!! 🤩
+[4/6/23, 8:14:49 AM] Gary Teh: Looking forward to the business model canvas that explains this illustration 🤩
+[4/6/23, 8:15:39 AM] Anupa/diya: I will even throw in a prototype!🤣
+[4/6/23, 8:16:18 AM] Anupa/diya: https://truesight.me/dao/canvas
+[4/6/23, 8:16:26 AM] Anupa/diya: Just incase we lose it
+[4/6/23, 8:53:56 AM] Anupa/diya: Can I have a project status of the groups
+@41791555798 cyber defense.
+[4/7/23, 6:54:52 AM] Anupa/diya: Just there could be a page with consultants and their area of expertise
+[4/7/23, 6:55:05 AM] Anupa/diya: Aga s idea for projects
+[4/7/23, 6:55:24 AM] Anupa/diya: So I am thinking maybe the project list specific expertise they are looking for
+[4/7/23, 11:13:50 AM] Anupa/diya: https://dorahacks.io/grant
+[4/7/23, 11:14:50 AM] Anupa/diya: https://aavegrants.org/
+[4/7/23, 11:15:19 AM] Anupa/diya: https://www.algorand.foundation/funding
+[4/7/23, 11:15:40 AM] Anupa/diya: I don't know. Since they recently crashed or hacked
+[4/7/23, 11:16:49 AM] Anupa/diya: https://esp.ethereum.foundation/layer-2-grants
+[4/7/23, 11:17:13 AM] Gary Teh: Shall we get more organized about the grants and put them in a google sheet?? 🙂
+[4/7/23, 11:17:23 AM] Anupa/diya: https://grants.filecoin.io/
+[4/7/23, 11:17:35 AM] Anupa/diya: Yes !
+[4/7/23, 11:18:11 AM] Anupa/diya: I just saw a list and just started sending
+[4/7/23, 11:18:50 AM] Gary Teh: Let’s use this
+
+https://docs.google.com/spreadsheets/d/11UXh0HmeRbZTS705XIli-UEiSJioMg4zArd7BTeoi5o/edit
+[4/7/23, 11:19:52 AM] Anupa/diya: https://ethereum.org/en/community/grants/
+[4/7/23, 11:19:58 AM] Anupa/diya: Yes will add them
+[4/7/23, 11:20:04 AM] Gary Teh: 🙂👍
+[4/7/23, 11:20:08 AM] Anupa/diya: I haven't gotten through them
+[4/7/23, 11:20:41 AM] Anupa/diya: Ethereum ones look good
+[4/7/23, 11:20:55 AM] Anupa/diya: I had a glance and we fall under many
+[4/7/23, 11:21:25 AM] Gary Teh: I wonder if we should also move the discussions about grant application to the town hall??
+[4/7/23, 11:21:51 AM] Anupa/diya: I was thinking ... after we do the sorting so then we can ask the community
+[4/7/23, 11:22:03 AM] Anupa/diya: If they can help with the applications or connections
+[4/7/23, 11:22:10 AM] Anupa/diya: We should regardless of the grants
+[4/7/23, 11:22:13 AM] Gary Teh: I am sure they could
+[4/7/23, 11:22:44 AM] Anupa/diya: Ask if anyone has any leads in eth or aave or uniswap.. it doesn't have to be the Indian way like someone will know someone 🤣🤣
+[4/7/23, 11:23:09 AM] Anupa/diya: Just an introduction like what aleksa did with chamverse is good
+[4/7/23, 1:17:47 PM] Tomas - Offchain: I'm still on talks with TON. We should have the talk about grants on the Town Hall, as there may be funds for research among any other things
+[4/7/23, 2:33:18 PM] Gary Teh: Totally agree. Let’s shift conversations on grants to that chatroom and keep conversations in this chatroom about the onboarding process
+[4/7/23, 2:39:08 PM] Tomas - Offchain: good idea. Let´s schedule a call with @918017107841 so we can get it done before the talk
+[4/7/23, 9:01:01 PM] Gary Teh: Had a long talk with @5511982667030 today. seems the signals are aligned that it is important to figure out which members would fit well in which roles in which projects and it is best to figure those out during the onboarding process
+[4/7/23, 9:03:43 PM] Gary Teh: She also did mention that chatrooms like the beer hall only serve to distract members from actionable activities that really bring value to our community and the overall ecosystem at large 
+
+It might not be a good thing to have action oriented new members get distracted by all the none action oriented discussions in the beer hall as that will only serve to confuse them and encourage them to just simply disengage from the entire community
+[4/7/23, 9:17:18 PM] Anupa/diya: This is what I have been saying as well.
+
+All projects should get a message saying
+What is your status
+Identify your key and active contributors (highlight them maybe on the website ? I don't know)
+Add some kpis 
+
+ New members need to be led my purpose of contribution. So that's why we have to make sure that "journeys" are clear.
+
+I feel via internal conversation they should know .... ah the beer hall, let's hang out there. 
+
+I have been thinking that we need to put a disclaimer somewhere  ( what do you think @41791555798 ) 
+The group is an open source ! Everyone is reliable for their own thoughts. Open to free speech. Group doesn't bear any consequences
+[4/7/23, 9:25:48 PM] Anupa/diya: @14153000019 we have to automate this process! You can't spend your whole life adding people on whatsapp 🤣🤣
+
+1. There is form.. which they fill out.  That form states some details (for your data collection) not mandatory.  
+
+With a terms and condition button( what it means to join a group)
+
+Then they get an automated email..thanks for joining . Here is a click to the whatsaapp group you have joined .
+Reaffirm the projects values and vision.
+Do and don't of the group
+Re affirm  
+
+Link to the platform sign in. Platform video
+[4/7/23, 9:55:19 PM] Anupa/diya: @14153000019 do we have any branding guidelines. The logo has been finalized?
+[4/7/23, 9:55:28 PM] Anupa/diya: Ya
+[4/7/23, 10:22:17 PM] Anupa/diya: Project page : https://forum.bankless.community/c/proposals/7
+[4/7/23, 10:22:42 PM] Anupa/diya: Landing page: https://near.org
+[4/7/23, 10:22:48 PM] Anupa/diya: Something like this
+[4/7/23, 10:23:00 PM] Anupa/diya: Done populating. Please add
+[4/8/23, 4:45:27 AM] Gary Teh: Will do 🙂👍
+
+Shall we request for more submissions in the town hall?
+[4/8/23, 4:49:38 AM] Gary Teh: It is possible to generate links for each WhatsApp group and make them available to prospective members to click at the end of the onboarding flow
+[4/8/23, 5:07:24 AM] Anupa/diya: Yes sure ! If they have any personal contacts within the links or otherwise that would be great
+[4/8/23, 10:36:24 PM] Gary Teh: I posed this question to ChatGpt
+
+What is a good framework we can use to onboard members to our DAO to ensure their needs and the DAO’s needs are best met and there is a symbiotic relationship between both as well as ensure minimal time is wasted onboarding new DAO members?
+[4/8/23, 10:36:36 PM] Gary Teh: This was the response 
+
+Onboarding new members to a DAO can be a slow and complex process, and it is vital to have a clear onboarding framework that caters to the needs of both the new members and the DAO. Below is a framework for onboarding new members to a DAO:
+
+1. Identify Skills and Knowledge: Identify the skills and knowledge required for participation in the DAO. This allows the DAO to focus on recruiting members with the necessary expertise that adds value to the DAO.
+
+2. Develop a Structured Orientation: Create a structured orientation program that includes an introduction to the DAO’s vision, purpose, and governance framework. It would also include information on platform access, transaction fees, DAO tokens, and the role of the members in the DAO.
+
+3. Mentoring Program: Put in place a mentoring program with experienced DAO members helping guide new members through the onboarding process. This provides new members with a support system that helps them navigate various aspects of the DAO, answering questions, and giving advice as they get started.
+
+4. Training and Education Program: Create a training and education program for new members that includes access to learning resources, DAO workshops, and webinars. This provides an opportunity for members to learn from each other, share knowledge and experiences. It increases their understanding and knowledge of key aspects of the DAO, its ecosystem, and its stakeholders.
+
+5. Welcome Package: Develop a welcome package that provides resources and information on the DAO’s history, performance and future plans, the current status of the DAO’s assets, and how to get involved.
+
+6. Streamline the Registration Process: Create a streamlined registration process that allows new members to register with minimal effort. Simplify the member identification and approval process by utilizing a voting system that allows existing members to approve or reject new members.
+
+7. Feedback and Assessment System: Implement a feedback and assessment system that includes regular surveys, workshops, and town hall meetings. Collect feedback from members on their experiences and use this feedback to improve the onboarding process continually.
+
+In conclusion, having a well-structured framework is crucial for efficiently and effectively integrating new members into the DAO. The framework should be designed to cater to the DAO's specific needs, promote efficiency and minimize the time required to onboard new members. A successful onboarding process facilitates a symbiotic relationship between the new members and the DAO, leads to greater cohesion and community spirit, and increases the chances of success in DAO projects.
+[4/8/23, 11:04:05 PM] Anupa/diya: It's similar to p
+[4/8/23, 11:04:27 PM] Anupa/diya: Ours.  But on larger.
+[4/8/23, 11:04:31 PM] Anupa/diya: Scale
+[4/8/23, 11:04:54 PM] Anupa/diya: We should automate as much as possible or see if we can get community engages
+[4/8/23, 11:05:03 PM] Anupa/diya: Engagers
+[4/9/23, 5:02:25 AM] Gary Teh: True. 
+
+Seems ChatGpt is really good tool at surfacing all the known parameters already out there that we ourselves have not considered for various aspects of our DAO
+
+From my perspective, our community can then horne in on the details of what these parameters should be so that it’s customized for ourselves
+[4/9/23, 7:53:19 AM] Gary Teh: I believe for the parts we can’t already auto generate from the use of ChatGpt, then we should get human involvement from members in our DAO
+
+Was chatting with @5511982667030 this morning during breakfast
+
+They are already using ChatGpt in their MBA courses to both define the course work as well as help students deeply explore the subject 
+
+This leaves them to focus their in classroom discussions on what is yet defined. A huge part of it falls under the category of morality
+[4/9/23, 8:49:25 AM] Gary Teh: After witnessing all the training data that the ChatGpt has already been trained with
+
+Pertaining to the copy content for the various landing pages, I believe we could get ChatGpt’s help to provide the first draft for each page. 
+
+What we should perhaps focus on is the page architecture 
+
+    - what are the pages there
+    - how they are linked to one another
+[4/9/23, 9:06:44 AM] Anupa/diya: 🤣🤣🤣
+[4/9/23, 9:09:29 AM] Anupa/diya: I dont think we should be so dependent on chat gtp. Why feed it with so much data
+
+We can have a look at what it has to say. The draft that you guys shared with you guys has the wire frame structure
+
+I did some research on potential DAO website like Aave and a few others.
+[4/9/23, 9:09:40 AM] Anupa/diya: Quite reflective
+[4/9/23, 9:10:50 AM] Gary Teh: Can we get the first draft up by Thursday?
+[4/9/23, 9:10:53 AM] Gary Teh: 🙂👍
+[4/9/23, 9:11:45 AM] Anupa/diya: I will try by Friday.
+[4/9/23, 9:11:57 AM] Anupa/diya: Do we have the text ready ?
+[4/9/23, 9:12:21 AM] Anupa/diya: Friday seems good since it's just the wire frame.
+[4/9/23, 9:12:39 AM] Anupa/diya: If we can have the text happening on the side .
+[4/9/23, 9:22:49 AM] Gary Teh: We don’t. Doesn’t seem like anyone is working on it 
+
+That is why ChatGpt
+[4/9/23, 9:24:10 AM] Anupa/diya: ChatGpt is like going to Wallmart ! 🤣🤣 we need to be artisanal
+[4/9/23, 9:53:11 AM] Gary Teh: Sure. we can utilize the artisans for the most important center pieces.
+[4/14/23, 6:20:26 AM] Gary Teh: @918017107841 @5491125130580 will be slight delayed 
+
+Am securing my boat ride to the Colombian borders now
+[4/14/23, 6:21:48 AM] Gary Teh: I will join the call once I get back to the hostel 
+
+It’s not safe to be walking around in the streets here with my face in my phone 
+
+The phone will get snatched
+[4/14/23, 6:22:02 AM] Anupa/diya: Ya sure.
+[4/14/23, 6:22:29 AM] Anupa/diya: If Tomas is ok we can start as I have another  call within an hour.
+[4/14/23, 6:23:08 AM] Anupa/diya: Once it's safer for you. You can join
+[4/14/23, 6:28:05 AM] Gary Teh: Ok 🙂
+[4/14/23, 6:28:21 AM] Anupa/diya: Don't get mugged !
+[4/14/23, 6:28:31 AM] Anupa/diya: My phone got snatched in London!
+[4/14/23, 6:39:20 AM] Gary Teh: Am in. Was the meeting now or in 20 minutes?
+[4/14/23, 6:39:59 AM] Anupa/diya: In 20 Mins
+[4/14/23, 6:40:09 AM] Gary Teh: Cool! Will be ready in 20 minutes.
+[4/14/23, 6:55:58 AM] Tomas - Offchain: I'm delayed too!
+[4/14/23, 7:13:20 AM] Gary Teh: Hey @5491125130580 we are in
+[4/14/23, 7:15:57 AM] Tomas - Offchain: Getting in
+[4/14/23, 10:03:32 AM] Anita Lamprecht: ‎Anita Lamprecht left
+[4/14/23, 3:46:04 PM] Gary Teh: First draft of Sun Mints white paper
+https://docs.google.com/document/d/1BcrV4rtG5cNTdcycw2H94OI-pmT-dDal3x5jPcyvWC0/edit#
+[4/14/23, 3:46:39 PM] Gary Teh: Written in collaboration with ChatGpt. It proposes I read and edit its response and then prompt it for more.
+[4/14/23, 3:51:56 PM] Tomas - Offchain: good job chatgpt! 🤣
+‎[4/14/23, 4:38:37 PM] Gary Teh: ‎image omitted
+[4/17/23, 6:12:17 AM] [project] 🌐 Main DAO Website Development 🚧: ‎You changed the group name to “[ops] Landing page 2023 draft”
+[5/10/23, 12:59:27 PM] Suheil z: ‎You added Suheil z
+[5/10/23, 1:00:03 PM] Gary Teh: @918017107841 could you share the figma link to the designs for our new landing pages with @972509342179 
+
+He would like to help implement the site 🙂👍
+[5/10/23, 1:00:50 PM] Suheil z: always happy to provide all what i can do contribute to growth .
+[5/10/23, 1:01:42 PM] Gary Teh: Thank you brother 🙂👍
+[5/10/23, 1:04:31 PM] Barbara Sandini: ‎You removed Barbara Sandini
+[5/10/23, 1:04:37 PM] Fatima: ‎You removed Fatima
+[5/10/23, 1:04:43 PM] Val Lapidus: ‎You removed Val Lapidus
+[5/10/23, 1:12:33 PM] Gary Teh: I have pruned all the members that are not relevant for this scope to reduce the noise to signal ratio
+[5/10/23, 1:17:07 PM] Suheil z: share with me ready canvas so that i can get on it and let u know what can bee done at what timeline scope
+[5/10/23, 1:17:17 PM] Suheil z: mockups
+[5/10/23, 1:19:07 PM] Gary Teh: Just got off the bus for a bit. This is the figma link
+https://www.figma.com/file/qmo3zL4Yo54KxcM2FvaWd9/TruSight?type=design&node-id=0-1
+[5/10/23, 1:57:53 PM] Gary Teh: @918017107841 could you grant @972509342179 editing rights so that he can start exporting the assets from figma?
+https://www.figma.com/file/qmo3zL4Yo54KxcM2FvaWd9/TruSight?type=design&node-id=0-1
+[5/10/23, 1:59:12 PM] Suheil z: hello anupa, are you aware that we can install webflow plug in into figma and export ur mockups design from figma to webflow and we can have first good verrsion of html code for the website, then we will need to refine it and polish it to be ready for online hosting
+[5/10/23, 1:59:46 PM] Gary Teh: @918017107841 is in Indian timezone. She is probably asleep now. She will reply once she wakes up
+[5/10/23, 1:59:55 PM] Suheil z: no problem
+[5/10/23, 2:00:18 PM] Suheil z: no rush i just throw wt i have in mind immediately as brain is weak theses days cant last hhh
+[5/10/23, 2:41:01 PM] Gary Teh: Let’s do weekly updates of our progress in this chatroom 🙂👍
+[5/10/23, 4:50:53 PM] Gary Teh: ‎You deleted this message.
+[5/10/23, 4:51:17 PM] Gary Teh: ‎You deleted this message.
+‎[5/10/23, 4:51:35 PM] Gary Teh: ‎image omitted
+[5/10/23, 4:53:19 PM] Gary Teh: I am proposing for red 
+
+Our mission is to operate crowdsourced profitable blockchain-enabled businesses with the goal of restoring social and environmental Justice.
+
+Our actions are guided by our core values of autonomy, integrity and diversity.
+‎[5/10/23, 4:55:30 PM] Gary Teh: ‎image omitted
+[5/10/23, 4:57:45 PM] Gary Teh: Clicking on the join button should direct the visitor to fill up a form
+
+- Name
+- Email
+- His/her motivation for joining the project 
+- Desired role in the project 
+
+We are going to be very selective on who will be welcomed into our DAO moving forward because we are attempting some really serious undertaking… the business of restoring Justice
+[5/10/23, 4:59:59 PM] Gary Teh: Given the gravity of our cause, we can’t really have any random Tom, Dick and Harry joining us whose heart is not in the right place 
+
+We should only allow genuine truth seekers into our DAO moving forward 
+
+Truth seekers who are genuinely motivated to restoring Justice
+‎[5/10/23, 5:58:27 PM] Gary Teh: ‎image omitted
+[5/10/23, 5:59:10 PM] Gary Teh: That way everyone knows everyone else in the guild who hasn’t been replaced yet is there for a reason
+‎[5/10/23, 6:00:10 PM] Gary Teh: ‎image omitted
+[5/10/23, 6:52:54 PM] Anupa/diya: @972509342179
+[5/10/23, 6:53:01 PM] Anupa/diya: Hi !
+[5/10/23, 6:53:45 PM] Anupa/diya: Just saw the messages. Will send over the link. Gary and I spoke yesterday with some changes to the flow and text. Let me update that and send you a style sheet
+[5/10/23, 10:08:17 PM] Gary Teh: ‎You deleted this message.
+‎[5/10/23, 10:11:36 PM] Gary Teh: ‎image omitted
+[5/10/23, 10:21:10 PM] Gary Teh: This is the address of our governance token on the Solana chain 
+
+3wmsJkKWLdFT4tF4rG8zUZQ8M4hKUDtDuJW8q6i9KbgF
+[5/10/23, 10:22:21 PM] Gary Teh: This is the location of our vault where various assets are stored 
+
+https://TrueSight.me/vault
+
+You should be able to extract the value of various assets based on their associated wallet addresses 🙂
+[5/10/23, 10:28:29 PM] Gary Teh: ‎You deleted this message.
+[5/10/23, 10:29:55 PM] Gary Teh: @918017107841 once the user has logged in using their gmail account they should be direct to a page which have the same exact contents as this page on our current site but with the same design style you are right now using 
+
+https://truesight.me/dao
+[5/10/23, 10:33:08 PM] Anupa/diya: Cool. I was wondering for the past token holders should we do a email/ wallet log in ?
+[5/10/23, 10:33:49 PM] Anupa/diya: or will it two part step - once you log in.. when you need to access the token pages - -thats when you connect via the wallet
+[5/10/23, 10:38:30 PM] Gary Teh: All of them email login
+
+There will be a button after you have logged in to connect your wallets if you haven’t done so
+
+Once they connected their wallets when they are logged the system pulls their governance token balances from their wallet
+
+Until the user chooses to unlink their wallet (telling system to forget about the wallet address), the system will have access to read from their wallet address
+[5/10/23, 10:38:48 PM] Gary Teh: Just play around with the existing page and you will understand what I mean
+[5/10/23, 10:38:56 PM] Gary Teh: https://truesight.me/dao
+[5/10/23, 10:40:00 PM] Gary Teh: Also the system in the background will check their email address against our ledger via google sheet api to see the amount of governance tokens that are still sitting on the google sheet ledger yet issued to their wallets
+[5/10/23, 10:40:49 PM] Anupa/diya: ok great.. eventually .. in a few months.. once the onboarding is more robust there should only be a connect your wallet
+[5/10/23, 10:41:41 PM] Gary Teh: I doubt it’s going to be a few months 
+
+Bulk of the population we will be onboarding will be mainly none web3 native folks 
+
+I see it more as something that will happen in 4 years time
+[5/10/23, 10:44:13 PM] Gary Teh: ‎You deleted this message.
+[5/10/23, 10:44:32 PM] Gary Teh: ‎You deleted this message.
+[5/10/23, 10:44:59 PM] Gary Teh: Also I still haven’t seen any good solution that allows backend login via wallets. All wallet authentication are done via the front end. This means the website can be easily hacked if authentication is done just via this route 
+
+I shall not go down the rabbit hole with you because you don’t have an engineering background but just take it at face value
+[5/10/23, 10:45:47 PM] Anupa/diya: 🤣🤣 sure !
+[5/10/23, 10:46:47 PM] Anupa/diya: It also depends on the kind of people who organically rotate towards and it depends on how much of onbaordinb we proactively do.
+[5/11/23, 1:53:25 AM] Suheil z: hi, so conclusion i should wait those moock ups design still need to be modified ?
+[5/11/23, 1:53:33 AM] Suheil z: before i export them to make the website
+[5/11/23, 1:55:57 AM] Anupa/diya: Hey. Yes.  We are just finalizing the text and flow
+‎[5/11/23, 3:49:49 AM] Gary Teh: ‎image omitted
+[5/11/23, 3:51:29 AM] Gary Teh: ‎You deleted this message.
+‎[5/11/23, 3:54:31 AM] Gary Teh: ‎image omitted
+[5/11/23, 3:57:33 AM] Anupa/diya: I am just finishing some office work. I will just sit on this in another half hour
+[5/11/23, 5:53:15 AM] Anupa/diya: @14153000019
+[5/11/23, 5:55:29 AM] Anupa/diya: 1. For the contributors .. we legal and experience and strategy with building for ecoverse as roles 
+
+If you were are looking at Amazon at one of our touch points for sale, then we will need it. Maybe not now. But in stage 2
+
+Is aleksa sharing the governance document to add it
+[5/11/23, 5:55:51 AM] Anupa/diya: @972509342179 https://www.figma.com/file/qmo3zL4Yo54KxcM2FvaWd9/TruSight?type=design&node-id=0-437&t=4RqRwPiL7SqH1Oj2-0
+[5/11/23, 5:55:56 AM] Anupa/diya: This is the link
+[5/11/23, 5:56:48 AM] Anupa/diya: The style criteria is simple. Text should be slightly interactive. There is a gradient ball at various points of the pages . can we have it slowly move around
+[5/11/23, 5:57:39 AM] Anupa/diya: There are these cards . Like this black and orange... its in a carousel.. once you click on the preferred card . it should change colour. 1
+[5/11/23, 5:57:54 AM] Suheil z: i need u to iinvite me suheilz@w3blab.io  to be able to export slilides too webfloow
+[5/11/23, 5:57:54 AM] Anupa/diya: Please feel free to suggest any ui intervention as I am not Ui designer
+[5/11/23, 5:58:41 AM] Suheil z: for that we can use the power of community, we can lunch beta version share it within our community and get user feedback :)
+[5/11/23, 5:58:55 AM] Anupa/diya: Sure
+[5/11/23, 5:59:22 AM] Anupa/diya: @14153000019 can you invite Suheil ..It is not allowing me
+[5/11/23, 5:59:27 AM] Anupa/diya: The text might change
+‎[5/11/23, 6:07:49 AM] Gary Teh: ‎image omitted
+[5/11/23, 6:09:56 AM] Anupa/diya: In that case .. we should have this website on the truSight Dao account
+[5/11/23, 6:10:01 AM] Anupa/diya: Let me shift it
+[5/11/23, 6:10:14 AM] Gary Teh: 👍
+[5/11/23, 6:10:35 AM] Gary Teh: Shift to garyjob@truesight.me
+[5/11/23, 6:11:28 AM] Gary Teh: Let me know when you are done
+[5/11/23, 6:12:52 AM] Anupa/diya: Let me see if i have access
+[5/11/23, 6:18:52 AM] Suheil z: if it is not working, you can try as admin from ur side to install webflow plugin and then export the figma to webflow then at webflow its a plug and play environment to build the website
+[5/11/23, 6:19:01 AM] Suheil z: i can hop on call and assist u if u want
+[5/11/23, 6:19:32 AM] Anupa/diya: Sure that will be great
+[5/11/23, 6:19:43 AM] Anupa/diya: I know how to export the file
+[5/11/23, 6:20:17 AM] Gary Teh: Great! Am in the middle of the UN conference right now
+
+I left my MacBook at the train station 🤣
+[5/11/23, 6:20:21 AM] Anupa/diya: Maybe like tomorrow
+[5/11/23, 6:20:30 AM] Anupa/diya: Holy shit !
+[5/11/23, 6:20:45 AM] Anupa/diya: Catch you later
+[5/11/23, 6:21:04 AM] Suheil z: sure no problem
+[5/12/23, 5:20:51 AM] Suheil z: hello , shall we try to open call to fix up the figma --> webflow export ?
+[5/12/23, 5:35:24 AM] Gary Teh: @972509342179 do you have the option to just duplicate the entire figma project?
+
+I don’t think @918017107841 knows how to access that project anymore
+[5/12/23, 5:35:53 AM] Suheil z: i gave it quick try didnt succeed will sit on it more no biggy
+[5/12/23, 5:38:05 AM] Suheil z: nvm suddenly out of nowhere found it hahha
+[5/12/23, 5:38:21 AM] Suheil z: funny how sometimes when get stuck u just need to zoom out and re zoom and BAAM hhh
+[5/12/23, 5:41:25 AM] Gary Teh: I remember having this problem with another designer who was contributing to the DAO last year 
+
+Same problem 🤣
+[5/12/23, 5:41:46 AM] Gary Teh: Then grant editing rights to @918017107841
+[5/12/23, 5:43:36 AM] Gary Teh: Her email address is 
+
+anupadasgupta06@gmail.com
+[5/12/23, 5:44:00 AM] Gary Teh: That way she can do her editing on the version that you duplicated 🙂
+[5/12/23, 5:44:05 AM] Suheil z: just succeeded to connect now figuriing out how to export designs
+[5/12/23, 5:44:21 AM] Suheil z: i will set up webflow and create a team
+[5/12/23, 5:45:05 AM] Suheil z: dont wrong name me , i am not a designer ( so that no one understands wrong and then tell me oh u said u are designer :P ) hhhh
+[5/12/23, 5:51:52 AM] Anupa/diya: Hi ! Guys. Once I am back. I am just download the file and we can upload it to a common account
+[5/12/23, 5:58:12 AM] Gary Teh: My internet still sucks perhaps till tomorrow evening
+[5/12/23, 6:06:29 AM] Suheil z: its fine i managed, now on webflow managing to buiild it
+[5/12/23, 6:38:18 AM] Anupa/diya: Hi I have sent Gary the figna file
+[5/12/23, 6:38:28 AM] Anupa/diya: So he can put it on a common account
+[5/12/23, 6:38:48 AM] Anupa/diya: Which can be accessed by anyone
+[5/12/23, 6:39:31 AM] Gary Teh: @972509342179 I have just forwarded you a copy of it via your email 🙂👍
+[5/12/23, 6:42:43 AM] Suheil z: got it go it no worries
+‎[5/12/23, 8:41:43 AM] Gary Teh: ‎image omitted
+[5/12/23, 8:42:56 AM] Suheil z: so uve been awarding yourself all that time?  hhhh
+[5/12/23, 8:43:45 AM] Gary Teh: Yes, Whenever I contribute to our DAo
+‎[5/12/23, 8:44:10 AM] Gary Teh: ‎image omitted
+[5/12/23, 9:02:50 AM] Anupa/diya: Awesome!
+[5/12/23, 9:03:07 AM] Anupa/diya: By the way
+[5/12/23, 9:03:42 AM] Anupa/diya: If most of our members are beginners . Should we write about how incentivisation works
+[5/12/23, 9:05:28 AM] Gary Teh: Yes! Seems like we will need a page on that FAQ explaining our tokenomics
+[5/12/23, 9:12:36 AM] Anupa/diya: Yes we discussed this. It will be goof
+[5/12/23, 9:12:37 AM] Anupa/diya: Good
+[5/12/23, 9:12:37 AM] Anupa/diya: Maybe we can do an infographics
+[5/12/23, 9:17:13 AM] Gary Teh: That will help save me time explaining as well
+[5/12/23, 9:17:20 AM] Gary Teh: More like a how it works page
+[5/12/23, 9:19:00 AM] Anupa/diya: @972509342179 can we do an interactive infographics
+[5/12/23, 9:19:25 AM] Anupa/diya: Rather than a flat vector
+[5/12/23, 9:30:39 AM] Gary Teh: @972509342179 If it’s technically too challenging for initial MVP, please just say no
+[5/12/23, 9:33:23 AM] Suheil z: cant reply on top of my head right now will get back to u
+[5/12/23, 9:37:01 AM] Anupa/diya: Yes no pressure !
+[5/12/23, 9:37:03 AM] Anupa/diya: Please
+[5/12/23, 9:37:13 AM] Anupa/diya: These are just thoughts not requirements
+[5/12/23, 9:40:40 AM] Gary Teh: Let’s aim to get a first version sooner rather than later.
+
+That way when I start sharing about the EcoVerse21 project there is someplace I can start directing prospects that are interested
+[5/18/23, 10:39:03 AM] Gary Teh: ‎You deleted this message.
+[5/18/23, 10:39:22 AM] Gary Teh: @972509342179 what is the status of system development?
+[5/18/23, 11:20:22 AM] Suheil z: ‎This message was deleted.
+‎[5/18/23, 11:20:42 AM] Suheil z: ‎<attached: -0000790-Shadi Atamne.vcf>
+[5/18/23, 11:20:47 AM] Suheil z: can u add him to this group
+[5/18/23, 11:20:49 AM] Suheil z: ?
+[5/18/23, 11:23:09 AM] Gary Teh: ‎You deleted this message.
+[5/18/23, 11:24:12 AM] Gary Teh: He can’t be invited 
+
+Send him this link 
+
+https://chat.whatsapp.com/ISILdWTzaWaL5YXg96tNLz
+[6/13/23, 2:20:50 AM] Anupa/diya: ‎Anupa/diya left
+[6/13/23, 4:39:43 AM] Suheil - Europe: ‎You added Suheil - Europe
+[6/13/23, 4:39:49 AM] Suheil z: ‎You removed Suheil z
+[8/24/23, 11:08:09 AM] Suheil - Europe: ‎You removed Suheil - Europe
+[8/24/23, 11:08:24 AM] [project] 🌐 Main DAO Website Development 🚧: ‎You added Anupa/diya and Shadi Atamne
+[8/24/23, 11:08:29 AM] Tomas - Offchain: ‎You removed Tomas - Offchain
+[8/24/23, 11:09:01 AM] Gary Teh: @918017107841 I got some feedback from @15419086904 about our main site
+
+Content is a little sparse for the landing page and the about us page
+[8/24/23, 11:10:06 AM] Gary Teh: I am considering to have for the landing page
+    - live updates on activity status within our DAO
+
+For the About US page
+    - short excerpts from White paper as well as our history
+    - profile of governanors overseeing the DAO for the season
+
+Thoughts?
+[8/24/23, 6:09:34 PM] Anupa/diya: We can add these.
+[8/24/23, 6:09:53 PM] Anupa/diya: I had suggested the activity status for the projects
+[8/24/23, 6:10:17 PM] Anupa/diya: So for agroverse we can add a bar or some sort of data
+[8/24/23, 6:11:13 PM] Anupa/diya: We also spoke of adding the governors. We can ask which governor would like to be showcased
+[8/24/23, 6:13:50 PM] Gary Teh: I have cloned the figma project into the admin@truesight.me account 
+
+https://www.figma.com/file/j0WmfBIG1W3Zx1uQlyddLJ/TruSight-(Copy)?type=design&node-id=0-1&mode=design&t=ZVdvGCQ7dgSN6CYu-0
+[8/24/23, 6:14:11 PM] Gary Teh: @918017107841 Perhaps you might want to extend it based on your suggestions??
+[8/24/23, 6:18:06 PM] Anupa/diya: Sure will have a look
+[8/24/23, 6:18:49 PM] Anupa/diya: In that case. We should send out a form in the governors group where people can add their photos and a 2 line bip
+[8/24/23, 6:19:11 PM] Anupa/diya: If we are doing this, we should add profiles of people involved in projects as well.
+[8/24/23, 6:19:54 PM] Anupa/diya: In terms of the tracker, let me see what are the milestones we can add
+[8/24/23, 6:20:22 PM] Anupa/diya: Are we adding anything for sun mint or
+[8/24/23, 6:20:26 PM] Anupa/diya: Only agroverse
+[8/24/23, 6:20:29 PM] Anupa/diya: ?
+[8/24/23, 9:30:48 PM] Gary Teh: For now only Agroverse
+[8/24/23, 9:35:45 PM] Anupa/diya: In that case let ask people who want to be reached
+[8/24/23, 9:36:42 PM] Anupa/diya: @15419086904 can we meet at some point to discuss the tracker and it's option
+[8/24/23, 9:51:29 PM] Gary Teh: I am meeting with @15419086904 this coming Tuesday 
+
+Happy to invite you to join the session
+[8/24/23, 10:09:27 PM] Anupa/diya: Should be ok. Around time ?
+[8/24/23, 10:30:57 PM] Gary Teh: ‎You deleted this message.
+[8/24/23, 10:31:15 PM] Gary Teh: 1030pm chennai time 🙂🙏
+[8/24/23, 10:33:35 PM] Anupa/diya: Can we do a bit earlier or your night
+[8/24/23, 10:45:03 PM] Gary Teh: Let’s check with @15419086904 
+
+He is in the same time zone as I am 
+
+@15419086904 would 9am PST be a possible option next Tuesday?
+[8/24/23, 10:48:17 PM] Gary Teh: @15419086904 to give you some context @918017107841 is the UI/UX designer that crafted the design for the main site 🙂🙏
+[8/24/23, 10:49:34 PM] Shadi Atamne: Yea I can do 9am
+[8/24/23, 10:50:37 PM] Gary Teh: Let me update the calendar Time as well as the agenda
+[8/24/23, 10:50:52 PM] Shadi Atamne: Sounds good 👍🏽
+‎[8/24/23, 10:52:57 PM] Gary Teh: ‎image omitted
+[8/24/23, 11:40:00 PM] Anupa/diya: Thanks !
+[8/28/23, 8:52:55 AM] Anupa/diya: Can I have access to this page
+[8/28/23, 9:03:06 AM] Gary Teh: Use admin@truesight.me account
+[8/28/23, 9:05:39 AM] Anupa/diya: whats the passwork
+[8/28/23, 9:05:44 AM] Anupa/diya: password
+[8/28/23, 9:20:00 AM] Gary Teh: Use google authentication
+
+This is the password to use for google authentication 
+
+QkijXcTiifp8#i4s
+[8/29/23, 8:57:24 AM] Gary Teh: Ok folks heading in to the chat
+
+Won’t have my MacBook with me today. It’s flat 
+
+Working off of my phone
+[8/29/23, 8:57:42 AM] Gary Teh: Gary Teh has invited you to join a video meeting on Google Meet.
+
+Join the meeting: https://meet.google.com/rrs-xdqy-rom
+
+Dial in (audio only): ‪(US) +1 631-606-4596‬ PIN: ‪161 286 612#‬
+Other numbers: https://tel.meet/rrs-xdqy-rom?pin=2821874437393
+[8/29/23, 9:46:31 AM] Gary Teh: @15419086904 and @918017107841 let's use this Figma instead. I couldn't figure out how to transfer editing rights of the other one
+
+https://www.figma.com/file/yNewTbIXqAXzXLFzHEYxLc/TruSight-(Copy)-(Copy)?type=design&node-id=0-1&mode=design&t=2xPjmNaJZDjGUZLU-0
+‎[8/29/23, 9:49:04 AM] Gary Teh: ‎image omitted
+[8/29/23, 9:52:23 AM] Gary Teh: I have shared the login credentials to both your email addresses via LastPass 
+
+So if you installed the last pass chrome extension and created an account using your emails addresses you should have credentials to login to figma automatically suggested for you when you attempt to sign into Figma using admin@truesight.me
+‎[8/29/23, 9:52:38 AM] Gary Teh: ‎image omitted
+‎[8/29/23, 9:52:38 AM] Gary Teh: ‎image omitted
+[8/29/23, 9:57:04 AM] Gary Teh: https://chrome.google.com/webstore/detail/lastpass-free-password-ma/hdokiejnpimakedhajhdlcegeplioahd
+[8/30/23, 3:12:28 AM] Anupa/diya: https://docs.google.com/spreadsheets/d/1ly0fYhO4AxBCzzJMWwZlZsJGA1hsKtouKf-Mos1YXY0/edit#gid=0
+[8/30/23, 5:16:54 AM] Anupa/diya: I have also populated the figma page with the new recommendations
+[8/30/23, 5:17:19 AM] Anupa/diya: @15419086904 for the tracker. Do u want to create a dummy design so I can add the info
+[8/30/23, 7:19:33 AM] Gary Teh: @918017107841 when you state dummy design do you mean google sheet or do you mean graphical interface?? 🙂🙏
+[8/30/23, 10:15:54 AM] Anupa/diya: The website
+[8/30/23, 10:16:08 AM] Anupa/diya: I added whatever I showed on screen share
+[8/30/23, 10:16:37 AM] Anupa/diya: We can just share this as it is
+[8/30/23, 10:17:19 AM] Anupa/diya: This is the guild member profile
+[8/30/23, 10:17:45 AM] Anupa/diya: So for the milestone .. should I do stage 1 stage 2 in the Google sheet @15419086904
+‎[8/30/23, 10:54:15 AM] Gary Teh: ‎image omitted
+[8/30/23, 10:10:28 PM] Anupa/diya: Updated
+‎[8/31/23, 1:12:10 AM] Gary Teh: ‎image omitted
+[9/3/23, 7:40:56 AM] Gary Teh: @15419086904 
+
+Once we have the base site up we should consider 2 sets of API integration
+
+*Set 1: Google Docs*
+- Pull up the total number of governance tokens that have already been issued 
+- Pull up the total amount of Fiat managed off chain
+
+*Set 2: Solana API integration*
+- Pull up the total amount of Fiat stored on the Solana chain
+[9/3/23, 7:41:13 AM] Gary Teh: Total number of governance tokens issued
+https://truesight.me/ledger
+[9/3/23, 7:41:38 AM] Gary Teh: ‎You deleted this message.
+‎[9/3/23, 7:42:43 AM] Gary Teh: ‎image omitted
+‎[9/3/23, 7:43:17 AM] Gary Teh: ‎image omitted
+‎[9/3/23, 7:44:07 AM] Gary Teh: ‎image omitted
+‎[9/3/23, 7:49:19 AM] Gary Teh: ‎image omitted
+[9/3/23, 7:26:55 PM] Gary Teh: ‎You deleted this message.
+[9/3/23, 7:28:56 PM] Gary Teh: @918017107841 do take a look and perhaps modify it to make more sense. I believe I messed it up. 
+
+https://www.figma.com/file/yNewTbIXqAXzXLFzHEYxLc/TruSight-(Copy)-(Copy)?type=design&node-id=0-1&mode=design&t=Tz1pBxGrXfqOADfO-0
+
+*key ideas I wanted to convey*
+- how much USD is right now in our treasury backing each TDG token if a member wants to cash out
+- how much effort in terms of USD has been contributed by DAO members
+- the exchange rate DAO members have been contributing at
+[9/3/23, 7:30:11 PM] Gary Teh: ‎You deleted this message.
+‎[9/3/23, 7:35:31 PM] Gary Teh: ‎image omitted
+[9/3/23, 7:36:28 PM] Anupa/diya: Ya will do that
+[9/3/23, 7:36:43 PM] Anupa/diya: This looks fine
+‎[9/3/23, 7:53:30 PM] Gary Teh: ‎image omitted
+[9/3/23, 8:01:41 PM] Anupa/diya: Maybe we can just play with the font family. See what works
+[9/3/23, 9:53:56 PM] Anupa/diya: done
+‎[9/4/23, 8:05:23 AM] Shadi Atamne: ‎image omitted
+[9/4/23, 8:14:07 AM] Gary Teh: Love it! 🤩🙏
+[9/4/23, 9:10:05 AM] Anupa/diya: Fab !
+[9/4/23, 9:10:29 AM] Anupa/diya: Please change whatever else you see fit
+[9/4/23, 9:10:38 AM] Anupa/diya: Love the glow !
+[9/5/23, 4:51:36 PM] Gary Teh: @15419086904 could we delay tomorrow meeting by 30minutes?
+
+@918017107841 needs to put nephew to sleep
+[9/5/23, 5:10:55 PM] Shadi Atamne: Yea no problem
+[9/5/23, 6:31:45 PM] Anupa/diya: Niece 😁
+[9/5/23, 6:31:52 PM] Anupa/diya: Thanks
+[9/6/23, 4:47:32 AM] Gary Teh: @15419086904 could we also install this plugin on the Wordpress implementation?
+
+https://wordpress.org/plugins/redirection/
+[9/6/23, 4:48:06 AM] Gary Teh: We will need to port some of the permalinks over once the new site is up 🙂🙏
+[9/6/23, 4:59:55 AM] Anupa/diya: @14153000019 as we are revising the onbaording process  we should also think of connecting the website you had created with token visibility and allocation
+
+@15419086904 can you please have a look at this other website to see how we can incorporate it
+[9/6/23, 5:07:22 AM] Gary Teh: We don’t need to reference the site 
+
+It’s mainly just a bunch of API calls to the proper end points 🙂🙏
+
+- google api call to ledger google sheet to read member token balance 
+
+- api call to Solana chain to read wallet balance associated with wallet address member filed with us
+[9/6/23, 5:08:47 AM] Anupa/diya: Basically I want people to see the tokens . They can keep  them cash them.. trade them ?
+[9/6/23, 5:16:00 AM] Gary Teh: Trading will be after we migrated our governance tokens to the Ethereum chain I would actually hold off on that due to SEC
+[9/6/23, 5:16:22 AM] Gary Teh: Cashing out we will do privately and manually for now too
+[9/6/23, 5:16:41 AM] Gary Teh: See tokens can be accomplished via the two API services
+[9/6/23, 5:25:50 AM] Anupa/diya: If we are being transperant, then we need to add all of these information somewhere.
+[9/6/23, 5:26:07 AM] Anupa/diya: After our calls, we need to redirect the message as clear and transperant so there are no gaps
+‎[9/6/23, 5:33:04 AM] Gary Teh: ‎image omitted
+‎[9/6/23, 5:33:05 AM] Gary Teh: ‎image omitted
+[9/6/23, 5:33:28 AM] Gary Teh: As for the rest DAO will need to vote to pass resolution
+[9/6/23, 5:35:20 AM] Gary Teh: These decisions can’t be unilaterally
+[9/6/23, 5:36:33 AM] Anupa/diya: The transperancy is a given
+[9/10/23, 5:05:03 AM] Gary Teh: Hi @15419086904 during our upcoming session what are you thoughts if we did a walk through of what is already done and then create a checklist of outstanding items that once done we feel comfortable launching the site?
+
+It doesn’t have to be the full list of items we have discussed so far. 🙂🙏
+[9/10/23, 5:25:26 AM] Anupa/diya: @14153000019 in that case. We should update the text on the goals and expectations
+[9/10/23, 5:28:04 AM] Anupa/diya: We should add the profiles
+[9/10/23, 5:28:35 AM] Anupa/diya: As well
+[9/10/23, 5:29:50 AM] Anupa/diya: Are we doing the automated registration. We should
+[9/10/23, 5:33:35 AM] Anupa/diya: @15419086904 how should we design the automated email
+[9/10/23, 6:20:37 AM] Gary Teh: Let’s compile the list during our upcoming session
+[9/10/23, 7:24:16 PM] Shadi Atamne: Sounds good to me. Not everything needs to be completed for us to launch the site.
+[9/10/23, 7:26:21 PM] Gary Teh: That is true 
+
+Let’s assemble a list of outstanding items and agree on those that are blockers for our first release during our Wednesday session together
+
+The rest goes into after release
+[9/10/23, 7:26:32 PM] Shadi Atamne: Maybe we can get a dev/beta version up this week that’s not viewable by anyone else but us
+[9/10/23, 7:27:40 PM] Gary Teh: That would be great 
+
+What do you need to get that up?
+[9/10/23, 7:28:13 PM] Gary Teh: Let me know. I will try to sort that out in the morning
+[9/10/23, 7:28:32 PM] Shadi Atamne: I’ll let you know tomorrow
+[9/10/23, 7:30:23 PM] Shadi Atamne: Adding some subtle animations to make the site feel a little interactive 🙃
+[9/10/23, 7:31:04 PM] Shadi Atamne: Tasteful I promise
+[9/11/23, 12:59:32 AM] Anupa/diya: @15419086904 I would like to add a section for wholesale enquiry where the inputs connect to parent email
+‎[9/11/23, 2:12:45 PM] Gary Teh: ‎image omitted
+[9/11/23, 2:14:12 PM] Gary Teh: Sorry for the sudden changes
+[9/11/23, 3:54:17 PM] Shadi Atamne: Friday
+[9/11/23, 5:51:58 PM] Gary Teh: Let’s do that then
+
+I will update the calendar
+[9/11/23, 6:56:09 PM] Anupa/diya: Friday is good
+[9/11/23, 6:56:20 PM] Anupa/diya: Thanks
+[9/11/23, 7:27:08 PM] Shadi Atamne: On the home page? Or on all pages? 
+
+It would also be good to have a section to join mailing list or newsletter
+[9/11/23, 7:34:19 PM] Anupa/diya: Pn ⁰⁰
+[9/11/23, 7:34:39 PM] Anupa/diya: On a certain page
+[9/11/23, 7:35:05 PM] Anupa/diya: I have made a section on the figma
+[9/11/23, 7:35:38 PM] Anupa/diya: Yes we have that on the to do list
+[9/11/23, 10:44:39 PM] Anupa/diya: @15419086904 I had a query for you. It is something maybe for the future
+
+Can we create some kind of input field on the website  which take all the responses and send it to multiple whaysapp groups
+[9/11/23, 10:46:43 PM] Shadi Atamne: I’ve never done anything with WhatsApp but I’m sure there is a way. What kind of input and response are you wanting?
+[9/11/23, 10:49:57 PM] Anupa/diya: Just messages which can be sent to multiple whatsapp groups at the same time
+[9/11/23, 11:12:52 PM] Shadi Atamne: To let the group know someone filled out a form on the site?
+[9/15/23, 12:26:34 AM] Shadi Atamne: Can we meet on Wednesday instead of tomorrow? I won’t be home until late tomorrow night
+[9/15/23, 12:27:22 AM] Shadi Atamne: But I’ll be creating the live test site on Saturday
+[9/15/23, 12:32:29 AM] Anupa/diya: Ya sure we can meet on Wednesday.  However I will have to propose a time a bit earlier because i can't do 10 pm. Can we meet at 9 pm
+[9/15/23, 12:35:06 AM] Shadi Atamne: Yea that’s fine with me
+[9/15/23, 12:36:54 AM] Anupa/diya: Great
+[9/15/23, 5:13:11 AM] Anupa/diya: @14153000019 hey do we need to discuss anything or should we cancel the call
+[9/15/23, 5:38:32 AM] Gary Teh: Let’s just cancel today’s call
+
+The star of the show is @15419086904 
+
+I have already shifted our call to next Wednesday
+[9/15/23, 5:38:56 AM] Anupa/diya: Ok cool
+[9/17/23, 3:53:14 PM] Gary Teh: I just got scheduled to visit a farm on Wednesday 
+
+Don’t think I will be able to make it for the coming Wednesday meeting
+
+Will the both of you be able to meet and assemble the outstanding list before prior release?
+[9/17/23, 7:59:05 PM] Shadi Atamne: Yes
+[9/17/23, 8:00:04 PM] Anupa/diya: Yes sure
+[9/17/23, 8:08:32 PM] Gary Teh: Counting on both of you folks 
+
+Am visiting the cacao farm of Moses this Wednesday to get some important footages for our Agroverse project using the interview questions that @918017107841 provided
+[9/17/23, 8:10:10 PM] Anupa/diya: I am keen on listening to what our raasta dude has to say 🤣
+[9/19/23, 2:01:57 AM] Gary Teh: ‎You deleted this message.
+[9/19/23, 2:02:20 AM] Gary Teh: ‎You deleted this message.
+[9/19/23, 2:02:37 AM] Gary Teh: What is the compiled list before release? 🙂🙏
+[9/19/23, 2:02:43 AM] Gary Teh: Shall we schedule to meet next week to follow up on the list?
+[9/19/23, 2:17:21 AM] Anupa/diya: Let's me speak to @15419086904 so we can stock check
+[9/19/23, 2:18:43 AM] Gary Teh: Please share the list here
+[9/19/23, 2:20:00 AM] Anupa/diya: Once we have the call. I feel it's just easier
+[9/19/23, 2:27:35 AM] Gary Teh: Did the both of you had a FaceTime yesterday?
+[9/19/23, 2:32:13 AM] Anupa/diya: It's tomorrow
+[9/19/23, 2:39:05 AM] Gary Teh: Lost track of time already 🤦‍♂️🤣
+
+Been too busy
+[9/19/23, 2:39:20 AM] Gary Teh: Keep me posted
+[9/19/23, 2:41:32 AM] Anupa/diya: Yea sure
+[9/19/23, 2:41:42 AM] Anupa/diya: Do u want to join ?
+[9/19/23, 2:53:43 AM] Gary Teh: Not possible 
+
+Visit to farm facility tomorrow
+[9/20/23, 9:03:19 AM] Anupa/diya: @14153000019 I saw you lurking on whatsapp 🤣🤣 while we were on a call
+[9/20/23, 9:04:47 AM] Anupa/diya: Our call was pretty good. 
+
+We couldn't see the project pages as there was some issues. Shady has completed the project pages, made a block for the personas and completed the homepage
+[9/20/23, 9:06:09 AM] Anupa/diya: We spoke about some potential implementation like direct messaging from the website to whatspp, automated ledger on the website and one more thing which I can't remember
+[9/20/23, 9:08:25 AM] Anupa/diya: @14153000019 ! Guess what ! I told @15419086904 about the bringing internet to local communities. His girlfriend works with the UN and his sister works on grants and proposals.
+
+I asked if they could give us any tips of effective proposals and if they had the time, maybe for a review. If possible 
+
+Thanks @15419086904 that's really nice of you to offer but no pressure. We are all so pressed with time.
+[9/20/23, 9:18:02 AM] Gary Teh: Nice! How many hours was your zoom session?
+[9/20/23, 9:20:42 AM] Anupa/diya: An hour
+[9/20/23, 9:22:45 AM] Anupa/diya: Why are you replying ! Aren't u supposed to be in the forest without internet
+[9/20/23, 9:23:38 AM] Anupa/diya: If you have ..please add me in ! 🤣🤣🤣🤣
+[9/20/23, 9:30:51 AM] Gary Teh: They canceled on me last minute 
+
+I was busy sorting out the all the fda stuff and the invoicing just now
+[9/20/23, 9:31:20 AM] Gary Teh: Getting Too busy 
+
+Be warned: Will start dropping stuff my plate just like any computer system
+[9/20/23, 9:36:25 AM] Anupa/diya: I know!
+‎[9/20/23, 9:42:34 AM] Gary Teh: ‎image omitted
+‎[9/20/23, 9:46:43 AM] Anupa/diya: ‎image omitted
+[9/20/23, 9:47:00 AM] Anupa/diya: @15419086904 this is what I meant.
+[9/20/23, 9:48:10 AM] Anupa/diya: @14153000019 I was telling Shady if we can automate the ledger. It's better than the goggle form
+[9/20/23, 10:05:13 AM] Gary Teh: You speak with Derek and Vlatko in the engineering guild 
+
+They are working on that right now 
+
+End of message
+[9/20/23, 10:05:41 AM] Anupa/diya: Ok thanks
+[9/20/23, 10:13:12 AM] Anupa/diya: Texted him
+[9/20/23, 10:13:44 AM] Gary Teh: Actually Suheil
+[9/20/23, 10:13:53 AM] Gary Teh: Suheil and Derek
+[9/20/23, 10:13:59 AM] Gary Teh: Vlatko is not involved
+[9/20/23, 10:16:33 AM] Anupa/diya: Ah ok
+[9/20/23, 10:18:36 AM] Anupa/diya: I have asked Suheil
+[9/20/23, 6:28:38 PM] Gary Teh: Let me know when is the next facetime session
+[9/20/23, 9:46:05 PM] Anupa/diya: Does Monday work for everyone
+[9/21/23, 2:04:52 AM] Gary Teh: Should work 
+
+Please share the checklist that both of you have assembled 
+
+That way we can track progress closely 🙂🙏
+[9/21/23, 2:05:27 AM] Gary Teh: This is what Suheil and Derek are working on 
+
+https://docs.google.com/document/d/18-SX70xi2pGQez47u0O31BwxeUflGZQyUMqYBLqbamI/edit
+[9/21/23, 2:24:51 AM] Anupa/diya: Once Shady shares the working site . We can do the final analysis
+[9/21/23, 9:08:54 PM] Anupa/diya: @15419086904 If you could screen shot the pages you have to done, we can quickly stock check. It doesnt need to be live
+[9/22/23, 8:51:03 AM] Anupa/diya: Should we schedule the same time for Monday @14153000019 @15419086904
+[9/22/23, 11:56:18 AM] Gary Teh: Go for it between the both of you if @15419086904 managed to figure out the technical issues 
+
+I will be in Transit from Balneario to Florianopolis 
+
+Schedule is very hectic right now with all the activities in Agroverse, I can’t manage more stuff on my plate 🙂🙏
+[9/24/23, 10:24:00 AM] Shadi Atamne: I can’t on Monday
+[9/24/23, 11:20:14 AM] Gary Teh: Let’s try to do on Thursday?
+[9/24/23, 6:28:09 PM] Anupa/diya: Will try. If I can't, could share the link @15419086904 with the details and I can send it my comments
+[9/26/23, 6:28:19 AM] Anupa/diya: @15419086904 Hi . Is it possible for you to send the site for review sometime during the day
+[9/26/23, 2:46:13 PM] Shadi Atamne: Was stuck on a coding issue but finally solved it. Will have the beta site up tomorrow 🥳
+[9/26/23, 2:48:07 PM] Gary Teh: By the way you are now a governor 🙂🙏
+[9/26/23, 2:49:24 PM] Shadi Atamne: I like the sound of that
+[9/26/23, 2:50:00 PM] Gary Teh: You might want to join the Townhall then
+
+Because that is where voting happens 
+
+Also you now have editing rights to our ledger and rubric
+‎[9/26/23, 3:56:34 PM] Gary Teh: ‎image omitted
+‎[9/26/23, 3:56:34 PM] Gary Teh: ‎image omitted
+‎[9/26/23, 3:56:35 PM] Gary Teh: ‎image omitted
+[9/27/23, 6:29:04 AM] Gary Teh: @918017107841 you have been freed up from all the other projects 
+
+Let’s just concentrate on this one for now 🙂🙏
+[9/27/23, 6:33:48 AM] Anupa/diya: Yes thats great
+[9/27/23, 6:33:52 AM] Anupa/diya: 😁
+[9/27/23, 6:35:27 AM] Anupa/diya: I was thinking that I would need access just to the website. The agroverse service proposition has to feed into the trusight. That's what we said right ?
+[9/27/23, 6:36:55 AM] Anupa/diya: I will need to know for the proposal.
+
+Will you make a group for agroverse strategy or will you have the time to pass on the messages
+‎[9/27/23, 6:40:14 AM] Gary Teh: ‎image omitted
+[9/27/23, 6:40:44 AM] Anupa/diya: thats great !
+[9/27/23, 8:09:46 AM] Gary Teh: Do the communication in the town hall that’s it’s purpose is for anyways
+[9/28/23, 8:20:43 AM] Anupa/diya: Hey guys running 10 mins late
+[9/28/23, 8:22:41 AM] Gary Teh: ok
+[9/28/23, 8:40:24 AM] Anupa/diya: Have joined
+[9/28/23, 8:40:42 AM] Anupa/diya: On Google meet
+[9/28/23, 11:18:51 AM] Emelin - Bahia: ‎You added Emelin - Bahia
+[9/28/23, 11:20:53 AM] Gary Teh: @557191035605 I am adding you to this chatroom where we collaborate on the main DAO's website that @15419086904 is working on.
+
+The purpose of the main DAO website is to recruit contributors to our ecosystem to help contribute to projects within our DAO like Agroverse
+
+There is a section that talks about the Agroverse project, since you are now in charge of content on the Agroverse website, it is important we ensure the portion of the contents to be displayed on the Main DAO website on Agroverse is in sync with what is displayed on Agroverse.
+[9/28/23, 11:28:30 AM] Emelin - Bahia: Ok. When you can please send me the google drive link and remember I changed e-mail and I couldn't acess last pass. The eternal mistic error that expires in 2 hours but doesn't work after 3 seconds.
+[9/28/23, 11:36:15 AM] Gary Teh: The work that @918017107841 has done so far is on Figma
+https://www.figma.com/file/yNewTbIXqAXzXLFzHEYxLc/TruSight-(Copy)-(Copy)?type=design&mode=design&t=KpM9gogZCJVdkgoa-0
+
+To access you need password for google account admin@truesight.me
+[9/28/23, 11:36:35 AM] Gary Teh: This is the password: QkijXcTiifp8#i4s
+[9/28/23, 11:38:54 AM] Emelin - Bahia: Thanks
+[9/28/23, 11:50:16 AM] Emelin - Bahia: I left some commentaries so I can remember them later. @918017107841 tell me if you have a free spot in your agenda tomorrow.
+[9/28/23, 11:51:48 AM] Gary Teh: We also do have our weekly sync next Friday. Let me invite you to it.
+[9/28/23, 11:58:46 AM] Gary Teh: @557191035605 is just going to be an observe in this guild
+[9/28/23, 12:00:27 PM] Emelin - Bahia: No hands on Figma just observing and commenting tips?
+[9/28/23, 12:00:31 PM] Emelin - Bahia: Just so I know.
+[9/28/23, 12:00:36 PM] Emelin - Bahia: To clarify.
+[9/28/23, 12:00:48 PM] Gary Teh: That is correct.
+[9/28/23, 12:01:08 PM] Gary Teh: If @918017107841 has any questions about Agroverse content, she can ask you. Nothing beyond that.
+[9/28/23, 6:12:23 PM] Anupa/diya: @557191035605 hey
+[9/28/23, 6:12:41 PM] Anupa/diya: What time zone are you at ?
+[9/28/23, 6:14:34 PM] Emelin - Bahia: Hello. Brazil BRT
+[9/28/23, 6:15:27 PM] Emelin - Bahia: Right now time is 22:15 for me. I am in South America.
+[9/28/23, 6:16:52 PM] Anupa/diya: I can do 6 30 pm ist on Friday
+[9/28/23, 6:17:00 PM] Anupa/diya: Does that work for you
+[9/28/23, 6:20:25 PM] Emelin - Bahia: Ok, sure.
+[9/28/23, 6:25:56 PM] Anupa/diya: Great. Please send me your email address so I can send you a Google invite
+[9/28/23, 6:26:30 PM] Anupa/diya: @15419086904 can you send me the link of the word document you are using
+[9/28/23, 9:07:38 PM] Gary Teh: I correct myself, these are two partners we already have
+
+Edge and Node: House of Web3 - George and Noelle
+https://edgeandnode.com/
+
+OffChain Global - Jonathan and Ken 
+https://offchain.social/
+[9/28/23, 9:08:15 PM] Gary Teh: And a third
+
+House of Balance - Tiff, Victor and Hans Martin
+https://www.houseofbalancedavos.com/
+[9/28/23, 9:08:28 PM] Gary Teh: They are all in the Beer Hall
+[9/28/23, 9:08:31 PM] Anupa/diya: We might as well add them.
+[9/28/23, 9:08:36 PM] Gary Teh: True. Just go for it
+[9/28/23, 9:10:10 PM] Anupa/diya: Hi Emelin 
+
+I saw your comments 
+
+1. Not using black _ Shady is already working on a white option which looks great. I partially don't think black doesn't work. Many sports and automobile brands do use black..
+[9/28/23, 9:10:32 PM] Anupa/diya: Let's look at white option. We can also maybe put it up for voting
+[9/28/23, 9:11:32 PM] Gary Teh: And a fourth - Karin
+https://lanur.swiss/
+[9/28/23, 9:11:36 PM] Anupa/diya: The black and yello was already a pre set tone by the previous set
+[9/28/23, 9:12:14 PM] Anupa/diya: I didn't know she had a sight ! Fab
+[9/28/23, 9:12:52 PM] Anupa/diya: 2. In terms of highlighter _ lets use our design judgement 🤣
+[9/28/23, 9:14:23 PM] Anupa/diya: I think we should shift our call to next Friday so @15419086904 can also had his comments since he is working with ui as well.
+[9/29/23, 5:14:49 AM] Emelin - Bahia: emelinjung@gmail.com
+[9/29/23, 5:22:02 AM] Anupa/diya: Should we reschedule for next week. I think it will be good if @15419086904 joins the conversation as well.
+[9/29/23, 5:22:29 AM] Emelin - Bahia: What are you guys talking about? :)
+[9/29/23, 5:28:05 AM] Gary Teh: They are talking about the DAO’s website 
+
+This was our meeting from yesterday 
+
+https://youtu.be/HGqbxC4BofU?feature=shared
+[9/29/23, 5:28:58 AM] Emelin - Bahia: To the person who invented the record meetings feature, my gratitude.
+[9/29/23, 5:51:35 AM] Anupa/diya: The website has gone through various variations. It's always been an interactive process.
+
+ It would be great if we look into your alternatives that you are proposing and we can collectively re iterate on Friday
+[9/29/23, 8:30:16 AM] Emelin - Bahia: Yes, sure. Today I will take a pause. I will only add some info I wanted to confirm with Gary and test some mockups possibilities to substitute an image we are using right now.
+[9/29/23, 8:32:08 AM] Emelin - Bahia: I need to schedule my agenda to this week. The agroverse will take some time from me as I am dealing with the content and what I can do about the visuals. As it uses ready layouts it limits my actions. Today I will fix some errors, add small info and see the mockup.
+[9/29/23, 8:32:13 AM] Emelin - Bahia: ‎This message was deleted.
+[9/29/23, 8:34:26 AM] Anupa/diya: That's great !! 👍
+[9/29/23, 2:11:59 PM] [project] 🌐 Main DAO Website Development 🚧: ‎You changed the group name to “[ops] Main DAO Website”
+[9/29/23, 2:17:50 PM] [project] 🌐 Main DAO Website Development 🚧: ‎You changed the group description
+[9/29/23, 2:18:01 PM] [project] 🌐 Main DAO Website Development 🚧: ‎You changed the group name to “[ops] 🌐 Main DAO Website Development 🚧”
+[9/29/23, 8:14:55 PM] Anupa/diya: Morning everyone!
+[9/29/23, 8:15:06 PM] Anupa/diya: It just struck me why we are going with black
+[9/29/23, 8:15:11 PM] Anupa/diya: As a website colour
+[9/29/23, 8:15:19 PM] Anupa/diya: I had totally forgotten
+[9/29/23, 8:16:28 PM] Anupa/diya: One of the main goals was to use this current website would be connected to the original trusight website which manages the tokens
+[9/29/23, 8:16:52 PM] Anupa/diya: That website has a black base and the highlights are the tru sight colour
+[9/29/23, 8:17:26 PM] Anupa/diya: We will have to connect the two eventually to build the end to end experience
+[10/1/23, 10:04:04 AM] Anupa/diya: This is something that we should strive towards building an end to end experience. Can we digitize the Ledger as well. 
+
+This will be necessary to enhance the onboarding process and also to automate the process of filling out the ledger
+‎[10/3/23, 7:57:37 AM] Gary Teh: ‎image omitted
+[10/3/23, 7:59:19 AM] Gary Teh: The follow up question is how do you see being part of this DAO help you become fully actualized?
+[10/3/23, 8:01:42 AM] Gary Teh: TrueSight DAO is a spiritual dojo where individuals seeking to fully self actualize come to
+
+As part of their spiritual training, they contribute their time and effort towards building profitable business that aim at restoring social and environmental Justice. ‎<This message was edited>
+[10/4/23, 9:56:36 AM] Anupa/diya: This has to be strongly stated or projected and also this has to align with Agroverse
+[10/4/23, 9:57:41 AM] Anupa/diya: Now that @557191035605 is looking into UI, I will concentrate on the service proposition.
+
+@557191035605 I had a look at the comments . Please go ahead with an ui change you want to Carry out
+[10/4/23, 10:01:25 AM] Anupa/diya: In terms of the voice and tone, i saw the retail approach you had suggested. We had this conversation in one of the meetings.
+
+The current voice and tone is more about the farmer and their journey. It was a conscious decision to mobilize the position of the farmer and also we are not in the position to develop a great product photography strategy. We will need guidelines and execution. If you can manage that via ai or any design tool. Please go ahead
+[10/4/23, 10:03:20 AM] Anupa/diya: We will also need to make sure that ux experience of the sale is end to end which is what I am looking at now.
+[10/4/23, 10:03:34 AM] Anupa/diya: Let's chat more on Friday !
+‎[10/4/23, 2:17:47 PM] Emelin - Bahia: ‎image omitted
+[10/4/23, 2:18:45 PM] Gary Teh: Please use admin@truesight.me account on Figma
+[10/4/23, 2:18:56 PM] Gary Teh: You don't need to make it a team project
+[10/4/23, 2:19:09 PM] Emelin - Bahia: I'm there
+[10/4/23, 2:19:29 PM] Emelin - Bahia: I want to do it on the account so we have the branding guide at the same place
+[10/4/23, 2:19:35 PM] Emelin - Bahia: instead of my personal account
+[10/4/23, 2:19:53 PM] Gary Teh: Ok. Please delete this project. Seems empty anyways
+[10/4/23, 2:21:51 PM] Emelin - Bahia: I was just saying in case someone was about to do something with this.
+‎[10/4/23, 2:22:02 PM] Emelin - Bahia: ‎GIF omitted
+‎[10/6/23, 1:04:29 PM] Gary Teh: ‎image omitted
+[10/6/23, 6:31:34 PM] Anupa/diya: I had reached out to him saying that we will send him the website and people can onbaord
+[10/6/23, 6:33:34 PM] Anupa/diya: Once they submit the form, are we vetting them or are they directly getting access to the desired group.
+[10/6/23, 6:41:51 PM] Gary Teh: We vet them first to figure out what is the *initial* investment they can contribute to our DAO. 
+
+At this point, I am feeling more inclined for our DAO to be exclusive than free for all
+
+We must force an *upfront investment* from new prospects. That way they have some skin in the game and take things seriously instead of being a zombie crowd
+[10/6/23, 6:43:47 PM] Shadi Atamne: Hey @918017107841 once I make the beta site live (tomorrow) I will let you know and then we can map out the new/existing user flow
+‎[10/6/23, 6:44:18 PM] Gary Teh: ‎image omitted
+[10/6/23, 6:45:08 PM] Shadi Atamne: We can then add a few of the existing members into the “system” (database) to test out the funnel
+[10/6/23, 6:45:50 PM] Shadi Atamne: And maybe create some dumy accounts to test new user registration and make tweaks from there
+[10/6/23, 6:47:18 PM] Gary Teh: Perfect once it’s tested, smoothed out and production is live let’s surface the poll that forces all DAO members who wants still want to qualify to stay in the town hall to go through onboarding process otherwise get booted out
+[10/6/23, 6:48:33 PM] Shadi Atamne: I can set up different roles for existing members and different roles (based on contributors investors etc) and what emails they get once signed up. So contributors will get an email with the scribe how to videos
+[10/6/23, 6:49:07 PM] Shadi Atamne: We can actually have polls using gravity forms
+[10/6/23, 6:49:25 PM] Shadi Atamne: There is a bunch of cool features we can utilize
+[10/6/23, 6:50:54 PM] Shadi Atamne: Gary, can you share the shop links?
+[10/6/23, 6:52:57 PM] Shadi Atamne: And if you are using Shopify, we can (later on) make a shop page on the new site that will use Shopify code but keep the visitors on the site until they are ready to checkout
+[10/6/23, 6:53:31 PM] Shadi Atamne: Just for the UX
+[10/6/23, 6:57:44 PM] Gary Teh: Https://Agroverse.shop
+[10/6/23, 6:58:02 PM] Gary Teh: We are using wix
+[10/6/23, 6:58:36 PM] Shadi Atamne: Hmmmm ok
+[10/6/23, 7:01:30 PM] Shadi Atamne: Maybe think about migrating the shop to Wordpress?
+[10/6/23, 7:06:42 PM] Gary Teh: Later on perhaps 
+
+Let’s just validate we can sell first
+
+We don’t want to be stuck in another 3 months of engineering cycle before we can start selling 🙂🙏 ‎<This message was edited>
+[10/6/23, 7:14:54 PM] Shadi Atamne: lol that’s true
+[10/6/23, 7:15:26 PM] Shadi Atamne: Well I just got a fresh batch of my adderall so I’ll be working non stop for the next couple days on the site
+[10/6/23, 7:15:54 PM] Gary Teh: 🤯
+‎[10/6/23, 7:16:19 PM] Gary Teh: ‎image omitted
+[10/6/23, 7:24:01 PM] Shadi Atamne: I’ll need a nice drink after this weekend
+[10/6/23, 7:34:58 PM] Gary Teh: At some point we will be importing liquor made with cacao fruit 
+
+Everyone who has sampled it so far loves it
+[10/6/23, 7:35:40 PM] Shadi Atamne: Ohhhh nice! Would love to try that
+[10/6/23, 7:41:55 PM] Gary Teh: We have quite a few samples that were never before seen in the USA 
+
+Right now we are testing with folks with Bay Area on how to prioritize them 
+
+As rolling out each of them to the market will probably cost us USd10K each 
+
+So we can’t roll them all out at once
+[10/6/23, 8:45:15 PM] Anupa/diya: I love it !
+[10/6/23, 8:46:53 PM] Anupa/diya: My aim for us to get funding so we can shift this all ecosystem on to a site @15419086904  built from scratch. The map that I showed should function from one source
+[10/6/23, 8:48:33 PM] Anupa/diya: That's great. Thanks.  
+
+In that case - do you want to send me the details so i can set up the form and then you can connect it to the true sight email?
+[10/6/23, 9:58:41 PM] Shadi Atamne: I agree, the ecosystem should be centralized 🤪
+[10/6/23, 9:59:50 PM] Shadi Atamne: I will give you access once I have it live tomorrow night my time (PST)
+[10/6/23, 10:09:45 PM] Anupa/diya: It has to be the TruSight Dao Mother ship and for the shop especially for the payments. Since we will be doing cross border payments .. if it's in crypto and fiat there are various regulations for kyc in some countries.
+‎[10/7/23, 12:08:01 AM] Anupa/diya: ‎image omitted
+[10/7/23, 12:08:33 AM] Anupa/diya: @557191035605 for the website
+[10/7/23, 5:53:33 PM] Gary Teh: @15419086904 how is progress?  🙂🙏
+[10/7/23, 6:14:47 PM] Shadi Atamne: Getting there
+[10/7/23, 6:18:13 PM] Shadi Atamne: I need to forget about being a perfectionist for now since this is not the final final product.
+[10/7/23, 6:18:31 PM] Shadi Atamne: So I can have it launched tonight
+[10/7/23, 6:18:47 PM] Shadi Atamne: And then worry about the small details
+‎[10/7/23, 7:53:17 PM] Gary Teh: ‎image omitted
+‎[10/7/23, 7:54:39 PM] Gary Teh: ‎image omitted
+[10/7/23, 7:55:41 PM] Anupa/diya: @15419086904 thanks for the update ! Let's just have the information up and figure out the rest later. 
+I will add the form and email .
+
+Please take care !
+[10/7/23, 7:57:57 PM] Anupa/diya: I belive in this ! 🤣 the designers in us will always want to iterate 🤣. It's a given
+‎[10/8/23, 5:43:44 AM] Gary Teh: ‎image omitted
+‎[10/8/23, 5:43:55 AM] Gary Teh: ‎GIF omitted
+[10/8/23, 6:05:27 AM] Garis Pang: ‎You added Garis Pang
+[10/8/23, 6:08:44 AM] Gary Teh: Inviting @6594897484 into this guild since he is most active in trying to recruit more new DAO members 
+
+Recruiting is his super power. 
+
+@918017107841 once @15419086904 has setup the prototype site please work with @6594897484 to iterate on the onboarding flow to see what works and what not 
+
+@6594897484 has helped pioneered a lot of our DAO policies related to HR
+
+Prior to this he built and ran an executive recruitment company based out of Singapore which was generating more than 1 million revenue per year 
+
+@6594897484 This scope off my plate now. I am too busy dealing with supply chain related matters. Please follow up with @918017107841 🙂🙏 ‎<This message was edited>
+[10/8/23, 7:16:28 AM] Anupa/diya: @6594897484 Hi ! We are using a simple onbaording process  we have three profiles that the users can use.
+
+The Beer Hall _ Chat and explore 
+Contribute explore
+Invest 
+
+Upon selection they will find a form which they need go submit and depending on their interest they will give me guided to their chosen option via whatsapp or an call
+[10/8/23, 7:18:11 AM] Anupa/diya: Through an email
+[10/8/23, 7:18:32 AM] Gary Teh: @918017107841 I think of all the folks in our DAO, @6594897484 and Suheil are the most active in recruiting new members
+
+You might want to get Suheil inputs too on the onboarding experience
+[10/8/23, 7:19:24 AM] Anupa/diya: Yes sure. Once the website is up.. it will be easier
+[10/8/23, 7:21:50 AM] Anupa/diya: For contributors, would be a good idea to give them the link to the ledger to see how they can get incentivised in the future
+[10/8/23, 2:34:32 PM] Gary Teh: @15419086904 is the prototype live on a url? 🙂🙏 ‎<This message was edited>
+[10/8/23, 3:58:42 PM] Shadi Atamne: Will be in a couple hours. I crashed
+[10/8/23, 4:05:30 PM] Gary Teh: Keep breathing!
+[10/8/23, 8:37:21 PM] Anupa/diya: @15419086904 given the deadline and your health,  if we can break down the requirements 
+
+Current_Add_ information (most of it) (static) and make the 3 profiles functional.
+I have the text ready for the form and also the follow up emails so if you guide me through the form for profile 1 during the call I can add them for the next
+[10/8/23, 9:15:41 PM] Anupa/diya: @14153000019 are we connecting the forms to admin@trusight.com
+[10/8/23, 9:15:59 PM] Anupa/diya: Or support@trusight.com
+[10/8/23, 9:21:48 PM] Gary Teh: Actually why not? 
+
+governors@truesight.me
+
+They all land up in the same email account anyways ‎<This message was edited>
+[10/8/23, 9:22:37 PM] Anupa/diya: Ok cool
+[10/9/23, 5:12:10 AM] Anupa/diya: Hey @15419086904 Thanks for making the website go live !! Its starting to shape up
+[10/9/23, 5:12:44 AM] Anupa/diya: One question - Is it possible for us to have the profile sections as well since thats the main priority for onbaording
+[10/9/23, 5:12:49 AM] Anupa/diya: I can start on the forms
+[10/9/23, 5:13:09 AM] Anupa/diya: and connected emails
+[10/9/23, 5:17:36 AM] Anupa/diya: We can have it on the get involved page
+[10/9/23, 5:21:15 AM] Anupa/diya: @14153000019 I dont have access to Aleksa s writeup on Governance. You would. Could you just extract like a few points like a paragraph for the website
+[10/9/23, 7:17:10 AM] Gary Teh: I actually don’t have writing access too
+
+Let me ask her
+‎[10/9/23, 7:29:15 AM] Gary Teh: ‎image omitted
+‎[10/9/23, 9:05:09 AM] Gary Teh: ‎image omitted
+[10/9/23, 9:10:21 AM] Anupa/diya: I asked @15419086904 if he needed any help.  I can do a quick wix page to just start the process going
+[10/9/23, 9:10:46 AM] Anupa/diya: Till he finishes the website
+[10/9/23, 9:11:06 AM] Anupa/diya: I can just start the prototype with folks who want to start
+[10/9/23, 9:15:39 AM] Gary Teh: Go for it. 🙂🙏
+‎[10/9/23, 9:42:00 AM] Gary Teh: ‎image omitted
+[10/9/23, 9:43:07 AM] Anupa/diya: I will ask v to go through our prototype also. He can give us feedback
+[10/9/23, 9:43:30 AM] Anupa/diya: Whose the saint 🤣
+[10/9/23, 9:46:05 AM] Gary Teh: Him! His view of who he will become when he is fully self actualized
+[10/9/23, 9:47:03 AM] Shadi Atamne: Let’s talk more about the profiles during tomorrows meeting
+[10/9/23, 9:48:02 AM] Anupa/diya: As we are onboarding now, e should need that.
+[10/9/23, 9:48:31 AM] Anupa/diya: If you create the template, can we add the information tomorrow and publish ?
+[10/9/23, 9:48:54 AM] Anupa/diya: That's a conversation for another time
+[10/9/23, 9:50:14 AM] Anupa/diya: Can we duplicate the project  template ?
+[10/9/23, 9:52:20 AM] Gary Teh: I feel That is part of onboarding
+
+After he suggest then we match him to the relevant roles within The projects
+[10/9/23, 9:54:43 AM] Shadi Atamne: I want to talk about the profile stuff tomorrow because I’m a little confused about this
+[10/9/23, 9:56:53 AM] Anupa/diya: What we are creating now is more of a linear information centric.  This is more immersive .. for each we need to chalk out the journey. 
+
+This approach should be more like a question answer which needs to be thought about
+[10/9/23, 9:57:08 AM] Anupa/diya: Sure no problem . It's chat about it.
+[10/9/23, 9:57:50 AM] Shadi Atamne: When you say profiles, do you mean setting up accounts for specific members to login to the site and make changes?
+[10/9/23, 9:57:51 AM] Anupa/diya: If we can quickly develop thereafter that would be great. It's just a duplication of the project ux
+[10/9/23, 9:58:42 AM] Anupa/diya: If you look at the figma page, it's the beer hall, contributor and the investor
+[10/9/23, 9:59:17 AM] Anupa/diya: So if you click on the contributor>it goes to the form> form generates the automated email
+[10/9/23, 9:59:40 AM] Anupa/diya: You said we can use gravity for the forms
+[10/9/23, 10:00:00 AM] Anupa/diya: And also we can create the email template
+[10/9/23, 10:00:18 AM] Anupa/diya: It's super simple
+[10/9/23, 10:02:36 AM] Anupa/diya: It's exactly what you have done but with the form
+[10/9/23, 10:05:54 AM] Shadi Atamne: The forms are easy to create and use
+[10/9/23, 10:06:57 AM] Anupa/diya: In that case, If we have the three boxes, maybe you can just show me one of the options during the call
+[10/9/23, 10:14:19 AM] Anupa/diya: Great . If you can set the boxes up
+[10/9/23, 10:14:38 AM] Anupa/diya: Below the project bar that would be grata
+[10/9/23, 10:14:40 AM] Anupa/diya: Great
+[10/9/23, 12:55:47 PM] Gary Teh: I just realized this person I am chatting with on LinkedIn is V.
+
+Notice the drastic difference between how you presented him to me (A software developer that will be very willing to help fulfill our software needs) and how he described his fully actualized self to me (a saint who wants to educate the society)
+[10/9/23, 2:50:28 PM] Gary Teh: Alias applied to common shared email account
+[10/9/23, 6:23:49 PM] Anupa/diya: The conversation for onboarding was very different. We were speaking about agrotech which led to agroverse and then the foodstamping conversation
+‎[10/9/23, 6:26:57 PM] Emelin - Bahia: ‎GIF omitted
+‎[10/9/23, 6:49:52 PM] Gary Teh: ‎image omitted
+[10/9/23, 6:52:54 PM] Emelin - Bahia: Don't we all 🤌🏾
+[10/9/23, 6:55:50 PM] Emelin - Bahia: This year I met an ex budhist monk and a budhist (you). In the end of the day we are just doing the best we can.
+[10/9/23, 6:56:28 PM] Emelin - Bahia: But people always loved saints. The problem is when they wish to turn into them.
+[10/9/23, 6:57:27 PM] Emelin - Bahia: The hardest battle lies inside ✨
+[10/9/23, 7:00:56 PM] Anupa/diya: They wish and then fail to succeed.
+[10/9/23, 7:02:07 PM] Anupa/diya: Selflessness is very hard to achieve
+‎[10/9/23, 7:02:59 PM] Gary Teh: ‎image omitted
+[10/9/23, 7:04:21 PM] Anupa/diya: Rebirth🤣
+[10/9/23, 7:09:19 PM] Anupa/diya: That level of darkness is very disclosed just  exhibited. Haven't you seen the character of Joker in the batman 🤣🤣. People at that level don't proclaim their darkness on whatsapp
+[10/9/23, 7:10:04 PM] Gary Teh: He actually adapted it from sun Tze art of war. 
+
+Principles of the grounds of nine death 
+
+First you embrace your own death and then you are liberated to truly live 🤩
+‎[10/9/23, 7:10:46 PM] Gary Teh: ‎image omitted
+[10/9/23, 7:11:53 PM] Anupa/diya: Isn't their a movie about him?
+[10/9/23, 7:12:09 PM] Anupa/diya: There
+[10/9/23, 7:12:12 PM] Gary Teh: There were many
+‎[10/9/23, 7:13:07 PM] Gary Teh: ‎image omitted
+[10/9/23, 7:14:45 PM] Anupa/diya: True!
+[10/9/23, 7:15:31 PM] Gary Teh: Live fast die young 🤩
+
+Couldn’t have asked for a better life ‎<This message was edited>
+[10/9/23, 7:16:31 PM] Gary Teh: I wonder if folks like them will ever lose their steam if they live a longer life… 🤔
+[10/9/23, 7:18:25 PM] Anupa/diya: Never. The passion and zeal for life and self purpose is bigger than their existence unless there is a tragic incident
+‎[10/9/23, 7:18:25 PM] Emelin - Bahia: ‎GIF omitted
+‎[10/9/23, 7:19:00 PM] Emelin - Bahia: ‎audio omitted
+[10/9/23, 7:21:07 PM] Emelin - Bahia: It is 2023. Even Barbie movie questioned death. I don't know if people became deeper or just depressed.
+[10/9/23, 7:22:03 PM] Emelin - Bahia: "What can't be cured must be endured."
+‎[10/9/23, 7:23:53 PM] Emelin - Bahia: ‎sticker omitted
+[10/9/23, 7:25:37 PM] Emelin - Bahia: Good night guys (bed time here in Brazil).
+[10/10/23, 2:26:02 AM] Shadi Atamne: Made a few updates to the site
+[10/10/23, 4:08:37 AM] Gary Teh: Wonderful 🤩
+[10/10/23, 4:55:42 AM] Anupa/diya: Thanks !! Will have a look
+[10/10/23, 9:26:24 AM] Gary Teh: Folks will be delayed by 15minutes
+[10/10/23, 9:39:50 AM] Gary Teh: I am in
+[10/10/23, 9:39:54 AM] Gary Teh: https://us06web.zoom.us/j/83905210075?pwd=C3ma35N3CljOsVgl3VyxkmOjvsGank.1
+[10/10/23, 9:40:12 AM] Gary Teh: *Agenda*
+    - Review live site lead by Shadi
+    - Review onboarding materials generated for live site lead by. Anupa ‎<This message was edited>
+[10/10/23, 9:42:19 AM] Gary Teh: @15419086904 ???
+[10/10/23, 10:46:54 AM] Shadi Atamne: Hey Gary, sorry something came up and wasn’t able to make the meeting.
+[10/10/23, 11:08:48 AM] Gary Teh: No worries. We made a recording of our session
+https://youtu.be/GlmIbaSSAcU
+
+*Follow up needs*
+Which day and what time will you be available to catch us up and walk through how to utilize the Admin panel for the beta site?
+
+What is the next step in terms of deploying the life site?
+[10/10/23, 11:28:35 AM] Gary Teh: This is a walk through of the existing Edgar system
+https://youtu.be/CLI2yIw28K4
+‎[10/10/23, 5:19:33 PM] Gary Teh: ‎image omitted
+‎[10/10/23, 5:19:34 PM] Gary Teh: ‎image omitted
+‎[10/10/23, 5:19:34 PM] Gary Teh: ‎image omitted
+[10/10/23, 5:25:04 PM] Emelin - Bahia: ‎This message was deleted.
+[10/10/23, 6:58:22 PM] Shadi Atamne: This Wednesday and Thursday I’ll be working on bug fixes and adding the rest of the content so the site can be ready to go live ‎<This message was edited>
+[10/10/23, 6:59:41 PM] Gary Teh: Perfect! 🤩🙏
+
+Which IP address should I start pointing TrueSight.me domain to?? 
+
+Also what is the Wp-admin panel ID  and password I should be using??
+[10/10/23, 7:01:00 PM] Anupa/diya: @557191035605 could you please send me a few lines on agroverse which you gave re written
+[10/10/23, 7:01:53 PM] Anupa/diya: @15419086904 i will add the information for the forms on to figma ?
+[10/10/23, 7:01:54 PM] Shadi Atamne: I’ll let you know tomorrow about the hosting and once I’m done with the bug fixes will send you login info
+[10/10/23, 7:02:38 PM] Anupa/diya: Or if you can send me a YouTube link on using gravity I can add the information on my own ?
+[10/10/23, 7:03:02 PM] Anupa/diya: We also need to add the white paper for TruSight and Agroverse
+[10/10/23, 7:03:07 PM] Shadi Atamne: Yes please. It will be easier and quicker if I just setup and create the forms myself
+[10/10/23, 7:07:17 PM] Anupa/diya: Thanks ! Will you send me your email address please
+[10/10/23, 7:08:02 PM] Anupa/diya: If I need to access the older website, what url do I use
+[10/10/23, 7:13:33 PM] Anupa/diya: @14153000019
+[10/10/23, 7:15:50 PM] Gary Teh: After migration 
+
+Edgar.TrueSight.me
+
+Will setup tonight ‎<This message was edited>
+[10/10/23, 8:29:57 PM] Anupa/diya: This is great ! Can we have a counter to sell the nibs ? Or even a qr code. Giving them a promo offer.
+[10/10/23, 9:27:28 PM] Gary Teh: edgar.truesight.me is now live.
+
+@15419086904 once you have the Live site ready tell me what IP address to point it to as well as the port, I will do the configuration on Nginx proxy server on my side to point truesight.me to your server location to the right port address ‎<This message was edited>
+[10/11/23, 3:51:10 AM] Anupa/diya: @15419086904 can we add a terms and conditions to the form 
+
+@14153000019 we should add a few points that states the member know what the DAO is providing and what the member will be a part of
+[10/11/23, 7:10:48 AM] Gary Teh: Use existing ones from Edgar
+[10/11/23, 7:11:00 AM] Gary Teh: Or get ChatGpt to generate them
+[10/11/23, 7:29:31 AM] Gary Teh: @918017107841 access to governance doc
+
+https://docs.google.com/document/d/1jUBd6E2cFwFMBDLURS-SxCY75AlJ7sPtUklXi0N8hR4/edit
+[10/11/23, 8:44:19 AM] Anupa/diya: @15419086904 do you have access to the white papers
+‎[10/11/23, 2:55:58 PM] Gary Teh: ‎image omitted
+[10/11/23, 2:56:11 PM] Gary Teh: Going live!! 🤩
+[10/12/23, 7:36:06 AM] Anupa/diya: Hi @15419086904 I am just sending you text for the profiles and some other stuff. After the first official live - should we meet and discuss what is the text milestone - we need to look deeper in to ui as well.
+[10/12/23, 8:29:20 AM] Gary Teh: @15419086904 could we get the production site up this weekend? 🙂🙏
+[10/12/23, 10:25:42 AM] Shadi Atamne: Yea it will be up this weekend
+[10/12/23, 10:25:57 AM] Shadi Atamne: I’m finishing up the styling now
+[10/12/23, 10:26:08 AM] Anupa/diya: Thanks !
+[10/12/23, 10:26:24 AM] Anupa/diya: I have added the form on the figma
+[10/12/23, 10:26:35 AM] Shadi Atamne: I’ll push it to the beta site when I’m done
+[10/12/23, 10:26:50 AM] Shadi Atamne: All the edits I made
+[10/12/23, 10:26:51 AM] Anupa/diya: And also sent you a word docu with some links and stuff
+‎[10/12/23, 10:37:51 AM] Shadi Atamne: ‎video omitted
+[10/12/23, 10:40:27 AM] Anupa/diya: What we can do is that if the forms are placed on the main page below the projects . Once the user goes to let's say the agroverse role section.  There can be a button which re directs them to the forms on the home page
+[10/12/23, 10:40:53 AM] Anupa/diya: The form has a section which asks them which role they are applying for.
+[10/12/23, 10:42:21 AM] Anupa/diya: It can say Role : (maybe a drop menu of all the roles or we can encourage them to type it out) and also have an option where they can suggest what role they would like to add
+[10/12/23, 10:43:06 AM] Anupa/diya: @14153000019 for the governance doc. I think they tab should just open up to the document aleksa has made
+[10/12/23, 11:19:25 AM] Shadi Atamne: Gravity forms has conditional logic options that can be used to create 1 main form instead of a form for each type of lead capture
+[10/12/23, 11:23:11 AM] Shadi Atamne: The form/s will be placed in a modal(pop up) and triggered by a button/link so no need to leave a page
+[10/15/23, 11:10:48 AM] Gary Teh: @15419086904 what time are you deploying to production today?
+
+Let me know also the up address i should point our nginx proxy to
+[10/15/23, 12:37:00 PM] Shadi Atamne: Not until later tonight but in the meanwhile I can set up a splash page so you can point to the IP
+[10/15/23, 12:37:41 PM] Gary Teh: Perfect!! 🤩🙏
+[10/15/23, 12:38:26 PM] Shadi Atamne: I should be home in an hour and half so I’ll let you know once I have that set up
+[10/15/23, 12:41:30 PM] Gary Teh: Perfect! I just finished my growth hack at the farmers market here
+
+Got us a space to do our first in real life selling booth 🤩🙏
+[10/15/23, 9:45:31 PM] Anupa/diya: @15419086904 thanks so much! This is great
+[10/15/23, 9:45:42 PM] Anupa/diya: I am going on leave for the 21 st.
+[10/15/23, 9:46:56 PM] Anupa/diya: And back only on the 28th. When can I look at the site. I will need to test some stuff. Gary leaves I think beginning of Nov for three weeks
+[10/15/23, 9:49:28 PM] Gary Teh: Mid of Nov
+[10/15/23, 9:51:36 PM] Anupa/diya: Before he leaves we should do the testing. When do you think we should start. Please let me know so I can pre plan!
+[10/15/23, 9:51:41 PM] Anupa/diya: 😃
+[10/16/23, 2:53:37 AM] Anupa/diya: Hi @557191035605 I saw the website ! It's looking very nice and it was so nice to spot you
+‎[10/16/23, 8:26:47 AM] Gary Teh: ‎image omitted
+‎[10/16/23, 9:42:43 AM] Gary Teh: ‎image omitted
+[10/16/23, 11:04:02 AM] Shadi Atamne: Fixed it
+[10/16/23, 11:08:03 AM] Shadi Atamne: I did something and accidentally lost some code during my compiling
+[10/16/23, 11:09:11 AM] Shadi Atamne: Gary, you should get an email with your login stuff
+[10/16/23, 11:14:01 AM] Gary Teh: Ok! Cool! Let me check.
+[10/16/23, 11:17:30 AM] Gary Teh: How come its\ sending me to this URL when I type in truesight.me
+
+https://truesight.me/wp-login.php?redirect_to=https%3A%2F%2Ftruesight.me%2F&reauth=1
+[10/16/23, 11:17:55 AM] Gary Teh: Which email address did you send it to?
+[10/16/23, 11:20:00 AM] Shadi Atamne: ‎This message was deleted.
+[10/16/23, 11:20:07 AM] Gary Teh: garyjob@truesight.me
+[10/16/23, 11:20:09 AM] Gary Teh: This one
+[10/16/23, 11:20:31 AM] Shadi Atamne: I think it was just Gary
+[10/16/23, 11:20:51 AM] Gary Teh: Oh. Could you send it to garyjob@truesight.me
+
+The email address you sent to doesnt exist
+[10/16/23, 11:21:07 AM] Shadi Atamne: Ok will do
+[10/16/23, 11:21:27 AM] Gary Teh: Also could you help resolve this issue?
+[10/16/23, 11:21:34 AM] Gary Teh: Thanks! 🤩🙏
+[10/16/23, 11:21:56 AM] Shadi Atamne: My bad. It’s because I redirected all logged out users
+[10/16/23, 11:22:22 AM] Gary Teh: Ok.
+[10/16/23, 11:24:38 AM] Shadi Atamne: Nvm, sent to the garyjob one
+[10/16/23, 11:25:32 AM] Shadi Atamne: I still have a couple hours of work to do on this site today and it will be better
+[10/16/23, 11:26:01 AM] Anupa/diya: @15419086904 I don't see the profiles for the onbaording. Will manage the forms by Wednesday ?
+[10/16/23, 11:26:32 AM] Shadi Atamne: Yea, that’s one of the things I’ll be finishing up today
+[10/16/23, 11:26:57 AM] Anupa/diya: In that case, I am not making any temp fix ?
+[10/16/23, 11:27:07 AM] Shadi Atamne: No not yet
+[10/16/23, 11:28:09 AM] Anupa/diya: Thanks . Please let me know if you cant because I go on leave from Saturday for a week and I need to figure out some of the onbaording before I leave.
+[10/16/23, 11:28:31 AM] Anupa/diya: Do we need to regroup for the website this week ?
+[10/16/23, 11:29:07 AM] Shadi Atamne: Maybe good to walk you guys through it real quick
+[10/16/23, 11:30:20 AM] Anupa/diya: Hmm. I can only do Friday
+[10/16/23, 11:30:30 AM] Anupa/diya: Does that work
+‎[10/16/23, 11:32:49 AM] Anupa/diya: ‎image omitted
+[10/16/23, 11:33:14 AM] Shadi Atamne: Friday works
+[10/16/23, 11:33:21 AM] Anupa/diya: Awesome thanks !
+[10/16/23, 11:33:57 AM] Anupa/diya: Can we do a little bit later. I can do after dinner. Our festivities begin
+‎[10/16/23, 11:35:02 AM] Anupa/diya: ‎image omitted
+[10/16/23, 11:40:09 AM] Gary Teh: Or maybe do a video recording of the walk through and send us
+[10/16/23, 11:42:30 AM] Anupa/diya: That would be better . We can have a look at it and respond and after that if required we can do that call
+‎[10/16/23, 11:51:53 AM] Gary Teh: ‎image omitted
+[10/16/23, 11:53:41 AM] Anupa/diya: This can only happen once the profile of the contributors is there
+[10/16/23, 11:54:16 AM] Anupa/diya: The contributor will have a section where the user will add the role or other
+[10/16/23, 11:58:18 AM] Gary Teh: The content on this page also needs to be updated
+https://truesight.me/governance/
+
+its showing agroverse
+[10/16/23, 12:16:03 PM] Shadi Atamne: Yea there is only so much I can do at once
+‎[10/16/23, 12:17:15 PM] Gary Teh: ‎image omitted
+[10/16/23, 1:49:01 PM] Gary Teh: Actually governance should point to our white paper as the draft that Aleksa wrote is severely out dated
+
+Our constitution gone through multiple drafts of iteration since the time she came up with a draft.
+
+https://edgar.truesight.me/whitepaper
+[10/16/23, 2:44:50 PM] Shadi Atamne: I’ll update it
+‎[10/16/23, 3:18:01 PM] Gary Teh: ‎image omitted
+[10/16/23, 3:18:01 PM] Gary Teh: ‎You deleted this message.
+[10/16/23, 3:18:02 PM] Gary Teh: ‎You deleted this message.
+[10/16/23, 3:18:02 PM] Gary Teh: ‎You deleted this message.
+[10/16/23, 3:18:02 PM] Gary Teh: ‎You deleted this message.
+‎[10/16/23, 3:29:07 PM] Gary Teh: ‎image omitted
+‎[10/16/23, 3:29:08 PM] Gary Teh: ‎image omitted
+‎[10/16/23, 3:29:08 PM] Gary Teh: ‎image omitted
+‎[10/16/23, 3:29:08 PM] Gary Teh: ‎image omitted
+[10/16/23, 7:52:57 PM] Anupa/diya: @15419086904 please look at the word doc for the implementation
+[10/16/23, 7:54:45 PM] Anupa/diya: Thanks!!
+‎[10/18/23, 6:17:40 AM] Gary Teh: ‎image omitted
+[10/18/23, 7:10:58 PM] Anupa/diya: I can only to the onboarding after I come back from my holiday which is the 29th.
+
+We will need to look at a timeline for deadlines. As in the next main course of action is development. @15419086904 . please refer to the figma and list the actions items for dev with corresponding deadline dates or else is becoming very difficult to plan and this is becoming endless.
+
+I will only plan the onbaording hereafterafter that since I had to cancel the onboarding sessions twice.
+
+Planning is key since all of us have other real time projects to deal with
+[10/18/23, 7:16:22 PM] Shadi Atamne: I will be working on and finishing things tonight. Had to shift away to my other work and was also a little preoccupied with everything going on in my home country.
+[10/18/23, 7:20:17 PM] Anupa/diya: It's extremely heartbreaking with what is heartbreaking. I can even imagine.
+
+Please keep us in the loop of the progress even if there is a delay( it's totally understandable) because we will have to plan around each other's schedule
+[10/18/23, 7:20:48 PM] Anupa/diya: Can we say that the deadline has shifted to next Monday.?
+[10/18/23, 7:21:44 PM] Anupa/diya: Whenever you have the time , please make the deliverables list. We can all add to it and track each other's progress
+[10/18/23, 7:22:48 PM] Anupa/diya: We all have the other work to attend so this planning is essential
+[10/18/23, 7:36:04 PM] Gary Teh: Gaza?
+[10/18/23, 8:16:55 PM] Shadi Atamne: Yea
+[10/18/23, 8:20:17 PM] Shadi Atamne: I’ll make a todo list that will also live in the GitHub repo
+[10/18/23, 8:25:24 PM] Anupa/diya: Thanks !
+[10/18/23, 8:35:40 PM] Gary Teh: We are trying to organize humanitarian food shipment to them right now
+[10/19/23, 9:38:28 PM] Anupa/diya: @557191035605 I had suggested that we should add all cacao events on the website
+[10/19/23, 9:38:42 PM] Anupa/diya: Wix has a way that we can list the events
+[10/19/23, 9:39:12 PM] Anupa/diya: I am making a document with the information required. If you could make a tab called events and add it
+[10/20/23, 4:10:24 AM] Emelin - Bahia: @918017107841 That is nice. The events sponsored or what kind of events?
+[10/20/23, 4:13:59 AM] Anupa/diya: These are events Gary and Val are mostly doing
+[10/20/23, 4:14:17 AM] Anupa/diya: I think it's good to showcase them on the agroverse site
+[10/20/23, 4:18:32 AM] Emelin - Bahia: Nice. It is good to show them on Instagram as well. Have it recordered and posted.
+‎[10/20/23, 4:19:57 AM] Emelin - Bahia: ‎audio omitted
+[10/20/23, 4:20:38 AM] Emelin - Bahia: For Instagram an event post with the details (place, time, etc).
+[10/20/23, 4:21:29 AM] Anupa/diya: Suheil will be looking into that. Please feel free to reach out to him
+[10/20/23, 8:41:41 AM] Anupa/diya: https://docs.google.com/document/d/1vSCykGqduenP7bOOSmo1vwbzs8776AiyCUR3DLqIr74/edit?usp=drivesdk
+[10/20/23, 8:42:01 AM] Anupa/diya: This is the link to the template for events. Link open to all
+‎[10/20/23, 12:56:12 PM] Gary Teh: ‎image omitted
+[10/20/23, 1:24:35 PM] Anupa/diya: I think it's great for traction! Let's utilize this space to get people to know about trusight , get interested to eventually contribute 🙌
+[10/20/23, 1:24:55 PM] Anupa/diya: And also buy !! 👍👍
+[10/20/23, 5:06:42 PM] Shadi Atamne: Pushing a big update to the site tonight
+[10/20/23, 5:10:06 PM] Gary Teh: Wonderful!! 🤩🙏
+‎[10/20/23, 5:10:18 PM] Gary Teh: ‎video omitted
+[10/20/23, 5:13:14 PM] Shadi Atamne: I like the shirts
+[10/20/23, 9:57:26 PM] Gary Teh: Kevin did a wonderful job! 🤩
+[10/23/23, 9:07:34 AM] Anupa/diya: Given ref to the conversation in agroverse
+[10/23/23, 9:08:16 AM] Anupa/diya: Onboarding to the DAO. I feel can't wait till we built to the end to end ux experience
+[10/23/23, 9:09:02 AM] Anupa/diya: There are main pdfs linking to the web 3 .. what is a DAO. X Y Z. I know this guy Jamie Parmenter
+[10/23/23, 9:09:13 AM] Anupa/diya: Who did these short posts
+[10/23/23, 9:09:23 AM] Anupa/diya: I can ask him if he is happy share this material
+[10/23/23, 9:09:45 AM] Anupa/diya: Or even Anthony Day.. Laura bolanos ..
+[10/23/23, 9:10:05 AM] Anupa/diya: We just link to posts
+[10/23/23, 9:10:20 AM] Gary Teh: I thought you were on vacation till 29th??? 🤔🤣
+[10/23/23, 9:10:30 AM] Anupa/diya: There is fantastic video channel which I follow called crypto something
+[10/23/23, 9:10:40 AM] Anupa/diya: I am ...🤣🤣🤣
+‎[10/23/23, 9:11:05 AM] Gary Teh: ‎image omitted
+[10/23/23, 9:11:24 AM] Anupa/diya: Do you think one can not look at the blowing up tru sight Dao chats 🤣🤣
+‎[10/23/23, 9:12:15 AM] Gary Teh: ‎image omitted
+[10/23/23, 9:12:21 AM] Anupa/diya: I will gather the resource once I come back  @15419086904 could you add them on the faq page or some onboarding
+[10/23/23, 9:13:43 AM] Anupa/diya: https://youtube.com/@WhiteboardCrypto?si=XyiRQIT_UA7DErCv
+[10/23/23, 9:13:55 AM] Anupa/diya: This page is very good for beginners
+[10/23/23, 9:48:30 AM] [project] 🌐 Main DAO Website Development 🚧: ‎You changed the group name to “[project] 🌐 Main DAO Website Development 🚧”
+[10/23/23, 3:33:33 PM] Gary Teh: @15419086904 still haven't received the login details for the site. Mind sending it again to admin@truesight.me?
+[10/26/23, 7:35:20 PM] Anupa/diya: Hey @15419086904 I will start reaching people for  test onboarding.  What is the status like ?
+[10/26/23, 8:14:42 PM] Anupa/diya: @14153000019 we will need to re highlight how can we can avail governance in the reply back form
+[10/26/23, 8:15:16 PM] Anupa/diya: We can do a walkthrough and just upload that the YouTube and link.
+[10/27/23, 12:48:40 PM] Shadi Atamne: I can do a walkthrough on Monday. And I’ll send you the login info again today Gary.
+[10/27/23, 2:43:56 PM] Gary Teh: Perfect 🙂🙏
+[10/27/23, 8:40:55 PM] Anupa/diya: Thanks !! That will be great.
+[10/27/23, 8:42:46 PM] Anupa/diya: Can we do 8 30 pm ist ?
+[10/28/23, 12:43:27 PM] Shadi Atamne: Yea
+[10/28/23, 12:44:46 PM] Shadi Atamne: I’ll be on the road Monday from 4pm - 6pm
+[10/28/23, 12:45:24 PM] Shadi Atamne: Do you mean 8:30pm eastern? So 5:30pm pacific?
+[10/28/23, 2:04:39 PM] Gary Teh: I think she means India standard time
+
+Basically 8am PST ‎<This message was edited>
+‎[10/30/23, 9:38:21 AM] Gary Teh: ‎image omitted
+[10/30/23, 8:30:16 PM] Anupa/diya: @15419086904 can we have access to WordPress. There are so many angles that are piling up so maybe we can start that on the side
+[10/30/23, 8:30:42 PM] Anupa/diya: I can foresee some additions and edits for sure.
+[10/30/23, 8:31:29 PM] Anupa/diya: Ans again I suggest we do a quick run on wix for the launch and then change it back once stuff is ready on WordPress
+[10/30/23, 8:36:05 PM] Shadi Atamne: Stuff is ready on Wordpress. I sent the password again to the email that Gary gave me.
+[10/30/23, 8:36:25 PM] Anupa/diya: It's ready ?
+[10/30/23, 8:36:34 PM] Shadi Atamne: Yes
+[10/30/23, 8:36:39 PM] Anupa/diya: Can we have a look at it ? I had no idea.
+[10/30/23, 8:36:46 PM] Shadi Atamne: If you go to one of the projects
+[10/30/23, 8:37:15 PM] Shadi Atamne: And click on one of the buttons for participate, contribute, invest
+[10/30/23, 8:37:23 PM] Shadi Atamne: You will see forms pop up
+[10/30/23, 8:37:26 PM] Anupa/diya: Can I start the prep onboarding
+[10/30/23, 8:38:02 PM] Shadi Atamne: They need editing a bit but that’s why I gave access to Gary
+[10/30/23, 8:38:27 PM] Shadi Atamne: You can start but again, the forms need editing
+‎[10/30/23, 8:38:33 PM] Gary Teh: ‎image omitted
+[10/30/23, 8:38:57 PM] Gary Teh: I don’t think the SMTP server is configured correctly if you are generating emails via that route
+[10/30/23, 8:39:02 PM] Shadi Atamne: Gary can you do a reset password?
+[10/30/23, 8:39:27 PM] Gary Teh: I tried that the other day. No emails were received
+
+I tried around 10 times 🤔
+[10/30/23, 8:39:29 PM] Shadi Atamne: Emails are sending correctly
+[10/30/23, 8:39:31 PM] Gary Teh: That is why I asked
+[10/30/23, 8:39:39 PM] Gary Teh: What email address is it sending from
+[10/30/23, 8:40:11 PM] Shadi Atamne: It’s sending from my admin address
+[10/30/23, 8:40:27 PM] Shadi Atamne: Let me check real quick. I’m driving
+[10/30/23, 8:40:40 PM] Gary Teh: Ok. Thanks 🙂🙏
+[10/30/23, 8:42:11 PM] Anupa/diya: Thanks !@15419086904. Will have a look
+[10/30/23, 8:42:54 PM] Anupa/diya: @14153000019 if I need to edit some text. How do we do this. Will you send me the log in.
+[10/30/23, 8:43:07 PM] Shadi Atamne: garyjob@truesight.me
+[10/30/23, 8:43:13 PM] Shadi Atamne: That’s the email
+[10/30/23, 8:43:49 PM] Gary Teh: You should be able to use that email address to access it once @15419086904 sorts out the email issue
+[10/30/23, 8:44:02 PM] Anupa/diya: The password
+[10/30/23, 8:44:11 PM] Anupa/diya: Ok cool
+[10/30/23, 8:44:34 PM] Shadi Atamne: truesightadmin1
+[10/30/23, 8:44:43 PM] Shadi Atamne: That’s the password for now
+[10/30/23, 8:45:41 PM] Shadi Atamne: Did it work?
+‎[10/30/23, 8:46:32 PM] Gary Teh: ‎image omitted
+[10/30/23, 8:46:55 PM] Shadi Atamne: 👍🏽
+[10/30/23, 8:51:47 PM] Gary Teh: Thank you brother! 😎
+[10/30/23, 11:17:17 PM] Anupa/diya: @15419086904 looking great !! Thanks
+[10/31/23, 12:26:10 AM] Anupa/diya: is this not on the www.wordpress.com url
+[10/31/23, 6:44:29 AM] Anupa/diya: Hi @15419086904
+[10/31/23, 6:44:41 AM] Anupa/diya: I tried www.wordpress.com
+[10/31/23, 6:45:04 AM] Anupa/diya: I added the email but it didn't work for me. Can you just send me the correct link
+[10/31/23, 10:24:55 AM] Shadi Atamne: truesight.me/wp-admin
+‎[10/31/23, 3:54:27 PM] Gary Teh: ‎image omitted
+[10/31/23, 10:18:15 PM] Anupa/diya: @15419086904 I went through the website! Looks great. There are some few things missing from the original form template. I dont use worsdpress so how should we do this
+[10/31/23, 10:18:27 PM] Anupa/diya: Can I send you a google doc with changes
+[10/31/23, 10:19:12 PM] Anupa/diya: I need to add a few field input boxes
+[10/31/23, 10:19:45 PM] Anupa/diya: and I need to edit the replies
+[10/31/23, 10:24:44 PM] Anupa/diya: For contribute
+‎[10/31/23, 10:24:50 PM] Anupa/diya: ‎image omitted
+[10/31/23, 10:24:54 PM] Anupa/diya: This is the current form
+‎[10/31/23, 10:25:14 PM] Anupa/diya: ‎image omitted
+[10/31/23, 10:25:20 PM] Anupa/diya: We will need to add these inputs
+[10/31/23, 10:37:12 PM] Anupa/diya: I can send you the edited text for the replies. Please update
+[10/31/23, 10:41:41 PM] Anupa/diya: Let me know what is possible or what you think is best and we can rework the ux.
+[10/31/23, 10:46:12 PM] Anupa/diya: I think its best that we collectively have a look at it once shady is ready to go with all his inputs and direction.
+[11/1/23, 7:44:30 AM] Shadi Atamne: I don’t know if I’ll have time this week but I’ll try
+[11/3/23, 6:13:18 AM] Gary Teh: Feel free to exercise your autonomy and do as you feel fit 🙂🙏
+
+Just consider our inputs as merely ideas and suggestions ultimately since you are the final executioner, it’s your call at the end of the day. 
+
+To do otherwise would be unintentionally introduce centralization elements that will only hamper progress on iterations ‎<This message was edited>
+[11/3/23, 7:18:18 AM] Anupa/diya: @15419086904 please look into the ux of the website as there as still gaps which are appearing.
+[11/3/23, 9:07:34 AM] Shadi Atamne: I won’t be able to look into the website this week or next week. Also, please explain what you mean.
+[11/3/23, 9:24:20 AM] Anupa/diya: The technical dev is one part right and ux is secondary pary - of how the experience of the user will be. 
+
+For examples- the forms need to be fixed. The part of the governance tokens needs to be highlighted. Each role has to connect to a form. And some others 
+
+If one looks at the end product, all of this has to be holistically looked into
+[11/3/23, 9:25:07 AM] Anupa/diya: Whenever it's possible Just tell us know so we can look at it then. Thanks
+[11/7/23, 3:34:31 PM] Shadi Atamne: Still not clear what you mean about gaps?
+[11/7/23, 3:47:20 PM] Shadi Atamne: I gave access to the site so you guys can make content fixes which includes the forms themselves.
+
+For the user experience, having a button for a form on each individual role is not the best option or practice so I created 3 buttons on each project page, 1 button for each form instead of too many buttons. This also makes it easier and more clear for anyone who is editing content on the site.
+[11/7/23, 3:55:32 PM] Shadi Atamne: The site is a work in progress. I don’t understand why the site was removed and replaced with a coming soon type page.
+[11/7/23, 3:57:05 PM] Shadi Atamne: ‎This message was deleted.
+[11/7/23, 5:03:55 PM] Gary Teh: Perhaps a time to train @918017107841 on how to update the site 
+
+She was feeling overwhelmed and went ahead to create a bridge on wix 🙂🙏
+[11/7/23, 5:38:30 PM] Anupa/diya: I don't do WordPress. I  don't have the time to get trained and there is no point to duplication since Shady is already doing it.
+
+I looked at updating the form since some of the  fields weren't added and there wasn't even an option. That's  just one of the things.
+
+Given said that, Gary said that the onbaording has to start this week in the beer hall. Thats why the sudden need.
+
+. As you had mentioned you wont available. I couldn't wait.
+
+This is just an intermediate site  that I have created which will get re purposed for another site once we  have finalized your site. 
+
+Let's catch up when you have the time. We can sort this  apart from the website info, the pagess need to be interactive 
+
+We also need to add update the governance token onbording as said from the start.
+[11/7/23, 8:01:31 PM] Shadi Atamne: I can make time this week. Tomorrow or Thursday.
+[11/7/23, 9:40:45 PM] Gary Teh: Let’s do Thursday 🙂🙏
+[11/7/23, 10:06:29 PM] Shadi Atamne: Just let me know what time
+[11/7/23, 10:12:42 PM] Shadi Atamne: @918017107841 I’m creating step-by-step how-to’s for to share with you and everyone else that will be editing stuff on the site
+[11/7/23, 10:37:10 PM] Anupa/diya: I  cant make it next week. I don't really want to get into editing if you are doing the task. There is no point of duplication
+[11/7/23, 10:37:19 PM] Anupa/diya: We should meet to stock check
+[11/7/23, 10:39:31 PM] Anupa/diya: Let me know what time next week works
+‎[11/9/23, 8:17:14 AM] Gary Teh: ‎image omitted
+‎[11/9/23, 8:17:16 AM] Gary Teh: ‎image omitted
+[11/9/23, 9:11:06 AM] Anupa/diya: I am almost done ! Just finishing the forms
+[11/9/23, 11:07:23 AM] Anupa/diya: @15419086904  I am actually really shocked with the turn of events. Suheil publicly is claiming that you have an issue with me creating this second website and he is going on and on about it. He thinks i have found a developer. Its wix at the end of the day. who hires anyone. Honestly to be fair, this website design has been going on forever. As you stated you are unavailable to work on it and I have had to cancel one round of onboarding sessions and Gary has asked me to start the second one so I made it. Its as simple as that. There are some things that need to be fixed and added and I couldnt wait. We all have other work and personal commitments. I dont see this as such a big deal. I have already mentioned that this will repurposed. We all have to work as team mates. If you had an issue, you should have just approached me. I am sure we are not here to out do each other.
+[11/9/23, 11:08:33 AM] Anupa/diya: I hope we can sort this out.
+[11/9/23, 11:24:48 AM] Shadi Atamne: I didn’t know the site was taken down until Suheil asked me why the site was down.
+[11/9/23, 11:26:00 AM] Shadi Atamne: I didn’t go to suheil or anyone complaining about the site
+‎[11/9/23, 11:26:46 AM] Gary Teh: ‎image omitted
+[11/9/23, 11:28:17 AM] Anupa/diya: I am sure you didn't. You definetly dont seem like that but he was just going on and on which made me surprised. I do apologize i should have mentioned. It happened so quickly and you wouldnt be available. Happy to catch next week to sort this out
+[11/9/23, 11:28:53 AM] Anupa/diya: Not on me nor on my teams expense !
+‎[11/9/23, 11:29:33 AM] Gary Teh: ‎image omitted
+[11/9/23, 11:32:30 AM] Shadi Atamne: Suheil was surprised when the new site wasn’t up anymore and so was I after working on it so much.
+‎[11/9/23, 11:34:55 AM] Gary Teh: ‎image omitted
+[11/9/23, 11:39:10 AM] Shadi Atamne: There is phases to this new website project and flip flopping between 2 different sites makes it difficult to move on to the next phase in the build process.
+[11/9/23, 11:44:01 AM] Anupa/diya: I completely agree with you but given that we have deadlines popping up, we will have to deliver. As I suggested early, what we can sit and do is set deadlines on the tasks of what needs to be done and we can work towards. As we progress, we will have to keep adding things to what is already do so that will also have to be factored. Let the onboarding start with this and we can see what we need to add and subtract. Let me what day suits you
+[11/9/23, 11:44:12 AM] Shadi Atamne: What I mean is: now the new site isn’t visible so how can we see or know what needs to be fixed?
+[11/9/23, 11:44:25 AM] Anupa/diya: it is visible.
+[11/9/23, 11:44:41 AM] Shadi Atamne: The one I made
+[11/9/23, 11:44:58 AM] Anupa/diya: Gary re routed it to the wix
+[11/9/23, 11:45:13 AM] Anupa/diya: for the onboarding to start
+[11/9/23, 11:45:49 AM] Anupa/diya: the new site is visible
+[11/9/23, 11:46:30 AM] Shadi Atamne: You mean the wiz site is visible
+[11/9/23, 11:46:38 AM] Anupa/diya: i had just created a landing page since i just had 2 days to put it together and gary was giving out the link as it was still in process 😆
+[11/9/23, 11:46:39 AM] Shadi Atamne: Wix
+[11/9/23, 11:46:45 AM] Anupa/diya: ya
+[11/9/23, 11:47:06 AM] Shadi Atamne: I’m talking about the Wordpress site
+[11/9/23, 11:47:20 AM] Anupa/diya: i have no idea about that
+[11/9/23, 11:47:25 AM] Shadi Atamne: That’s not visible anymore
+[11/9/23, 11:47:47 AM] Anupa/diya: @14153000019 can you answer it?
+[11/9/23, 11:48:03 AM] Anupa/diya: Cant you log in and see it?
+[11/9/23, 11:49:06 AM] Anupa/diya: I did some research. There is a plugin called elementor which helps websites nicer on wordpress. its paid but I can get the plugin
+[11/9/23, 11:49:29 AM] Anupa/diya: check it out and let me know
+[11/9/23, 11:49:42 AM] Anupa/diya: it becomes like wix
+[11/9/23, 11:55:36 AM] Shadi Atamne: I don’t feel like this conversation is going anywhere productive
+[11/9/23, 11:59:53 AM] Gary Teh: Let me create a separate domain 
+
+For example have *beta.TrueSight.me* point to the Wordpress side 
+
+@15419086904 would that approach work for you?
+‎[11/9/23, 12:00:26 PM] Gary Teh: ‎image omitted
+‎[11/9/23, 12:09:56 PM] Gary Teh: ‎image omitted
+[11/9/23, 12:11:15 PM] Shadi Atamne: I’ll have to go in and adjust it to point to that url
+[11/9/23, 12:32:27 PM] Shadi Atamne: Moving forward there will be a QA process to:
+- submit items for fixing
+- submit items for suggested fixing
+[11/9/23, 12:36:04 PM] Gary Teh: Perfect! 🤩🙏
+[11/9/23, 12:37:13 PM] Gary Teh: Perhaps we could use the *star* function of the WhatsApp channel to highlight post that describes about items that need fixing 
+
+Once it’s been fixed @15419086904 you can go ahead to *unstar* the post
+
+That way we don’t need to be jumping around multiple apps ‎<This message was edited>
+[11/9/23, 12:37:46 PM] Shadi Atamne: I’m going to set up a clickup account to this
+[11/9/23, 12:38:05 PM] Gary Teh: Ok. That works too
+
+I am aware that @918017107841 is a big fan of it
+[11/9/23, 12:38:15 PM] Gary Teh: Exercise your *autonomy* 🙂🙏
+[11/9/23, 12:39:39 PM] Shadi Atamne: As a developer I don’t care for it lol but I know how useful it can be for non developers to communicate with developers about fixes
+‎[11/9/23, 12:44:45 PM] Gary Teh: ‎image omitted
+[11/9/23, 12:49:56 PM] Shadi Atamne: Also, if something needs urgent fixing (like the forms for ex.) just let me know and I will make the time to address it right away so that we don’t end up here again. Even if I say I can’t work on the site this week
+‎[11/9/23, 12:51:10 PM] Gary Teh: ‎image omitted
+[11/9/23, 12:51:20 PM] Shadi Atamne: lol
+‎[11/9/23, 12:53:57 PM] Shadi Atamne: ‎GIF omitted
+[11/10/23, 11:16:59 AM] Gary Teh: @15419086904 dumb ass question 
+
+Do you backup the files in production as well as the database?
+
+*Scenario*
+I install a new Wordpress plugin
+
+New files are added
+New database tables are created 
+
+Time passes
+
+Site gets hacked by one of those annoying Eastern European hackers 
+
+Files and database tables where change during the hack 
+
+Your local copy does not contain any of the files and database table changes made during my wp-plugin install
+
+*Outcome*
+Changes made in production not on backed up in local or dev are lost 
+
+🙂🙏 ‎<This message was edited>
+[11/10/23, 11:54:28 AM] Shadi Atamne: Not a dumb question lol
+[11/10/23, 11:59:27 AM] Shadi Atamne: This is why we have dev and production environments. Its better to install plugins in the dev environment and make any changes there. The Dev environment should always be the most up to date version.
+[11/10/23, 12:01:33 PM] Shadi Atamne: This way we just need to backup the production data tables only. No need to backup files
+[11/10/23, 1:13:19 PM] Gary Teh: @918017107841 this is your request for video instructions on where to reference for governance token holdings for each DAO member
+
+https://youtu.be/0OCO2wXF1jE
+
+*Time Taken: 1 hour* ‎<This message was edited>
+[11/10/23, 1:18:09 PM] Anupa/diya: Thanks !
+[11/10/23, 1:18:23 PM] Anupa/diya: I love click up ❤️
+[11/10/23, 1:18:39 PM] Anupa/diya: Let's add what needs to be done
+[11/10/23, 1:19:00 PM] Anupa/diya: Can we do call next week
+[11/10/23, 1:19:56 PM] Anupa/diya: Shady can we do elementor ?
+[11/10/23, 1:23:40 PM] Anupa/diya: It's great to track A
+‎[11/10/23, 1:24:04 PM] Gary Teh: ‎image omitted
+‎[11/10/23, 1:24:04 PM] Gary Teh: ‎image omitted
+‎[11/10/23, 1:25:03 PM] Gary Teh: ‎image omitted
+‎[11/10/23, 1:26:02 PM] Gary Teh: ‎image omitted
+[11/10/23, 1:27:01 PM] Shadi Atamne: No we won’t be using a page builder.
+[11/10/23, 1:30:14 PM] Gary Teh: @15419086904 
+
+*this is the Javascript which you will use to read an Ethereum wallet address*
+https://gist.github.com/garyjob/4156bcefced981b0e9c416239276851c
+
+*this is the Javascript which you will use to read an Solana wallet address*
+https://gist.github.com/garyjob/1e3ed1342c20aadae0c091ad277f0198
+
+*Time Taken: 10 minutes*
+[11/10/23, 1:30:16 PM] Shadi Atamne: I’ve been building custom sites for 15 years now and my expertise is in developing wordpress themes that are easy for my clients to use.
+[11/10/23, 1:31:17 PM] Gary Teh: Exercise your autonomy @15419086904. You are the best judge for the path you should take regarding the codebase you are working on 🙂🙏
+
+Just treat what our inputs as just inputs to your neural network for computation and nothing more ‎<This message was edited>
+[11/10/23, 1:33:35 PM] Shadi Atamne: Page builders like elementor or divi are used by every digital marketing agency out there so that they don’t have to hire real developers
+[11/10/23, 1:39:06 PM] Anupa/diya: I thought it was more like an editor
+[11/10/23, 1:39:22 PM] Gary Teh: Started experimenting with WhatsApp API integration
+https://business.whatsapp.com/developers/developer-hub
+
+Facebook App URL: https://developers.facebook.com/apps/1755861778249170/add/
+
+*Start Time: 1330Hrs*
+[11/10/23, 1:41:27 PM] Shadi Atamne: Nope. Wordpress has a pretty robust editor called Gutenberg
+[11/10/23, 1:42:48 PM] Shadi Atamne: And I built custom gutenberg content blocks
+‎[11/10/23, 1:43:30 PM] Anupa/diya: ‎image omitted
+[11/10/23, 1:43:37 PM] Anupa/diya: Looks great
+[11/10/23, 1:43:38 PM] Shadi Atamne: So each section of content on the site is a gutenberg block
+[11/10/23, 1:43:44 PM] Anupa/diya: Should we try it
+[11/10/23, 1:45:03 PM] Shadi Atamne: I’m trying to explain that this is how I’ve already developed the site…
+[11/10/23, 1:45:12 PM] Anupa/diya: Looks easier to collaboratively work
+[11/10/23, 1:45:55 PM] Anupa/diya: The ui currently looks difficult .just a thought
+[11/10/23, 1:46:29 PM] Shadi Atamne: Look into Zappier’s zaps for gravityforms and whatsapp 😉
+[11/10/23, 1:47:30 PM] Shadi Atamne: The UI of what?
+[11/10/23, 1:49:03 PM] Anupa/diya: The website
+[11/10/23, 1:50:31 PM] Shadi Atamne: Lets talk more about this so I fully understand what you want to do
+[11/10/23, 1:51:21 PM] Anupa/diya: Hopefully nothing Like Gary ! 🤣🤣
+[11/10/23, 1:51:41 PM] Anupa/diya: If I can pitch in if required!
+[11/10/23, 1:52:18 PM] Shadi Atamne: Are you talking about the site i built?
+[11/10/23, 1:53:42 PM] Anupa/diya: Yes   I can edit If required.
+‎[11/10/23, 1:53:43 PM] Gary Teh: ‎image omitted
+[11/10/23, 1:58:07 PM] Shadi Atamne: I wasn’t done working on the visual aspects of the site because functionality was more urgent
+[11/10/23, 1:59:17 PM] Shadi Atamne: What you trying to do?
+[11/10/23, 2:01:28 PM] Gary Teh: Trying to pull the WhatsApp messages via API to auto award governance tokens.
+
+Nothing to do with what you are doing immediately right now. But way down the road, if this infrastructure works users should be able to see how their governance tokens were automatically awarded to them. 
+
+Right now the awarding is a manual process. ‎<This message was edited>
+[11/10/23, 2:03:25 PM] Gary Teh: Regarding @918017107841 input. Just listen to it and shelf it for now. 
+
+Once you are ready with what you are working on just show us what the system and how it should be used. 🙂🙏 ‎<This message was edited>
+[11/10/23, 2:05:09 PM] Shadi Atamne: I thought thats what you were probably thinking and thats why I mentioned Zappier.
+[11/10/23, 2:05:55 PM] Shadi Atamne: Sounds good
+[11/10/23, 2:06:10 PM] Gary Teh: I see. Which Zapier integrator are you suggesting. Maybe that route will be easier
+
+Send me the link ‎<This message was edited>
+‎[11/10/23, 2:09:00 PM] Gary Teh: ‎image omitted
+[11/10/23, 2:09:52 PM] Shadi Atamne: Since I’m using Gravity Forms for submissions, we use those submitted fields to trigger a whatsapp event
+[11/10/23, 2:10:14 PM] Gary Teh: I see.
+[11/10/23, 2:10:44 PM] Shadi Atamne: And gravityforms has a bunch of integrations
+[11/10/23, 2:10:51 PM] Shadi Atamne: On zappier
+[11/10/23, 2:12:33 PM] Shadi Atamne: So my biggest question is, how do you want to handle the form submissions?
+[11/10/23, 2:14:31 PM] Shadi Atamne: For the governance token part that you want to achieve, the form submissions need to also create users
+[11/10/23, 2:15:55 PM] Gary Teh: That is true. 
+For the awarding of governance tokens parts. Too much details to actually go into right now. 
+I will come up with some specifications once we figured out that the tech part actually works.
+
+Key requirements for the automation of this is that existing DAO members active in our WhatsApp channels do not need to adopt any form of new behavior ‎<This message was edited>
+[11/10/23, 2:16:23 PM] Gary Teh: Shoot an email to admin@truesight.me
+[11/10/23, 2:18:20 PM] Shadi Atamne: The api stuff works, already looked into it 😬
+[11/10/23, 2:19:28 PM] Gary Teh: So basically you are saying if I texted you this message and then indicate this below
+
+*Time Taken: 30 minutes*
+
+There is a way to pick up this specific message and then attribute 50TDG for myself? ‎<This message was edited>
+[11/10/23, 2:19:47 PM] Shadi Atamne: Gravity Forms and google sheets zappier integration to pull in DAO member info and create new users
+[11/10/23, 2:20:24 PM] Gary Teh: We are talking about different things. Nvm. Will share this use case more the next time we meet in facetime
+[11/10/23, 2:21:01 PM] Shadi Atamne: I get what you are trying to do. Let’s talk more about it soon.
+‎[11/10/23, 2:23:11 PM] Gary Teh: ‎image omitted
+[11/10/23, 2:27:57 PM] Gary Teh: The vision would that it eventually tracks across our group members activities on Instagram, LinkedIn, Telegram and Discord and automatically awards them with governance tokens whenever they do something that contributes to any of our projects
+
+That way, members Do Nothing different than what they are already doing but get ever more governance tokens and voting rights in our DAO as they carry out their normal course of activities in their daily life
+
+And then way way later on these records notarized on our own chain ran on nodes in the SunMint cluster ran in the facilities provided by our DAO members
+
+You see how I am gradually stitching all these different components in our Eco-System together 🤔 ‎<This message was edited>
+[11/12/23, 1:42:57 PM] Shadi Atamne: I see what your vision is and how complicated it’s going to get lol BUT not impossible. I like this challenge. My brain is now trying to figure out the architecture of this.
+[11/12/23, 1:49:46 PM] Shadi Atamne: @14153000019 this is how we connect and sync form submissions with the current google sheets: 
+https://gravitywiz.com/documentation/gravity-forms-google-sheets/
+‎[11/12/23, 2:03:46 PM] Gary Teh: ‎<attached: 00000003-PHOTO-2023-11-12-14-03-46.jpg>
+‎[11/12/23, 2:03:47 PM] Gary Teh: ‎<attached: 00000004-PHOTO-2023-11-12-14-03-47.jpg>
+[11/12/23, 2:04:49 PM] Shadi Atamne: Using Gravityforms, we can connect to all these different services and then trigger our custom events via Gravityforms (ie send a whatsapp msg)
+[11/12/23, 2:05:08 PM] Shadi Atamne: https://zapier.com/apps/gravity-forms/integrations/instagram
+[11/12/23, 2:05:43 PM] Shadi Atamne: Example of connecting GForms with IG
+[11/12/23, 2:07:19 PM] Shadi Atamne: So basically, gravityforms will be how we connect everything
+[11/15/23, 8:54:48 PM] Anupa/diya: @15419086904 the first onboarding process went well. In terms of the form inputs please look at the  current format
+
+We will need to add another page for another onbaording process which I am currently  getting the information together. Please factor that in
+[11/15/23, 8:55:17 PM] Anupa/diya: @14153000019 the governance document has a lot of commentary by Anita and Aleksa . Can we get rid of those
+[11/15/23, 8:57:57 PM] Gary Teh: Refer to this 
+
+Edgar.TrueSight.me/whitepaper 
+
+You can safely ignore the governance document shared by Aleksa and Anita
+
+Aleksa work has already been incorporated into our white paper ‎<This message was edited>
+[11/15/23, 8:59:22 PM] Anupa/diya: This is already there. Then won't re route anything
+[11/15/23, 9:00:26 PM] Gary Teh: I spoke with Aleksa two months 
+
+What she provided was just reference
+
+We have already evolved way beyond that with all the voting activities going on since she drafted that document last year
+[11/15/23, 9:01:45 PM] Shadi Atamne: What is needed from me exactly?
+[11/15/23, 9:03:17 PM] Anupa/diya: 1. Update the submission forms with the current form that is there on the true sight.me 
+
+2. I will designing another page so we will have to add that as well
+[11/15/23, 9:04:41 PM] Anupa/diya: The ux of the join us has to have one more element and it needs to go on the main page since it is not project specific
+[11/15/23, 9:05:04 PM] Shadi Atamne: @14153000019 are there high resolution versions of the images in the white paper and possibly the Agroverse logo raw file?
+‎[11/15/23, 9:06:52 PM] Anupa/diya: ‎<attached: 00000018-PHOTO-2023-11-15-21-06-52.jpg>
+[11/15/23, 9:07:17 PM] Shadi Atamne: Ok 👍🏽
+[11/15/23, 9:08:08 PM] Anupa/diya: I have also updated the text
+[11/15/23, 9:08:45 PM] Anupa/diya: You can just copy it from the main site
+[11/15/23, 9:09:13 PM] Gary Teh: I created a lot of those in here 
+
+https://www.figma.com/file/6eeHKiU4YH3o0bzTenbh04?node-id=0:1&locale=en&type=design
+
+And 
+
+https://www.figma.com/file/5mjGBssanqhmb2foWP2HJf?locale=en&type=design
+[11/15/23, 9:09:16 PM] Gary Teh: You will need to dig around
+[11/15/23, 9:10:09 PM] Anupa/diya: I think @15419086904 will need the actual source for the high resolutions  ?
+[11/15/23, 9:10:15 PM] Shadi Atamne: Can you give me editing permission for the google docs?
+[11/15/23, 9:10:30 PM] Anupa/diya: Annia will have the agroverse raw file
+[11/15/23, 9:10:32 PM] Shadi Atamne: Correct
+[11/15/23, 9:11:02 PM] Anupa/diya: We only have the png files
+[11/15/23, 9:11:05 PM] Shadi Atamne: Ok. Thanks Anupa
+[11/15/23, 9:11:17 PM] Shadi Atamne: That’s fine too
+[11/15/23, 9:11:20 PM] Anupa/diya: I can send you what I have
+[11/15/23, 9:11:34 PM] Shadi Atamne: That would be great
+[11/15/23, 9:11:50 PM] Anupa/diya: Sure !
+[11/15/23, 9:12:46 PM] Shadi Atamne: I don’t want to get them from wix because wix adds a bunch of metadata to uploaded images
+[11/15/23, 9:16:19 PM] Anupa/diya: I will send you the Google drive file
+[11/15/23, 9:17:14 PM] Anupa/diya: ‎This message was deleted.
+‎[11/15/23, 9:19:35 PM] Gary Teh: ‎<attached: 00000037-PHOTO-2023-11-15-21-19-35.jpg>
+‎[11/15/23, 9:19:35 PM] Gary Teh: ‎<attached: 00000038-PHOTO-2023-11-15-21-19-35.jpg>
+[11/15/23, 9:19:35 PM] Anupa/diya: Sent
+[11/15/23, 9:20:10 PM] Anupa/diya: Sent
+‎[11/15/23, 9:20:33 PM] Gary Teh: ‎<attached: 00000041-PHOTO-2023-11-15-21-20-33.jpg>
+[11/15/23, 9:21:20 PM] Anupa/diya: Please tell them earning daily for immediate withdrawal isn't happening
+[11/15/23, 9:22:02 PM] Anupa/diya: 🤣
+[11/15/23, 9:22:35 PM] Gary Teh: 🤔🤷‍♂️🤣
+[11/15/23, 9:23:22 PM] Anupa/diya: That's a fact ! It goes back to the purpose conversation from yesterday
+‎[11/15/23, 9:23:47 PM] Gary Teh: ‎<attached: 00000046-PHOTO-2023-11-15-21-23-47.jpg>
+‎[11/15/23, 9:23:48 PM] Gary Teh: ‎<attached: 00000047-PHOTO-2023-11-15-21-23-48.jpg>
+‎[11/15/23, 9:23:49 PM] Gary Teh: ‎<attached: 00000048-PHOTO-2023-11-15-21-23-49.jpg>
+‎[11/15/23, 9:24:24 PM] Anupa/diya: ‎<attached: 00000049-PHOTO-2023-11-15-21-24-24.jpg>
+[11/15/23, 9:24:28 PM] Anupa/diya: This is my view
+[11/15/23, 9:24:50 PM] Gary Teh: He should be able to figure it out himself just by looking at what is on the site 
+
+If he can’t figure it out then the copy writing on the site is not self explanatory enough 🤔
+[11/15/23, 9:25:10 PM] Gary Teh: I am looking at it on my iPhone with  browser ‎<This message was edited>
+‎[11/15/23, 9:25:42 PM] Anupa/diya: ‎<attached: 00000053-PHOTO-2023-11-15-21-25-42.jpg>
+‎[11/15/23, 9:25:43 PM] Anupa/diya: ‎<attached: 00000054-PHOTO-2023-11-15-21-25-43.jpg>
+[11/15/23, 9:25:48 PM] Anupa/diya: This is my phone
+[11/15/23, 9:26:14 PM] Anupa/diya: Very strange
+‎[11/15/23, 9:26:15 PM] Gary Teh: ‎<attached: 00000057-PHOTO-2023-11-15-21-26-15.jpg>
+[11/15/23, 9:26:24 PM] Gary Teh: 🤷‍♂️
+[11/15/23, 9:26:41 PM] Anupa/diya: I know ! I am using an android
+[11/15/23, 9:27:06 PM] Anupa/diya: Let me check
+‎[11/15/23, 9:27:42 PM] Gary Teh: ‎<attached: 00000061-VIDEO-2023-11-15-21-27-42.mp4>
+[11/15/23, 9:28:12 PM] Shadi Atamne: How it’s on my iphone too
+[11/15/23, 9:29:16 PM] Shadi Atamne: With wix, depending on what template is used
+[11/15/23, 9:29:50 PM] Shadi Atamne: Additional css is needed for specific devices
+[11/15/23, 9:30:09 PM] Shadi Atamne: Not all templates are fully responsive
+[11/15/23, 10:24:16 PM] Anupa/diya: Let me speak to the customer care
+[11/15/23, 10:24:27 PM] Anupa/diya: Normally they are pretty goof
+[11/15/23, 10:24:30 PM] Anupa/diya: Good
+‎[11/16/23, 8:27:41 AM] Gary Teh: ‎<attached: 00000069-PHOTO-2023-11-16-08-27-41.jpg>
+‎[11/16/23, 8:28:47 AM] Gary Teh: ‎<attached: 00000070-PHOTO-2023-11-16-08-28-47.jpg>
+[11/16/23, 8:32:28 AM] Anupa/diya: This person is looking at a profit shade
+[11/16/23, 8:32:37 AM] Anupa/diya: Share
+‎[11/16/23, 9:58:10 AM] Gary Teh: ‎<attached: 00000073-PHOTO-2023-11-16-09-58-10.jpg>
+[11/16/23, 9:59:10 AM] Anupa/diya: Obviously he didn't get tye Dao memo 🤣
+[11/16/23, 9:59:58 AM] Anupa/diya: I invested 25 hours from the time I started
+‎[11/16/23, 10:47:29 AM] Gary Teh: ‎<attached: 00000076-PHOTO-2023-11-16-10-47-29.jpg>
+[11/17/23, 3:13:37 AM] Anupa/diya: Till people sew monetary success it will be very difficult to get people to join
+[11/17/23, 3:15:31 AM] Anupa/diya: Unless they are getting visibility or they want to built their portfolio or
+[11/17/23, 3:15:40 AM] Anupa/diya: They really align with the cause
+[11/17/23, 6:57:45 AM] Gary Teh: Which is good. 🤩🙏
+[11/17/23, 6:57:54 AM] Gary Teh: Self selection!!
+[11/23/23, 3:33:41 PM] Gary Teh: @15419086904 want to try uploading your Wordpress site source code there?
+
+https://github.com/TrueSightDAO/mainsite
+
+That way we can have more pairs of eyes looking at the site and extending it 🙂🙏
+‎[12/4/23, 4:00:52 PM] Gary Teh: ‎<attached: 00000083-PHOTO-2023-12-04-16-00-52.jpg>
+‎[12/14/23, 12:01:20 AM] Gary Teh: ‎<attached: 00000084-PHOTO-2023-12-14-00-01-20.jpg>
+[12/14/23, 12:02:36 AM] Gary Teh: @918017107841 anyway to have a link on this page pointing to Agroverse.shop?
+
+https://www.truesight.me/agroverse
+[12/14/23, 12:03:06 AM] Gary Teh: @918017107841 anyway to have a link on this page pointing to Edgar.TrueSight.me?
+
+https://www.truesight.me/edgar
+[12/14/23, 3:10:36 AM] Anupa/diya: is this different from what was earlier discussed?
+[12/14/23, 3:14:26 AM] Anupa/diya: @15419086904 Just wondering what the progress was with the wordpress website. Can we add all these aspects to the that website? As I had said earlier then I can use this wi website for another potential TruSight Dao project
+[12/14/23, 3:17:54 AM] Anupa/diya: @6594897484 Would you like to removed from the group.
+[12/14/23, 3:18:21 AM] Anupa/diya: The onboarding process is ready and on the website
+[12/14/23, 5:02:47 AM] Gary Teh: What was discussed earlier was to point this to our ledger 🙂🙏
