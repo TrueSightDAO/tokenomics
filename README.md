@@ -4,7 +4,25 @@ This library utilized OpenAi to automatically score contribution submissions by 
 
 ## Pre-requisites
   - Python version 3.11.6
-  
+
+
+## Usage
+
+Starting the Jyupter Notebook
+```
+jupyter notebook
+```
+
+WhatsApp chat log location
+```
+\data
+```
+
+Output CSV files location 
+```
+\analysis
+```
+
 
 ## Setup
 
