@@ -13,6 +13,18 @@ Starting the Jyupter Notebook
 jupyter notebook
 ```
 
+Execution scripts
+```
+# for awarding TDG tokens
+TDG_scoring.ipynb
+```
+
+```
+# for updating sales and records on Agroverse AGL contracts
+AGL_scoring.ipynb
+```
+
+
 WhatsApp chat log location
 ```
 \data
