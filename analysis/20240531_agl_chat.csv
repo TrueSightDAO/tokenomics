@@ -2,18 +2,18 @@ Date,Description,Entity,Amount,Currency,Transaction Type
 20240506,Spend  $5.99 for reusable coffee bag,Gary Teh, -1,Kraft Pouches, Asset
 20240506,Spend  $5.99 for reusable coffee bag,Gary Teh, 5.99, USD, Asset
 20240506,"Spent $116.91 for 18 servings moka pot
-‎",Gary Teh, -18,1 Gallon Zip Loc Bags, Asset
-20240506,"Spent $116.91 for 18 servings moka pot
 ‎",Gary Teh, 116.91, USD, Asset
 20240506,"‎<attached: 00001623-PHOTO-2024-05-06-13-16-01.jpg>
 ‎",Gary Teh, 0, Unknown, Unknown
 20240506,‎<attached: 00001624-PHOTO-2024-05-06-13-16-09.jpg>,Gary Teh, 0, Unknown, Unknown
 20240507,"Spent 15 minutes talking with @16468233438 on payment matters to Orlantildes and the management of the 15 KG Cacao samples
-‎",Gary Teh,0,Unknown,Unknown
+‎",Gary Teh, -15,Cacao Nibs KG, Unknown
+20240507,"Spent 15 minutes talking with @16468233438 on payment matters to Orlantildes and the management of the 15 KG Cacao samples
+‎",Gary Teh, 0, Unknown, Unknown
 20240507,‎<attached: 00001626-PHOTO-2024-05-07-10-25-36.jpg>,Gary Teh, 0, Unknown, Unknown
 20240507,"Spent an hour and a half generating this video clip and sharing it
 
-https://www.instagram.com/reel/C6raMadvJk3/?igsh=MzRlODBiNWFlZA==",Gary Teh,0,Unknown,Unknown
+https://www.instagram.com/reel/C6raMadvJk3/?igsh=MzRlODBiNWFlZA==",Gary Teh, 0, Unknown, Unknown
 20240507,Spent 10 minutes updating our Facebook page presence,Gary Teh, 0, Unknown, Unknown
 20240507,"Sold 1 pound for usd20 to Chris
 ‎",Gary Teh, -0.453592,Cacao Nibs KG, Assets
@@ -43,9 +43,9 @@ This will aid in our content marketing efforts once SEO kicks in",Gary Teh, 0, U
 
 https://www.instagram.com/reel/C64VlXivsSb/?igsh=MzRlODBiNWFlZA== ‎<This message was edited>",Gary Teh, 0, Unknown, Unknown
 20240513,"Spend US dollar $19.47 for 4 bottles of 52 fl oz oat milk and 200 tree fl oz espresso cups
-‎",Gary Teh, -4,8 Ounce Package Craft Pouch, Asset
+‎",Gary Teh, -4,1. Kraft Pouches, Unknown
 20240513,"Spend US dollar $19.47 for 4 bottles of 52 fl oz oat milk and 200 tree fl oz espresso cups
-‎",Gary Teh, 19.47, USD, Asset
+‎",Gary Teh, 0, Unknown, Unknown
 20240513,‎<attached: 00001641-PHOTO-2024-05-13-12-38-38.jpg>,Gary Teh, 0, Unknown, Unknown
 20240514,"Spent US dollar $57.38 on mold for making cacao
 ‎",Gary Teh, 57.38, USD, Asset
@@ -54,528 +54,30 @@ https://www.instagram.com/reel/C64VlXivsSb/?igsh=MzRlODBiNWFlZA== ‎<This messa
 20240514,‎<attached: 00001644-PHOTO-2024-05-14-12-02-08.jpg>,Gary Teh, 0, Unknown, Unknown
 20240514,"Spent 1 hour crafting this video and sharing it 
 
-https://www.instagram.com/reel/C69mK9dSyGZ/?igsh=MzRlODBiNWFlZA==",Gary Teh,0,Unknown,Unknown
-20240515,Spent an hour today we’re working the copy of our website,Gary Teh,0,Unknown,Unknown
-20240515,"Spend one and a half hour acquiring Washington state operators certificate
-‎",Gary Teh, 0, Unknown, Asset
-20240515,"‎<attached: 00001648-PHOTO-2024-05-15-10-21-26.jpg>
-‎",Gary Teh, 0, Unknown, Unknown
-20240515,‎<attached: 00001649-PHOTO-2024-05-15-10-21-28.jpg>,Gary Teh,0,Unknown,Unknown
-20240522,"Levi and Elinor for the lama bus decided to buy a bag this morning for usd10
-‎",Gary Teh, -1,8 Ounce Package Craft Pouch, Asset
-20240522,"Levi and Elinor for the lama bus decided to buy a bag this morning for usd10
-‎",Gary Teh, 10.00, USD, Asset
-20240522,‎<attached: 00001651-PHOTO-2024-05-22-11-55-32.jpg>,Gary Teh, 0, Unknown, Unknown
-20240522,Macy bought 1 bag of 8 ounce of cacao nibs for USD $10,Gary Teh, -1,8 Ounce Package Craft Pouch, Asset
-20240522,Macy bought 1 bag of 8 ounce of cacao nibs for USD $10,Gary Teh, 10.00, USD, Asset
-20240522,I spent $20 getting this dandelion syrup for making hot chocolate with,Gary Teh, -1,Kraft Pouches, Assets
-20240522,I spent $20 getting this dandelion syrup for making hot chocolate with,Gary Teh, 20.00, USD, Assets
-20240522,Lady bought two samples of One US dollar Cacao drink,Gary Teh, -2,8 Ounce Package Craft Pouch, Asset
-20240522,Lady bought two samples of One US dollar Cacao drink,Gary Teh, 2.00, USD, Asset
-20240522,"Lady bought one bag of 8 ounce cacao nips for US$10 in total
-‎",Gary Teh, -1,8 Ounce Package Craft Pouch, Asset
-20240522,"Lady bought one bag of 8 ounce cacao nips for US$10 in total
-‎",Gary Teh, 10.00, USD, Asset
-20240522,"‎<attached: 00001656-PHOTO-2024-05-22-13-13-33.jpg>
-‎",Gary Teh, 0, Unknown, Unknown
-20240522,‎<attached: 00001657-PHOTO-2024-05-22-13-13-33.jpg>,Gary Teh, 0, Unknown, Unknown
-20240522,Sold 1 cup of espresso for 1USD,Gary Teh, -1,Espresso cup, Asset
-20240522,Sold 1 cup of espresso for 1USD,Gary Teh, 1.00, USD, Asset
-20240522,Sold one cup of espresso for one USD,Gary Teh, -1,Espresso cup, Assets
-20240522,Sold one cup of espresso for one USD,Gary Teh, 1.00, USD, Assets
-20240522,Sold one more bag for usd10,Gary Teh, -1,8 Ounce Package Craft Pouch, Assets
-20240522,Sold one more bag for usd10,Gary Teh, 10.00, USD, Assets
-20240522,Sold one bag for usd10,Gary Teh, -1,8 Ounce Package Craft Pouch, Assets
-20240522,Sold one bag for usd10,Gary Teh, 10.00, USD, Assets
-20240522,"Sold one bag for usd10
-
-She uses cacao for her skin allergic reaction as well
-‎",Gary Teh, -1,8 Ounce Package Craft Pouch, Asset
-20240522,"Sold one bag for usd10
-
-She uses cacao for her skin allergic reaction as well
-‎",Gary Teh, 10.00, USD, Asset
-20240522,"‎<attached: 00001663-PHOTO-2024-05-22-13-13-44.jpg>
-‎",Gary Teh, 0, Unknown, Unknown
-20240522,"‎<attached: 00001664-PHOTO-2024-05-22-13-13-45.jpg>
-‎",Gary Teh, 0, Unknown, Unknown
-20240522,"‎<attached: 00001665-PHOTO-2024-05-22-13-13-47.jpg>
-‎",Gary Teh, 0, Unknown, Unknown
-20240522,"‎<attached: 00001666-PHOTO-2024-05-22-13-13-48.jpg>
-‎",Gary Teh, 0, Unknown, Unknown
-20240522,‎<attached: 00001667-PHOTO-2024-05-22-13-13-49.jpg>,Gary Teh, 0, Unknown, Unknown
-20240506,Spend  $5.99 for reusable coffee bag,Gary Teh, -1,Kraft Pouches, Assets
-20240506,Spend  $5.99 for reusable coffee bag,Gary Teh, 5.99, USD, Assets
-20240506,"Spent $116.91 for 18 servings moka pot
-‎",Gary Teh, 116.91, USD, Asset
-20240506,"‎<attached: 00001623-PHOTO-2024-05-06-13-16-01.jpg>
-‎",Gary Teh,0,Unknown,Unknown
-20240506,‎<attached: 00001624-PHOTO-2024-05-06-13-16-09.jpg>,Gary Teh, 0, Unknown, Unknown
-20240507,"Spent 15 minutes talking with @16468233438 on payment matters to Orlantildes and the management of the 15 KG Cacao samples
-‎",Gary Teh,0,Unknown,Unknown
-20240507,‎<attached: 00001626-PHOTO-2024-05-07-10-25-36.jpg>,Gary Teh, 0, Unknown, Unknown
-20240507,"Spent an hour and a half generating this video clip and sharing it
-
-https://www.instagram.com/reel/C6raMadvJk3/?igsh=MzRlODBiNWFlZA==",Gary Teh,0,Unknown,Unknown
-20240507,Spent 10 minutes updating our Facebook page presence,Gary Teh, 0, Unknown, Unknown
-20240507,"Sold 1 pound for usd20 to Chris
-‎",Gary Teh, -0.453592,Cacao Nibs KG, Asset
-20240507,"Sold 1 pound for usd20 to Chris
-‎",Gary Teh, 20.00, USD, Asset
-20240507,‎<attached: 00001630-PHOTO-2024-05-07-20-53-15.jpg>,Gary Teh, 0, Unknown, Unknown
-20240509,"Spent two hours making the recording and sharing it
-
-https://www.tiktok.com/t/ZTL4y3WP1/
-‎",Gary Teh,0,Unknown,Unknown
-20240511,‎<attached: 00001632-PHOTO-2024-05-11-08-26-17.jpg>,Gary Teh,0,Unknown,Unknown
-20240511,"Spent an hour to update our copy to just center everything around Cacao from the Amazonian region
-
-https://www.agroverse.shop/",Gary Teh,0,Unknown,Unknown
-20240511,"Spent an hour updating our WIX shopping cart for dynamic shipping prices within the USA using USPS ground advantage 
-
-https://support.wix.com/en/article/wix-stores-setting-up-real-time-shipping-calculation-with-usps ‎<This message was edited>",Gary Teh,0,Unknown,Unknown
-20240511,"Sent 45 minutes updating our site’s footer to ensure prominent display of social and newletter sign up form on every single page of our website. 
-
-This will aid in our content marketing efforts once SEO kicks in",Gary Teh,0,Unknown,Unknown
-20240511,"Spend 10 minutes, reaching out to the two shamans to check if they will be interested to cross promote the Cacao ceremony is on our website
-‎",Gary Teh,0,Unknown,Unknown
-20240506,Spend  $5.99 for reusable coffee bag,Gary Teh, 5.99, USD, Assets
-20240506,"Spent $116.91 for 18 servings moka pot
-‎",Gary Teh, 116.91, USD, Asset
-20240506,"‎<attached: 00001623-PHOTO-2024-05-06-13-16-01.jpg>
-‎",Gary Teh, 0, Unknown, Unknown
-20240506,‎<attached: 00001624-PHOTO-2024-05-06-13-16-09.jpg>,Gary Teh,0,Unknown,Unknown
-20240507,"Spent 15 minutes talking with @16468233438 on payment matters to Orlantildes and the management of the 15 KG Cacao samples
-‎",Gary Teh,0,Unknown,Unknown
-20240507,‎<attached: 00001626-PHOTO-2024-05-07-10-25-36.jpg>,Gary Teh,0,Unknown,Unknown
-20240507,"Spent an hour and a half generating this video clip and sharing it
-
-https://www.instagram.com/reel/C6raMadvJk3/?igsh=MzRlODBiNWFlZA==",Gary Teh,0,Unknown,Unknown
-20240507,Spent 10 minutes updating our Facebook page presence,Gary Teh,0,Unknown,Unknown
-20240507,"Sold 1 pound for usd20 to Chris
-‎",Gary Teh, -0.453592,Cacao Nibs KG, Asset
-20240507,"Sold 1 pound for usd20 to Chris
-‎",Gary Teh, 20.00, USD, Asset
-20240507,‎<attached: 00001630-PHOTO-2024-05-07-20-53-15.jpg>,Gary Teh, 0, Unknown, Unknown
-20240509,"Spent two hours making the recording and sharing it
-
-https://www.tiktok.com/t/ZTL4y3WP1/
-‎",Gary Teh,0,Unknown,Unknown
-20240511,‎<attached: 00001632-PHOTO-2024-05-11-08-26-17.jpg>,Gary Teh,0,Unknown,Unknown
-20240511,"Spent an hour to update our copy to just center everything around Cacao from the Amazonian region
-
-https://www.agroverse.shop/",Gary Teh,0,Unknown,Unknown
-20240511,"Spent an hour updating our WIX shopping cart for dynamic shipping prices within the USA using USPS ground advantage 
-
-https://support.wix.com/en/article/wix-stores-setting-up-real-time-shipping-calculation-with-usps ‎<This message was edited>",Gary Teh, 0, Unknown, Unknown
-20240511,"Sent 45 minutes updating our site’s footer to ensure prominent display of social and newletter sign up form on every single page of our website. 
-
-This will aid in our content marketing efforts once SEO kicks in",Gary Teh,0,Unknown,Unknown
-20240511,"Spend 10 minutes, reaching out to the two shamans to check if they will be interested to cross promote the Cacao ceremony is on our website
-‎",Gary Teh, 0, Unknown, Unknown
-20240511,"‎<attached: 00001637-PHOTO-2024-05-11-13-31-22.jpg>
-‎",Gary Teh,0,Unknown,Unknown
-20240511,‎<attached: 00001638-PHOTO-2024-05-11-13-31-22.jpg>,Gary Teh, 0, Unknown, Unknown
-20240512,"Spent two hours filming and editing this
-
-https://www.instagram.com/reel/C64VlXivsSb/?igsh=MzRlODBiNWFlZA== ‎<This message was edited>",Gary Teh, 0, Unknown, Unknown
-20240513,"Spend US dollar $19.47 for 4 bottles of 52 fl oz oat milk and 200 tree fl oz espresso cups
-‎",Gary Teh,0,Unknown,Unknown
-20240513,‎<attached: 00001641-PHOTO-2024-05-13-12-38-38.jpg>,Gary Teh, 0, Unknown, Unknown
-20240514,"Spent US dollar $57.38 on mold for making cacao
-‎",Gary Teh, 57.38, USD, Assets
-20240514,"‎<attached: 00001643-PHOTO-2024-05-14-12-02-05.jpg>
-‎",Gary Teh,0,Unknown,Unknown
-20240514,‎<attached: 00001644-PHOTO-2024-05-14-12-02-08.jpg>,Gary Teh,0,Unknown,Unknown
-20240514,"Spent 1 hour crafting this video and sharing it 
-
-https://www.instagram.com/reel/C69mK9dSyGZ/?igsh=MzRlODBiNWFlZA==",Gary Teh,0,Unknown,Unknown
-20240515,Spent an hour today we’re working the copy of our website,Gary Teh,0,Unknown,Unknown
-20240515,"Spend one and a half hour acquiring Washington state operators certificate
-‎",Gary Teh, 0, Unknown, Unknown
-20240515,"‎<attached: 00001648-PHOTO-2024-05-15-10-21-26.jpg>
-‎",Gary Teh, 0, Unknown, Unknown
-20240515,‎<attached: 00001649-PHOTO-2024-05-15-10-21-28.jpg>,Gary Teh, 0, Unknown, Unknown
-20240522,"Levi and Elinor for the lama bus decided to buy a bag this morning for usd10
-‎",Gary Teh, 10.00, USD, Asset
-20240522,‎<attached: 00001651-PHOTO-2024-05-22-11-55-32.jpg>,Gary Teh, 0, Unknown, Unknown
-20240522,Macy bought 1 bag of 8 ounce of cacao nibs for USD $10,Gary Teh, -1,8 Ounce Package Craft Pouch, Asset
-20240522,Macy bought 1 bag of 8 ounce of cacao nibs for USD $10,Gary Teh, 10.00, USD, Asset
-20240522,I spent $20 getting this dandelion syrup for making hot chocolate with,Gary Teh, 20.00, USD, Assets
-20240522,Lady bought two samples of One US dollar Cacao drink,Gary Teh, -2,Cacao Nibs KG, Assets
-20240522,Lady bought two samples of One US dollar Cacao drink,Gary Teh, 2.00, USD, Assets
-20240522,"Lady bought one bag of 8 ounce cacao nips for US$10 in total
-‎",Gary Teh, -1,8 Ounce Package Craft Pouch, Asset
-20240522,"Lady bought one bag of 8 ounce cacao nips for US$10 in total
-‎",Gary Teh, 10.00, USD, Asset
-20240522,"‎<attached: 00001656-PHOTO-2024-05-22-13-13-33.jpg>
-‎",Gary Teh,0,Unknown,Unknown
-20240522,‎<attached: 00001657-PHOTO-2024-05-22-13-13-33.jpg>,Gary Teh,0,Unknown,Unknown
-20240522,Sold 1 cup of espresso for 1USD,Gary Teh, -1,Espress cup, Asset
-20240522,Sold 1 cup of espresso for 1USD,Gary Teh, 1.00, USD, Asset
-20240522,Sold one cup of espresso for one USD,Gary Teh, -1,Espresso cup, Asset
-20240522,Sold one cup of espresso for one USD,Gary Teh, 1.00, USD, Asset
-20240522,Sold one more bag for usd10,Gary Teh, -1,8 Ounce Package Craft Pouch, Assets
-20240522,Sold one more bag for usd10,Gary Teh, 10.00, USD, Assets
-20240522,Sold one bag for usd10,Gary Teh, -1, Kraft Pouches, Assets
-20240522,Sold one bag for usd10,Gary Teh, 10.00, USD, Assets
-20240522,"Sold one bag for usd10
-
-She uses cacao for her skin allergic reaction as well
-‎",Gary Teh, -1,8 Ounce Package Craft Pouch, Assets
-20240522,"Sold one bag for usd10
-
-She uses cacao for her skin allergic reaction as well
-‎",Gary Teh, 10.00, USD, Assets
-20240522,"‎<attached: 00001663-PHOTO-2024-05-22-13-13-44.jpg>
-‎",Gary Teh,0,Unknown,Unknown
-20240522,"‎<attached: 00001664-PHOTO-2024-05-22-13-13-45.jpg>
-‎",Gary Teh,0,Unknown,Unknown
-20240522,"‎<attached: 00001665-PHOTO-2024-05-22-13-13-47.jpg>
-‎",Gary Teh,0,Unknown,Unknown
-20240522,"‎<attached: 00001666-PHOTO-2024-05-22-13-13-48.jpg>
-‎",Gary Teh, 0, Unknown, Unknown
-20240522,‎<attached: 00001667-PHOTO-2024-05-22-13-13-49.jpg>,Gary Teh, 0, Unknown, Unknown
-20240522,"Sold one bag for usd10
-‎",Gary Teh, -1,8 Ounce Package Craft Pouch, Assets
-20240522,"Sold one bag for usd10
-‎",Gary Teh, 10.00, USD, Assets
-20240522,‎<attached: 00001669-PHOTO-2024-05-22-13-13-53.jpg>,Gary Teh, 0, Unknown, Unknown
-20240522,"Sold one bag for usd10
-‎",Gary Teh, -1,8 Ounce Package Craft Pouch, Asset
-20240522,"Sold one bag for usd10
-‎",Gary Teh, 10.00, USD, Asset
-20240522,‎<attached: 00001671-PHOTO-2024-05-22-13-13-58.jpg>,Gary Teh, 0, Unknown, Unknown
-20240522,"Sold one bag for usd10
-‎",Gary Teh, -1,Kraft Pouches, Asset
-20240522,"Sold one bag for usd10
-‎",Gary Teh, 10.00, USD, Asset
-20240522,‎<attached: 00001673-PHOTO-2024-05-22-13-14-00.jpg>,Gary Teh, 0, Unknown, Unknown
-20240522,"Sold one bag for usd10
-‎",Gary Teh, -1,8 Ounce Package Craft Pouch, Assets
-20240522,"Sold one bag for usd10
-‎",Gary Teh, 10.00, USD, Assets
-20240522,‎<attached: 00001675-PHOTO-2024-05-22-13-14-03.jpg>,Gary Teh,0,Unknown,Unknown
-20240522,"Sold one bag this morning for USD10
-‎",Gary Teh, -1,Kraft Pouches, Asset
-20240522,"Sold one bag this morning for USD10
-‎",Gary Teh, 10.00, USD, Asset
-20240522,‎<attached: 00001677-PHOTO-2024-05-22-13-14-05.jpg>,Gary Teh,0,Unknown,Unknown
-20240522,"Sold one more bag this morning for usd10
-‎",Gary Teh, -1,8 Ounce Package Craft Pouch, Asset
-20240522,"Sold one more bag this morning for usd10
-‎",Gary Teh, 10.00, USD, Asset
-20240522,"‎<attached: 00001679-PHOTO-2024-05-22-13-14-06.jpg>
-‎",Gary Teh,0,Unknown,Unknown
-20240522,‎<attached: 00001680-PHOTO-2024-05-22-13-14-07.jpg>,Gary Teh, 0, Unknown, Unknown
-20240522,"Received usd1 donations for chocolate drink
-‎",Gary Teh, 1.00, USD, Asset
-20240522,‎<attached: 00001682-PHOTO-2024-05-22-13-14-07.jpg>,Gary Teh, 0, Unknown, Unknown
-20240522,"Sold one bag to Nadia for usd10
-‎",Gary Teh, -1,8 Ounce Package Craft Pouch, Asset
-20240522,"Sold one bag to Nadia for usd10
-‎",Gary Teh, 10.00, USD, Asset
-20240522,‎<attached: 00001684-PHOTO-2024-05-22-13-14-08.jpg>,Gary Teh,0,Unknown,Unknown
-20240522,"Sold one for usd10
-‎",Gary Teh, -0.453592,Cacao Nibs KG, Asset
-20240522,"Sold one for usd10
-‎",Gary Teh, 10.00, USD, Asset
-20240522,‎<attached: 00001686-PHOTO-2024-05-22-13-14-09.jpg>,Gary Teh, 0, Unknown, Unknown
-20240522,"Ruby donated USd0.25 for a cup of cacao
-‎",Gary Teh, 0.25, USD, Assets
-20240522,‎<attached: 00001688-PHOTO-2024-05-22-13-14-09.jpg>,Gary Teh,0,Unknown,Unknown
-20240522,Mike donated usd5 for a cup of cacao,Gary Teh, 5.00, USD, Assets
-20240522,Ronen donated USD0.50 for a cup of cacao,Gary Teh, 0.50, USD, Asset
-20240522,"Random dude donated USD0.25 for a cup of cacao
-‎",Gary Teh, 0.25, USD, Assets
-20240522,‎<attached: 00001692-PHOTO-2024-05-22-13-14-10.jpg>,Gary Teh,0,Unknown,Unknown
-20240522,"Elinor sold off a bag of cacao for usd10 while I was away at the peace sign on the hill side
-‎",Gary Teh, -1,Cacao Nibs KG, Assets
-20240522,"Elinor sold off a bag of cacao for usd10 while I was away at the peace sign on the hill side
-‎",Gary Teh, 10.00, USD, Assets
-20240522,‎<attached: 00001694-PHOTO-2024-05-22-13-14-11.jpg>,Gary Teh, 0, Unknown, Unknown
-20240522,"Folks to run the booth that wants to educate folks to become vegan came and showed their support
-They bought usd10 for 1 bag
-‎",Gary Teh, -1,8 Ounce Package Craft Pouch, Asset
-20240522,"Folks to run the booth that wants to educate folks to become vegan came and showed their support
-They bought usd10 for 1 bag
-‎",Gary Teh, 10.00, USD, Asset
-20240522,‎<attached: 00001696-PHOTO-2024-05-22-13-14-12.jpg>,Gary Teh, 0, Unknown, Unknown
-20240522,"Sold 1 bag of 8 ounce to this retired physicists for usd10
-‎",Gary Teh, -1,8 Ounce Package Craft Pouch, Asset
-20240522,"Sold 1 bag of 8 ounce to this retired physicists for usd10
-‎",Gary Teh, 10.00, USD, Asset
-20240522,‎<attached: 00001698-PHOTO-2024-05-22-13-14-13.jpg>,Gary Teh, 0, Unknown, Unknown
-20240522,"Sold 2 bags this morning for a total of usd10
-‎",Gary Teh, -2,8 Ounce Package Craft Pouch, Asset
-20240522,"Sold 2 bags this morning for a total of usd10
-‎",Gary Teh, 0, Unknown, Asset
-20240522,"‎<attached: 00001700-PHOTO-2024-05-22-13-14-14.jpg>
-‎",Gary Teh,0,Unknown,Unknown
-20240522,‎<attached: 00001701-PHOTO-2024-05-22-13-14-14.jpg>,Gary Teh,0,Unknown,Unknown
-20240522,Received 1USD donations for a cup of cacao nibs,Gary Teh, 1.00, USD, Asset
-20240522,"Received 2USD donations from Thunder
-‎",Gary Teh, 2.00, USD, Assets
-20240522,‎<attached: 00001704-PHOTO-2024-05-22-13-14-15.jpg>,Gary Teh,0,Unknown,Unknown
-20240522,"Sold 1 bag for usd10
-‎",Gary Teh, -1,8 Ounce Package Craft Pouch, Asset
-20240522,"Sold 1 bag for usd10
-‎",Gary Teh, 10.00, USD, Asset
-20240522,"‎<attached: 00001706-PHOTO-2024-05-22-13-14-16.jpg>
-‎",Gary Teh,0,Unknown,Unknown
-20240522,‎<attached: 00001707-PHOTO-2024-05-22-13-14-17.jpg>,Gary Teh, 0, Unknown, Unknown
-20240522,Someone bought a bag of cacao for uSD10,Gary Teh, -1,8 Ounce Package Craft Pouch, Asset
-20240522,Someone bought a bag of cacao for uSD10,Gary Teh, 10.00, USD, Asset
-20240522,"Blake bought a bag of cacao for usd10
-‎",Gary Teh, -1,8 Ounce Package Craft Pouch, Assets
-20240522,"Blake bought a bag of cacao for usd10
-‎",Gary Teh, 10.00, USD, Assets
-20240522,‎<attached: 00001710-PHOTO-2024-05-22-13-14-18.jpg>,Gary Teh,0,Unknown,Unknown
-20240522,"Ray the healer supports our project by buying USD10 for a bag of cacao nibs
-‎",Gary Teh, -1,8 Ounce Package Craft Pouch, Asset
-20240522,"Ray the healer supports our project by buying USD10 for a bag of cacao nibs
-‎",Gary Teh, 10.00, USD, Asset
-20240522,‎<attached: 00001712-PHOTO-2024-05-22-13-14-19.jpg>,Gary Teh,0,Unknown,Unknown
-20240522,"Melody bought 1 bag of 8 ounce for usd10
-‎",Gary Teh, -1,8 Ounce Package Craft Pouch, Asset
-20240522,"Melody bought 1 bag of 8 ounce for usd10
-‎",Gary Teh, 10.00, USD, Asset
-20240522,‎<attached: 00001714-PHOTO-2024-05-22-13-14-19.jpg>,Gary Teh, 0, Unknown, Unknown
-20240522,MMAcy gifted usd20 worth of lilacs syrup for our medicine of the heart offerings,Gary Teh, 20.00, USD, Assets
-20240522,"MMAcy gifted usd20 worth of dandelion syrup for our medicine of the heart offering
-‎",Gary Teh, 20.00, USD, Assets
-20240522,"‎<attached: 00001717-PHOTO-2024-05-22-13-14-21.jpg>
-‎",Gary Teh,0,Unknown,Unknown
-20240522,‎<attached: 00001718-PHOTO-2024-05-22-13-14-21.jpg>,Gary Teh,0,Unknown,Unknown
-20240522,"@14153000019 great job with the sales, looks like personal outreach is working best!",Val Lapidus, 0, Unknown, Unknown
-20240522,Me and Elinor spent a total of 30 hours each this past week promoting our Cacao,Gary Teh, 0, Unknown, Unknown
-20240522,"Spent usd15.20 for 4 bottles of oat milk
-‎",Gary Teh, -4,Kraft Pouches, Asset
-20240522,"Spent usd15.20 for 4 bottles of oat milk
-‎",Gary Teh, 15.20, USD, Asset
-20240522,‎<attached: 00001722-PHOTO-2024-05-22-16-38-40.jpg>,Gary Teh,0,Unknown,Unknown
-20240522,"Spanish US dollar $10.83 on 400 cups of 3 oz
-‎",Gary Teh, -400,espresso cup, Asset
-20240522,"Spanish US dollar $10.83 on 400 cups of 3 oz
-‎",Gary Teh, 10.83, USD, Asset
-20240522,‎<attached: 00001724-PHOTO-2024-05-22-16-49-08.jpg>,Gary Teh, 0, Unknown, Unknown
-20240522,"Spent usd27.45 for fuel
-‎",Gary Teh, 27.45, USD, Asset
-20240522,‎<attached: 00001726-PHOTO-2024-05-22-22-44-04.jpg>,Gary Teh,0,Unknown,Unknown
-20240523,Spent one hour today having a back-and-forth with Val and Orlantildes on the payments,Gary Teh,0,Unknown,Unknown
-20240523,"Spent an hour today editing the video for posting today unfortunately, the bandwidth was so bad it does not",Gary Teh, 0, Unknown, Unknown
-20240523,"Spent 15 minutes doing the mathematics on cause put back difference between shipping half a ton and 1 ton
-
-From the inventory perspective we do not get a lot of cost savings per 8 ounce bag shipping one versus half a ton
-‎",Gary Teh, 0, Unknown, Unknown
-20240523,‎<attached: 00001730-PHOTO-2024-05-23-18-51-40.jpg>,Gary Teh, 0, Unknown, Unknown
-20240523,"Spent 1 hour working on landing page copy
-https://www.agroverse.shop/",Gary Teh,0,Unknown,Unknown
-20240524,"Just sold 1 bag for usd10
-‎",Gary Teh, -1,8 Ounce Package Craft Pouch, Asset
-20240524,"Just sold 1 bag for usd10
-‎",Gary Teh, 10.00, USD, Asset
-20240524,‎<attached: 00001733-PHOTO-2024-05-24-12-46-02.jpg>,Gary Teh,0,Unknown,Unknown
-20240525,Just sold 1 bag for usd10,Gary Teh, -1,8 Ounce Package Craft Pouch, Asset
-20240525,Just sold 1 bag for usd10,Gary Teh, 10.00, USD, Asset
-20240525,Sold 1 bag of 8 ounce for usd10,Gary Teh, -1,8 Ounce Package Craft Pouch, Assets
-20240525,Sold 1 bag of 8 ounce for usd10,Gary Teh, 10.00, USD, Assets
-20240525,Received 1USd donation,Gary Teh, 1.00, USD, Asset
-20240525,Sold 1 bag for usd10,Gary Teh, -1,8 Ounce Package Craft Pouch, Asset
-20240525,Sold 1 bag for usd10,Gary Teh, 10.00, USD, Asset
-20240525,Sold 1 bag for usd10,Gary Teh, -1,8 Ounce Package Craft Pouch, Assets
-20240525,Sold 1 bag for usd10,Gary Teh, 10.00, USD, Assets
-20240525,Sold 1 bag to Jen for usd10,Gary Teh, -1,8 Ounce Package Craft Pouch, Assets
-20240525,Sold 1 bag to Jen for usd10,Gary Teh, 10.00, USD, Assets
-20240525,Sold 1 bag for usd10,Gary Teh, -1,8 Ounce Package Craft Pouch, Assets
-20240525,Sold 1 bag for usd10,Gary Teh, 10.00, USD, Assets
-20240525,Sold one bag for usd10,Gary Teh, -1,8 Ounce Package Craft Pouch, Assets
-20240525,Sold one bag for usd10,Gary Teh, 10.00, USD, Assets
-20240525,Sold 1 bag for usd10,Gary Teh, -1,8 Ounce Package Craft Pouch, Asset
-20240525,Sold 1 bag for usd10,Gary Teh, 10.00, USD, Asset
-20240525,Assembled 13 bags of 8 ounce bags from AGL2 unassembled bulk,Gary Teh, 13,8 Ounce Package Craft Pouch, Asset
-20240525,Assembled 13 bags of 8 ounce bags from AGL2 unassembled bulk,Gary Teh, 0, Unknown, Asset
-20240525,Received usd5 donations,Gary Teh, 5.00, USD, Assets
-20240525,"Received usd5 donations
-‎",Gary Teh, 5.00, USD, Assets
-20240526,"‎image omitted
-‎",Gary Teh,0,Unknown,Unknown
-20240526,"‎image omitted
-‎",Gary Teh,0,Unknown,Unknown
-20240526,"‎image omitted
-‎",Gary Teh,0,Unknown,Unknown
-20240526,"‎image omitted
-‎",Gary Teh,0,Unknown,Unknown
-20240526,"‎image omitted
-‎",Gary Teh,0,Unknown,Unknown
-20240526,"‎image omitted
-‎",Gary Teh,0,Unknown,Unknown
-20240526,"‎image omitted
-‎",Gary Teh,0,Unknown,Unknown
-20240526,"‎image omitted
-‎",Gary Teh,0,Unknown,Unknown
-20240526,"‎image omitted
-‎",Gary Teh,0,Unknown,Unknown
-20240526,"‎image omitted
-‎",Gary Teh,0,Unknown,Unknown
-20240526,"‎image omitted
-‎",Gary Teh,0,Unknown,Unknown
-20240526,"‎image omitted
-‎",Gary Teh,0,Unknown,Unknown
-20240526,"‎image omitted
-‎",Gary Teh,0,Unknown,Unknown
-20240526,‎image omitted,Gary Teh, 0, Unknown, Unknown
-20240526,"Sold 1 bag for usd10 this morning
-‎",Gary Teh, -1,8 Ounce Package Craft Pouch, Asset
-20240526,"Sold 1 bag for usd10 this morning
-‎",Gary Teh, 10.00, USD, Asset
-20240526,‎<attached: 00001761-PHOTO-2024-05-26-13-30-37.jpg>,Gary Teh, 0, Unknown, Unknown
-20240526,"Sold 1 bag to Kayla from Waka and Baka for usd10
-‎",Gary Teh, -1,8 Ounce Package Craft Pouch, Asset
-20240526,"Sold 1 bag to Kayla from Waka and Baka for usd10
-‎",Gary Teh, 10.00, USD, Asset
-20240526,"‎<attached: 00001763-PHOTO-2024-05-26-14-12-58.jpg>
-‎",Gary Teh,0,Unknown,Unknown
-20240526,‎<attached: 00001764-PHOTO-2024-05-26-14-13-02.jpg>,Gary Teh,0,Unknown,Unknown
-20240526,"Just sold one more bag for usd10 to Desiree ‎<This message was edited>
-‎",Gary Teh, -1,8 Ounce Package Craft Pouch, Assets
-20240526,"Just sold one more bag for usd10 to Desiree ‎<This message was edited>
-‎",Gary Teh, 10.00, USD, Assets
-20240526,‎<attached: 00001766-PHOTO-2024-05-26-14-47-41.jpg>,Gary Teh, 0, Unknown, Unknown
-20240526,"Just sold one bag for usd10
-‎",Gary Teh, -1,8 Ounce Package Craft Pouch, Asset
-20240526,"Just sold one bag for usd10
-‎",Gary Teh, 10.00, USD, Asset
-20240526,‎<attached: 00001768-PHOTO-2024-05-26-16-31-42.jpg>,Gary Teh, 0, Unknown, Unknown
-20240526,"Sold 2 bags for usd20 to Bobby
-‎",Gary Teh, -2,8 Ounce Package Craft Pouch, Assets
-20240526,"Sold 2 bags for usd20 to Bobby
-‎",Gary Teh, 20.00, USD, Assets
-20240526,‎<attached: 00001770-PHOTO-2024-05-26-17-55-07.jpg>,Gary Teh, 0, Unknown, Unknown
-20240526,"Sold 1 bag of 8 ounce cacao nibs for usd10
-‎",Gary Teh, -1,8 Ounce Package Craft Pouch, Asset
-20240526,"Sold 1 bag of 8 ounce cacao nibs for usd10
-‎",Gary Teh, 10.00, USD, Asset
-20240526,‎<attached: 00001772-PHOTO-2024-05-26-19-42-11.jpg>,Gary Teh, 0, Unknown, Unknown
-20240527,"Jody, Elinor’s mum bought a bag of cacao nibs for usd10
-‎",Gary Teh, -1,Kraft Pouches, Asset
-20240527,"Jody, Elinor’s mum bought a bag of cacao nibs for usd10
-‎",Gary Teh, 10.00, USD, Asset
-20240527,‎<attached: 00001774-PHOTO-2024-05-27-10-45-12.jpg>,Gary Teh, 0, Unknown, Unknown
-20240527,"Received usd2 donation this morning
-‎",Gary Teh, 2.00, USD, Assets
-20240527,‎<attached: 00001776-PHOTO-2024-05-27-12-22-09.jpg>,Gary Teh,0,Unknown,Unknown
-20240527,"Sold 1 bag of 8 ounce for usd10
-‎",Gary Teh, -1,8 Ounce Package Craft Pouch, Asset
-20240527,"Sold 1 bag of 8 ounce for usd10
-‎",Gary Teh, 10.00, USD, Asset
-20240527,‎<attached: 00001778-PHOTO-2024-05-27-12-22-24.jpg>,Gary Teh,0,Unknown,Unknown
-20240528,"Spent 10 minutes applying to be both a vendor and speaker at the Mass Meditation initiative in LA
-‎",Gary Teh,0,Unknown,Unknown
-20240528,‎<attached: 00001780-PHOTO-2024-05-28-07-06-06.jpg>,Gary Teh, 0, Unknown, Unknown
-20240528,https://disclosurefest.org/vendor/thank-you,Gary Teh,0,Unknown,Unknown
-20240528,"Paid out $43 for affiliate program to Elinor for 
-
-- 25 bags sold at okanogan barter faire 
-- ⁠18 bags sold at burning cow barter faire
-‎",Gary Teh, 43.00, USD, Asset
-20240528,‎<attached: 00001783-PHOTO-2024-05-28-10-15-41.jpg>,Gary Teh,0,Unknown,Unknown
-20240528,"Spent an hour editing and uploading this video
-
-https://www.instagram.com/reel/C7hgV5svfF8/?igsh=MW9kY3FtNXNvbzR6Ng==
-‎",Gary Teh, 0, Unknown, Unknown
-20240528,‎<attached: 00001785-PHOTO-2024-05-28-13-08-08.jpg>,Gary Teh,0,Unknown,Unknown
-20240528,177 sent,Gary Teh,0,Unknown,Unknown
-20240528,Spent 30 minutes resolving payment issues with Coopercabruca,Gary Teh,0,Unknown,Unknown
-20240528,"Spent 2 hours to setup and publish our first ever blogpost and newsletter 
-
-https://www.agroverse.shop/post/understanding-cabruca-a-traditional-agroforestry-practice-for-amazonian-rainforest-conservation",Gary Teh, 0, Unknown, Unknown
-20240528,"Spent 30 minutes to publish our upcoming Better Daze event listing
-https://www.agroverse.shop/",Gary Teh,0,Unknown,Unknown
-20240528,"Spent USD13.07 to print namecard for use in the upcoming events.
-‎",Gary Teh, 13.07, USD, Asset
-20240528,"namecard_printing_at_office_depot.pdf • ‎1 page ‎<attached: 00001791-namecard_printing_at_office_depot.pdf>
-‎",Gary Teh,0,Unknown,Unknown
-20240528,namecard_printing_at_office_depot_2.pdf • ‎1 page ‎<attached: 00001792-namecard_printing_at_office_depot_2.pdf>,Gary Teh, 0, Unknown, Unknown
-20240528,"Two growth hacks to consider
-
-- stickers for kids pointing to community recipes page
-
-- ⁠stickers for nomads for their vehicles
-‎",Gary Teh,0,Unknown,Unknown
-20240506,Spend  $5.99 for reusable coffee bag,Gary Teh, 5.99, USD, Asset
-20240506,"Spent $116.91 for 18 servings moka pot
-‎",Gary Teh, 116.91, USD, Asset
-20240506,"‎<attached: 00001623-PHOTO-2024-05-06-13-16-01.jpg>
-‎",Gary Teh, 0, Unknown, Unknown.
-20240506,‎<attached: 00001624-PHOTO-2024-05-06-13-16-09.jpg>,Gary Teh,0,Unknown,Unknown
-20240507,"Spent 15 minutes talking with @16468233438 on payment matters to Orlantildes and the management of the 15 KG Cacao samples
-‎",Gary Teh,0,Unknown,Unknown
-20240507,‎<attached: 00001626-PHOTO-2024-05-07-10-25-36.jpg>,Gary Teh, 0, Unknown, Unknown
-20240507,"Spent an hour and a half generating this video clip and sharing it
-
-https://www.instagram.com/reel/C6raMadvJk3/?igsh=MzRlODBiNWFlZA==",Gary Teh,0,Unknown,Unknown
-20240507,Spent 10 minutes updating our Facebook page presence,Gary Teh,0,Unknown,Unknown
-20240507,"Sold 1 pound for usd20 to Chris
-‎",Gary Teh, -0.453592,Cacao Nibs KG, Asset
-20240507,"Sold 1 pound for usd20 to Chris
-‎",Gary Teh, 20.00, USD, Asset
-20240507,‎<attached: 00001630-PHOTO-2024-05-07-20-53-15.jpg>,Gary Teh, 0, Unknown, Unknown
-20240509,"Spent two hours making the recording and sharing it
-
-https://www.tiktok.com/t/ZTL4y3WP1/
-‎",Gary Teh,0,Unknown,Unknown
-20240511,‎<attached: 00001632-PHOTO-2024-05-11-08-26-17.jpg>,Gary Teh, 0, Unknown, Unknown
-20240511,"Spent an hour to update our copy to just center everything around Cacao from the Amazonian region
-
-https://www.agroverse.shop/",Gary Teh,0,Unknown,Unknown
-20240511,"Spent an hour updating our WIX shopping cart for dynamic shipping prices within the USA using USPS ground advantage 
-
-https://support.wix.com/en/article/wix-stores-setting-up-real-time-shipping-calculation-with-usps ‎<This message was edited>",Gary Teh, 0, Unknown, Unknown
-20240511,"Sent 45 minutes updating our site’s footer to ensure prominent display of social and newletter sign up form on every single page of our website. 
-
-This will aid in our content marketing efforts once SEO kicks in",Gary Teh,0,Unknown,Unknown
-20240511,"Spend 10 minutes, reaching out to the two shamans to check if they will be interested to cross promote the Cacao ceremony is on our website
-‎",Gary Teh,0,Unknown,Unknown
-20240511,"‎<attached: 00001637-PHOTO-2024-05-11-13-31-22.jpg>
-‎",Gary Teh, 0, Unknown, Unknown
-20240511,‎<attached: 00001638-PHOTO-2024-05-11-13-31-22.jpg>,Gary Teh,0,Unknown,Unknown
-20240512,"Spent two hours filming and editing this
-
-https://www.instagram.com/reel/C64VlXivsSb/?igsh=MzRlODBiNWFlZA== ‎<This message was edited>",Gary Teh,0,Unknown,Unknown
-20240513,"Spend US dollar $19.47 for 4 bottles of 52 fl oz oat milk and 200 tree fl oz espresso cups
-‎",Gary Teh, 19.47, USD, Asset
-20240513,‎<attached: 00001641-PHOTO-2024-05-13-12-38-38.jpg>,Gary Teh,0,Unknown,Unknown
-20240514,"Spent US dollar $57.38 on mold for making cacao
-‎",Gary Teh, 57.38, USD, Assets
-20240514,"‎<attached: 00001643-PHOTO-2024-05-14-12-02-05.jpg>
-‎",Gary Teh,0,Unknown,Unknown
-20240514,‎<attached: 00001644-PHOTO-2024-05-14-12-02-08.jpg>,Gary Teh, 0, Unknown, Unknown
-20240514,"Spent 1 hour crafting this video and sharing it 
-
 https://www.instagram.com/reel/C69mK9dSyGZ/?igsh=MzRlODBiNWFlZA==",Gary Teh, 0, Unknown, Unknown
-20240515,Spent an hour today we’re working the copy of our website,Gary Teh,0,Unknown,Unknown
+20240515,Spent an hour today we’re working the copy of our website,Gary Teh, 0, Unknown, Unknown
 20240515,"Spend one and a half hour acquiring Washington state operators certificate
 ‎",Gary Teh, 0, Unknown, Unknown
 20240515,"‎<attached: 00001648-PHOTO-2024-05-15-10-21-26.jpg>
 ‎",Gary Teh, 0, Unknown, Unknown
 20240515,‎<attached: 00001649-PHOTO-2024-05-15-10-21-28.jpg>,Gary Teh, 0, Unknown, Unknown
 20240522,"Levi and Elinor for the lama bus decided to buy a bag this morning for usd10
-‎",Gary Teh, -1,Kraft Pouches, Asset
+‎",Gary Teh, -1,8 Ounce Package Craft Pouch, Assets
 20240522,"Levi and Elinor for the lama bus decided to buy a bag this morning for usd10
-‎",Gary Teh, 10.00, USD, Asset
-20240522,‎<attached: 00001651-PHOTO-2024-05-22-11-55-32.jpg>,Gary Teh,0,Unknown,Unknown
+‎",Gary Teh, 10.00, USD, Assets
+20240522,‎<attached: 00001651-PHOTO-2024-05-22-11-55-32.jpg>,Gary Teh, 0, Unknown, Unknown
 20240522,Macy bought 1 bag of 8 ounce of cacao nibs for USD $10,Gary Teh, -1,8 Ounce Package Craft Pouch, Asset
 20240522,Macy bought 1 bag of 8 ounce of cacao nibs for USD $10,Gary Teh, 10.00, USD, Asset
 20240522,I spent $20 getting this dandelion syrup for making hot chocolate with,Gary Teh, 20.00, USD, Asset
+20240522,Lady bought two samples of One US dollar Cacao drink,Gary Teh, -2, Kraft Pouches, Asset
 20240522,Lady bought two samples of One US dollar Cacao drink,Gary Teh, 2.00, USD, Asset
 20240522,"Lady bought one bag of 8 ounce cacao nips for US$10 in total
-‎",Gary Teh, -1,8 Ounce Package Craft Pouch, Asset
+‎",Gary Teh, -1,8 Ounce Package Craft Pouch, Assets
 20240522,"Lady bought one bag of 8 ounce cacao nips for US$10 in total
-‎",Gary Teh, 10.00, USD, Asset
+‎",Gary Teh, 10.00, USD, Assets
 20240522,"‎<attached: 00001656-PHOTO-2024-05-22-13-13-33.jpg>
 ‎",Gary Teh, 0, Unknown, Unknown
-20240522,‎<attached: 00001657-PHOTO-2024-05-22-13-13-33.jpg>,Gary Teh,0,Unknown,Unknown
+20240522,‎<attached: 00001657-PHOTO-2024-05-22-13-13-33.jpg>,Gary Teh, 0, Unknown, Unknown
 20240522,Sold 1 cup of espresso for 1USD,Gary Teh, -1,Espresso cup, Assets
 20240522,Sold 1 cup of espresso for 1USD,Gary Teh, 1.00, USD, Assets
 20240522,Sold one cup of espresso for one USD,Gary Teh, -1,Espresso cup, Assets
@@ -593,143 +95,6 @@ She uses cacao for her skin allergic reaction as well
 She uses cacao for her skin allergic reaction as well
 ‎",Gary Teh, 10.00, USD, Asset
 20240522,"‎<attached: 00001663-PHOTO-2024-05-22-13-13-44.jpg>
-‎",Gary Teh,0,Unknown,Unknown
-20240522,"‎<attached: 00001664-PHOTO-2024-05-22-13-13-45.jpg>
-‎",Gary Teh, 0, Unknown, Unknown
-20240522,"‎<attached: 00001665-PHOTO-2024-05-22-13-13-47.jpg>
-‎",Gary Teh,0,Unknown,Unknown
-20240522,"‎<attached: 00001666-PHOTO-2024-05-22-13-13-48.jpg>
-‎",Gary Teh,0,Unknown,Unknown
-20240522,‎<attached: 00001667-PHOTO-2024-05-22-13-13-49.jpg>,Gary Teh, 0, Unknown, Unknown
-20240522,"Sold one bag for usd10
-‎",Gary Teh, -1,8 Ounce Package Craft Pouch, Asset
-20240522,"Sold one bag for usd10
-‎",Gary Teh, 10.00, USD, Asset
-20240522,‎<attached: 00001669-PHOTO-2024-05-22-13-13-53.jpg>,Gary Teh, 0, Unknown, Unknown
-20240522,"Sold one bag for usd10
-‎",Gary Teh, -1,Kraft Pouches, Asset
-20240522,"Sold one bag for usd10
-‎",Gary Teh, 10.00, USD, Asset
-20240522,‎<attached: 00001671-PHOTO-2024-05-22-13-13-58.jpg>,Gary Teh, 0, Unknown, Unknown
-20240522,"Sold one bag for usd10
-‎",Gary Teh, -1,8 Ounce Package Craft Pouch, Asset
-20240522,"Sold one bag for usd10
-‎",Gary Teh, 10.00, USD, Asset
-20240522,‎<attached: 00001673-PHOTO-2024-05-22-13-14-00.jpg>,Gary Teh,0,Unknown,Unknown
-20240522,"Sold one bag for usd10
-‎",Gary Teh, -1,8 Ounce Package Craft Pouch, Assets
-20240522,"Sold one bag for usd10
-‎",Gary Teh, 10.00, USD, Assets
-20240522,‎<attached: 00001675-PHOTO-2024-05-22-13-14-03.jpg>,Gary Teh, 0, Unknown, Unknown
-20240522,"Sold one bag this morning for USD10
-‎",Gary Teh, -1,8 Ounce Package Craft Pouch, Asset
-20240522,"Sold one bag this morning for USD10
-‎",Gary Teh, 10.00, USD, Asset
-20240522,‎<attached: 00001677-PHOTO-2024-05-22-13-14-05.jpg>,Gary Teh, 0, Unknown, Unknown
-20240522,"Sold one more bag this morning for usd10
-‎",Gary Teh, -1,8 Ounce Package Craft Pouch, Asset
-20240522,"Sold one more bag this morning for usd10
-‎",Gary Teh, 10.00, USD, Asset
-20240522,"‎<attached: 00001679-PHOTO-2024-05-22-13-14-06.jpg>
-‎",Gary Teh,0,Unknown,Unknown
-20240522,‎<attached: 00001680-PHOTO-2024-05-22-13-14-07.jpg>,Gary Teh, 0, Unknown, Unknown
-20240522,"Received usd1 donations for chocolate drink
-‎",Gary Teh, 1.00, USD, Assets
-20240522,‎<attached: 00001682-PHOTO-2024-05-22-13-14-07.jpg>,Gary Teh, 0, Unknown, Unknown
-20240522,"Sold one bag to Nadia for usd10
-‎",Gary Teh, -1,8 Ounce Package Craft Pouch, Asset
-20240522,"Sold one bag to Nadia for usd10
-‎",Gary Teh, 10.00, USD, Asset
-20240506,Spend  $5.99 for reusable coffee bag,Gary Teh, 5.99, USD, Assets
-20240506,"Spent $116.91 for 18 servings moka pot
-‎",Gary Teh, 116.91, USD, Asset
-20240506,"‎<attached: 00001623-PHOTO-2024-05-06-13-16-01.jpg>
-‎",Gary Teh, 0, Unknown, Unknown
-20240506,‎<attached: 00001624-PHOTO-2024-05-06-13-16-09.jpg>,Gary Teh, 0, Unknown, Unknown
-20240507,"Spent 15 minutes talking with @16468233438 on payment matters to Orlantildes and the management of the 15 KG Cacao samples
-‎",Gary Teh, 0, Unknown, Unknown
-20240507,‎<attached: 00001626-PHOTO-2024-05-07-10-25-36.jpg>,Gary Teh, 0, Unknown, Unknown
-20240507,"Spent an hour and a half generating this video clip and sharing it
-
-https://www.instagram.com/reel/C6raMadvJk3/?igsh=MzRlODBiNWFlZA==",Gary Teh, 0, Unknown, Unknown
-20240507,Spent 10 minutes updating our Facebook page presence,Gary Teh, 0, Unknown, Unknown
-20240507,"Sold 1 pound for usd20 to Chris
-‎",Gary Teh, -0.453592,Cacao Nibs KG, Asset
-20240507,"Sold 1 pound for usd20 to Chris
-‎",Gary Teh, 20.00, USD, Asset
-20240507,‎<attached: 00001630-PHOTO-2024-05-07-20-53-15.jpg>,Gary Teh, 0, Unknown, Unknown
-20240509,"Spent two hours making the recording and sharing it
-
-https://www.tiktok.com/t/ZTL4y3WP1/
-‎",Gary Teh, 0, Unknown, Unknown
-20240511,‎<attached: 00001632-PHOTO-2024-05-11-08-26-17.jpg>,Gary Teh, 0, Unknown, Unknown
-20240511,"Spent an hour to update our copy to just center everything around Cacao from the Amazonian region
-
-https://www.agroverse.shop/",Gary Teh, 0, Unknown, Unknown
-20240511,"Spent an hour updating our WIX shopping cart for dynamic shipping prices within the USA using USPS ground advantage 
-
-https://support.wix.com/en/article/wix-stores-setting-up-real-time-shipping-calculation-with-usps ‎<This message was edited>",Gary Teh, 0, Unknown, Unknown
-20240511,"Sent 45 minutes updating our site’s footer to ensure prominent display of social and newletter sign up form on every single page of our website. 
-
-This will aid in our content marketing efforts once SEO kicks in",Gary Teh, 0, Unknown, Unknown
-20240511,"Spend 10 minutes, reaching out to the two shamans to check if they will be interested to cross promote the Cacao ceremony is on our website
-‎",Gary Teh, 0, Unknown, Unknown
-20240511,"‎<attached: 00001637-PHOTO-2024-05-11-13-31-22.jpg>
-‎",Gary Teh, 0, Unknown, Unknown
-20240511,‎<attached: 00001638-PHOTO-2024-05-11-13-31-22.jpg>,Gary Teh, 0, Unknown, Unknown
-20240512,"Spent two hours filming and editing this
-
-https://www.instagram.com/reel/C64VlXivsSb/?igsh=MzRlODBiNWFlZA== ‎<This message was edited>",Gary Teh, 0, Unknown, Unknown
-20240513,"Spend US dollar $19.47 for 4 bottles of 52 fl oz oat milk and 200 tree fl oz espresso cups
-‎",Gary Teh,0,Unknown,Unknown
-20240513,‎<attached: 00001641-PHOTO-2024-05-13-12-38-38.jpg>,Gary Teh, 0, Unknown, Unknown
-20240514,"Spent US dollar $57.38 on mold for making cacao
-‎",Gary Teh, 57.38, USD, Asset
-20240514,"‎<attached: 00001643-PHOTO-2024-05-14-12-02-05.jpg>
-‎",Gary Teh, 0, Unknown, Unknown
-20240514,‎<attached: 00001644-PHOTO-2024-05-14-12-02-08.jpg>,Gary Teh, 0, Unknown, Unknown
-20240514,"Spent 1 hour crafting this video and sharing it 
-
-https://www.instagram.com/reel/C69mK9dSyGZ/?igsh=MzRlODBiNWFlZA==",Gary Teh, 0, Unknown, Unknown
-20240515,Spent an hour today we’re working the copy of our website,Gary Teh, 0, Unknown, Unknown
-20240515,"Spend one and a half hour acquiring Washington state operators certificate
-‎",Gary Teh, 1.5, USD, Asset
-20240515,"‎<attached: 00001648-PHOTO-2024-05-15-10-21-26.jpg>
-‎",Gary Teh, 0, Unknown, Unknown
-20240515,‎<attached: 00001649-PHOTO-2024-05-15-10-21-28.jpg>,Gary Teh, 0, Unknown, Unknown
-20240522,"Levi and Elinor for the lama bus decided to buy a bag this morning for usd10
-‎",Gary Teh, -1,Kraft Pouches, Asset
-20240522,"Levi and Elinor for the lama bus decided to buy a bag this morning for usd10
-‎",Gary Teh, 10.00, USD, Asset
-20240522,‎<attached: 00001651-PHOTO-2024-05-22-11-55-32.jpg>,Gary Teh, 0, Unknown, Unknown
-20240522,Macy bought 1 bag of 8 ounce of cacao nibs for USD $10,Gary Teh, -1,8 Ounce Package Craft Pouch, Asset
-20240522,Macy bought 1 bag of 8 ounce of cacao nibs for USD $10,Gary Teh, 10.00, USD, Asset
-20240522,I spent $20 getting this dandelion syrup for making hot chocolate with,Gary Teh, 20.00, USD, Asset
-20240522,Lady bought two samples of One US dollar Cacao drink,Gary Teh, 2.00, USD, Assets
-20240522,"Lady bought one bag of 8 ounce cacao nips for US$10 in total
-‎",Gary Teh, -1,8 Ounce Package Craft Pouch, Asset
-20240522,"Lady bought one bag of 8 ounce cacao nips for US$10 in total
-‎",Gary Teh, 10.00, USD, Asset
-20240522,"‎<attached: 00001656-PHOTO-2024-05-22-13-13-33.jpg>
-‎",Gary Teh, 0, Unknown, Unknown
-20240522,‎<attached: 00001657-PHOTO-2024-05-22-13-13-33.jpg>,Gary Teh, 0, Unknown, Unknown
-20240522,Sold 1 cup of espresso for 1USD,Gary Teh, -1,Espresso cup, Asset
-20240522,Sold 1 cup of espresso for 1USD,Gary Teh, 1.00, USD, Asset
-20240522,Sold one cup of espresso for one USD,Gary Teh, -1,Espresso cup, Asset
-20240522,Sold one cup of espresso for one USD,Gary Teh, 1.00, USD, Asset
-20240522,Sold one more bag for usd10,Gary Teh, -1,8 Ounce Package Craft Pouch, Asset
-20240522,Sold one more bag for usd10,Gary Teh, 10.00, USD, Asset
-20240522,Sold one bag for usd10,Gary Teh, -1,8 Ounce Package Craft Pouch, Assets
-20240522,Sold one bag for usd10,Gary Teh, 10.00, USD, Assets
-20240522,"Sold one bag for usd10
-
-She uses cacao for her skin allergic reaction as well
-‎",Gary Teh, -1,8 Ounce Package Craft Pouch, Assets
-20240522,"Sold one bag for usd10
-
-She uses cacao for her skin allergic reaction as well
-‎",Gary Teh, 10.00, USD, Assets
-20240522,"‎<attached: 00001663-PHOTO-2024-05-22-13-13-44.jpg>
 ‎",Gary Teh, 0, Unknown, Unknown
 20240522,"‎<attached: 00001664-PHOTO-2024-05-22-13-13-45.jpg>
 ‎",Gary Teh, 0, Unknown, Unknown
@@ -744,14 +109,14 @@ She uses cacao for her skin allergic reaction as well
 ‎",Gary Teh, 10.00, USD, Assets
 20240522,‎<attached: 00001669-PHOTO-2024-05-22-13-13-53.jpg>,Gary Teh, 0, Unknown, Unknown
 20240522,"Sold one bag for usd10
-‎",Gary Teh, -1,8 Ounce Package Craft Pouch, Asset
-20240522,"Sold one bag for usd10
-‎",Gary Teh, 10.00, USD, Asset
-20240522,‎<attached: 00001671-PHOTO-2024-05-22-13-13-58.jpg>,Gary Teh, 0, Unknown, Unknown
-20240522,"Sold one bag for usd10
 ‎",Gary Teh, -1,8 Ounce Package Craft Pouch, Assets
 20240522,"Sold one bag for usd10
 ‎",Gary Teh, 10.00, USD, Assets
+20240522,‎<attached: 00001671-PHOTO-2024-05-22-13-13-58.jpg>,Gary Teh, 0, Unknown, Unknown
+20240522,"Sold one bag for usd10
+‎",Gary Teh, -1,8 Ounce Package Craft Pouch, Asset
+20240522,"Sold one bag for usd10
+‎",Gary Teh, 10.00, USD, Asset
 20240522,‎<attached: 00001673-PHOTO-2024-05-22-13-14-00.jpg>,Gary Teh, 0, Unknown, Unknown
 20240522,"Sold one bag for usd10
 ‎",Gary Teh, -1,8 Ounce Package Craft Pouch, Asset
@@ -774,14 +139,14 @@ She uses cacao for her skin allergic reaction as well
 ‎",Gary Teh, 1.00, USD, Assets
 20240522,‎<attached: 00001682-PHOTO-2024-05-22-13-14-07.jpg>,Gary Teh, 0, Unknown, Unknown
 20240522,"Sold one bag to Nadia for usd10
-‎",Gary Teh, -1,8 Ounce Package Craft Pouch, Asset
+‎",Gary Teh, -1,Kraft Pouches, Asset
 20240522,"Sold one bag to Nadia for usd10
 ‎",Gary Teh, 10.00, USD, Asset
 20240522,‎<attached: 00001684-PHOTO-2024-05-22-13-14-08.jpg>,Gary Teh, 0, Unknown, Unknown
 20240522,"Sold one for usd10
-‎",Gary Teh, -1,Cacao Nibs KG, Assets
+‎",Gary Teh, -1,Cacao Nibs KG, Asset
 20240522,"Sold one for usd10
-‎",Gary Teh, 10.00, USD, Assets
+‎",Gary Teh, 10.00, USD, Asset
 20240522,‎<attached: 00001686-PHOTO-2024-05-22-13-14-09.jpg>,Gary Teh, 0, Unknown, Unknown
 20240522,"Ruby donated USd0.25 for a cup of cacao
 ‎",Gary Teh, 0.25, USD, Assets
@@ -792,26 +157,26 @@ She uses cacao for her skin allergic reaction as well
 ‎",Gary Teh, 0.25, USD, Assets
 20240522,‎<attached: 00001692-PHOTO-2024-05-22-13-14-10.jpg>,Gary Teh, 0, Unknown, Unknown
 20240522,"Elinor sold off a bag of cacao for usd10 while I was away at the peace sign on the hill side
-‎",Gary Teh, -1,Cacao Nibs KG, Assets
+‎",Gary Teh, -1,Cacao Nibs KG, Asset
 20240522,"Elinor sold off a bag of cacao for usd10 while I was away at the peace sign on the hill side
-‎",Gary Teh, 10.00, USD, Assets
+‎",Gary Teh, 10.00, USD, Asset
 20240522,‎<attached: 00001694-PHOTO-2024-05-22-13-14-11.jpg>,Gary Teh, 0, Unknown, Unknown
 20240522,"Folks to run the booth that wants to educate folks to become vegan came and showed their support
 They bought usd10 for 1 bag
-‎",Gary Teh, 1,8 Ounce Package Craft Pouch, Asset
+‎",Gary Teh, -1,8 Ounce Package Craft Pouch, Asset
 20240522,"Folks to run the booth that wants to educate folks to become vegan came and showed their support
 They bought usd10 for 1 bag
 ‎",Gary Teh, 10.00, USD, Asset
 20240522,‎<attached: 00001696-PHOTO-2024-05-22-13-14-12.jpg>,Gary Teh, 0, Unknown, Unknown
 20240522,"Sold 1 bag of 8 ounce to this retired physicists for usd10
-‎",Gary Teh, -1,8 Ounce Package Craft Pouch, Asset
+‎",Gary Teh, -1,8 Ounce Package Craft Pouch, Assets
 20240522,"Sold 1 bag of 8 ounce to this retired physicists for usd10
-‎",Gary Teh, 10.00, USD, Asset
+‎",Gary Teh, 10.00, USD, Assets
 20240522,‎<attached: 00001698-PHOTO-2024-05-22-13-14-13.jpg>,Gary Teh, 0, Unknown, Unknown
 20240522,"Sold 2 bags this morning for a total of usd10
-‎",Gary Teh, -2,8 Ounce Package Craft Pouch, Assets
+‎",Gary Teh, -2,8 Ounce Package Craft Pouch, Asset
 20240522,"Sold 2 bags this morning for a total of usd10
-‎",Gary Teh, 10.00, USD, Assets
+‎",Gary Teh, 10.00, USD, Asset
 20240522,"‎<attached: 00001700-PHOTO-2024-05-22-13-14-14.jpg>
 ‎",Gary Teh, 0, Unknown, Unknown
 20240522,‎<attached: 00001701-PHOTO-2024-05-22-13-14-14.jpg>,Gary Teh, 0, Unknown, Unknown
@@ -826,41 +191,41 @@ They bought usd10 for 1 bag
 20240522,"‎<attached: 00001706-PHOTO-2024-05-22-13-14-16.jpg>
 ‎",Gary Teh, 0, Unknown, Unknown
 20240522,‎<attached: 00001707-PHOTO-2024-05-22-13-14-17.jpg>,Gary Teh, 0, Unknown, Unknown
-20240522,Someone bought a bag of cacao for uSD10,Gary Teh, -1,8 Ounce Package Craft Pouch, Asset
-20240522,Someone bought a bag of cacao for uSD10,Gary Teh, 10.00, USD, Asset
+20240522,Someone bought a bag of cacao for uSD10,Gary Teh, -1,8 Ounce Package Craft Pouch, Assets
+20240522,Someone bought a bag of cacao for uSD10,Gary Teh, 10.00, USD, Assets
 20240522,"Blake bought a bag of cacao for usd10
-‎",Gary Teh, -1,Craft Pouch, Asset
+‎",Gary Teh, -1,Kraft Pouches, Assets
 20240522,"Blake bought a bag of cacao for usd10
-‎",Gary Teh, 10.00, USD, Asset
+‎",Gary Teh, 10.00, USD, Assets
 20240522,‎<attached: 00001710-PHOTO-2024-05-22-13-14-18.jpg>,Gary Teh, 0, Unknown, Unknown
 20240522,"Ray the healer supports our project by buying USD10 for a bag of cacao nibs
-‎",Gary Teh, -1,8 Ounce Package Craft Pouch, Assets
+‎",Gary Teh, -1,8 Ounce Package Craft Pouch, Asset
 20240522,"Ray the healer supports our project by buying USD10 for a bag of cacao nibs
-‎",Gary Teh, 10.00, USD, Assets
+‎",Gary Teh, 10.00, USD, Asset
 20240522,‎<attached: 00001712-PHOTO-2024-05-22-13-14-19.jpg>,Gary Teh, 0, Unknown, Unknown
 20240522,"Melody bought 1 bag of 8 ounce for usd10
-‎",Gary Teh, -1,8 Ounce Package Craft Pouch, Assets
+‎",Gary Teh, -1,8 Ounce Package Craft Pouch, Asset
 20240522,"Melody bought 1 bag of 8 ounce for usd10
-‎",Gary Teh, 10.00, USD, Assets
+‎",Gary Teh, 10.00, USD, Asset
 20240522,‎<attached: 00001714-PHOTO-2024-05-22-13-14-19.jpg>,Gary Teh, 0, Unknown, Unknown
 20240522,MMAcy gifted usd20 worth of lilacs syrup for our medicine of the heart offerings,Gary Teh, 20.00, USD, Assets
 20240522,"MMAcy gifted usd20 worth of dandelion syrup for our medicine of the heart offering
-‎",Gary Teh, 20.00, USD, Assets
+‎",Gary Teh, 20.00, USD, Asset
 20240522,"‎<attached: 00001717-PHOTO-2024-05-22-13-14-21.jpg>
 ‎",Gary Teh, 0, Unknown, Unknown
 20240522,‎<attached: 00001718-PHOTO-2024-05-22-13-14-21.jpg>,Gary Teh, 0, Unknown, Unknown
 20240522,"@14153000019 great job with the sales, looks like personal outreach is working best!",Val Lapidus, 0, Unknown, Unknown
 20240522,Me and Elinor spent a total of 30 hours each this past week promoting our Cacao,Gary Teh, 0, Unknown, Unknown
 20240522,"Spent usd15.20 for 4 bottles of oat milk
-‎",Gary Teh, -4,Kraft Pouches, Asset
+‎",Gary Teh, -4,Kraft Pouches, Assets
 20240522,"Spent usd15.20 for 4 bottles of oat milk
-‎",Gary Teh, 15.20, USD, Asset
+‎",Gary Teh, 15.20, USD, Assets
 20240522,‎<attached: 00001722-PHOTO-2024-05-22-16-38-40.jpg>,Gary Teh, 0, Unknown, Unknown
 20240522,"Spanish US dollar $10.83 on 400 cups of 3 oz
 ‎",Gary Teh, 10.83, USD, Asset
 20240522,‎<attached: 00001724-PHOTO-2024-05-22-16-49-08.jpg>,Gary Teh, 0, Unknown, Unknown
 20240522,"Spent usd27.45 for fuel
-‎",Gary Teh, 27.45, USD, Asset
+‎",Gary Teh, 27.45, USD, Assets
 20240522,‎<attached: 00001726-PHOTO-2024-05-22-22-44-04.jpg>,Gary Teh, 0, Unknown, Unknown
 20240523,Spent one hour today having a back-and-forth with Val and Orlantildes on the payments,Gary Teh, 0, Unknown, Unknown
 20240523,"Spent an hour today editing the video for posting today unfortunately, the bandwidth was so bad it does not",Gary Teh, 0, Unknown, Unknown
@@ -878,19 +243,19 @@ https://www.agroverse.shop/",Gary Teh, 0, Unknown, Unknown
 20240524,‎<attached: 00001733-PHOTO-2024-05-24-12-46-02.jpg>,Gary Teh, 0, Unknown, Unknown
 20240525,Just sold 1 bag for usd10,Gary Teh, -1,8 Ounce Package Craft Pouch, Assets
 20240525,Just sold 1 bag for usd10,Gary Teh, 10.00, USD, Assets
-20240525,Sold 1 bag of 8 ounce for usd10,Gary Teh, -1,8 Ounce Package Craft Pouch, Assets
-20240525,Sold 1 bag of 8 ounce for usd10,Gary Teh, 10.00, USD, Assets
+20240525,Sold 1 bag of 8 ounce for usd10,Gary Teh, -1,8 Ounce Package Craft Pouch, Asset
+20240525,Sold 1 bag of 8 ounce for usd10,Gary Teh, 10.00, USD, Asset
 20240525,Received 1USd donation,Gary Teh, 1.00, USD, Asset
-20240525,Sold 1 bag for usd10,Gary Teh, -1,8 Ounce Package Craft Pouch, Assets
-20240525,Sold 1 bag for usd10,Gary Teh, 10.00, USD, Assets
 20240525,Sold 1 bag for usd10,Gary Teh, -1,8 Ounce Package Craft Pouch, Asset
 20240525,Sold 1 bag for usd10,Gary Teh, 10.00, USD, Asset
-20240525,Sold 1 bag to Jen for usd10,Gary Teh, -1,8 Ounce Package Craft Pouch, Asset
-20240525,Sold 1 bag to Jen for usd10,Gary Teh, 10.00, USD, Asset
+20240525,Sold 1 bag for usd10,Gary Teh, -1,8 Ounce Package Craft Pouch, Asset
+20240525,Sold 1 bag for usd10,Gary Teh, 10.00, USD, Asset
+20240525,Sold 1 bag to Jen for usd10,Gary Teh, -1,8 Ounce Package Craft Pouch, Assets
+20240525,Sold 1 bag to Jen for usd10,Gary Teh, 10.00, USD, Assets
 20240525,Sold 1 bag for usd10,Gary Teh, -1,8 Ounce Package Craft Pouch, Assets
 20240525,Sold 1 bag for usd10,Gary Teh, 10.00, USD, Assets
-20240525,Sold one bag for usd10,Gary Teh, -1,8 Ounce Package Craft Pouch, Assets
-20240525,Sold one bag for usd10,Gary Teh, 10.00, USD, Assets
+20240525,Sold one bag for usd10,Gary Teh, -1,Kraft Pouches, Asset
+20240525,Sold one bag for usd10,Gary Teh, 10.00, USD, Asset
 20240525,Sold 1 bag for usd10,Gary Teh, -1,8 Ounce Package Craft Pouch, Asset
 20240525,Sold 1 bag for usd10,Gary Teh, 10.00, USD, Asset
 20240525,Assembled 13 bags of 8 ounce bags from AGL2 unassembled bulk,Gary Teh, 13,8 Ounce Package Craft Pouch, Asset
@@ -931,9 +296,9 @@ https://www.agroverse.shop/",Gary Teh, 0, Unknown, Unknown
 ‎",Gary Teh, 10.00, USD, Asset
 20240526,‎<attached: 00001761-PHOTO-2024-05-26-13-30-37.jpg>,Gary Teh, 0, Unknown, Unknown
 20240526,"Sold 1 bag to Kayla from Waka and Baka for usd10
-‎",Gary Teh, -1,8 Ounce Package Craft Pouch, Asset
+‎",Gary Teh, -1,8 Ounce Package Craft Pouch, Assets
 20240526,"Sold 1 bag to Kayla from Waka and Baka for usd10
-‎",Gary Teh, 10.00, USD, Asset
+‎",Gary Teh, 10.00, USD, Assets
 20240526,"‎<attached: 00001763-PHOTO-2024-05-26-14-12-58.jpg>
 ‎",Gary Teh, 0, Unknown, Unknown
 20240526,‎<attached: 00001764-PHOTO-2024-05-26-14-13-02.jpg>,Gary Teh, 0, Unknown, Unknown
@@ -943,7 +308,7 @@ https://www.agroverse.shop/",Gary Teh, 0, Unknown, Unknown
 ‎",Gary Teh, 10.00, USD, Assets
 20240526,‎<attached: 00001766-PHOTO-2024-05-26-14-47-41.jpg>,Gary Teh, 0, Unknown, Unknown
 20240526,"Just sold one bag for usd10
-‎",Gary Teh, -1.0,8 Ounce Package Craft Pouch, Assets
+‎",Gary Teh, -1,8 Ounce Package Craft Pouch, Assets
 20240526,"Just sold one bag for usd10
 ‎",Gary Teh, 10.00, USD, Assets
 20240526,‎<attached: 00001768-PHOTO-2024-05-26-16-31-42.jpg>,Gary Teh, 0, Unknown, Unknown
@@ -958,17 +323,17 @@ https://www.agroverse.shop/",Gary Teh, 0, Unknown, Unknown
 ‎",Gary Teh, 10.00, USD, Asset
 20240526,‎<attached: 00001772-PHOTO-2024-05-26-19-42-11.jpg>,Gary Teh, 0, Unknown, Unknown
 20240527,"Jody, Elinor’s mum bought a bag of cacao nibs for usd10
-‎",Gary Teh, -1,8 Ounce Package Craft Pouch, Asset
+‎",Gary Teh, -1,Kraft Pouches, Asset
 20240527,"Jody, Elinor’s mum bought a bag of cacao nibs for usd10
 ‎",Gary Teh, 10.00, USD, Asset
 20240527,‎<attached: 00001774-PHOTO-2024-05-27-10-45-12.jpg>,Gary Teh, 0, Unknown, Unknown
 20240527,"Received usd2 donation this morning
-‎",Gary Teh, 2.00, USD, Asset
+‎",Gary Teh, 2.00, USD, Assets
 20240527,‎<attached: 00001776-PHOTO-2024-05-27-12-22-09.jpg>,Gary Teh, 0, Unknown, Unknown
 20240527,"Sold 1 bag of 8 ounce for usd10
-‎",Gary Teh, -1,8 Ounce Package Craft Pouch, Assets
+‎",Gary Teh, -1,8 Ounce Package Craft Pouch, Asset
 20240527,"Sold 1 bag of 8 ounce for usd10
-‎",Gary Teh, 10.00, USD, Assets
+‎",Gary Teh, 10.00, USD, Asset
 20240527,‎<attached: 00001778-PHOTO-2024-05-27-12-22-24.jpg>,Gary Teh, 0, Unknown, Unknown
 20240528,"Spent 10 minutes applying to be both a vendor and speaker at the Mass Meditation initiative in LA
 ‎",Gary Teh, 0, Unknown, Unknown
@@ -978,14 +343,19 @@ https://www.agroverse.shop/",Gary Teh, 0, Unknown, Unknown
 
 - 25 bags sold at okanogan barter faire 
 - ⁠18 bags sold at burning cow barter faire
-‎",Gary Teh,0,Unknown,Unknown
+‎",Gary Teh, -43.00,Kraft Pouches, Asset
+20240528,"Paid out $43 for affiliate program to Elinor for 
+
+- 25 bags sold at okanogan barter faire 
+- ⁠18 bags sold at burning cow barter faire
+‎",Gary Teh, 43.00, USD, Asset
 20240528,‎<attached: 00001783-PHOTO-2024-05-28-10-15-41.jpg>,Gary Teh, 0, Unknown, Unknown
 20240528,"Spent an hour editing and uploading this video
 
 https://www.instagram.com/reel/C7hgV5svfF8/?igsh=MW9kY3FtNXNvbzR6Ng==
 ‎",Gary Teh, 0, Unknown, Unknown
 20240528,‎<attached: 00001785-PHOTO-2024-05-28-13-08-08.jpg>,Gary Teh, 0, Unknown, Unknown
-20240528,177 sent,Gary Teh, 0, Unknown, Unknown
+20240528,177 sent,Gary Teh, 0, Unknown, Unknown.
 20240528,Spent 30 minutes resolving payment issues with Coopercabruca,Gary Teh, 0, Unknown, Unknown
 20240528,"Spent 2 hours to setup and publish our first ever blogpost and newsletter 
 
@@ -1006,9 +376,7 @@ https://www.agroverse.shop/",Gary Teh, 0, Unknown, Unknown
 20240528,‎<attached: 00001794-PHOTO-2024-05-28-19-23-09.jpg>,Gary Teh, 0, Unknown, Unknown
 20240529,spent 30 minutes updating our landing page copy ‎<This message was edited>,Gary Teh, 0, Unknown, Unknown
 20240529,"Spent USD145.90 for Northwest nomad tickets in September 19 through to 23rd where we will have our cacao circle.
-‎",Gary Teh, 145.90,USD, Asset
-20240529,"Spent USD145.90 for Northwest nomad tickets in September 19 through to 23rd where we will have our cacao circle.
-‎",Gary Teh, 0, Unknown, Asset
+‎",Gary Teh, 145.90, USD, Assets
 20240529,20240529_northwest_nomad_ticket.pdf • ‎1 page ‎<attached: 00001797-20240529_northwest_nomad_ticket.pdf>,Gary Teh, 0, Unknown, Unknown
 20240529,Spent 1hour and 15 minutes cleaning up the recipe section of our website.,Gary Teh, 0, Unknown, Unknown
 20240530,"Sold for USD20 two bags of 8 ounce nips
