@@ -64,3 +64,7 @@ Backup all requirements
 pip freeze > requirements.txt
 ```
 
+Environmental settings to disable freezing
+```
+export PYDEVD_DISABLE_FILE_VALIDATION=1 
+```
