@@ -11,7 +11,7 @@ This repository contains Google Apps Script (GAS) files designed to process and 
 - **Prevent Duplicates**: Use hashing to ensure contributions are unique and avoid reprocessing.
 
 ### Files in This Repository
-1. **`grok_scoring_for_telegram_and_whatsapp_logs.gs`**  
+1. **[`grok_scoring_for_telegram_and_whatsapp_logs.gs`](./grok_scoring_for_telegram_and_whatsapp_logs.gs)**  
    - **Purpose**: Main script for processing and scoring chat logs from both Telegram and WhatsApp.
    - **Features**:
      - Fetches Telegram logs from a Google Sheet and WhatsApp logs from `.txt` files in Google Drive.
@@ -24,7 +24,7 @@ This repository contains Google Apps Script (GAS) files designed to process and 
      - `checkTdgIssued()`: Scores contributions via Grok API.
      - `sendTelegramNotification()`: Notifies contributors.
 
-2. **`importer_telegram_chatlogs_to_google_sheet.gs`**  
+2. **[`importer_telegram_chatlogs_to_google_sheet.gs`](./importer_telegram_chatlogs_to_google_sheet.gs)**  
    - **Purpose**: Imports Telegram chat logs directly from the Telegram API into a Google Sheet.
    - **Features**:
      - Pulls updates from Telegram using the Bot API.
@@ -43,7 +43,7 @@ This repository contains Google Apps Script (GAS) files designed to process and 
 - **Telegram Bot**: Create a bot via [BotFather](https://t.me/BotFather) to get a `TELEGRAM_API_TOKEN`.
 - **API Keys**:
   - `XAI_API_KEY`: For xAI’s Grok API (used in scoring).
-  - `OPENAI_API_KEY`: For OpenAI API (used for equinox/solstice dates in `grok_scoring_for_telegram_and_whatsapp_logs.gs`).
+  - `OPENAI_API_KEY`: For OpenAI API (used for equinox/solstice dates in [`grok_scoring_for_telegram_and_whatsapp_logs.gs`](./grok_scoring_for_telegram_and_whatsapp_logs.gs)).
 - **Google Sheets**: Set up sheets as described in the configuration section.
 - **Google Drive**: Folders for WhatsApp chat logs and intermediate files.
 
