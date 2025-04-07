@@ -890,7 +890,12 @@ function sendTelegramNotification(chatId, contributorUsernames) {
 
   const apiUrl = `https://api.telegram.org/bot${token}/sendMessage`; // Fix: Use token, not TELEGRAM_TOKEN
   const contributorNamesString = contributorUsernames.map(name => `@${name}`).join(", ");
-  const outputSheetLink = "https://truesight.me/submissions/scored-and-to-be-tokenized";
+  
+  const baseOutputSheetLink = "https://truesight.me/submissions/scored-and-to-be-tokenized";
+  
+  // Add timestamp as a query parameter
+  const timestamp = new Date().getTime(); // Current timestamp in milliseconds
+  const outputSheetLink = `${baseOutputSheetLink}?ts=${timestamp}`;
 
   const payload = {
     chat_id: chatId,
