@@ -43,7 +43,7 @@ function getUSDTBalanceInVault() {
       "jsonrpc": "2.0", "id": 1,
       "method": "getTokenAccountBalance",
       "params": [
-        "BkcbCEnD14C7cYiN6VwpYuGmpVrjfoRwobhQQScBugqQ"
+        "LATOKEN_TOKEN"
       ]
     }
 
