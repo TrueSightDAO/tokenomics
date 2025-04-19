@@ -12,23 +12,23 @@ This repository contains scripts for automating data management and contribution
   See python_scripts/README.md for setup and usage instructions.
 
 - **google_app_scripts**\
-  Contains Google Apps Scripts organized into two submodules: `[tdg_asset_management](./google_app_scripts/tdg_asset_management)` for managing TDG asset data (off-chain and on-chain balances, sales, and token buy-back budgets) and `[tdg_scoring](./google_app_scripts/tdg_scoring)` for processing and scoring Telegram/WhatsApp chat logs using xAI's Grok and OpenAI APIs. Data is stored in Google Sheets, with notifications sent via Telegram.\
+  Contains Google Apps Scripts organized into two submodules: [tdg_asset_management](./google_app_scripts/tdg_asset_management) for managing TDG asset data (off-chain and on-chain balances, sales, and token buy-back budgets) and [tdg_scoring](./google_app_scripts/tdg_scoring) for processing and scoring Telegram/WhatsApp chat logs using xAI's Grok and OpenAI APIs. Data is stored in Google Sheets, with notifications sent via Telegram.\
   See google_app_scripts/README.md for setup and usage instructions.
 
 ## Getting Started
 
 ### Prerequisites
 
-- **Python Environment** (for `[python_scripts](./python_scripts)`):
+- **Python Environment** (for [python_scripts](./python_scripts)):
   - Python 3.11.6
   - Virtualenv for dependency management
   - OpenAI API key (`OPENAI_API_KEY`)
-- **Google Account** (for `[google_app_scripts](./google_app_scripts)`):
+- **Google Account** (for [google_app_scripts](./google_app_scripts)):
   - Access to Google Apps Script, Google Sheets, and Google Drive
   - API keys: `WIX_API_KEY`, `XAI_API_KEY`, `OPENAI_API_KEY`, `TELEGRAM_API_TOKEN`
 - **External Services**:
-  - Solana RPC endpoint and LATOKEN API (for `[google_app_scripts/tdg_asset_management](./google_app_scripts/tdg_asset_management)`)
-  - Telegram Bot setup via BotFather (for `[google_app_scripts/tdg_scoring](./google_app_scripts/tdg_scoring)`)
+  - Solana RPC endpoint and LATOKEN API (for [google_app_scripts/tdg_asset_management](./google_app_scripts/tdg_asset_management))
+  - Telegram Bot setup via BotFather (for [google_app_scripts/tdg_scoring](./google_app_scripts/tdg_scoring))
 
 ### Setup Instructions
 
@@ -51,13 +51,13 @@ This repository contains scripts for automating data management and contribution
 
 ## Security Considerations
 
-- Store API keys securely (e.g., using environment variables for `[python_scripts](./python_scripts)` or Google Apps Script's Properties Service for `[google_app_scripts](./google_app_scripts)`).
+- Store API keys securely (e.g., using environment variables for [python_scripts](./python_scripts) or Google Apps Script's Properties Service for [google_app_scripts](./google_app_scripts)).
 - Be aware of rate limits for external APIs (OpenAI, Wix, Solana, LATOKEN, xAI, Telegram).
 - Validate all external data to prevent processing errors or security issues.
 
 ## Contributing
 
-Contributions are welcome! Please submit pull requests or open issues for bug reports, feature requests, or improvements. Ensure changes are tested and documented in the relevant subfolder's `README`. Note that `[python_scripts](./python_scripts)` is a legacy system, and new development should focus on `[google_app_scripts](./google_app_scripts)` unless maintaining legacy functionality.
+Contributions are welcome! Please submit pull requests or open issues for bug reports, feature requests, or improvements. Ensure changes are tested and documented in the relevant subfolder's `README`. Note that [python_scripts](./python_scripts) is a legacy system, and new development should focus on [google_app_scripts](./google_app_scripts) unless maintaining legacy functionality.
 
 ## License
 
