@@ -1,70 +1,64 @@
-# TSD Ledger - Contribution Scoring
-This library utilized OpenAi to automatically score contribution submissions by DAO members in our WhatsApp channels
+# TrueSight DAO Governance Ecosystem Automation
 
+This repository contains scripts for automating data management and contribution scoring within the TrueSight DAO Governance (TDG) ecosystem. The project is divided into two main subfolders, each focusing on a specific aspect of the TDG ecosystem:
 
-## Pre-requisites
-  - Python version 3.11.6
+- **python_scripts**: Legacy Python-based scripts for scoring DAO member contributions and updating Agroverse AGL contracts.
+- **google_app_scripts**: Modern Google Apps Scripts for managing DAO assets and scoring Telegram/WhatsApp chat logs.
 
+## Repository Structure
 
-## Usage
+- **python_scripts**\
+  **Legacy System**: Contains Python scripts and Jupyter Notebooks for scoring TDG member contributions from WhatsApp chat logs using OpenAI's API. It also handles updates to Agroverse AGL contracts. The scripts process chat logs stored in a `data` folder and output results to an `analysis` folder. This represents an older implementation of the contribution scoring system.\
+  See python_scripts/README.md for setup and usage instructions.
 
-Starting the Jyupter Notebook
-```
-jupyter notebook
-```
+- **google_app_scripts**\
+  Contains Google Apps Scripts organized into two submodules: `[tdg_asset_management](./google_app_scripts/tdg_asset_management)` for managing TDG asset data (off-chain and on-chain balances, sales, and token buy-back budgets) and `[tdg_scoring](./google_app_scripts/tdg_scoring)` for processing and scoring Telegram/WhatsApp chat logs using xAI's Grok and OpenAI APIs. Data is stored in Google Sheets, with notifications sent via Telegram.\
+  See google_app_scripts/README.md for setup and usage instructions.
 
-Execution scripts
-```
-# for awarding TDG tokens
-TDG_scoring.ipynb
-```
+## Getting Started
 
-```
-# for updating sales and records on Agroverse AGL contracts
-AGL_scoring.ipynb
-```
+### Prerequisites
 
+- **Python Environment** (for `[python_scripts](./python_scripts)`):
+  - Python 3.11.6
+  - Virtualenv for dependency management
+  - OpenAI API key (`OPENAI_API_KEY`)
+- **Google Account** (for `[google_app_scripts](./google_app_scripts)`):
+  - Access to Google Apps Script, Google Sheets, and Google Drive
+  - API keys: `WIX_API_KEY`, `XAI_API_KEY`, `OPENAI_API_KEY`, `TELEGRAM_API_TOKEN`
+- **External Services**:
+  - Solana RPC endpoint and LATOKEN API (for `[google_app_scripts/tdg_asset_management](./google_app_scripts/tdg_asset_management)`)
+  - Telegram Bot setup via BotFather (for `[google_app_scripts/tdg_scoring](./google_app_scripts/tdg_scoring)`)
 
-WhatsApp chat log location
-```
-\data
-```
+### Setup Instructions
 
-Output CSV files location 
-```
-\analysis
-```
+1. **Clone the Repository**:
 
+   ```bash
+   git clone <repository-url>
+   ```
 
-## Setup
+   Alternatively, download the repository as a ZIP file and extract it.
 
-Setup version of Python in folder
-```
-pyenv local 3.11.6
-```
+2. **Navigate to Subfolders**:
 
-Setup Virtual Environment
-```
-pip install virtualenv
-virtualenv -p 3.11.6 venv
-```
+   - For legacy Python-based contribution scoring and AGL contract updates, refer to python_scripts/README.md.
+   - For modern Google Apps Script-based asset management and chat log scoring, refer to google_app_scripts/README.md.
 
-Activating virtual environment
-```
-source ./venv/bin/activate
-```
+3. **Follow Subfolder-Specific Instructions**:
 
-Install all dependencies
-```
-pip install -r requirements.txt
-```
+   - Each subfolder contains a detailed `README.md` with setup, configuration, and usage instructions specific to its scripts.
 
-Backup all requirements
-```
-pip freeze > requirements.txt
-```
+## Security Considerations
 
-Environmental settings to disable freezing
-```
-export PYDEVD_DISABLE_FILE_VALIDATION=1 
-```
+- Store API keys securely (e.g., using environment variables for `[python_scripts](./python_scripts)` or Google Apps Script's Properties Service for `[google_app_scripts](./google_app_scripts)`).
+- Be aware of rate limits for external APIs (OpenAI, Wix, Solana, LATOKEN, xAI, Telegram).
+- Validate all external data to prevent processing errors or security issues.
+
+## Contributing
+
+Contributions are welcome! Please submit pull requests or open issues for bug reports, feature requests, or improvements. Ensure changes are tested and documented in the relevant subfolder's `README`. Note that `[python_scripts](./python_scripts)` is a legacy system, and new development should focus on `[google_app_scripts](./google_app_scripts)` unless maintaining legacy functionality.
+
+## License
+
+This project is unlicensed. Use and modify at your own risk.
