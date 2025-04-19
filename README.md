@@ -2,16 +2,16 @@
 
 This repository contains scripts for automating data management and contribution scoring within the TrueSight DAO Governance (TDG) ecosystem. The project is divided into two main subfolders, each focusing on a specific aspect of the TDG ecosystem:
 
-- **python_scripts**: Legacy Python-based scripts for scoring DAO member contributions and updating Agroverse AGL contracts.
-- **google_app_scripts**: Modern Google Apps Scripts for managing DAO assets and scoring Telegram/WhatsApp chat logs.
+- **[python_scripts](/python_scripts)**: Legacy Python-based scripts for scoring DAO member contributions and updating Agroverse AGL contracts.
+- **[google_app_scripts](./google_app_scripts)**: Modern Google Apps Scripts for managing DAO assets and scoring Telegram/WhatsApp chat logs.
 
 ## Repository Structure
 
-- **python_scripts**\
+- **[python_scripts](./python_scripts)**\
   **Legacy System**: Contains Python scripts and Jupyter Notebooks for scoring TDG member contributions from WhatsApp chat logs using OpenAI's API. It also handles updates to Agroverse AGL contracts. The scripts process chat logs stored in a `data` folder and output results to an `analysis` folder. This represents an older implementation of the contribution scoring system.\
   See python_scripts/README.md for setup and usage instructions.
 
-- **google_app_scripts**\
+- **[google_app_scripts](./google_app_scripts)**\
   Contains Google Apps Scripts organized into two submodules: [tdg_asset_management](./google_app_scripts/tdg_asset_management) for managing TDG asset data (off-chain and on-chain balances, sales, and token buy-back budgets) and [tdg_scoring](./google_app_scripts/tdg_scoring) for processing and scoring Telegram/WhatsApp chat logs using xAI's Grok and OpenAI APIs. Data is stored in Google Sheets, with notifications sent via Telegram.\
   See google_app_scripts/README.md for setup and usage instructions.
 
