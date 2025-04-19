@@ -1,6 +1,6 @@
 # TDG Ecosystem Scripts
 
-This repository contains Google Apps Script projects for managing and analyzing data within the TDG (Token-based Decentralized Governance) ecosystem. The repository is organized into two main subfolders, each focusing on a distinct aspect of the ecosystem:
+This repository contains Google Apps Script projects for managing and analyzing data within the TrueSight DAO Decentralized Governance ecosystem. The repository is organized into two main subfolders, each focusing on a distinct aspect of the ecosystem:
 
 - [tdg_asset_management](./tdg_asset_management): Manages DAO asset data, including off-chain and on-chain balances, sales, and token buy-back budgets.
 - [tdg_scoring](./tdg_scoring): Processes and scores Telegram and WhatsApp chat logs to assign TDG tokens based on contributions.
