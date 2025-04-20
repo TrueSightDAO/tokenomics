@@ -1,11 +1,13 @@
 const creds = getCredentials();
 
 var wixAccessToken = creds.WIX_API_KEY;
+var quickNodeApiKey = creds.QUICKNODE_API_KEY;
 
 var ledgerDocId = "1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU";
 var offChainAssetBalanceTab = SpreadsheetApp.openById(ledgerDocId).getSheetByName("off chain asset balance");
 var offTransactionsTab = SpreadsheetApp.openById(ledgerDocId).getSheetByName("offchain transactions");
 var tdgIssuedBalanceTab = SpreadsheetApp.openById(ledgerDocId).getSheetByName("Ledger history");
+var solanaUsdtVaultWalletAddress = "BkcbCEnD14C7cYiN6VwpYuGmpVrjfoRwobhQQScBugqQ"
 
 function updateTotalDAOAssetOnWix() {
   var full_asset_value = getOffChainAssetValue() + getUSDTBalanceInVault();
@@ -43,13 +45,13 @@ function getUSDTBalanceInVault() {
       "jsonrpc": "2.0", "id": 1,
       "method": "getTokenAccountBalance",
       "params": [
-        "LATOKEN_TOKEN"
+        solanaUsdtVaultWalletAddress
       ]
     }
 
     options.payload = JSON.stringify(payload);
 
-    var request_url = "https://side-clean-replica.solana-mainnet.quiknode.pro/0fe3dc035c4a206089b9407036a56a5fe7bf989f/";
+    var request_url = "https://side-clean-replica.solana-mainnet.quiknode.pro/" + quickNodeApiKey + "/";
     var response = UrlFetchApp.fetch(request_url, options);     
 
     var response = UrlFetchApp.fetch(request_url, options);
