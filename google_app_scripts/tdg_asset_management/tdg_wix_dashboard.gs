@@ -1,13 +1,26 @@
+// Stores the credentials object retrieved from the getCredentials() function
 const creds = getCredentials();
 
+// Wix API key for authentication with Wix APIs
 var wixAccessToken = creds.WIX_API_KEY;
+
+// QuickNode API key for accessing Solana blockchain data
 var quickNodeApiKey = creds.QUICKNODE_API_KEY;
 
+// Google Spreadsheet ID for the ledger document
 var ledgerDocId = "1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU";
+
+// Reference to the "off chain asset balance" sheet in the ledger Google Spreadsheet
 var offChainAssetBalanceTab = SpreadsheetApp.openById(ledgerDocId).getSheetByName("off chain asset balance");
+
+// Reference to the "offchain transactions" sheet in the ledger Google Spreadsheet
 var offTransactionsTab = SpreadsheetApp.openById(ledgerDocId).getSheetByName("offchain transactions");
+
+// Reference to the "Ledger history" sheet in the ledger Google Spreadsheet
 var tdgIssuedBalanceTab = SpreadsheetApp.openById(ledgerDocId).getSheetByName("Ledger history");
-var solanaUsdtVaultWalletAddress = "BkcbCEnD14C7cYiN6VwpYuGmpVrjfoRwobhQQScBugqQ"
+
+// Solana wallet address for the USDT vault
+var solanaUsdtVaultWalletAddress = "BkcbCEnD14C7cYiN6VwpYuGmpVrjfoRwobhQQScBugqQ";
 
 function updateTotalDAOAssetOnWix() {
   var full_asset_value = getOffChainAssetValue() + getUSDTBalanceInVault();
