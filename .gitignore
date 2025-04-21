@@ -1,2 +1,11 @@
 /venv/*
 /.env
+la_token_market_making_python/.env
+# Ignore Jupyter logs and checkpoints
+jupyter.log
+python_scripts/jupyter.log
+**/.ipynb_checkpoints/
+# Ignore Python bytecode caches in our LATOKEN client
+la_token_market_making_python/__pycache__/
+# Ignore local environment file for python_scripts
+python_scripts/.env
