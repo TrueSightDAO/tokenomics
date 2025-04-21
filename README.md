@@ -1,9 +1,10 @@
 # TrueSight DAO Governance Ecosystem Automation
 
-This repository contains scripts for automating data management and contribution scoring within the TrueSight DAO Governance (TDG) ecosystem. The project is divided into two main subfolders, each focusing on a specific aspect of the TDG ecosystem:
+This repository contains scripts for automating data management and contribution scoring within the TrueSight DAO Governance (TDG) ecosystem. The project is divided into three main subfolders, each focusing on a specific aspect of the TDG ecosystem:
 
-- **[python_scripts](/python_scripts)**: Legacy Python-based scripts for scoring DAO member contributions and updating Agroverse AGL contracts.
-- **[google_app_scripts](./google_app_scripts)**: Modern Google Apps Scripts for managing DAO assets and scoring Telegram/WhatsApp chat logs.
+ - **[python_scripts](/python_scripts)**: Legacy Python-based scripts for scoring DAO member contributions and updating Agroverse AGL contracts.
+ - **[google_app_scripts](./google_app_scripts)**: Modern Google Apps Scripts for managing DAO assets and scoring Telegram/WhatsApp chat logs.
+ - **[la_token_market_making_python](./la_token_market_making_python)**: Python-based market making bot for LA_TOKEN tokens, including the main script and a sandbox notebook. See la_token_market_making_python/README.md for setup and usage instructions.
 
 ## Repository Structure
 
@@ -14,6 +15,9 @@ This repository contains scripts for automating data management and contribution
 - **[google_app_scripts](./google_app_scripts)**\
   Contains Google Apps Scripts organized into two submodules: [tdg_asset_management](./google_app_scripts/tdg_asset_management) for managing TDG asset data (off-chain and on-chain balances, sales, and token buy-back budgets) and [tdg_scoring](./google_app_scripts/tdg_scoring) for processing and scoring Telegram/WhatsApp chat logs using xAI's Grok and OpenAI APIs. Data is stored in Google Sheets, with notifications sent via Telegram.\
   See google_app_scripts/README.md for setup and usage instructions.
+ 
+- **[la_token_market_making_python](./la_token_market_making_python)**\\
+  Python-based market making bot for LA_TOKEN tokens, including the main script and a sandbox notebook. See la_token_market_making_python/README.md for setup and usage instructions.
 
 ## Getting Started
 
@@ -43,7 +47,8 @@ This repository contains scripts for automating data management and contribution
 2. **Navigate to Subfolders**:
 
    - For legacy Python-based contribution scoring and AGL contract updates, refer to python_scripts/README.md.
-   - For modern Google Apps Script-based asset management and chat log scoring, refer to google_app_scripts/README.md.
+    - For modern Google Apps Script-based asset management and chat log scoring, refer to google_app_scripts/README.md.
+    - For the LA_TOKEN market making bot and sandbox, refer to la_token_market_making_python/README.md.
 
 3. **Follow Subfolder-Specific Instructions**:
 

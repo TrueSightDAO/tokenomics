@@ -8,8 +8,13 @@ This library utilized OpenAi to automatically score contribution submissions by 
 
 ## Usage
 
-Starting the Jyupter Notebook
+Starting the Jupyter Notebook:
 ```
+jupyter notebook
+```
+Note: the notebook server serves the current folder. To browse all repository folders (e.g. to access la_token_market_making_python), start the server from the repo root:
+```bash
+cd ..
 jupyter notebook
 ```
 
