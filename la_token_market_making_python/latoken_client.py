@@ -225,7 +225,7 @@ class LatokenClient:
         resp = self.session.post(url, headers=headers, data=body)
         resp.raise_for_status()
         print("Line 227")
-        print(resp.json())
+        print(resp)
         try:
             return resp.json()
         except ValueError:
