@@ -16,8 +16,8 @@ local_env = os.path.join(os.path.dirname(__file__), '.env')
 load_dotenv(dotenv_path=local_env)
 # allow importing local modules in this folder
 sys.path.append(os.path.dirname(__file__))
-from la_token_market_making_python.wix_client import get_daily_budget
-from la_token_market_making_python.latoken_client import LatokenClient
+from wix_client import get_daily_budget
+from latoken_client import LatokenClient
 
 def parse_args():
     parser = argparse.ArgumentParser(
