@@ -79,7 +79,7 @@ print("Daily budget:", budget)
 #### Market Making Bot
 Run the Python script to start continuous market making:
 ```bash
-python LA_TOKEN_market_making.py --interval 5.0 --config path/to/config.yaml
+python market_maker.py --interval 5.0 --config path/to/config.yaml
 ```
 
 #### Sandbox Notebook
