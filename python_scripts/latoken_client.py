@@ -224,12 +224,8 @@ class LatokenClient:
         url = f"{self.base_url}/v2/order"
         resp = self.session.post(url, headers=headers, data=body)
         resp.raise_for_status()
-
-        print("\n\n\n==== Start: Request to place order API call =====")
-        print(payload)
-        print("\n==== Start: Response from place order API call =====")
-        print(resp)
-        print("==== End: Place order API calls =====\n\n\n")
+        print("Line 227")
+        print(resp.json())
         try:
             return resp.json()
         except ValueError:

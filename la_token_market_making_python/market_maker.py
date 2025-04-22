@@ -16,8 +16,8 @@ local_env = os.path.join(os.path.dirname(__file__), '.env')
 load_dotenv(dotenv_path=local_env)
 # allow importing local modules in this folder
 sys.path.append(os.path.dirname(__file__))
-from la_token_market_making_python.wix_client import get_daily_budget
-from la_token_market_making_python.latoken_client import LatokenClient
+from wix_client import get_daily_budget
+from latoken_client import LatokenClient
 
 def parse_args():
     parser = argparse.ArgumentParser(
@@ -90,6 +90,38 @@ class MarketMaker:
         order_book = self.fetch_order_book()
         # TODO: Implement strategy steps using budget and order book data
         pass
+
+    def open_market_purchase(self,
+                             quantity: float,
+                             price: float = None,
+                             condition: str = "GTC",
+                             client_order_id: str = None) -> dict:
+        """
+        Place a buy order for the given TDG quantity.
+
+        If price is None, submits a MARKET order; otherwise a LIMIT order at the specified price.
+
+        Args:
+            quantity: amount of TDG to buy.
+            price: optional limit price in USD per TDG. If omitted, a MARKET order is placed.
+            condition: 'GTC', 'IOC', or 'FOK'.
+            client_order_id: optional client reference ID for the order.
+        Returns:
+            LATOKEN API response (order id, status, etc.).
+        """
+        if price is None:
+            logging.info("Placing MARKET BUY order: qty=%.8f TDG", quantity)
+        else:
+            logging.info("Placing LIMIT BUY order: qty=%.8f TDG @ price=%.8f USD", quantity, price)
+        response = self.latoken.place_order(
+            side="BUY",
+            quantity=quantity,
+            price=price,
+            condition=condition,
+            client_order_id=client_order_id,
+        )
+        logging.info("Order response: %s", response)
+        return response
 
     def start(self):
         """Begin the continuous market making loop."""

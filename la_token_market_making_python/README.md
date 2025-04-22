@@ -65,10 +65,25 @@ print("Daily budget:", budget)
    virtualenv -p 3.11.6 venv
    source ./venv/bin/activate
    ```
-4. Install dependencies:
+4. Install Python dependencies:
    ```bash
    pip install -r requirements.txt
    ```
+
+### Ubuntu on AWS
+
+If you are deploying on an Ubuntu server (e.g., AWS EC2), you may need to install system packages first:
+```bash
+sudo apt update && sudo apt install python3-venv python3-pip
+```
+
+Then create and activate a virtual environment, upgrade pip, and install project requirements:
+```bash
+python3 -m venv venv
+source venv/bin/activate
+pip install --upgrade pip
+pip install -r requirements.txt
+```
 5. (If you hit debugger-related file validation errors):
    ```bash
    export PYDEVD_DISABLE_FILE_VALIDATION=1
@@ -79,7 +94,7 @@ print("Daily budget:", budget)
 #### Market Making Bot
 Run the Python script to start continuous market making:
 ```bash
-python LA_TOKEN_market_making.py --interval 5.0 --config path/to/config.yaml
+python market_maker.py --interval 5.0 --config path/to/config.yaml
 ```
 
 #### Sandbox Notebook
@@ -93,6 +108,32 @@ cd ..
 jupyter notebook --NotebookApp.token='' --NotebookApp.password=''
 ```
 Then open `LA_TOKEN_sandbox.ipynb`.
+  
+### SSH/SOCKS Proxy via Local Port
+
+If your network requires routing API traffic over SSH using a SOCKS proxy, you can forward a local port (e.g. 9999) and configure the client. For example, with a host alias `la_tokens_proxy` in your `~/.ssh/config`:
+
+```ssh-config
+Host la_tokens_proxy
+  HostName 54.151.185.25
+  User ubuntu
+  IdentityFile /Users/garyjob/Applications/aws_keypairs/LATOKENS_exchange.pem
+```
+
+Start the dynamic SOCKS tunnel on port 9999:
+```bash
+ssh -D 9999 la_tokens_proxy -N
+```
+
+Then instantiate `LatokenClient` with a `proxies` dict:
+```python
+from latoken_client import LatokenClient
+
+proxies = { 'http': 'socks5://127.0.0.1:9999',
+            'https': 'socks5://127.0.0.1:9999' }
+client = LatokenClient(api_key, api_secret, proxies=proxies)
+```
+All subsequent REST calls (`get_book`, `place_order`, etc.) will be sent through the SSH SOCKS proxy.
 
 ### Calculating Purchase Amount
 
