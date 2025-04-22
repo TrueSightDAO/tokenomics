@@ -93,6 +93,32 @@ cd ..
 jupyter notebook --NotebookApp.token='' --NotebookApp.password=''
 ```
 Then open `LA_TOKEN_sandbox.ipynb`.
+  
+### SSH/SOCKS Proxy via Local Port
+
+If your network requires routing API traffic over SSH using a SOCKS proxy, you can forward a local port (e.g. 9999) and configure the client. For example, with a host alias `la_tokens_proxy` in your `~/.ssh/config`:
+
+```ssh-config
+Host la_tokens_proxy
+  HostName 54.151.185.25
+  User ubuntu
+  IdentityFile /Users/garyjob/Applications/aws_keypairs/LATOKENS_exchange.pem
+```
+
+Start the dynamic SOCKS tunnel on port 9999:
+```bash
+ssh -D 9999 la_tokens_proxy -N
+```
+
+Then instantiate `LatokenClient` with a `proxies` dict:
+```python
+from latoken_client import LatokenClient
+
+proxies = { 'http': 'socks5://127.0.0.1:9999',
+            'https': 'socks5://127.0.0.1:9999' }
+client = LatokenClient(api_key, api_secret, proxies=proxies)
+```
+All subsequent REST calls (`get_book`, `place_order`, etc.) will be sent through the SSH SOCKS proxy.
 
 ### Calculating Purchase Amount
 
