@@ -61,8 +61,8 @@ def main():
         print(f" - {q:.4f} TDG @ {price:.8f} USD = {c:.4f} USD")
 
 
-    purchase_price = 0.001
-    qty = 5.0  # specify desired TDG amount to buy
+    purchase_price = '0.001'
+    qty = '5.0'  # specify desired TDG amount to buy
     mm = MarketMaker(interval=0)
     # Override default LatokenClient to use SSH proxy and credentials
     mm.latoken = client
