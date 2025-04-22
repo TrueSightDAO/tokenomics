@@ -227,7 +227,7 @@ class LatokenClient:
 
         print("\n\n\n==== Start: Request to place order API call =====")
         print(payload)
-        print("==== Start: Response from place order API call =====")
+        print("\n==== Start: Response from place order API call =====")
         print(resp)
         print("==== End: Place order API calls =====\n\n\n")
         try:
