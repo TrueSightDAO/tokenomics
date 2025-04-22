@@ -20,6 +20,9 @@ load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), '.env'))
 from wix_client import get_daily_budget
 from latoken_client import LatokenClient, get_order_book
 
+from market_maker import MarketMaker
+from latoken_client import get_order_book, LatokenClient
+
 def main():
     # Show which WIX data item ID is configured
     print("WIX_DAILY_BUDGET_DATA_ITEM_ID =", os.getenv("WIX_DAILY_BUDGET_DATA_ITEM_ID"))
@@ -56,6 +59,16 @@ def main():
         q = entry['quantity']
         c = entry['cost']
         print(f" - {q:.4f} TDG @ {price:.8f} USD = {c:.4f} USD")
+
+
+    purchase_price = 0.001
+    qty = 5.0  # specify desired TDG amount to buy
+    mm = MarketMaker(interval=0)
+    # Override default LatokenClient to use SSH proxy and credentials
+    mm.latoken = client
+    response = mm.open_market_purchase(quantity=qty, price=purchase_price)
+    print('Limit order response:', response)
+
 
 if __name__ == '__main__':
     main()

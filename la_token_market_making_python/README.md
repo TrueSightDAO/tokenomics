@@ -65,10 +65,25 @@ print("Daily budget:", budget)
    virtualenv -p 3.11.6 venv
    source ./venv/bin/activate
    ```
-4. Install dependencies:
+4. Install Python dependencies:
    ```bash
    pip install -r requirements.txt
    ```
+
+### Ubuntu on AWS
+
+If you are deploying on an Ubuntu server (e.g., AWS EC2), you may need to install system packages first:
+```bash
+sudo apt update && sudo apt install python3-venv python3-pip
+```
+
+Then create and activate a virtual environment, upgrade pip, and install project requirements:
+```bash
+python3 -m venv venv
+source venv/bin/activate
+pip install --upgrade pip
+pip install -r requirements.txt
+```
 5. (If you hit debugger-related file validation errors):
    ```bash
    export PYDEVD_DISABLE_FILE_VALIDATION=1
