@@ -227,9 +227,9 @@ class LatokenClient:
 
         print("\n\n\n==== Start: Request to place order API call =====")
         print(payload)
-        print("\n\n\n==== Start: Response from place order API call =====")
+        print("==== Start: Response from place order API call =====")
         print(resp)
-        print("==== End: Place order API calls =====")
+        print("==== End: Place order API calls =====\n\n\n")
         try:
             return resp.json()
         except ValueError:
