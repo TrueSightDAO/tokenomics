@@ -47,8 +47,8 @@ def generate_qr(url: str, output_file: str, box_size: int = 10, border: int = 4,
     )
     qr.add_data(url)
     qr.make(fit=True)
-    # Generate image with default orange modules (hex FFB020) and white background
-    img = qr.make_image(fill_color="#FFC966", back_color="white")
+    # Generate image with default black modules and white background
+    img = qr.make_image(fill_color="#000000", back_color="white")
     # Overlay logo if provided
     if logo_path:
         img = img.convert("RGBA")
