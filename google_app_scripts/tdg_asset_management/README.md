@@ -13,6 +13,7 @@ The script performs the following key functions:
 - Tracks and updates 30-day sales data.
 - Calculates daily TDG buy-back budget based on sales, TDG price, and U.S. Treasury yield.
 - Fetches and stores U.S. Treasury yield data.
+- Reads a list of TDG wallet addresses from the "Contributors voting weight" sheet and updates their TDG token balances via Solana RPC (QuickNode).
 
 ## Prerequisites
 
@@ -124,3 +125,12 @@ The script performs the following key functions:
 ## License
 
 This project is unlicensed. Use and modify at your own risk.
+## TDG Wallet Balance Script
+
+This new Google Apps Script file (`tdg_wallet_balance_check.gs`) fetches the TDG token balances for wallet addresses listed in the `Contributors voting weight` sheet and updates the latest TDG holdings in your Google Spreadsheet. Since TDG is now trading, this script ensures your sheet reflects on-chain TDG balances after trading.
+
+Key functions:
+
+- `getTdgWalletBalance(walletAddress)`: Fetch the TDG token balance for a given Solana wallet address via QuickNode RPC.
+- `updateTdgWalletBalancesFromSheet()`: Read wallet addresses from column D of the `Contributors voting weight` sheet (starting at row 5) and write their latest balances to column F.
+- `testGetTdgBalance()`: Utility function to log the TDG balance for a sample wallet address.
