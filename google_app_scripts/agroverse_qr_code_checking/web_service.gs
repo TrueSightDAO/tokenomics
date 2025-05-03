@@ -24,7 +24,7 @@ var DEPLOYMENT_EXAMPLE = DEPLOYMENT_URL + '?' + QR_CODE_PARAM + '=ABC123';
  * Expects a 'qr_code' query parameter.
  *
  * @param {Object} e Event object containing parameters.
- * @return {ContentService.TextOutput} JSON response.
+ * @return {ContentService.TextOutput|HtmlService.HtmlOutput} JSON response or HTML-based redirect.
  */
 function doGet(e) {
   var qrCode = e.parameter[QR_CODE_PARAM];
@@ -38,6 +38,29 @@ function doGet(e) {
     })).setMimeType(ContentService.MimeType.JSON);
   }
   var result = lookupBagByQRCode(qrCode);
+  // If client explicitly requests JSON format, always return JSON data
+  var fmt = e.parameter.format;
+  if (fmt && fmt.toLowerCase() === 'json') {
+    return ContentService.createTextOutput(JSON.stringify(result))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+  // If record has a landing page, perform an HTML redirect
+  if (!result.error && result.landing_page) {
+    var dest = result.landing_page;
+    // Build query string: include qr_code and optional status
+    var params = [];
+    params.push(QR_CODE_PARAM + '=' + encodeURIComponent(qrCode));
+    if (result.status) {
+      params.push('status=' + encodeURIComponent(result.status));
+    }
+    dest += (dest.indexOf('?') > -1 ? '&' : '?') + params.join('&');
+    var html = '<!DOCTYPE html><html><head>'
+      + '<meta http-equiv="refresh" content="0;url=' + dest + '"/>'
+      + '</head><body>Redirecting to <a href="' + dest + '">' + dest + '</a></body></html>';
+    return HtmlService.createHtmlOutput(html)
+      .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+  }
+  // Otherwise return JSON result
   return ContentService.createTextOutput(JSON.stringify(result))
     .setMimeType(ContentService.MimeType.JSON);
 }
