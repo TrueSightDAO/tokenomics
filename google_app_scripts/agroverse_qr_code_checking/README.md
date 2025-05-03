@@ -45,7 +45,9 @@ This service provides a smart endpoint to verify cacao bags in the supply chain.
      nginx -t && systemctl reload nginx
      ```
 - **Google Apps Script** (`web_service.gs`):
-  - `SHEET_URL`: URL of the Google Sheet (`.../edit?gid=472328231`).
+  - `SHEET_URL`: URL of the Google Sheet.
+    For example:
+    https://docs.google.com/spreadsheets/d/1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU/edit?gid=472328231#gid=472328231
   - `SHEET_NAME`: `Agroverse QR codes`.
   - `HEADER_ROW`: 2 (where column names live).
   - `DATA_START_ROW`: 3 (where data begins).
