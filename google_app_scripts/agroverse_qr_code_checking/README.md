@@ -24,7 +24,7 @@ This service provides a smart endpoint to verify cacao bags in the supply chain.
 1. Scan the QR code on a cacao bag.
 2. Your client opens:
    ```
-   https://api.truesight.me/v1/?qr_code=<CODE>
+   http://api.truesight.me/v1/?qr_code=HAPPY_BAG
    ```
 3. Possible responses:
    - **200 OK** with JSON bag details if `qr_code` is found.
@@ -38,13 +38,62 @@ This service provides a smart endpoint to verify cacao bags in the supply chain.
 - **SSL**: Place certificates at:
   - `/etc/ssl/certs/api.truesight.me.crt`
   - `/etc/ssl/private/api.truesight.me.key`
-- **NGINX**:
-  1. Update `SCRIPT_ID` in `api_truesight_me.conf` to your Apps Script Deployment ID.
-  2. Reload NGINX:
-     ```bash
-     nginx -t && systemctl reload nginx
+**NGINX** (`api_truesight_me.conf`):
+  This repository provides two main setups:
+
+  A) Full SSL-proxy (production-ready):
+     ```nginx
+     upstream google_app_web_service {
+         server script.google.com:443 max_fails=0;
+     }
+     server {
+         listen 443 ssl;
+         server_name api.truesight.me;
+
+         ssl_certificate     /etc/ssl/certs/api.truesight.me.crt;
+         ssl_certificate_key /etc/ssl/private/api.truesight.me.key;
+
+         add_header Strict-Transport-Security max-age=31536000;
+
+         location /v1/ {
+             proxy_pass https://google_app_web_service/macros/s/YOUR_SCRIPT_ID/exec$is_args$args;
+             proxy_set_header Host              script.google.com;
+             proxy_set_header X-Real-IP         $remote_addr;
+             proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+             proxy_set_header X-Forwarded-Proto https;
+         }
+     }
      ```
-- **Google Apps Script** (`web_service.gs`):
+
+  B) Temporary HTTP-only redirect (V1 hack):
+     ```nginx
+     server {
+         listen 80;
+         server_name api.truesight.me;
+
+         # Redirect /v1/ calls to Apps Script endpoint
+         location /v1/ {
+             return 302 https://script.google.com/macros/s/YOUR_SCRIPT_ID/exec$is_args$args;
+         }
+
+         # Redirect all other requests to documentation
+         location / {
+             return 302 https://github.com/TrueSightDAO/tokenomics/tree/main/google_app_scripts/agroverse_qr_code_checking;
+         }
+     }
+     ```
+
+  After editing your config, reload NGINX:
+  ```bash
+  nginx -t && systemctl reload nginx
+  ```
+  2. Reload NGINX:
+-  ```bash
+  nginx -t && systemctl reload nginx
+  ```
+- **Web App URL**:
+  - `https://script.google.com/macros/s/AKfycbxigq4-J0izShubqIC5k6Z7fgNRyVJLakfQ34HPuENiSpxuCG-wSq0g-wOAedZzzgaL/exec`
+- - **Google Apps Script** (`web_service.gs`):
   - `SHEET_URL`: URL of the Google Sheet.
     For example:
     https://docs.google.com/spreadsheets/d/1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU/edit?gid=472328231#gid=472328231

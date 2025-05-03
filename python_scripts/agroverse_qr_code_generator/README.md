@@ -44,16 +44,25 @@ python generator.py \
 
 
 
-Generate a QR with a centered logo for Fazenda:
+Generate a QR with a centered logo for visiting Fazenda page for this specific bag of cacao:
 ```bash
 python generator.py \
-  --url https://www.instagram.com/p/DI92I-ITJcW/ \
-  --output package_qr_codes/sao_jorge_fazenda.png \
+  --url 'https://edgar.truesight.me/agroverse/qr-code-check?qr_code=HAPPY_BAG' \
+  --output package_qr_codes/paulo_fazenda_serialized_tracking_happy.png \
   --logo ./agroverse_logo.jpg \
   --logo-ratio 0.25
 ```
 
-Generate a QR with a centered logo for Fazenda:
+```bash
+python generator.py \
+  --url 'https://edgar.truesight.me/agroverse/qr-code-check?qr_code=MISSING_BAG' \
+  --output package_qr_codes/paulo_fazenda_serialized_tracking_missing.png \
+  --logo ./agroverse_logo.jpg \
+  --logo-ratio 0.25
+```
+
+
+Generate a QR with a centered logo for visiting cacao circle page
 ```bash
 python generator.py \
   --url https://www.agroverse.shop/cacao-circles \
