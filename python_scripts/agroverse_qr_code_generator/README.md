@@ -38,11 +38,13 @@ python agroverse_qr_code_generator.py [URL] [options]
 Generate a simple QR:
 ```bash
 python generator.py \
-  "https://example.com" \
-  -o sao_jorge_fazenda.png
+  "https://www.agroverse.shop/cacao-circles" \
+  -o package_qr_codes/cacao_circles.png
 ```
 
-Generate a QR with a centered logo:
+
+
+Generate a QR with a centered logo for Fazenda:
 ```bash
 python generator.py \
   --url https://www.instagram.com/p/DI92I-ITJcW/ \
@@ -50,6 +52,16 @@ python generator.py \
   --logo ./agroverse_logo.jpg \
   --logo-ratio 0.25
 ```
+
+Generate a QR with a centered logo for Fazenda:
+```bash
+python generator.py \
+  --url https://www.agroverse.shop/cacao-circles \
+  --output package_qr_codes/cacao_cirlces.png \
+  --logo ./cacao_circles.jpg \
+  --logo-ratio 0.25
+```
+
 
 ---
 _This script is provided as-is without warranty._
