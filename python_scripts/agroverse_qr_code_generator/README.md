@@ -118,15 +118,15 @@ Ensure your Google service account key file `gdrive_key.json` is present in the 
 
 ### Usage
 ```bash
-   python3 batch_compiler.py \
-     --credentials gdrive_key.json \
-     --sheet-url "https://docs.google.com/spreadsheets/d/1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU/" \
-     --sheet-name "Agroverse QR codes" \
-     --output-dir package_qr_codes \
-     --box-size 10 \
-     --border 8 \
-     --logo-ratio 0.25 \
-     --font-family "/System/Library/Fonts/Helvetica.ttc"
+ python3 batch_compiler.py \
+   --credentials gdrive_key.json \
+   --sheet-url "https://docs.google.com/spreadsheets/d/1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU/" \
+   --sheet-name "Agroverse QR codes" \
+   --output-dir package_qr_codes \
+   --box-size 10 \
+   --border 8 \
+   --logo-ratio 0.25 \
+   --font-family "/System/Library/Fonts/Helvetica.ttc"
 ```
 
 Options:

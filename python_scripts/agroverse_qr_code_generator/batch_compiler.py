@@ -41,7 +41,14 @@ SIDE_MARGIN_RATIO = 0.05       # horizontal side margin as fraction of canvas wi
 QR_TO_HARVEST_RATIO = 0.00001    # vertical space from QR to harvest line
 HARVEST_TO_INFO_RATIO = 0.10   # vertical space from harvest to info line
 INFO_TO_PLANT_RATIO = 0.07     # vertical space from info to plant line
+# bottom margin as fraction of canvas height
 BOTTOM_MARGIN_RATIO = 0.05     # bottom margin as fraction of canvas height
+
+# Manual fixed positions (in pixels) to override dynamic layout. Set to None to use auto-layout
+FIXED_QR_Y = -25              # override QR Y position (px); e.g., -30
+FIXED_HARVEST_Y = 245         # override harvest text Y position (px)
+FIXED_INFO_Y = 270            # override info text Y position (px)
+FIXED_PLANT_Y = 295           # override plant text Y position (px)
 
 # Default font family for text
 DEFAULT_FONT_FAMILY = "Helvetica.ttc"
@@ -252,35 +259,34 @@ def compile_image(template_path: str,
     m3 = int(bg_h * INFO_TO_PLANT_RATIO)
     bottom_margin = int(bg_h * BOTTOM_MARGIN_RATIO)
 
-    # Compute starting Y so content sits above bottom margin
+    # Compute dynamic starting Y so content sits above bottom margin
     total_h = qr_h + m1 + h1 + m2 + h2 + m3 + h3
-    start_y = -30
+    dynamic_start_y = bg_h - bottom_margin - total_h
 
-    # Paste QR
+    # Paste QR code (centered horizontally)
     qr_x = (bg_w - qr_w) // 2
-    qr_y = start_y
+    qr_y = FIXED_QR_Y if FIXED_QR_Y is not None else dynamic_start_y
     template.paste(qr_img, (qr_x, qr_y), qr_img)
 
-    # Draw harvest text
-    # y = qr_y + qr_h + m1
-    y = 240
+    # Determine Y positions for text (manual override or dynamic)
+    harvest_y = FIXED_HARVEST_Y if FIXED_HARVEST_Y is not None else qr_y + qr_h + m1
+    info_y    = FIXED_INFO_Y    if FIXED_INFO_Y    is not None else harvest_y + h1 + m2
+    plant_y   = FIXED_PLANT_Y   if FIXED_PLANT_Y   is not None else info_y    + h2 + m3
+
+    # Draw harvest text (centered horizontally)
     w_harvest, _ = text_size(harvest_text, f_harvest)
     x = (bg_w - w_harvest) // 2
-    print("Harvest Y " , y)
-    draw.text((x, y), harvest_text, fill="black", font=f_harvest)
+    draw.text((x, harvest_y), harvest_text, fill="black", font=f_harvest)
 
     # Draw info text
-    y += h1 + m2
-    y = 265
     w_info, _ = text_size(info_text, f_info)
     x = (bg_w - w_info) // 2
-    draw.text((x, y), info_text, fill="black", font=f_info)
+    draw.text((x, info_y), info_text, fill="black", font=f_info)
 
     # Draw planting message
-    y = 290
     w_plant, _ = text_size(plant_text, f_plant)
     x = (bg_w - w_plant) // 2
-    draw.text((x, y), plant_text, fill="black", font=f_plant)
+    draw.text((x, plant_y), plant_text, fill="black", font=f_plant)
 
     return template
 
