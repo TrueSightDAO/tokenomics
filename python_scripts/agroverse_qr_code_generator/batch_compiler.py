@@ -30,9 +30,9 @@ QR_BASE_SIZE = 300            # base QR size for blank canvas before scaling (px
 QR_RATIO = 0.5                 # QR size as fraction of template width when template provided
 
 # Font size defaults (in pixels)
-DEFAULT_HARVEST_FONT_SIZE = 15 # default font size for harvest line
-DEFAULT_INFO_FONT_SIZE = 20   # default font size for info line
-DEFAULT_PLANT_FONT_SIZE = 18   # default font size for plant line
+DEFAULT_HARVEST_FONT_SIZE = 20 # default font size for harvest line
+DEFAULT_INFO_FONT_SIZE = 30   # default font size for info line
+DEFAULT_PLANT_FONT_SIZE = 25   # default font size for plant line
 MIN_FONT_RATIO = 0.02          # minimum font size as fraction of canvas height
 MIN_FONT_SIZE = 8              # absolute minimum font size in pixels
 
@@ -46,9 +46,9 @@ BOTTOM_MARGIN_RATIO = 0.05     # bottom margin as fraction of canvas height
 
 # Manual fixed positions (in pixels) to override dynamic layout. Set to None to use auto-layout
 FIXED_QR_Y = -25              # override QR Y position (px); e.g., -30
-FIXED_HARVEST_Y = 245         # override harvest text Y position (px)
-FIXED_INFO_Y = 270            # override info text Y position (px)
-FIXED_PLANT_Y = 295           # override plant text Y position (px)
+FIXED_HARVEST_Y = 240         # override harvest text Y position (px)
+FIXED_INFO_Y = 265            # override info text Y position (px)
+FIXED_PLANT_Y = 298           # override plant text Y position (px)
 
 # Default font family for text
 DEFAULT_FONT_FAMILY = "Helvetica.ttc"
