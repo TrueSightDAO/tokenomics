@@ -29,6 +29,9 @@
     <h1>QR Code Reader</h1>
     <video id="video" width="400" height="300" autoplay playsinline muted></video>
     <canvas id="canvas" style="display: none;"></canvas>
+    <!-- Zoom control for digital zoom (when supported) -->
+    <label id="zoom_label" hidden>Zoom: <span id="zoom_value">1</span>x</label>
+    <input type="range" id="zoom_slider" hidden disabled min="1" max="1" step="0.1">
     <input type="button" id="scan_button" value="Scan QR Code" disabled>
     <div id="output">Scan a QR code...</div>
 
@@ -53,11 +56,35 @@
                 const isMobile = /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
                 const constraints = {
                     video: isMobile
-                        ? { facingMode: { ideal: 'environment' } }
+                        ? {
+                            facingMode: { ideal: 'environment' },
+                            width: { ideal: 1280 },
+                            height: { ideal: 720 }
+                        }
                         : true
                 };
                 const stream = await navigator.mediaDevices.getUserMedia(constraints);
                 video.srcObject = stream;
+                // Add zoom controls if supported by the camera
+                const [track] = stream.getVideoTracks();
+                const capabilities = track.getCapabilities();
+                if (capabilities.zoom) {
+                    const zoomSlider = document.getElementById('zoom_slider');
+                    const zoomLabel = document.getElementById('zoom_label');
+                    const zoomValue = document.getElementById('zoom_value');
+                    zoomSlider.min = capabilities.zoom.min;
+                    zoomSlider.max = capabilities.zoom.max;
+                    zoomSlider.step = capabilities.zoom.step || 0.1;
+                    zoomSlider.value = track.getSettings().zoom || capabilities.zoom.min;
+                    zoomValue.textContent = zoomSlider.value;
+                    zoomSlider.hidden = false;
+                    zoomSlider.disabled = false;
+                    zoomLabel.hidden = false;
+                    zoomSlider.addEventListener('input', () => {
+                        track.applyConstraints({ advanced: [{ zoom: zoomSlider.value }] });
+                        zoomValue.textContent = zoomSlider.value;
+                    });
+                }
                 // When video metadata is loaded, set canvas size and enable scan button, then play video
                 video.onloadedmetadata = () => {
                     canvas.width = video.videoWidth;
