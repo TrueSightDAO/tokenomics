@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QR Code Reader</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin: 20px;
+        }
+        video, canvas {
+            border: 1px solid #ccc;
+            margin-bottom: 10px;
+        }
+        #output {
+            margin-top: 10px;
+            padding: 10px;
+            border: 1px solid #ccc;
+            max-width: 400px;
+            word-wrap: break-word;
+        }
+    </style>
+</head>
+<body>
+    <h1>QR Code Reader</h1>
+    <video id="video" width="400" height="300" autoplay></video>
+    <canvas id="canvas" style="display: none;"></canvas>
+    <input type="button" id="scan_button" value="Scan QR Code" disabled>
+    <div id="output">Scan a QR code...</div>
+
+    <!-- Include jsQR library via CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+    <script>
+        // Get DOM elements
+        const video = document.getElementById('video');
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const output = document.getElementById('output');
+        const scan_button = document.getElementById('scan_button');
+        scan_button.addEventListener('click', () => {
+            output.textContent = 'Scanning...';
+            scanQRCode();
+        });
+
+        // Access the camera
+        async function startCamera() {
+            try {
+                // Detect mobile devices to prefer the rear camera when available
+                const isMobile = /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+                const constraints = {
+                    video: isMobile
+                        ? { facingMode: { ideal: 'environment' } }
+                        : true
+                };
+                const stream = await navigator.mediaDevices.getUserMedia(constraints);
+                video.srcObject = stream;
+                video.play();
+                // Set canvas dimensions to match video when metadata loaded
+                video.addEventListener('loadedmetadata', () => {
+                    canvas.width = video.videoWidth;
+                    canvas.height = video.videoHeight;
+                    scan_button.disabled = false;
+                });
+            } catch (err) {
+                console.error('Error accessing camera:', err);
+                output.textContent = 'Error accessing camera: ' + err.message;
+            }
+        }
+
+        // Scan for QR codes
+        function scanQRCode() {
+            // Draw the current video frame onto the canvas
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            // Get image data from the canvas
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            // Use jsQR to decode the QR code
+            const code = jsQR(imageData.data, imageData.width, imageData.height, {
+                inversionAttempts: 'dontInvert'
+            });
+
+            if (code) {
+                // QR code found, display the result
+                output.textContent = 'QR Code Data: ' + code.data;
+                // Optionally stop the camera
+                const stream = video.srcObject;
+                const tracks = stream.getTracks();
+                tracks.forEach(track => track.stop());
+                video.srcObject = null;
+            } else {
+                // No QR code found, keep scanning
+                requestAnimationFrame(scanQRCode);
+            }
+        }
+
+        // Start the camera when the page loads
+        window.onload = function() {
+            startCamera();
+        }
+    </script>
+</body>
+</html>
