@@ -27,7 +27,7 @@
 </head>
 <body>
     <h1>QR Code Reader</h1>
-    <video id="video" width="400" height="300" autoplay></video>
+    <video id="video" width="400" height="300" autoplay playsinline muted></video>
     <canvas id="canvas" style="display: none;"></canvas>
     <input type="button" id="scan_button" value="Scan QR Code" disabled>
     <div id="output">Scan a QR code...</div>
@@ -58,13 +58,13 @@
                 };
                 const stream = await navigator.mediaDevices.getUserMedia(constraints);
                 video.srcObject = stream;
-                video.play();
-                // Set canvas dimensions to match video when metadata loaded
-                video.addEventListener('loadedmetadata', () => {
+                // When video metadata is loaded, set canvas size and enable scan button, then play video
+                video.onloadedmetadata = () => {
                     canvas.width = video.videoWidth;
                     canvas.height = video.videoHeight;
                     scan_button.disabled = false;
-                });
+                    video.play();
+                };
             } catch (err) {
                 console.error('Error accessing camera:', err);
                 output.textContent = 'Error accessing camera: ' + err.message;
