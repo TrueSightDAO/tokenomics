@@ -74,6 +74,7 @@
                     const zoomValue = document.getElementById('zoom_value');
                     zoomSlider.min = capabilities.zoom.min;
                     zoomSlider.max = capabilities.zoom.max;
+                    
                     zoomSlider.step = capabilities.zoom.step || 0.1;
                     zoomSlider.value = track.getSettings().zoom || capabilities.zoom.min;
                     zoomValue.textContent = zoomSlider.value;
