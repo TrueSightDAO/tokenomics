@@ -33,6 +33,11 @@
     <label id="zoom_label" hidden>Zoom: <span id="zoom_value">1</span>x</label>
     <input type="range" id="zoom_slider" hidden disabled min="1" max="1" step="0.1">
     <input type="button" id="scan_button" value="Scan QR Code" disabled>
+    <!-- Display extracted qr_code param -->
+    <div id="qr_param_display" style="margin-top:10px; font-size:1.2em; font-weight:bold;"></div>
+    <!-- Report sold button and output -->
+    <input type="button" id="report_button" value="Report Sold" disabled style="margin-top:5px;">
+    <div id="report_output" style="margin-top:10px;"></div>
     <div id="output">Scan a QR code...</div>
 
     <!-- Include jsQR library via CDN -->
@@ -44,9 +49,18 @@
         const ctx = canvas.getContext('2d');
         const output = document.getElementById('output');
         const scan_button = document.getElementById('scan_button');
+        const qrParamDisplay = document.getElementById('qr_param_display');
+        const reportButton = document.getElementById('report_button');
+        const reportOutput = document.getElementById('report_output');
         let scanning = false;
+        let lastQrParam = null;
         scan_button.addEventListener('click', () => {
             if (scanning) return;
+            // reset previous displays
+            qrParamDisplay.textContent = '';
+            reportOutput.textContent = '';
+            reportButton.disabled = true;
+            lastQrParam = null;
             scanning = true;
             output.textContent = 'Scanning...';
             scanQRCode();
@@ -125,12 +139,61 @@
                 output.textContent = 'QR Code Data: ' + code.data;
                 // Stop scanning but keep video running
                 scanning = false;
+                // Extract qr_code param if present
+                try {
+                    const urlObj = new URL(code.data);
+                    if (urlObj.searchParams.has('qr_code')) {
+                        lastQrParam = urlObj.searchParams.get('qr_code');
+                        qrParamDisplay.textContent = `QR Code: ${lastQrParam}`;
+                        reportButton.disabled = false;
+                    } else {
+                        qrParamDisplay.textContent = '';
+                        reportButton.disabled = true;
+                    }
+                } catch (e) {
+                    qrParamDisplay.textContent = '';
+                    reportButton.disabled = true;
+                }
             } else {
                 // No QR code found, keep scanning
                 requestAnimationFrame(scanQRCode);
             }
         }
 
+        // Handle report sold button click: copy text to clipboard on desktop, use native share on mobile
+        reportButton.addEventListener('click', () => {
+            if (!lastQrParam) return;
+            const text = `${lastQrParam} - this bag of cacao just sold by me for $25.`;
+            // Clear previous output
+            reportOutput.textContent = '';
+            // Detect mobile devices
+            const isMobile = /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+            if (isMobile && navigator.share) {
+                // Use native share on mobile
+                navigator.share({ text })
+                    .then(() => { reportOutput.textContent = 'Shared successfully.'; })
+                    .catch((error) => { reportOutput.textContent = 'Error sharing: ' + error; });
+            } else if (navigator.clipboard && navigator.clipboard.writeText) {
+                // Copy to clipboard on desktop
+                navigator.clipboard.writeText(text)
+                    .then(() => { reportOutput.textContent = 'Report text copied to clipboard.'; })
+                    .catch((err) => { reportOutput.textContent = 'Failed to copy text: ' + err; });
+            } else {
+                // Fallback for older browsers
+                const textarea = document.createElement('textarea');
+                textarea.value = text;
+                textarea.style.position = 'fixed'; textarea.style.opacity = '0';
+                document.body.appendChild(textarea);
+                textarea.focus(); textarea.select();
+                try {
+                    document.execCommand('copy');
+                    reportOutput.textContent = 'Report text copied to clipboard.';
+                } catch (err) {
+                    reportOutput.textContent = 'Failed to copy text: ' + err;
+                }
+                document.body.removeChild(textarea);
+            }
+        });
         // Start the camera when the page loads
         window.onload = function() {
             startCamera();
