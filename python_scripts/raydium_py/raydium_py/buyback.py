@@ -21,12 +21,18 @@ Install dependencies:
 """
 
 import os
+import sys
+# Include the nested raydium_py package directory on sys.path so that
+# imports from utils and raydium modules resolve correctly.
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'raydium_py'))
 import json
 import urllib.request
 import requests
 
 from dotenv import load_dotenv
 from solana.rpc.api import Client
+from raydium.cpmm import buy
+
 # from solana.keypair import Keypair
 # from solana.publickey import PublicKey
 
@@ -39,14 +45,15 @@ from solana.rpc.api import Client
 #     secret_key = bytes(data)
 #     return Keypair.from_secret_key(secret_key)
 
-# def execute_buyback(client: Client, payer: Keypair, token_mint: PublicKey,
-#                     usdc_amount: float, pool_id: PublicKey):
-#     """
-#     Placeholder for buyback logic on a given AMM pool.
-#     Implement token buyback spending USDC via the specified pool (e.g., Raydium swap).
-#     """
-#     print(f"Executing buyback spending {usdc_amount} USDC on pool {pool_id} to buy token {token_mint} using payer {payer.public_key}")
-#     # TODO: Build and send swap transaction using client, payer, pool_id, token_mint, usdc_amount
+def buyback():
+    budget = get_wix_daily_tdg_buyback_budget()
+    sol_to_use = check_usdc_to_sol(budget)
+    
+    pair_address = os.getenv("POOL_ID")
+    sol_in = sol_to_use
+    slippage = 5
+    buy(pair_address, sol_in, slippage)
+    
 
 def get_wix_daily_tdg_buyback_budget() -> float:
     """
@@ -122,58 +129,6 @@ def check_usdc_to_sol(usdc_amount: float) -> float:
         print(f"Failed to fetch data. Status code: {response.status_code}")
     
     
-
-def main():
-    load_dotenv()
-
-    # Core settings
-    rpc_url = os.getenv("RPC_URL")
-    private_key_base58 = os.getenv("PRIVATE_KEY_BASE58")
-    keypair_path = os.getenv("KEYPAIR_PATH")
-    pool_id_str = os.getenv("POOL_ID")
-    token_mint_str = os.getenv("TOKEN_MINT")
-
-    missing = []
-    if not rpc_url:
-        missing.append("RPC_URL")
-    if not (private_key_base58 or keypair_path):
-        missing.append("PRIVATE_KEY_BASE58 or KEYPAIR_PATH")
-    if not pool_id_str:
-        missing.append("POOL_ID")
-    if not token_mint_str:
-        missing.append("TOKEN_MINT")
-    if missing:
-        print(f"Error: Missing required env vars: {', '.join(missing)}")
-        return
-
-    client = Client(rpc_url)
-
-    # Load payer keypair
-    if private_key_base58:
-        from solana.keypair import Keypair as SolKeypair
-        import base64
-        try:
-            payer = SolKeypair.from_base58_string(private_key_base58)
-        except Exception as e:
-            print(f"Error loading base58 keypair: {e}")
-            return
-        # Print base64 secret for interoperability
-        print("Base64 secret key:", base64.b64encode(payer.secret_key).decode("utf-8"))
-    else:
-        payer = load_keypair(keypair_path)
-
-    pool_id = PublicKey(pool_id_str)
-    token_mint = PublicKey(token_mint_str)
-
-    # Fetch daily USDC budget from Wix
-    try:
-        usdc_amount = get_wix_daily_tdg_buyback_budget()
-    except Exception as e:
-        print(f"Error fetching Wix buyback budget: {e}")
-        return
-
-    print(f"Connected to {rpc_url}")
-    execute_buyback(client, payer, token_mint, usdc_amount, pool_id)
 import argparse
 import sys
 
@@ -201,7 +156,8 @@ def cli():
             print(f"Error fetching Wix buyback budget: {e}")
             sys.exit(1)
     elif args.command == "buyback":
-        main()
+        load_dotenv()
+        buyback()
     elif args.command == "check":
         load_dotenv()
         try:

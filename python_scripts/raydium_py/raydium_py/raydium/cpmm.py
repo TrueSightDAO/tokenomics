@@ -50,7 +50,7 @@ def buy(pair_address: str, sol_in: float = 0.1, slippage: int = 1) -> bool:
 
     print("Calculating transaction amounts...")
     amount_in = int(sol_in * SOL_DECIMAL)
-
+    
     base_reserve, quote_reserve, token_decimal = get_cpmm_reserves(pool_keys)
     amount_out = sol_for_tokens(sol_in, base_reserve, quote_reserve)
     print(f"Estimated Amount Out: {amount_out}")

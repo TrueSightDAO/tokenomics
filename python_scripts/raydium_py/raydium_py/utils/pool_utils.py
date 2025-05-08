@@ -314,7 +314,6 @@ def get_cpmm_reserves(pool_keys: CpmmPoolKeys):
         Processed
     )
     balances = balances_response.value
-
     quote_account = balances[0]
     base_account = balances[1]
     quote_account_balance = quote_account.data.parsed['info']['tokenAmount']['uiAmount']
