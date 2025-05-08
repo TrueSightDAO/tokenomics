@@ -22,16 +22,15 @@ Install dependencies:
 
 import os
 import sys
-# Include the nested raydium_py package directory on sys.path so that
-# imports from utils and raydium modules resolve correctly.
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'raydium_py'))
 import json
 import urllib.request
 import requests
 
 from dotenv import load_dotenv
 from solana.rpc.api import Client
-from raydium.cpmm import buy
+from raydium.cpmm import buy as cpmm_buy
+from raydium.amm_v4 import buy as v4_buy
+from utils.pool_utils import fetch_amm_v4_pool_keys
 
 # from solana.keypair import Keypair
 # from solana.publickey import PublicKey
@@ -48,11 +47,31 @@ from raydium.cpmm import buy
 def buyback():
     budget = get_wix_daily_tdg_buyback_budget()
     sol_to_use = check_usdc_to_sol(budget)
-    
+
     pair_address = os.getenv("POOL_ID")
-    sol_in = sol_to_use
-    slippage = 5
-    buy(pair_address, sol_in, slippage)
+    if not pair_address:
+        print("Missing POOL_ID environment variable")
+        sys.exit(1)
+
+    slippage = int(os.getenv("SLIPPAGE", "5"))
+
+    # Try CLMM (V4) first; if not found, fall back to CPMM
+    pool_v4 = fetch_amm_v4_pool_keys(pair_address)
+    print("Line 60")
+    print(pool_v4)
+    if pool_v4 is not None:
+        print(f"Detected CLMM V4 pool {pair_address}, using amm_v4.buy")
+        success = v4_buy(pair_address, sol_to_use, slippage)
+    else:
+        print(f"No V4 pool found for {pair_address}, using cpmm.buy")
+        success = cpmm_buy(pair_address, sol_to_use, slippage)
+
+    if not success:
+        print("Buy transaction failed")
+        sys.exit(1)
+
+    print("Buyback buy transaction succeeded")
+    return success
     
 
 def get_wix_daily_tdg_buyback_budget() -> float:
