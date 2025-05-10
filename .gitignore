@@ -9,3 +9,6 @@ python_scripts/jupyter.log
 la_token_market_making_python/__pycache__/
 # Ignore local environment file for python_scripts
 python_scripts/.env
+
+# macOS system files
+.DS_Store
