@@ -7,21 +7,16 @@ This repository contains scripts for automating data management and contribution
  - **[la_token_market_making_python](./la_token_market_making_python)**: Python-based market making bot for LA_TOKEN tokens, including the main script and a sandbox notebook. Work on this project is currently on hold as the LA_TOKEN internal engineering team has been unresponsive to our outreach to resolve trade execution issues. See la_token_market_making_python/README.md for setup and usage instructions.
  - **[python_scripts](/python_scripts)**: Legacy Python-based scripts for scoring DAO member contributions and updating Agroverse AGL contracts.
 
-## Repository Structure
+## Repository Structure                                                                                                        │
 
-- **[python_scripts](./python_scripts)**\
-  **Legacy System**: Contains Python scripts and Jupyter Notebooks for scoring TDG member contributions from WhatsApp chat logs using OpenAI's API. It also handles updates to Agroverse AGL contracts. The scripts process chat logs stored in a `data` folder and output results to an `analysis` folder. This represents an older implementation of the contribution scoring system.\
-  See python_scripts/README.md for setup and usage instructions.
+This project is organized into four main subfolders, ordered by active development focus:                                      │
 
-- **[google_app_scripts](./google_app_scripts)**\
-  Contains Google Apps Scripts organized into two submodules: [tdg_asset_management](./google_app_scripts/tdg_asset_management) for managing TDG asset data (off-chain and on-chain balances, sales, and token buy-back budgets) and [tdg_scoring](./google_app_scripts/tdg_scoring) for processing and scoring Telegram/WhatsApp chat logs using xAI's Grok and OpenAI APIs. Data is stored in Google Sheets, with notifications sent via Telegram.\
-  See google_app_scripts/README.md for setup and usage instructions.
- 
-- **[la_token_market_making_python](./la_token_market_making_python)**\\
-  Python-based market making bot for LA_TOKEN tokens, including the main script and a sandbox notebook. Work on this project is currently on hold as the LA_TOKEN internal engineering team has been unresponsive to our outreach to resolve trade execution issues. See la_token_market_making_python/README.md for setup and usage instructions.
+- [google_app_scripts](./google_app_scripts)                                                                                   │
+- [raydium_market_making](./raydium_market_making)                                                                             │
+- [la_token_market_making_python](./la_token_market_making_python)                                                             │
+- [python_scripts](./python_scripts)                                                                                           │
 
-- **[raydium_market_making](./raydium_market_making)**\\
-  Market making strategies for the Raydium AMM on Solana. Contains both a Python-based experimental implementation (`raydium_py`) and a TypeScript-based implementation (`raydium_type_script`). The Python approach did not work reliably; the TypeScript version is the default working implementation. See raydium_market_making/README.md for details.
+Each subfolder contains a README with detailed setup and usage instructions.                                                   │
 
 ## Getting Started
 
