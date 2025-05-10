@@ -2,10 +2,10 @@
 
 This repository contains scripts for automating data management and contribution scoring within the TrueSight DAO Governance (TDG) ecosystem. The project is divided into three main subfolders, each focusing on a specific aspect of the TDG ecosystem:
 
- - **[python_scripts](/python_scripts)**: Legacy Python-based scripts for scoring DAO member contributions and updating Agroverse AGL contracts.
  - **[google_app_scripts](./google_app_scripts)**: Modern Google Apps Scripts for managing DAO assets and scoring Telegram/WhatsApp chat logs.
+ - **[raydium_market_making](./raydium_market_making)**: Market making strategies for the Raydium AMM on Solana. Contains a TypeScript-based implementation (`raydium_type_script/`) (the default working implementation) and a Python-based experimental implementation (`raydium_py/`) (not maintained). See raydium_market_making/README.md for details.
  - **[la_token_market_making_python](./la_token_market_making_python)**: Python-based market making bot for LA_TOKEN tokens, including the main script and a sandbox notebook. Work on this project is currently on hold as the LA_TOKEN internal engineering team has been unresponsive to our outreach to resolve trade execution issues. See la_token_market_making_python/README.md for setup and usage instructions.
- - **[raydium_market_making](./raydium_market_making)**: Market making strategies for the Raydium AMM on Solana. Contains both a Python-based experimental implementation (`raydium_py/`) and a TypeScript-based implementation (`raydium_type_script/`). The Python approach did not work reliably; the TypeScript version is the default working implementation. See raydium_market_making/README.md for details.
+ - **[python_scripts](/python_scripts)**: Legacy Python-based scripts for scoring DAO member contributions and updating Agroverse AGL contracts.
 
 ## Repository Structure
 
@@ -25,38 +25,20 @@ This repository contains scripts for automating data management and contribution
 
 ## Getting Started
 
-### Prerequisites
+### Setup & Prerequisites
 
-- **Python Environment** (for [python_scripts](./python_scripts)):
-  - Python 3.11.6
-  - Virtualenv for dependency management
-  - OpenAI API key (`OPENAI_API_KEY`)
-- **Google Account** (for [google_app_scripts](./google_app_scripts)):
-  - Access to Google Apps Script, Google Sheets, and Google Drive
-  - API keys: `WIX_API_KEY`, `XAI_API_KEY`, `OPENAI_API_KEY`, `TELEGRAM_API_TOKEN`
-- **External Services**:
-  - Solana RPC endpoint and LATOKEN API (for [google_app_scripts/tdg_asset_management](./google_app_scripts/tdg_asset_management))
-  - Telegram Bot setup via BotFather (for [google_app_scripts/tdg_scoring](./google_app_scripts/tdg_scoring))
+Clone the repository:
 
-### Setup Instructions
+```bash
+git clone <repository-url>
+```
 
-1. **Clone the Repository**:
+For detailed setup, configuration, and prerequisites, please see the README in the relevant subfolder:
 
-   ```bash
-   git clone <repository-url>
-   ```
-
-   Alternatively, download the repository as a ZIP file and extract it.
-
-2. **Navigate to Subfolders**:
-
-   - For legacy Python-based contribution scoring and AGL contract updates, refer to python_scripts/README.md.
-    - For modern Google Apps Script-based asset management and chat log scoring, refer to google_app_scripts/README.md.
-    - For the LA_TOKEN market making bot and sandbox, refer to la_token_market_making_python/README.md.
-
-3. **Follow Subfolder-Specific Instructions**:
-
-   - Each subfolder contains a detailed `README.md` with setup, configuration, and usage instructions specific to its scripts.
+- [python_scripts](./python_scripts/README.md)
+- [google_app_scripts](./google_app_scripts/README.md)
+- [la_token_market_making_python](./la_token_market_making_python/README.md)
+- [raydium_market_making](./raydium_market_making/README.md)
 
 ## Security Considerations
 
