@@ -6,7 +6,7 @@
 // Full URL of your Google Spreadsheet (e.g. https://docs.google.com/spreadsheets/d/.../edit)
 var SHEET_URL = 'https://docs.google.com/spreadsheets/d/1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU/edit?gid=472328231';
 // Name of the sheet/tab within the spreadsheet
-var SHEET_NAME = 'Agroverse QR codes';
+var QR_CODE_SHEET_NAME = 'Agroverse QR codes';
 // Query parameter name for QR code lookups
 var QR_CODE_PARAM = 'qr_code';
 // Spreadsheet header row number (where column names appear)
@@ -86,9 +86,9 @@ function testGetRecord() {
  */
 function getRecordByQRCode(qrCode) {
   var spreadsheet = SpreadsheetApp.openByUrl(SHEET_URL);
-  var sheet = spreadsheet.getSheetByName(SHEET_NAME);
+  var sheet = spreadsheet.getSheetByName(QR_CODE_SHEET_NAME);
   if (!sheet) {
-    return { error: 'Sheet "' + SHEET_NAME + '" not found for QR code ' + qrCode, qr_code: qrCode };
+    return { error: 'Sheet "' + QR_CODE_SHEET_NAME + '" not found for QR code ' + qrCode, qr_code: qrCode };
   }
   var lastRow = sheet.getLastRow();
   var lastCol = sheet.getLastColumn();
