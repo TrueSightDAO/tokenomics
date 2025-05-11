@@ -1,10 +1,10 @@
 
 Usage
 ------
-Run the sandbox script with a specific command:
+Run the buyback_sol_to_tdg script with a specific command:
 
 ```bash
-yarn dev sandbox.ts <command> [value]
+yarn dev buyback_sol_to_tdg.ts <command> [value]
 ```
 
 Commands:
@@ -17,16 +17,16 @@ Commands:
 Examples:
 ```bash
 # Compute swap quote for 0.002 SOL
-yarn dev sandbox.ts swap 0.002
+yarn dev buyback_sol_to_tdg.ts swap 0.002
 
 # Fetch the Wix daily TDG buyback budget
-yarn dev sandbox.ts wix
+yarn dev buyback_sol_to_tdg.ts wix
 
 # Convert 100 USDC into SOL
-yarn dev sandbox.ts usdc2sol 100
+yarn dev buyback_sol_to_tdg.ts usdc2sol 100
 
 # Fetch the Wix daily TDG buyback budget and convert to SOL                                                                    │
-yarn dev sandbox.ts buyback 
+yarn dev buyback_sol_to_tdg.ts buyback 
 ```
 
 
@@ -70,7 +70,7 @@ If you do not already have one, create it manually:
 ```bash
 spl-token create-account <OUTPUT_MINT_ADDRESS>
 ```
-Replace `<OUTPUT_MINT_ADDRESS>` with the mint address of the token you will receive (the `OUTPUT_MINT` in `sandbox.ts`).
+Replace `<OUTPUT_MINT_ADDRESS>` with the mint address of the token you will receive (the `OUTPUT_MINT` in `buyback_sol_to_tdg.ts`).
 Without this ATA, the buyback command will fail with:
 ```
 Error: No token account found for output mint <OUTPUT_MINT_ADDRESS>
