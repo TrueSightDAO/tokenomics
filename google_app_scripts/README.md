@@ -15,6 +15,10 @@ This repository contains Google Apps Script projects for managing and analyzing 
   Contains Google Apps Scripts for importing and scoring chat logs from Telegram and WhatsApp. It uses AI APIs (xAI's Grok and OpenAI) to evaluate contributions and assign TDG tokens, with data stored in Google Sheets and notifications sent via Telegram.\
   See detailed README for setup and usage instructions.
 
+- [tdg_inventory_management](./tdg_inventory_management)\\
+  Provides a Google Apps Script web app to list inventory managers, fetch asset data for a specified manager, and list possible recipients from a Google Sheet.\\
+  See detailed README for setup and usage instructions.
+
 ## Getting Started
 
 ### Prerequisites
