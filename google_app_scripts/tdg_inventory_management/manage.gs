@@ -212,7 +212,7 @@ function doGet(e) {
  * Usage (in Apps Script console): testManager('Manager Name');
  */
 function testManager() {
-  managerName = "Matheus Reis"
+  managerName = "DHL"
   var e = { parameter: { manager: encodeURIComponent(managerName) } };
   var output = doGet(e);
   Logger.log('Assets for %s: %s', managerName, output.getContent());
