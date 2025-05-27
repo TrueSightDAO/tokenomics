@@ -36,7 +36,7 @@ jobs:
           TDG_MINT: ${{ secrets.TDG_MINT }}
           SOLANA_PRIVATE_KEY: ${{ secrets.SOLANA_PRIVATE_KEY }}
           QUICKNODE_RPC_URL: ${{ secrets.QUICKNODE_RPC_URL }}
-        run: yarn dev buyback.ts buyback
+        run: yarn dev buyback_sol_to_tdg.ts buyback
 
       - name: Notify on failure
         if: failure()
