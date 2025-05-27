@@ -99,3 +99,48 @@ GET https://script.google.com/macros/s/AKfycbztpV3TUIRn3ftNW1aGHAKw32OBJrp_p1Pr9
   ```
 
 Feel free to modify or extend this script to fit your needs.
+
+## Telegram Chat Logs Parser
+
+This Google Apps Script (`process_telegram_logs.gs`) parses Telegram chat logs stored in a Google Sheet and updates another Google Sheet with the sales states of serialized cacao bags. It uses xAI’s Grok model to extract QR codes and sale prices, validates contributors, and marks sold status in the Agroverse QR codes sheet.
+
+### Spreadsheet & Script Requirements
+- **Source Sheet** (`Telegram Chat Logs`): Holds raw Telegram chat data. Configure `SOURCE_SHEET_URL` and `SOURCE_SHEET_NAME` in `process_telegram_logs.gs`.
+- **Destination Sheet** (`Scored Chatlogs`): Receives parsed output. Configure `DESTINATION_SHEET_URL` and `DESTINATION_SHEET_NAME`.
+- **Contributors Sheet** (`Contributors contact information`): Validates contributors (Column H for Telegram handle).
+- **Agroverse QR Codes Sheet** (`Agroverse QR codes`): Stores QR codes and their statuses.
+
+### Installation & Setup
+1. In your Apps Script project, add a new script file named `process_telegram_logs.gs` and paste the contents of the provided script.
+2. Create a `Credentials.gs` file with two functions:
+   ```js
+   function setApiKeys() {
+     // Store your XAI_API_KEY and any other properties:
+     PropertiesService.getScriptProperties()
+       .setProperty('XAI_API_KEY', 'your_xai_api_key');
+   }
+   function getCredentials() {
+     return {
+       XAI_API_KEY: PropertiesService.getScriptProperties().getProperty('XAI_API_KEY'),
+       SOURCE_SHEET_URL: 'https://...',
+       SOURCE_SHEET_NAME: 'Telegram Chat Logs',
+       DESTINATION_SHEET_URL: 'https://...',
+       DESTINATION_SHEET_NAME: 'Scored Chatlogs',
+       CONTRIBUTORS_SHEET_URL: 'https://...',
+       CONTRIBUTORS_SHEET_NAME: 'Contributors contact information',
+       AGROVERSE_QR_SHEET_URL: 'https://...',
+       AGROVERSE_QR_SHEET_NAME: 'Agroverse QR codes'
+     };
+   }
+   ```
+3. Run `setApiKeys()` once to initialize your script properties.
+4. Authorize the script when prompted.
+
+### Execution
+- **Manual Run**: In the Apps Script editor, select the function `parseTelegramChatLogs` and click **Run**.
+- **Automated Trigger**: Set up a time-driven trigger:
+  1. In Apps Script, go to **Triggers**.
+  2. Click **Add Trigger**, choose `parseTelegramChatLogs`, select a schedule (e.g., hourly or daily).
+  3. Save and authorize.
+
+Parsed log entries will appear in your destination sheet, and sold statuses will be updated in the Agroverse QR codes sheet.
