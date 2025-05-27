@@ -1,16 +1,16 @@
-name: Daily TDG Buyback
+name: Hourly TDG to USDC Update
 
 on:
   schedule:
-    - cron: '0 5 * * *' # 05:00 UTC = 10:00 PM PDT
+    - cron: '0 * * * *' # Runs every hour at minute 0 (e.g., 00:00, 01:00 UTC)
   workflow_dispatch: # Allows manual triggering
 
 jobs:
-  run-buyback:
+  run-savetdg2usdc:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: raydium_market_making/raydium_type_script # Set working directory for steps
+        working-directory: raydium_market_making/raydium_type_script
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -20,21 +20,21 @@ jobs:
         with:
           node-version: '20' # Match your Node.js version
           cache: 'yarn'
-          cache-dependency-path: raydium_market_making/raydium_type_script/yarn.lock # Path to yarn.lock
+          cache-dependency-path: raydium_market_making/raydium_type_script/yarn.lock
 
       - name: Install dependencies
         run: yarn install --frozen-lockfile
 
-      - name: Run buyback script
+      - name: Run savetdg2usdc script
         env:
           SECRET_KEY: ${{ secrets.SECRET_KEY }}
           RPC_URL: ${{ secrets.RPC_URL }}
           WIX_API_KEY: ${{ secrets.WIX_API_KEY }}
-          WIX_DAILY_TDG_BUYBACK_ITEM_ID: ${{ secrets.WIX_DAILY_TDG_BUYBACK_ITEM_ID }}
-          WIX_DATA_COLLECTION_ID: ${{ secrets.WIX_DATA_COLLECTION_ID }}
           WIX_ACCOUNT_ID: ${{ secrets.WIX_ACCOUNT_ID }}
           WIX_SITE_ID: ${{ secrets.WIX_SITE_ID }}
-        run: yarn dev buyback_sol_to_tdg.ts buyback
+          USDC_MINT: ${{ vars.USDC_MINT }} # Non-sensitive, using vars
+          TDG_MINT: ${{ vars.TDG_MINT }}   # Non-sensitive, using vars
+        run: yarn dev buyback.ts savetdg2usdc
 
       - name: Notify on failure
         if: failure()
