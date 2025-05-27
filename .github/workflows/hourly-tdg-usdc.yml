@@ -34,7 +34,7 @@ jobs:
           WIX_SITE_ID: ${{ secrets.WIX_SITE_ID }}
           USDC_MINT: ${{ vars.USDC_MINT }} # Non-sensitive, using vars
           TDG_MINT: ${{ vars.TDG_MINT }}   # Non-sensitive, using vars
-        run: yarn dev buyback.ts savetdg2usdc
+        run: yarn dev buyback_sol_to_tdg.ts savetdg2usdc
 
       - name: Notify on failure
         if: failure()
