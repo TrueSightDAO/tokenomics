@@ -355,6 +355,28 @@ function getTdgUsdtPriceLaToken() {
   return last_price;
 }
 
+/**
+ * Retrieve the TDG to USDC exchange rate from Wix.
+ * @return {number} The TDG to USDC exchange rate stored on Wix.
+ */
+function getTdgUsdcPriceOnWix() {
+  var options = getWixRequestHeader();
+  var request_url = "https://www.wixapis.com/wix-data/v2/items/" + getWixTdgUsdcPriceDataItemId() + "?dataCollectionId=" + getWixDataCollectionId();  
+  var response = UrlFetchApp.fetch(request_url, options);
+  var content = response.getContentText();
+  var response_obj = JSON.parse(content);  
+  Logger.log("TDG to USDC exchange rate on Wix: " + response_obj.dataItem.data.exchangeRate);  
+  return response_obj.dataItem.data.exchangeRate;
+}
+
+/**
+ * Get the DataItemId for the TDG to USDC exchange rate.
+ * @return {string} The DataItemId for the TDG/USDC exchange rate.
+ */
+function getWixTdgUsdcPriceDataItemId() {
+  return "8edde502-ac79-4e66-ab2d-8ebb99108665";
+}
+
 
 function getUSTreasuryYield() {
   var treasury_yield_url = "https://home.treasury.gov/resource-center/data-chart-center/interest-rates/pages/xml?data=daily_treasury_yield_curve&field_tdr_date_value=" + new Date().getFullYear();
@@ -400,7 +422,7 @@ function getWixDailyTdgBuyBackBudgetDataItemId() {
 function setDailyTdgBuyBackBudget() {
   // Calculate the budget using the provided formula
   var last30DaysSales = get30DaysSales();
-  var tdgPrice = getTdgUsdtPriceLaToken();
+  var tdgPrice = getTdgUsdcPriceOnWix();
   var treasuryYield = getUSTreasuryYield();
   
   // Formula: (Last 30 days sales / 30) * min(TDG price, 1 - Treasury yield)
@@ -442,6 +464,8 @@ Logger.log("Treasury Yield : " + treasuryYield);
 function getDailyTdgBuyBackBudget() {
   var options = getWixRequestHeader();
   var request_url = "https://www.wixapis.com/wix-data/v2/items/" + getWixDailyTdgBuyBackBudgetDataItemId() + "?dataCollectionId=" + getWixDataCollectionId();  
+  Logger.log(request_url)
+  Logger.log(options)
   var response = UrlFetchApp.fetch(request_url, options);
   var content = response.getContentText();
   var response_obj = JSON.parse(content);  

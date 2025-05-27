@@ -25,6 +25,12 @@ yarn dev buyback_sol_to_tdg.ts wix
 # Convert 100 USDC into SOL
 yarn dev buyback_sol_to_tdg.ts usdc2sol 100
 
+# Check price of TDG in USDC
+yarn dev buyback_sol_to_tdg.ts tdg2usdc
+
+# Save price of TDG in USDC
+yarn dev buyback_sol_to_tdg.ts savetdg2usdc
+
 # Fetch the Wix daily TDG buyback budget and convert to SOL                                                                    │
 yarn dev buyback_sol_to_tdg.ts buyback 
 ```
