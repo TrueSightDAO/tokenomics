@@ -27,15 +27,13 @@ jobs:
 
       - name: Run buyback script
         env:
+          SECRET_KEY: ${{ secrets.SECRET_KEY }}
+          RPC_URL: ${{ secrets.RPC_URL }}
           WIX_API_KEY: ${{ secrets.WIX_API_KEY }}
           WIX_DAILY_TDG_BUYBACK_ITEM_ID: ${{ secrets.WIX_DAILY_TDG_BUYBACK_ITEM_ID }}
           WIX_DATA_COLLECTION_ID: ${{ secrets.WIX_DATA_COLLECTION_ID }}
           WIX_ACCOUNT_ID: ${{ secrets.WIX_ACCOUNT_ID }}
           WIX_SITE_ID: ${{ secrets.WIX_SITE_ID }}
-          USDC_MINT: ${{ secrets.USDC_MINT }}
-          TDG_MINT: ${{ secrets.TDG_MINT }}
-          SOLANA_PRIVATE_KEY: ${{ secrets.SOLANA_PRIVATE_KEY }}
-          QUICKNODE_RPC_URL: ${{ secrets.QUICKNODE_RPC_URL }}
         run: yarn dev buyback_sol_to_tdg.ts buyback
 
       - name: Notify on failure
