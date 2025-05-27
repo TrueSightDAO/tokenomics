@@ -1,0 +1,47 @@
+name: Daily TDG Buyback
+
+on:
+  schedule:
+    - cron: '0 5 * * *' # 05:00 UTC = 10:00 PM PDT
+  workflow_dispatch: # Allows manual triggering
+
+jobs:
+  run-buyback:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: raydium_market_making/raydium_type_script # Set working directory for steps
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20' # Match your Node.js version
+          cache: 'yarn'
+          cache-dependency-path: raydium_market_making/raydium_type_script/yarn.lock # Path to yarn.lock
+
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+
+      - name: Run buyback script
+        env:
+          WIX_API_KEY: ${{ secrets.WIX_API_KEY }}
+          WIX_DAILY_TDG_BUYBACK_ITEM_ID: ${{ secrets.WIX_DAILY_TDG_BUYBACK_ITEM_ID }}
+          WIX_DATA_COLLECTION_ID: ${{ secrets.WIX_DATA_COLLECTION_ID }}
+          WIX_ACCOUNT_ID: ${{ secrets.WIX_ACCOUNT_ID }}
+          WIX_SITE_ID: ${{ secrets.WIX_SITE_ID }}
+          USDC_MINT: ${{ secrets.USDC_MINT }}
+          TDG_MINT: ${{ secrets.TDG_MINT }}
+          SOLANA_PRIVATE_KEY: ${{ secrets.SOLANA_PRIVATE_KEY }}
+          QUICKNODE_RPC_URL: ${{ secrets.QUICKNODE_RPC_URL }}
+        run: yarn dev buyback.ts buyback
+
+      - name: Notify on failure
+        if: failure()
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const { context } = require('@actions/github');
+            console.log(`Workflow failed: ${context.job}`);
