@@ -26,9 +26,11 @@ const TELEGRAM_UPDATE_ID_COL = 0; // Column A
 const TELEGRAM_MESSAGE_ID_COL = 3; // Column D
 const CONTRIBUTOR_NAME_COL = 4; // Column E (must match Contributors Column H)
 const MESSAGE_COL = 6; // Column G
+const SALES_DATE_COL = 11; // Column L
 
 // Column indices for destination sheet
 const DEST_MESSAGE_ID_COL = 1; // Column B (for duplicate checking)
+const DEST_QR_CODE_COL = 4; // Column E (for QR code duplicate checking)
 
 // Column indices for contributors sheet
 const CONTRIBUTOR_NAME_COL_CONTRIBUTORS = 0; // Column A (Reporter Name)
@@ -38,6 +40,7 @@ const TELEGRAM_HANDLE_COL_CONTRIBUTORS = 7; // Column H (Telegram Handle)
 const QR_CODE_COL = 0; // Column A
 const VALUE_COL = 2; // Column C
 const STATUS_COL = 3; // Column D
+const INVENTORY_TYPE_COL = 8; // Column I
 
 // Function to check if contributorName is valid (matches Column H in Contributors sheet)
 function isValidContributor(contributorName) {
@@ -115,6 +118,26 @@ function getAgroverseValue(qrCode) {
     return ''; // Return empty string if no match found
   } catch (e) {
     Logger.log(`Error accessing Agroverse QR codes sheet: ${e.message}`);
+    return '';
+  }
+}
+
+// Function to get inventory type from Agroverse QR codes sheet based on QR code
+function getAgroverseInventoryType(qrCode) {
+  try {
+    const agroverseSpreadsheet = SpreadsheetApp.openByUrl(AGROVERSE_QR_SHEET_URL);
+    const agroverseSheet = agroverseSpreadsheet.getSheetByName(AGROVERSE_QR_SHEET_NAME);
+    const agroverseData = agroverseSheet.getDataRange().getValues();
+    
+    // Skip header row
+    for (let i = 1; i < agroverseData.length; i++) {
+      if (agroverseData[i][QR_CODE_COL] === qrCode) {
+        return agroverseData[i][INVENTORY_TYPE_COL] || '';
+      }
+    }
+    return ''; // Return empty string if no match found
+  } catch (e) {
+    Logger.log(`Error accessing Agroverse QR codes sheet for inventory type: ${e.message}`);
     return '';
   }
 }
@@ -203,8 +226,11 @@ function parseTelegramChatLogs() {
   // Get existing Telegram Message IDs from destination sheet to check for duplicates
   const existingMessageIds = destData.slice(1).map(row => row[DEST_MESSAGE_ID_COL]); // Column B
   
-  // Prepare data to append
-  const rowsToAppend = [];
+  // Initialize existing QR codes from destination sheet
+  let existingQrCodes = destData.slice(1).map(row => row[DEST_QR_CODE_COL]).filter(qr => qr); // Column E, filter out empty
+  
+  // Counter for new entries
+  let newEntries = 0;
   
   // Simple patterns for initial matching
   const patterns = [
@@ -236,6 +262,12 @@ function parseTelegramChatLogs() {
       
       // If valid data returned, prepare row
       if (qrCode && salePrice) {
+        // Check if QR code already exists
+        if (existingQrCodes.includes(qrCode)) {
+          Logger.log(`Skipping row ${i + 1} due to duplicate QR code: ${qrCode}`);
+          continue;
+        }
+        
         // Extract Telegram handle from message
         const handleMatch = message.match(telegramHandlePattern);
         let telegramHandle = handleMatch ? handleMatch[0] : null; // e.g., "@kikiscocoa" or null
@@ -243,33 +275,45 @@ function parseTelegramChatLogs() {
         // Get reporter name from Contributors sheet
         const finalContributorName = getReporterName(telegramHandle, contributorName);
         
+        // Get sales date from source sheet
+        const salesDate = sourceData[i][SALES_DATE_COL] || '';
+        
         // Update Agroverse QR codes sheet status to SOLD
         updateAgroverseQrStatus(qrCode);
         
         // Get value from Agroverse QR codes sheet
         const agroverseValue = getAgroverseValue(qrCode);
         
-        rowsToAppend.push([
+        // Get inventory type from Agroverse QR codes sheet
+        const inventoryType = getAgroverseInventoryType(qrCode);
+        
+        // Prepare row to append
+        const rowToAppend = [
           sourceData[i][TELEGRAM_UPDATE_ID_COL], // Column A: Telegram Update ID
           telegramMessageId, // Column B: Telegram Message ID
           message, // Column C: Message
           finalContributorName, // Column D: Contributor Name (from Contributors sheet or fallback)
           qrCode, // Column E: QR Code
           salePrice, // Column F: Sale Price
-          agroverseValue // Column G: Value from Agroverse QR codes Column C
-        ]);
+          agroverseValue, // Column G: Value from Agroverse QR codes Column C
+          salesDate, // Column H: Sales Date from source Column L
+          inventoryType // Column I: Inventory Type from Agroverse QR codes Column I
+        ];
+        
+        // Append the row to the destination sheet
+        destinationSheet.getRange(destinationSheet.getLastRow() + 1, 1, 1, rowToAppend.length).setValues([rowToAppend]);
+        
+        // Update existingQrCodes with the new QR code
+        existingQrCodes.push(qrCode);
+        newEntries++;
+        
+        Logger.log(`Added row ${i + 1} with QR code: ${qrCode}`);
       }
     }
   }
   
-  // Append new rows to destination sheet
-  if (rowsToAppend.length > 0) {
-    destinationSheet.getRange(destinationSheet.getLastRow() + 1, 1, rowsToAppend.length, rowsToAppend[0].length).setValues(rowsToAppend);
-  }
-  
-  Logger.log(`Processed ${sourceData.length - 1} rows, added ${rowsToAppend.length} new entries.`);
+  Logger.log(`Processed ${sourceData.length - 1} rows, added ${newEntries} new entries.`);
 }
-
 
 // Function to run the script manually or set up a trigger
 function setupTrigger() {
