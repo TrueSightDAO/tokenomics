@@ -100,8 +100,8 @@ function processNonAgl4Transactions() {
         continue;
       }
       
-      // Update Column J to "ACCOUNTED"
-      sourceSheet.getRange(i + 1, TOKENIZED_STATUS_COL + 1).setValue('ACCOUNTED');
+      // Update Column J to "PROCESSING"
+      sourceSheet.getRange(i + 1, TOKENIZED_STATUS_COL + 1).setValue('PROCESSING');
       
       // Get values for transactions
       const salesDate = sourceData[i][SALES_DATE_COL] || '';
@@ -162,11 +162,14 @@ function processNonAgl4Transactions() {
       destSheet.getRange(destInsertRow, 1, 3, destRowsToInsert[0].length).setValues(destRowsToInsert);
       
       // Get row numbers (1-based) for the inserted rows
-      const rowNumbers = [insertRow, insertRow + 1, insertRow + 2].join(',');
+      const rowNumbers = [destInsertRow, destInsertRow + 1, destInsertRow + 2].join(',');
       
       // Update Column K in source sheet with row numbers
       sourceSheet.getRange(i + 1, OFFCHAIN_ROW_NUMS_COL + 1).setValue(rowNumbers);
       
+      // Update Column J to "ACCOUNTED"
+      sourceSheet.getRange(i + 1, TOKENIZED_STATUS_COL + 1).setValue('ACCOUNTED');
+
       processedRows++;
       Logger.log(`Processed row ${i + 1}: Updated ACCOUNTED status and appended rows ${rowNumbers} in managed ledger transactions`);
     }
