@@ -3,10 +3,10 @@ const SOURCE_SHEET_URL = 'https://docs.google.com/spreadsheets/d/18bAVJfV-u57LBU
 const SOURCE_SHEET_NAME = 'Scored Chatlogs';
 
 // Sandbox version
-const DEST_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1F90Sq6jSfj8io0RmiUwdydzuWXOZA9siXHWDsj9ItTo/edit?gid=0#gid=0';
+// const DEST_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1F90Sq6jSfj8io0RmiUwdydzuWXOZA9siXHWDsj9ItTo/edit?gid=0#gid=0';
 
 // Production version
-// const DEST_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU/edit?gid=995916231#gid=995916231';
+const DEST_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU/edit?gid=995916231#gid=995916231';
 const DEST_SHEET_NAME = 'offchain transactions';
 
 // Column indices for source sheet (Scored Chatlogs)
@@ -52,7 +52,7 @@ function processTokenizedTransactions() {
       
       // Get the current last row in destination sheet
       const destLastRow = destSheet.getLastRow();
-      const insertRow = 2; // Insert after header row
+      const insertRow = destLastRow + 1; // Append after last row
       
       // Prepare three rows to insert
       const rowsToInsert = [
@@ -88,10 +88,7 @@ function processTokenizedTransactions() {
         ]
       ];
       
-      // Insert three blank rows at the top (row 2)
-      destSheet.insertRowsBefore(insertRow, 3);
-      
-      // Set values for the three rows
+      // Append the three rows at the end of the destination sheet
       destSheet.getRange(insertRow, 1, 3, rowsToInsert[0].length).setValues(rowsToInsert);
       
       // Get row numbers (1-based) for the inserted rows
@@ -101,7 +98,7 @@ function processTokenizedTransactions() {
       sourceSheet.getRange(i + 1, OFFCHAIN_ROW_NUMS_COL + 1).setValue(rowNumbers);
       
       processedRows++;
-      Logger.log(`Processed row ${i + 1}: Updated TOKENIZED status and inserted rows ${rowNumbers} in offchain transactions`);
+      Logger.log(`Processed row ${i + 1}: Updated TOKENIZED status and appended rows ${rowNumbers} in offchain transactions`);
     }
   }
   
