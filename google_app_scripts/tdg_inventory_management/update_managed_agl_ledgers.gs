@@ -19,8 +19,37 @@ const SALE_PRICE_COL = 5; // Column F
 // Function to resolve redirect URL
 function resolveRedirect(url) {
   try {
-    const response = UrlFetchApp.fetch(url, { followRedirects: true, muteHttpExceptions: true });
-    return response.getResponseCode() === 200 ? response.getEffectiveUrl() : '';
+    let currentUrl = url;
+    let redirectCount = 0;
+    const maxRedirects = 10;
+
+    while (redirectCount < maxRedirects) {
+      const response = UrlFetchApp.fetch(currentUrl, {
+        followRedirects: false,
+        muteHttpExceptions: true
+      });
+      const responseCode = response.getResponseCode();
+
+      // If not a redirect (2xx or other), return the current URL
+      if (responseCode < 300 || responseCode >= 400) {
+        return currentUrl;
+      }
+
+      // Get the Location header for the redirect
+      const headers = response.getHeaders();
+      const location = headers['Location'] || headers['location'];
+      if (!location) {
+        Logger.log(`No Location header for redirect at ${currentUrl}`);
+        return '';
+      }
+
+      // Update the current URL and increment redirect count
+      currentUrl = location;
+      redirectCount++;
+    }
+
+    Logger.log(`Exceeded maximum redirects (${maxRedirects}) for URL ${url}`);
+    return '';
   } catch (e) {
     Logger.log(`Error resolving redirect for URL ${url}: ${e.message}`);
     return '';
@@ -118,33 +147,28 @@ function processNonAgl4Transactions() {
           salePrice, // Column D: Sale Price
           'USD', // Column E: USD
           'Assets' // Column F: Assets
+        ],
+        // Third row
+        [
+          salesDate, // Column A: Sales Date
+          message, // Column B: Value
+          `Agroverse Tree Planting Contract - ${aglContractName}`, // Column C
+          1, // Column D: 1
+          'Cacao Tree To Be Planted', // Column E: Cacao Tree To Be Planted
+          'Liability' // Column F: Assets
         ]
       ];
       
-      destSheet.getRange(destInsertRow, 1, 2, destRowsToInsert[0].length).setValues(destRowsToInsert);
+      destSheet.getRange(destInsertRow, 1, 3, destRowsToInsert[0].length).setValues(destRowsToInsert);
       
-      // Append one row to offchain transactions sheet
-      const offchainLastRow = offchainSheet.getLastRow();
-      const offchainInsertRow = offchainLastRow + 1;
+      // Get row numbers (1-based) for the inserted rows
+      const rowNumbers = [insertRow, insertRow + 1, insertRow + 2].join(',');
       
-      const offchainRow = [
-        salesDate, // Column A: Sales Date
-        `${aglContractName} : ${qrCode}\n\n${message}`, // Column B
-        `Agroverse Tree Planting Contract - ${aglContractName}`, // Column C
-        1, // Column D: 1
-        'Cacao Tree To Be Planted', // Column E
-        '', // Column F: Empty
-        true // Column G: TRUE
-      ];
-      
-      offchainSheet.getRange(offchainInsertRow, 1, 1, offchainRow.length).setValues([offchainRow]);
-      
-      // Update Column K with row numbers (dest rows, newline, offchain row)
-      const rowNumbers = `${destInsertRow},${destInsertRow + 1}\n${offchainInsertRow}`;
+      // Update Column K in source sheet with row numbers
       sourceSheet.getRange(i + 1, OFFCHAIN_ROW_NUMS_COL + 1).setValue(rowNumbers);
       
       processedRows++;
-      Logger.log(`Processed row ${i + 1}: Updated TOKENIZED status, appended rows ${destInsertRow},${destInsertRow + 1} in Transactions, and row ${offchainInsertRow} in offchain transactions`);
+      Logger.log(`Processed row ${i + 1}: Updated ACCOUNTED status and appended rows ${rowNumbers} in managed ledger transactions`);
     }
   }
   
