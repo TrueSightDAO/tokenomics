@@ -26,9 +26,11 @@ const TELEGRAM_UPDATE_ID_COL = 0; // Column A
 const TELEGRAM_MESSAGE_ID_COL = 3; // Column D
 const CONTRIBUTOR_NAME_COL = 4; // Column E (must match Contributors Column H)
 const MESSAGE_COL = 6; // Column G
+const SALES_DATE_COL = 11; // Column L
 
 // Column indices for destination sheet
 const DEST_MESSAGE_ID_COL = 1; // Column B (for duplicate checking)
+const DEST_QR_CODE_COL = 4; // Column E (for QR code duplicate checking)
 
 // Column indices for contributors sheet
 const CONTRIBUTOR_NAME_COL_CONTRIBUTORS = 0; // Column A (Reporter Name)
@@ -200,8 +202,9 @@ function parseTelegramChatLogs() {
   const sourceData = sourceSheet.getDataRange().getValues();
   const destData = destinationSheet.getDataRange().getValues();
   
-  // Get existing Telegram Message IDs from destination sheet to check for duplicates
+  // Get existing Telegram Message IDs and QR codes from destination sheet to check for duplicates
   const existingMessageIds = destData.slice(1).map(row => row[DEST_MESSAGE_ID_COL]); // Column B
+  const existingQrCodes = destData.slice(1).map(row => row[DEST_QR_CODE_COL]).filter(qr => qr); // Column E, filter out empty
   
   // Prepare data to append
   const rowsToAppend = [];
@@ -236,12 +239,21 @@ function parseTelegramChatLogs() {
       
       // If valid data returned, prepare row
       if (qrCode && salePrice) {
+        // Check if QR code already exists in destination sheet
+        if (existingQrCodes.includes(qrCode)) {
+          Logger.log(`Skipping row ${i + 1} due to duplicate QR code: ${qrCode}`);
+          continue;
+        }
+        
         // Extract Telegram handle from message
         const handleMatch = message.match(telegramHandlePattern);
         let telegramHandle = handleMatch ? handleMatch[0] : null; // e.g., "@kikiscocoa" or null
         
         // Get reporter name from Contributors sheet
         const finalContributorName = getReporterName(telegramHandle, contributorName);
+        
+        // Get sales date from source sheet
+        const salesDate = sourceData[i][SALES_DATE_COL] || '';
         
         // Update Agroverse QR codes sheet status to SOLD
         updateAgroverseQrStatus(qrCode);
@@ -256,7 +268,8 @@ function parseTelegramChatLogs() {
           finalContributorName, // Column D: Contributor Name (from Contributors sheet or fallback)
           qrCode, // Column E: QR Code
           salePrice, // Column F: Sale Price
-          agroverseValue // Column G: Value from Agroverse QR codes Column C
+          agroverseValue, // Column G: Value from Agroverse QR codes Column C
+          salesDate // Column H: Sales Date from source Column L
         ]);
       }
     }
@@ -269,7 +282,6 @@ function parseTelegramChatLogs() {
   
   Logger.log(`Processed ${sourceData.length - 1} rows, added ${rowsToAppend.length} new entries.`);
 }
-
 
 // Function to run the script manually or set up a trigger
 function setupTrigger() {
