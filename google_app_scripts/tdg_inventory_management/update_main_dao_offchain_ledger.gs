@@ -40,8 +40,9 @@ function processTokenizedTransactions() {
     
     // Check if Column G is "https://www.agroverse.shop/agl4" and Column J is empty
     if (agroverseValue === 'https://www.agroverse.shop/agl4' && (!tokenizedStatus || tokenizedStatus === '')) {
-      // Update Column J to "TOKENIZED"
-      sourceSheet.getRange(i + 1, TOKENIZED_STATUS_COL + 1).setValue('TOKENIZED');
+
+      // Update Column J to "PROCESSING"
+      sourceSheet.getRange(i + 1, TOKENIZED_STATUS_COL + 1).setValue('PROCESSING');
       
       // Get values for offchain transactions
       const salesDate = sourceData[i][SALES_DATE_COL] || '';
@@ -96,6 +97,9 @@ function processTokenizedTransactions() {
       
       // Update Column K in source sheet with row numbers
       sourceSheet.getRange(i + 1, OFFCHAIN_ROW_NUMS_COL + 1).setValue(rowNumbers);
+
+      // Update Column J to "TOKENIZED"
+      sourceSheet.getRange(i + 1, TOKENIZED_STATUS_COL + 1).setValue('TOKENIZED');
       
       processedRows++;
       Logger.log(`Processed row ${i + 1}: Updated TOKENIZED status and appended rows ${rowNumbers} in offchain transactions`);
