@@ -19,8 +19,8 @@ This Google Apps Script provides a simple web API to:
 
 ## Installation
 1. Go to [Google Apps Script](https://script.google.com/) and create a new project.
-2. Add a new script file named `manage.gs`.
-3. Copy the contents of `manage.gs` into the script editor.
+2. Add a new script file named `web_app.gs`.
+3. Copy the contents of `web_app.gs` into the script editor.
 
 ## Deployment
 1. In the Apps Script editor, click **Deploy > New deployment**.
@@ -87,13 +87,13 @@ GET https://script.google.com/macros/s/AKfycbztpV3TUIRn3ftNW1aGHAKw32OBJrp_p1Pr9
 ```
 
 ## Customization
-- To use a different spreadsheet or sheet name, update the constants at the top of `manage.gs`:
+- To use a different spreadsheet or sheet name, update the constants at the top of `web_app.gs`:
   ```js
   var SPREADSHEET_ID = 'your-spreadsheet-id';
   var SHEET_NAME     = 'your-sheet-name';
   ```
 
-- To use a different contacts sheet for recipients, update `CONTACT_SHEET_NAME` in `manage.gs`:
+- To use a different contacts sheet for recipients, update `CONTACT_SHEET_NAME` in `web_app.gs`:
   ```js
   var CONTACT_SHEET_NAME = 'your-contacts-sheet-name';
   ```
