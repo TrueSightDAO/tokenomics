@@ -16,6 +16,27 @@ function testSendEmail() {
 }
 
 /**
+ * Processes all records with valid email in column L and no sent date in column M
+ */
+function processBatch() {
+  const sheet = SpreadsheetApp.openByUrl(SPREADSHEET_URL).getSheetByName(SHEET_NAME);
+  const data = sheet.getDataRange().getValues();
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+  // Iterate through rows, starting at 1 to skip header
+  for (let i = 1; i < data.length; i++) {
+    const email = data[i][EMAIL_COLUMN - 1]; // Column L
+    const notificationDate = data[i][TIMESTAMP_COLUMN - 1]; // Column M
+    const qrCode = data[i][QR_CODE_COLUMN - 1]; // Column A
+
+    // Check if email is valid and no notification date exists
+    if (emailRegex.test(email) && !notificationDate) {
+      sendEmailForQRCode(qrCode);
+    }
+  }
+}
+
+/**
  * Sends an email for a given QR code if conditions are met
  * @param {string} qrCode - The QR code to match in column A
  */
@@ -51,24 +72,6 @@ function sendEmailForQRCode(qrCode) {
         sheet.getRange(i + 1, TIMESTAMP_COLUMN).setValue(new Date());
         break; // Exit loop after processing
       }
-    }
-  }
-}
-
-/**
- * Trigger for onEdit to detect email changes in column L
- */
-function onEdit(e) {
-  const sheet = e.source.getSheetByName(SHEET_NAME);
-  const range = e.range;
-  const row = range.getRow();
-  const column = range.getColumn();
-
-  // Check if edit is in email column and row > 1 (skip header)
-  if (column === EMAIL_COLUMN && row > 1) {
-    const qrCode = sheet.getRange(row, QR_CODE_COLUMN).getValue();
-    if (qrCode) {
-      sendEmailForQRCode(qrCode);
     }
   }
 }
