@@ -6,52 +6,28 @@
 // Variable declarations
 const ORIGIN_SPREADSHEET_ID = '1Tbj7H5ur_egQLRugdXUaSIhEYIKp0vvVv2IZ7WTLCUo';
 const ORIGIN_SHEET_NAME = 'Scored Chatlogs';
-const DESTINATION_SPREADSHEET_ID = '1F90Sq6jSfj8io0RmiUwdydzuWXOZA9siXHWDsj9ItTo';
+
+// Sandbox
+// const DESTINATION_SPREADSHEET_ID = '1F90Sq6jSfj8io0RmiUwdydzuWXOZA9siXHWDsj9ItTo';
+
+// Production
+const DESTINATION_SPREADSHEET_ID = '1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU';
+
 const DESTINATION_SHEET_NAME = 'Ledger history';
 const CONTRIBUTORS_SHEET_NAME = 'Contributors contact information';
 const REVIEWED_STATUS = 'Reviewed';
 const COMPLETED_STATUS = 'Successfully Completed / Full Provision Awarded';
 const TRANSFERRED_STATUS = 'Transferred to Main Ledger';
 const ERROR_STATUS = 'Entry Error';
+const ERROR_CONTRIBUTOR_NOT_FOUND = 'Entry Error - Contributor Not Found';
 const IGNORED_STATUS = 'Ignored';
-
-/**
- * Validates and retrieves the correct Contributor ID from the Contributors contact information sheet.
- * @param {string} contributorId - The contributor ID from Origin Column A.
- * @param {GoogleAppsScript.Spreadsheet.Sheet} contributorsSheet - The Contributors contact information sheet.
- * @return {string} The validated Contributor ID.
- */
-function validateContributorId(contributorId, contributorsSheet) {
-  const contributorsData = contributorsSheet.getDataRange().getValues();
-  // Check if contributorId exists in Column A
-  for (let i = 1; i < contributorsData.length; i++) {
-    if (contributorsData[i][0] === contributorId) {
-      return contributorId; // ID is valid
-    }
-  }
-  
-  // If not found in Column A, check Column H (index 7) for matching ID or @ID
-  const searchId = contributorId.startsWith('@') ? contributorId.substring(1) : contributorId;
-  const altSearchId = contributorId.startsWith('@') ? contributorId : '@' + contributorId;
-  
-  for (let i = 1; i < contributorsData.length; i++) {
-    const colHValue = contributorsData[i][7] || '';
-    if (colHValue === searchId || colHValue === altSearchId) {
-      return contributorsData[i][0]; // Return corresponding Column A value
-    }
-  }
-  
-  // If no match found, return original ID and log error
-  Logger.log(`No matching Contributor ID found for ${contributorId}`);
-  return contributorId;
-}
 
 /**
  * Transfers a row from the origin sheet to the destination sheet based on hash_key.
  * @param {string} hash_key - The hash key to match in Column K of the origin sheet.
  */
 function transferRowByHashKey(hash_key) {
-  Logger.log("Processing " + hash_key);
+  Logger.log(`Processing hash_key: ${hash_key}`);
   try {
     // Open the origin and destination spreadsheets
     const originSpreadsheet = SpreadsheetApp.openById(ORIGIN_SPREADSHEET_ID);
@@ -86,12 +62,42 @@ function transferRowByHashKey(hash_key) {
     const valueG = rowData[6];
 
     if (status === REVIEWED_STATUS && valueG !== 0) {
-      // Validate Contributor ID from Column A
-      const validatedContributorId = validateContributorId(rowData[0], contributorsSheet);
+      // Validate Column A against Contributors contact information
+      let columnAValue = rowData[0];
+      const contributorsData = contributorsSheet.getDataRange().getValues();
+      let found = false;
+
+      // Check if Column A value exists in Contributors Column A
+      for (let i = 1; i < contributorsData.length; i++) {
+        if (contributorsData[i][0] === columnAValue) {
+          found = true;
+          break;
+        }
+      }
+
+      // If not found, check Column H for matching handle (with or without @)
+      if (!found) {
+        const handle = columnAValue.startsWith('@') ? columnAValue.slice(1) : columnAValue;
+        const handleWithAt = '@' + handle;
+        for (let i = 1; i < contributorsData.length; i++) {
+          if (contributorsData[i][7] === handle || contributorsData[i][7] === handleWithAt) {
+            columnAValue = contributorsData[i][0]; // Use corresponding Column A value
+            found = true;
+            break;
+          }
+        }
+      }
+
+      // If contributor not found, mark as error and exit
+      if (!found) {
+        originSheet.getRange(rowIndex, 6).setValue(ERROR_CONTRIBUTOR_NOT_FOUND);
+        Logger.log(`Contributor not found for hash_key ${hash_key}: ${rowData[0]}`);
+        return;
+      }
 
       // Prepare data for destination sheet
       const destinationRow = [
-        validatedContributorId, // Column A (validated)
+        columnAValue, // Column A (validated)
         rowData[1], // Column B
         rowData[2], // Column C
         rowData[3], // Column D
@@ -101,11 +107,20 @@ function transferRowByHashKey(hash_key) {
         rowData[7]  // Column H
       ];
 
-      // Append to destination sheet and get the new row number
+      // Find the last non-empty row in Column A of destination sheet
+      const destData = destinationSheet.getDataRange().getValues();
+      let lastNonEmptyRow = 1;
+      for (let i = 1; i < destData.length; i++) {
+        if (destData[i][0] !== '') {
+          lastNonEmptyRow = i + 1;
+        }
+      }
+
+      // Append to destination sheet at the correct row
       try {
-        const lastRow = destinationSheet.getLastRow();
-        destinationSheet.appendRow(destinationRow);
-        const newRowNumber = lastRow + 1; // New row number in destination sheet
+        destinationSheet.insertRowAfter(lastNonEmptyRow);
+        destinationSheet.getRange(lastNonEmptyRow + 1, 1, 1, destinationRow.length).setValues([destinationRow]);
+        const newRowNumber = lastNonEmptyRow + 1; // New row number in destination sheet
 
         // Update origin sheet Column F to "Transferred to Main Ledger"
         originSheet.getRange(rowIndex, 6).setValue(TRANSFERRED_STATUS);
@@ -129,6 +144,9 @@ function transferRowByHashKey(hash_key) {
   }
 }
 
+/**
+ * Test function to trigger the transfer for a specific hash_key.
+ */
 function testTransfer() {
-  transferRowByHashKey('D7YN9GVH4TLUS/yF/6Fz_A');
+  transferRowByHashKey('D7YN9GVH4TLUS/yF/6Fz_B');
 }
