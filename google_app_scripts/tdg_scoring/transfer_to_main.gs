@@ -7,6 +7,7 @@
 const ORIGIN_SPREADSHEET_ID = '1Tbj7H5ur_egQLRugdXUaSIhEYIKp0vvVv2IZ7WTLCUo';
 const ORIGIN_SHEET_NAME = 'Scored Chatlogs';
 
+
 // Sandbox
 // const DESTINATION_SPREADSHEET_ID = '1F90Sq6jSfj8io0RmiUwdydzuWXOZA9siXHWDsj9ItTo';
 
@@ -145,8 +146,42 @@ function transferRowByHashKey(hash_key) {
 }
 
 /**
+ * Fetches all rows from the origin sheet where Column F is "Reviewed" and processes each with transferRowByHashKey.
+ */
+function processAllReviewedRows() {
+  Logger.log('Starting to process all rows with "Reviewed" status in Column F.');
+  try {
+    // Open the origin spreadsheet
+    const originSpreadsheet = SpreadsheetApp.openById(ORIGIN_SPREADSHEET_ID);
+    const originSheet = originSpreadsheet.getSheetByName(ORIGIN_SHEET_NAME);
+
+    // Get data from origin sheet
+    const originData = originSheet.getDataRange().getValues();
+    let processedCount = 0;
+
+    // Iterate through rows, starting from index 1 to skip header
+    for (let i = 1; i < originData.length; i++) {
+      const status = originData[i][5]; // Column F (index 5)
+      const hash_key = originData[i][10]; // Column K (index 10)
+      if (status === REVIEWED_STATUS && hash_key) {
+        Logger.log(`Found reviewed row with hash_key: ${hash_key}`);
+        transferRowByHashKey(hash_key);
+        processedCount++;
+      }
+    }
+
+    Logger.log(`Processed ${processedCount} rows with "Reviewed" status.`);
+    if (processedCount === 0) {
+      Logger.log('No rows found with "Reviewed" status.');
+    }
+  } catch (e) {
+    Logger.log(`Error in processAllReviewedRows: ${e.message}`);
+  }
+}
+
+/**
  * Test function to trigger the transfer for a specific hash_key.
  */
 function testTransfer() {
-  transferRowByHashKey('D7YN9GVH4TLUS/yF/6Fz_B');
+  transferRowByHashKey('D7YN9GVH4TLUS/yF/6Fz_A');
 }
