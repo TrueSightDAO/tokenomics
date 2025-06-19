@@ -965,7 +965,7 @@ function resolveUnknownUsers() {
   // Find the first row where Found in Contributors (Column I, index 8) is false
   let targetRow = -1;
   for (let i = 1; i < outputData.length; i++) {
-    if (outputData[i][8] === false && outputData[i][5] == "Successfully Completed / Full Provision Awarded") {
+    if (outputData[i][8] === false && outputData[i][5] == "Pending Review") {
       targetRow = i;
       break;
     }
