@@ -2,7 +2,7 @@
 // - Messages with dates earlier than this will be skipped during processing.
 // - Format: "YYYYMMDD" (e.g., "20241213" means December 13, 2024).
 // - Adjust this to filter out old data you don’t want to process.
-const IGNORE_BEFORE_DATE = "20241213";
+const IGNORE_BEFORE_DATE = "20250316";
 
 // Load API keys and configuration settings from Credentials.gs
 // - setApiKeys(): Stores sensitive API keys in Google Apps Script’s Script Properties for security.
@@ -890,7 +890,7 @@ function sendTelegramNotification(chatId, contributorUsernames) {
 
   const apiUrl = `https://api.telegram.org/bot${token}/sendMessage`; // Fix: Use token, not TELEGRAM_TOKEN
   const contributorNamesString = contributorUsernames.map(name => `@${name}`).join(", ");
-  
+
   const baseOutputSheetLink = "https://truesight.me/submissions/scored-and-to-be-tokenized";
   
   // Add timestamp as a query parameter
@@ -941,4 +941,124 @@ function getChatIdForRow(row, telegramSheet, rowIndex) {
 
 function sendTestAcknowledgement() {
   sendTelegramNotification(2102593402, ["garyjob"]);
+}
+
+
+function resolveUnknownUsers() {
+  const outputSpreadsheet = SpreadsheetApp.openByUrl(OUTPUT_SHEET_URL);
+  const outputSheet = outputSpreadsheet.getSheetByName("Scored Chatlogs");
+  if (!outputSheet) {
+    Logger.log(`resolveUnknownUsers: Error: Sheet "Scored Chatlogs" not found in ${OUTPUT_SHEET_URL}`);
+    return;
+  }
+
+  const existingSpreadsheet = SpreadsheetApp.openByUrl(EXISTING_SHEET_URL);
+  const contributorSheet = existingSpreadsheet.getSheetByName("Contributors contact information");
+  if (!contributorSheet) {
+    Logger.log(`resolveUnknownUsers: Error: Sheet "Contributors contact information" not found in ${EXISTING_SHEET_URL}`);
+    return;
+  }
+
+  const outputData = outputSheet.getDataRange().getValues();
+  const contributorData = contributorSheet.getDataRange().getValues();
+  
+  // Find the first row where Found in Contributors (Column I, index 8) is false
+  let targetRow = -1;
+  for (let i = 1; i < outputData.length; i++) {
+    if (outputData[i][8] === false && outputData[i][5] == "Successfully Completed / Full Provision Awarded") {
+      targetRow = i;
+      break;
+    }
+  }
+
+  if (targetRow === -1) {
+    Logger.log(`resolveUnknownUsers: No records with Found in Contributors = false found in Scored Chatlogs`);
+    return;
+  }
+
+  const contributorName = outputData[targetRow][0].toString().trim();
+  const normalizedContributor = contributorName.replace(/\s/g, '').toLowerCase();
+  const contributorWithAt = `@${normalizedContributor}`;
+  const contributorWithoutAt = normalizedContributor.startsWith('@') ? normalizedContributor.slice(1) : normalizedContributor;
+
+  Logger.log(`resolveUnknownUsers: Processing contributor ${contributorName} at row ${targetRow + 1}`);
+
+  for (let i = 1; i < contributorData.length; i++) {
+    const actualName = contributorData[i][0] ? contributorData[i][0].toString().replace(/\s/g, '').toLowerCase() : "";
+    const telegramHandle = contributorData[i][7] ? contributorData[i][7].toString().replace(/\s/g, '').toLowerCase() : "";
+    const email = contributorData[i][5] ? contributorData[i][5].toString().replace(/\s/g, '').toLowerCase() : "";
+    const emailPlus = email.replace(/\+.*?(?=@)/, ''); // Remove +suffix from email if present
+    const columnQ = contributorData[i][16] ? contributorData[i][16].toString().replace(/\s/g, '').toLowerCase() : "";
+    const columnQWithAt = columnQ && !columnQ.startsWith('@') ? `@${columnQ}` : columnQ;
+    const columnQWithPlus = columnQ && !columnQ.startsWith('@') ? `+${columnQ.replace(/^@/, '')}` : columnQ.replace(/^@/, '+');
+
+    // Check for matches
+    if (actualName === contributorWithoutAt ||
+        telegramHandle === contributorWithAt ||
+        telegramHandle === contributorWithoutAt ||
+        email === contributorWithAt ||
+        email === contributorWithoutAt ||
+        emailPlus === contributorWithoutAt ||
+        columnQ === contributorWithAt ||
+        columnQ === contributorWithoutAt ||
+        columnQWithAt === contributorWithAt ||
+        columnQWithPlus === contributorWithoutAt) {
+      const matchedName = contributorData[i][0].toString().trim();
+      Logger.log(`resolveUnknownUsers: Match found for ${contributorName} with ${matchedName} in Contributors contact information`);
+
+      // Update Scored Chatlogs
+      outputSheet.getRange(targetRow + 1, 1).setValue(matchedName); // Column A
+      outputSheet.getRange(targetRow + 1, 9).setValue(true); // Column I
+      Logger.log(`resolveUnknownUsers: Updated row ${targetRow + 1}: Contributor Name to ${matchedName}, Found in Contributors to true`);
+      return;
+    }
+  }
+
+  // If no match is found, mark as RESOLVE FAILED
+  Logger.log(`resolveUnknownUsers: No match found for ${contributorName} in Contributors contact information`);
+  outputSheet.getRange(targetRow + 1, 9).setValue("RESOLVE FAILED"); // Column I
+  Logger.log(`resolveUnknownUsers: Updated row ${targetRow + 1}: Found in Contributors to RESOLVE FAILED`);
+}
+
+function resolveAllUnknownUsers() {
+  Logger.log(`resolveAllUnknownUsers: Starting to resolve all unknown users in Scored Chatlogs`);
+
+  const outputSpreadsheet = SpreadsheetApp.openByUrl(OUTPUT_SHEET_URL);
+  const outputSheet = outputSpreadsheet.getSheetByName("Scored Chatlogs");
+  if (!outputSheet) {
+    Logger.log(`resolveAllUnknownUsers: Error: Sheet "Scored Chatlogs" not found in ${OUTPUT_SHEET_URL}`);
+    return;
+  }
+
+  let hasUnresolvedRecords = true;
+  let iterationCount = 0;
+  const maxIterations = 1000; // Safety limit to prevent infinite loops
+
+  while (hasUnresolvedRecords && iterationCount < maxIterations) {
+    const outputData = outputSheet.getDataRange().getValues();
+    hasUnresolvedRecords = false;
+
+    // Check for any rows with Found in Contributors = false
+    for (let i = 1; i < outputData.length; i++) {
+      if (outputData[i][8] === false) {
+        hasUnresolvedRecords = true;
+        break;
+      }
+    }
+
+    if (hasUnresolvedRecords) {
+      Logger.log(`resolveAllUnknownUsers: Iteration ${iterationCount + 1}: Found unresolved records, calling resolveUnknownUsers`);
+      resolveUnknownUsers();
+    } else {
+      Logger.log(`resolveAllUnknownUsers: No more unresolved records found after ${iterationCount} iterations`);
+    }
+
+    iterationCount++;
+  }
+
+  if (iterationCount >= maxIterations) {
+    Logger.log(`resolveAllUnknownUsers: Reached maximum iterations (${maxIterations}), stopping to prevent infinite loop`);
+  } else {
+    Logger.log(`resolveAllUnknownUsers: Completed resolving all unknown users in ${iterationCount} iterations`);
+  }
 }
