@@ -962,17 +962,17 @@ function resolveUnknownUsers() {
   const outputData = outputSheet.getDataRange().getValues();
   const contributorData = contributorSheet.getDataRange().getValues();
   
-  // Find the first row where Found in Contributors (Column I, index 8) is false
+  // Find the first row where Found in Contributors (Column I, index 8) is false and Status (Column F, index 5) is "Pending Review"
   let targetRow = -1;
   for (let i = 1; i < outputData.length; i++) {
-    if (outputData[i][8] === false && outputData[i][5] == "Pending Review") {
+    if (outputData[i][8] === false && outputData[i][5] === "Pending Review") {
       targetRow = i;
       break;
     }
   }
 
   if (targetRow === -1) {
-    Logger.log(`resolveUnknownUsers: No records with Found in Contributors = false found in Scored Chatlogs`);
+    Logger.log(`resolveUnknownUsers: No records with Found in Contributors = false and Status = 'Pending Review' found in Scored Chatlogs`);
     return;
   }
 
@@ -1020,6 +1020,109 @@ function resolveUnknownUsers() {
   Logger.log(`resolveUnknownUsers: Updated row ${targetRow + 1}: Found in Contributors to RESOLVE FAILED`);
 }
 
+
+function findContributorName(inputString) {
+  if (!inputString || typeof inputString !== 'string') {
+    Logger.log(`findContributorName: Invalid input: ${inputString}`);
+    return false;
+  }
+
+  inputString = inputString.toLowerCase()
+  Logger.log("Checking " + inputString)
+
+  const existingSpreadsheet = SpreadsheetApp.openByUrl(EXISTING_SHEET_URL);
+  const contributorSheet = existingSpreadsheet.getSheetByName("Contributors contact information");
+  if (!contributorSheet) {
+    Logger.log(`findContributorName: Error: Sheet "Contributors contact information" not found in ${EXISTING_SHEET_URL}`);
+    return false;
+  }
+
+  const contributorData = contributorSheet.getDataRange().getValues();
+  const normalizedInput = inputString.replace(/\s/g, '').toLowerCase();
+  const inputWithAt = `@${normalizedInput}`;
+  const inputWithoutAt = normalizedInput.startsWith('@') ? normalizedInput.slice(1) : normalizedInput;
+
+  Logger.log(`findContributorName: Searching for ${inputString} (normalized: ${normalizedInput})`);
+
+  for (let i = 1; i < contributorData.length; i++) {
+    const actualName = contributorData[i][0] ? contributorData[i][0].toString().replace(/\s/g, '').toLowerCase() : "";
+    const telegramHandle = contributorData[i][7] ? contributorData[i][7].toString().replace(/\s/g, '').toLowerCase() : "";
+    
+    const email = contributorData[i][5] ? contributorData[i][5].toString().replace(/\s/g, '').toLowerCase() : "";
+    const emailPlus = email.replace(/\+.*?(?=@)/, ''); // Remove +suffix from email if present
+    const columnQ = contributorData[i][16] ? contributorData[i][16].toString().replace(/\s/g, '').toLowerCase() : "";
+    const columnQWithAt = columnQ && !columnQ.startsWith('@') ? `@${columnQ}` : columnQ;
+    const columnQWithPlus = columnQ && !columnQ.startsWith('@') ? `+${columnQ.replace(/^@/, '')}` : columnQ.replace(/^@/, '+');
+
+    // Check for matches
+    if (actualName === inputWithoutAt ||
+        telegramHandle === normalizedInput ||
+        telegramHandle === inputWithAt ||
+        telegramHandle === inputWithoutAt ||
+        email === normalizedInput ||
+        email === inputWithAt ||
+        email === inputWithoutAt ||
+        emailPlus === inputWithoutAt ||
+        columnQ === normalizedInput ||
+        columnQ === inputWithAt ||
+        columnQ === inputWithoutAt ||
+        columnQWithAt === normalizedInput ||
+        columnQWithAt === inputWithAt ||
+        columnQWithPlus === inputWithoutAt) {
+      const matchedName = contributorData[i][0].toString().trim();
+      Logger.log(`findContributorName: Match found for ${inputString} with ${matchedName}`);
+      return matchedName;
+    }
+  }
+
+  Logger.log(`findContributorName: No match found for ${inputString}`);
+  return false;
+}
+
+function resolveUnknownUsers() {
+  const outputSpreadsheet = SpreadsheetApp.openByUrl(OUTPUT_SHEET_URL);
+  const outputSheet = outputSpreadsheet.getSheetByName("Scored Chatlogs");
+  if (!outputSheet) {
+    Logger.log(`resolveUnknownUsers: Error: Sheet "Scored Chatlogs" not found in ${OUTPUT_SHEET_URL}`);
+    return;
+  }
+
+  const outputData = outputSheet.getDataRange().getValues();
+  
+  // Find the first row where Found in Contributors (Column I, index 8) is false and Status (Column F, index 5) is "Pending Review"
+  let targetRow = -1;
+  for (let i = 1; i < outputData.length; i++) {
+    if (outputData[i][8] === false && outputData[i][5] === "Pending Review") {
+      targetRow = i;
+      break;
+    }
+  }
+
+  if (targetRow === -1) {
+    Logger.log(`resolveUnknownUsers: No records with Found in Contributors = false and Status = 'Pending Review' found in Scored Chatlogs`);
+    return;
+  }
+
+  const contributorName = outputData[targetRow][0].toString().trim();
+  Logger.log(`resolveUnknownUsers: Processing contributor ${contributorName} at row ${targetRow + 1}`);
+
+  // Use findContributorName to search for a match
+  const matchedName = findContributorName(contributorName);
+  
+  if (matchedName) {
+    Logger.log(`resolveUnknownUsers: Match found for ${contributorName} with ${matchedName} via findContributorName`);
+
+    // Update Scored Chatlogs
+    outputSheet.getRange(targetRow + 1, 1).setValue(matchedName); // Column A
+    outputSheet.getRange(targetRow + 1, 9).setValue(true); // Column I
+    Logger.log(`resolveUnknownUsers: Updated row ${targetRow + 1}: Contributor Name to ${matchedName}, Found in Contributors to true`);
+  } else {
+    Logger.log(`resolveUnknownUsers: No match found for ${contributorName} via findContributorName`);
+    outputSheet.getRange(targetRow + 1, 9).setValue("RESOLVE FAILED"); // Column I
+    Logger.log(`resolveUnknownUsers: Updated row ${targetRow + 1}: Found in Contributors to RESOLVE FAILED`);
+  }
+}
+
 function resolveAllUnknownUsers() {
   Logger.log(`resolveAllUnknownUsers: Starting to resolve all unknown users in Scored Chatlogs`);
 
@@ -1061,4 +1164,8 @@ function resolveAllUnknownUsers() {
   } else {
     Logger.log(`resolveAllUnknownUsers: Completed resolving all unknown users in ${iterationCount} iterations`);
   }
+}
+
+function testFindContributorName(){
+  findContributorName('@Andrea')
 }
