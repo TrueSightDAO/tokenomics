@@ -1079,47 +1079,26 @@ function findContributorName(inputString) {
   return false;
 }
 
-function resolveUnknownUsers() {
-  const outputSpreadsheet = SpreadsheetApp.openByUrl(OUTPUT_SHEET_URL);
-  const outputSheet = outputSpreadsheet.getSheetByName("Scored Chatlogs");
-  if (!outputSheet) {
-    Logger.log(`resolveUnknownUsers: Error: Sheet "Scored Chatlogs" not found in ${OUTPUT_SHEET_URL}`);
+function resolveUnknownUsers(outputSheet, rowIndex, contributorName) {
+  if (!outputSheet || !contributorName || typeof rowIndex !== 'number' || rowIndex < 1) {
+    Logger.log(`resolveUnknownUsers: Invalid parameters - sheet: ${outputSheet}, row: ${rowIndex}, contributor: ${contributorName}`);
     return;
   }
 
-  const outputData = outputSheet.getDataRange().getValues();
-  
-  // Find the first row where Found in Contributors (Column I, index 8) is false and Status (Column F, index 5) is "Pending Review"
-  let targetRow = -1;
-  for (let i = 1; i < outputData.length; i++) {
-    if (outputData[i][8] === false && outputData[i][5] === "Pending Review") {
-      targetRow = i;
-      break;
-    }
-  }
-
-  if (targetRow === -1) {
-    Logger.log(`resolveUnknownUsers: No records with Found in Contributors = false and Status = 'Pending Review' found in Scored Chatlogs`);
-    return;
-  }
-
-  const contributorName = outputData[targetRow][0].toString().trim();
-  Logger.log(`resolveUnknownUsers: Processing contributor ${contributorName} at row ${targetRow + 1}`);
+  Logger.log(`resolveUnknownUsers: Processing contributor ${contributorName} at row ${rowIndex + 1}`);
 
   // Use findContributorName to search for a match
   const matchedName = findContributorName(contributorName);
   
   if (matchedName) {
     Logger.log(`resolveUnknownUsers: Match found for ${contributorName} with ${matchedName} via findContributorName`);
-
-    // Update Scored Chatlogs
-    outputSheet.getRange(targetRow + 1, 1).setValue(matchedName); // Column A
-    outputSheet.getRange(targetRow + 1, 9).setValue(true); // Column I
-    Logger.log(`resolveUnknownUsers: Updated row ${targetRow + 1}: Contributor Name to ${matchedName}, Found in Contributors to true`);
+    outputSheet.getRange(rowIndex + 1, 1).setValue(matchedName); // Column A
+    outputSheet.getRange(rowIndex + 1, 9).setValue(true); // Column I
+    Logger.log(`resolveUnknownUsers: Updated row ${rowIndex + 1}: Contributor Name to ${matchedName}, Found in Contributors to true`);
   } else {
     Logger.log(`resolveUnknownUsers: No match found for ${contributorName} via findContributorName`);
-    outputSheet.getRange(targetRow + 1, 9).setValue("RESOLVE FAILED"); // Column I
-    Logger.log(`resolveUnknownUsers: Updated row ${targetRow + 1}: Found in Contributors to RESOLVE FAILED`);
+    outputSheet.getRange(rowIndex + 1, 9).setValue("RESOLVE FAILED"); // Column I
+    Logger.log(`resolveUnknownUsers: Updated row ${rowIndex + 1}: Found in Contributors to RESOLVE FAILED`);
   }
 }
 
@@ -1133,39 +1112,28 @@ function resolveAllUnknownUsers() {
     return;
   }
 
-  let hasUnresolvedRecords = true;
-  let iterationCount = 0;
-  const maxIterations = 1000; // Safety limit to prevent infinite loops
+  const outputData = outputSheet.getDataRange().getValues();
+  let resolvedCount = 0;
+  let failedCount = 0;
 
-  while (hasUnresolvedRecords && iterationCount < maxIterations) {
-    const outputData = outputSheet.getDataRange().getValues();
-    hasUnresolvedRecords = false;
-
-    // Check for any rows with Found in Contributors = false
-    for (let i = 1; i < outputData.length; i++) {
-      if (outputData[i][8] === false) {
-        hasUnresolvedRecords = true;
-        break;
+  // Iterate through all rows once
+  for (let i = 1; i < outputData.length; i++) {
+    if (outputData[i][8] === false && outputData[i][5] === "Pending Review") {
+      const contributorName = outputData[i][0].toString().trim();
+      Logger.log(`resolveAllUnknownUsers: Found unresolved record at row ${i + 1} for contributor ${contributorName}`);
+      resolveUnknownUsers(outputSheet, i, contributorName);
+      const updatedStatus = outputSheet.getRange(i + 1, 9).getValue();
+      if (updatedStatus === true) {
+        resolvedCount++;
+      } else if (updatedStatus === "RESOLVE FAILED") {
+        failedCount++;
       }
     }
-
-    if (hasUnresolvedRecords) {
-      Logger.log(`resolveAllUnknownUsers: Iteration ${iterationCount + 1}: Found unresolved records, calling resolveUnknownUsers`);
-      resolveUnknownUsers();
-    } else {
-      Logger.log(`resolveAllUnknownUsers: No more unresolved records found after ${iterationCount} iterations`);
-    }
-
-    iterationCount++;
   }
 
-  if (iterationCount >= maxIterations) {
-    Logger.log(`resolveAllUnknownUsers: Reached maximum iterations (${maxIterations}), stopping to prevent infinite loop`);
-  } else {
-    Logger.log(`resolveAllUnknownUsers: Completed resolving all unknown users in ${iterationCount} iterations`);
-  }
+  Logger.log(`resolveAllUnknownUsers: Completed processing. Resolved: ${resolvedCount}, Failed: ${failedCount}, Total rows processed: ${outputData.length - 1}`);
 }
 
-function testFindContributorName(){
-  findContributorName('@Andrea')
+function testFindContributorName() {
+  findContributorName('@Andrea');
 }
