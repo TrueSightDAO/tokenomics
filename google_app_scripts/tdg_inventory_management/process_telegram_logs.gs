@@ -361,7 +361,7 @@ function sendQrCodeNotification(qrCode, contributorName, chatId) {
   const timestamp = new Date().getTime();
   const outputSheetLink = `${baseOutputSheetLink}?ts=${timestamp}`;
 
-  const messageText = `New QR code detected: ${qrCode} (${inventoryType}) by ${contributorName}. Recorded in the Google Sheet. Review here: ${outputSheetLink}`;
+  const messageText = `${qrCode}\n\n New QR code detected ${inventoryType} by ${contributorName}. Recorded in the Google Sheet. \n\nReview here: https://truesight.me/physical-assets/serialized/sold`;
 
   const payload = {
     chat_id: chatId,

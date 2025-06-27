@@ -92,7 +92,7 @@ function sendNonAgl4TransactionNotification(qrCode, contributorName, aglContract
   const timestamp = new Date().getTime();
   const outputSheetLink = `${destSheetUrl}&ts=${timestamp}`;
 
-  const messageText = `Transactions for QR code ${qrCode} (${aglContractName}) by ${contributorName} have been completed and recorded in the managed ledger. Review here: ${outputSheetLink}`;
+  const messageText = `${qrCode} \n\nTransactions for QR code (${aglContractName}) by ${contributorName} have been completed and recorded in the managed ledger. \n\nReview here: ${outputSheetLink}`;
 
   const payload = {
     chat_id: chatId,

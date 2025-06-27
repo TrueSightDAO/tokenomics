@@ -43,7 +43,7 @@ function sendTransactionCompletionNotification(qrCode, contributorName) {
   const timestamp = new Date().getTime();
   const outputSheetLink = `${baseOutputSheetLink}&ts=${timestamp}`;
 
-  const messageText = `Transactions for QR code ${qrCode} by ${contributorName} have been completed and recorded in the offchain transactions sheet. Review here: ${outputSheetLink}`;
+  const messageText = `${qrCode}\n\n Transactions for QR code by ${contributorName} have been completed and recorded in the offchain transactions sheet. \n\nReview here: http://truesight.me/physical-assets/`;
 
   const payload = {
     chat_id: chatId,
