@@ -1,3 +1,17 @@
+// Load API keys and configuration settings from Credentials.gs
+// - setApiKeys(): Stores sensitive API keys in Google Apps Script’s Script Properties for security.
+// - getCredentials(): Retrieves all configuration details (API keys, URLs, IDs) as an object.
+// - These steps ensure keys and settings are centralized and not hardcoded here.
+setApiKeys();
+const creds = getCredentials();
+
+// Telegram Bot API token for sending notifications
+// - Used to authenticate requests to the Telegram Bot API for sending messages.
+// - Example: "7095843169:AAFscsdjnj-AOCV1fhmUp5RN5SliLbQpZaU".
+// - Set your own token in Credentials.gs or Script Properties to enable notifications.
+// - Obtain this from BotFather on Telegram (https://t.me/BotFather).
+const TELEGRAM_TOKEN = creds.TELEGRAM_API_TOKEN;
+
 // Configuration Variables
 const SOURCE_SHEET_URL = 'https://docs.google.com/spreadsheets/d/18bAVJfV-u57LBUgnCKB4kg65YOzvTfR3PZJ5WS9IVos/edit?gid=0#gid=0';
 const SOURCE_SHEET_NAME = 'Scored Chatlogs';

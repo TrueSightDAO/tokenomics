@@ -1,15 +1,25 @@
+// Load API keys and configuration settings from Credentials.gs
+// - setApiKeys(): Stores sensitive API keys in Google Apps Script’s Script Properties for security.
+// - getCredentials(): Retrieves all configuration details (API keys, URLs, IDs) as an object.
+// - These steps ensure keys and settings are centralized and not hardcoded here.
+setApiKeys();
+const creds = getCredentials();
+
+// Telegram Bot API token for sending notifications
+// - Used to authenticate requests to the Telegram Bot API for sending messages.
+// - Example: "7095843169:AAFscsdjnj-AOCV1fhmUp5RN5SliLbQpZaU".
+// - Set your own token in Credentials.gs or Script Properties to enable notifications.
+// - Obtain this from BotFather on Telegram (https://t.me/BotFather).
+const TELEGRAM_TOKEN = creds.TELEGRAM_API_TOKEN;
+
 // Configuration Variables
 const SOURCE_SHEET_URL = 'https://docs.google.com/spreadsheets/d/18bAVJfV-u57LBUgnCKB4kg65YOzvTfR3PZJ5WS9IVos/edit?gid=0#gid=0';
 const SOURCE_SHEET_NAME = 'Scored Chatlogs';
-
-// Sandbox version
-// const DEST_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1F90Sq6jSfj8io0RmiUwdydzuWXOZA9siXHWDsj9ItTo/edit?gid=0#gid=0';
-
-// Production version
 const DEST_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU/edit?gid=995916231#gid=995916231';
 const DEST_SHEET_NAME = 'offchain transactions';
 
 // Column indices for source sheet (Scored Chatlogs)
+const DEST_QR_CODE_COL = 4; // Column E (QR Code)
 const AGROVERSE_VALUE_COL = 6; // Column G
 const SALES_DATE_COL = 7; // Column H
 const INVENTORY_TYPE_COL = 8; // Column I
@@ -18,6 +28,49 @@ const OFFCHAIN_ROW_NUMS_COL = 10; // Column K
 const MESSAGE_COL = 2; // Column C
 const CONTRIBUTOR_NAME_COL = 3; // Column D
 const SALE_PRICE_COL = 5; // Column F
+
+// Function to send Telegram notification for completed transactions
+function sendTransactionCompletionNotification(qrCode, contributorName) {
+  const token = creds.TELEGRAM_API_TOKEN;
+  const chatId = '-1002190388985'; // Fixed chat ID as specified
+  if (!token) {
+    Logger.log(`sendTransactionCompletionNotification: Error: TELEGRAM_API_TOKEN not set in Credentials`);
+    return;
+  }
+
+  const apiUrl = `https://api.telegram.org/bot${token}/sendMessage`;
+  const baseOutputSheetLink = 'https://docs.google.com/spreadsheets/d/1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU/edit?gid=995916231#gid=995916231';
+  const timestamp = new Date().getTime();
+  const outputSheetLink = `${baseOutputSheetLink}&ts=${timestamp}`;
+
+  const messageText = `Transactions for QR code ${qrCode} by ${contributorName} have been completed and recorded in the offchain transactions sheet. Review here: ${outputSheetLink}`;
+
+  const payload = {
+    chat_id: chatId,
+    text: messageText
+  };
+
+  const options = {
+    method: 'post',
+    contentType: 'application/json',
+    payload: JSON.stringify(payload),
+    muteHttpExceptions: true
+  };
+
+  try {
+    Logger.log(`sendTransactionCompletionNotification: Sending notification for QR code ${qrCode} to chat ${chatId}`);
+    const response = UrlFetchApp.fetch(apiUrl, options);
+    const status = response.getResponseCode();
+    const responseText = response.getContentText();
+    if (status === 200) {
+      Logger.log(`sendTransactionCompletionNotification: Successfully sent notification for QR code ${qrCode} to chat ${chatId}`);
+    } else {
+      Logger.log(`sendTransactionCompletionNotification: Failed to send notification for QR code ${qrCode}. Status: ${status}, Response: ${responseText}`);
+    }
+  } catch (e) {
+    Logger.log(`sendTransactionCompletionNotification: Error sending Telegram notification for QR code ${qrCode}: ${e.message}`);
+  }
+}
 
 // Function to process Scored Chatlogs and update offchain transactions
 function processTokenizedTransactions() {
@@ -40,11 +93,11 @@ function processTokenizedTransactions() {
     
     // Check if Column G is "https://www.agroverse.shop/agl4" and Column J is empty
     if (agroverseValue === 'https://www.agroverse.shop/agl4' && (!tokenizedStatus || tokenizedStatus === '')) {
-
       // Update Column J to "PROCESSING"
       sourceSheet.getRange(i + 1, TOKENIZED_STATUS_COL + 1).setValue('PROCESSING');
       
       // Get values for offchain transactions
+      const qrCode = sourceData[i][DEST_QR_CODE_COL] || '';
       const salesDate = sourceData[i][SALES_DATE_COL] || '';
       const message = sourceData[i][MESSAGE_COL] || '';
       const contributorName = sourceData[i][CONTRIBUTOR_NAME_COL] || '';
@@ -82,7 +135,7 @@ function processTokenizedTransactions() {
           salesDate, // Column A: Sales Date
           message, // Column B: Message
           'Agroverse Tree Planting Contract - agl4', // Column C: Fixed value
-          1, // Column D: -1
+          1, // Column D: 1
           'Cacao Tree To Be Planted', // Column E: Fixed value
           '', // Column F: Empty
           true // Column G: TRUE
@@ -97,9 +150,16 @@ function processTokenizedTransactions() {
       
       // Update Column K in source sheet with row numbers
       sourceSheet.getRange(i + 1, OFFCHAIN_ROW_NUMS_COL + 1).setValue(rowNumbers);
-
+      
       // Update Column J to "TOKENIZED"
       sourceSheet.getRange(i + 1, TOKENIZED_STATUS_COL + 1).setValue('TOKENIZED');
+      
+      // Send Telegram notification for completed transaction
+      if (qrCode) {
+        sendTransactionCompletionNotification(qrCode, contributorName);
+      } else {
+        Logger.log(`No QR code found for row ${i + 1}, skipping notification`);
+      }
       
       processedRows++;
       Logger.log(`Processed row ${i + 1}: Updated TOKENIZED status and appended rows ${rowNumbers} in offchain transactions`);
