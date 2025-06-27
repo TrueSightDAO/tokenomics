@@ -1,3 +1,17 @@
+// Load API keys and configuration settings from Credentials.gs
+// - setApiKeys(): Stores sensitive API keys in Google Apps Script’s Script Properties for security.
+// - getCredentials(): Retrieves all configuration details (API keys, URLs, IDs) as an object.
+// - These steps ensure keys and settings are centralized and not hardcoded here.
+setApiKeys();
+const creds = getCredentials();
+
+// Telegram Bot API token for sending notifications
+// - Used to authenticate requests to the Telegram Bot API for sending messages.
+// - Example: "7095843169:AAFscsdjnj-AOCV1fhmUp5RN5SliLbQpZaU".
+// - Set your own token in Credentials.gs or Script Properties to enable notifications.
+// - Obtain this from BotFather on Telegram (https://t.me/BotFather).
+const TELEGRAM_TOKEN = creds.TELEGRAM_API_TOKEN;
+
 // Configuration Variables
 const SOURCE_SHEET_URL = 'https://docs.google.com/spreadsheets/d/18bAVJfV-u57LBUgnCKB4kg65YOzvTfR3PZJ5WS9IVos/edit?gid=0#gid=0';
 const SOURCE_SHEET_NAME = 'Scored Chatlogs';
@@ -63,6 +77,48 @@ function extractAglContractName(url) {
     return url.slice(prefix.length);
   }
   return '';
+}
+
+// Function to send Telegram notification for completed non-agl4 transactions
+function sendNonAgl4TransactionNotification(qrCode, contributorName, aglContractName, destSheetUrl) {
+  const token = creds.TELEGRAM_API_TOKEN;
+  const chatId = '-1002190388985'; // Fixed chat ID as specified
+  if (!token) {
+    Logger.log(`sendNonAgl4TransactionNotification: Error: TELEGRAM_API_TOKEN not set in Credentials`);
+    return;
+  }
+
+  const apiUrl = `https://api.telegram.org/bot${token}/sendMessage`;
+  const timestamp = new Date().getTime();
+  const outputSheetLink = `${destSheetUrl}&ts=${timestamp}`;
+
+  const messageText = `${qrCode} \n\nTransactions for QR code (${aglContractName}) by ${contributorName} have been completed and recorded in the managed ledger. \n\nReview here: ${outputSheetLink}`;
+
+  const payload = {
+    chat_id: chatId,
+    text: messageText
+  };
+
+  const options = {
+    method: 'post',
+    contentType: 'application/json',
+    payload: JSON.stringify(payload),
+    muteHttpExceptions: true
+  };
+
+  try {
+    Logger.log(`sendNonAgl4TransactionNotification: Sending notification for QR code ${qrCode} to chat ${chatId}`);
+    const response = UrlFetchApp.fetch(apiUrl, options);
+    const status = response.getResponseCode();
+    const responseText = response.getContentText();
+    if (status === 200) {
+      Logger.log(`sendNonAgl4TransactionNotification: Successfully sent notification for QR code ${qrCode} to chat ${chatId}`);
+    } else {
+      Logger.log(`sendNonAgl4TransactionNotification: Failed to send notification for QR code ${qrCode}. Status: ${status}, Response: ${responseText}`);
+    }
+  } catch (e) {
+    Logger.log(`sendNonAgl4TransactionNotification: Error sending Telegram notification for QR code ${qrCode}: ${e.message}`);
+  }
 }
 
 // Function to process Scored Chatlogs for non-agl4 transactions
@@ -155,7 +211,7 @@ function processNonAgl4Transactions() {
           `Agroverse Tree Planting Contract - ${aglContractName}`, // Column C
           1, // Column D: 1
           'Cacao Tree To Be Planted', // Column E: Cacao Tree To Be Planted
-          'Liability' // Column F: Assets
+          'Liability' // Column F: Liability
         ]
       ];
       
@@ -169,7 +225,14 @@ function processNonAgl4Transactions() {
       
       // Update Column J to "ACCOUNTED"
       sourceSheet.getRange(i + 1, TOKENIZED_STATUS_COL + 1).setValue('ACCOUNTED');
-
+      
+      // Send Telegram notification for completed non-agl4 transaction
+      if (qrCode) {
+        sendNonAgl4TransactionNotification(qrCode, contributorName, aglContractName, destSheetUrl);
+      } else {
+        Logger.log(`No QR code found for row ${i + 1}, skipping notification`);
+      }
+      
       processedRows++;
       Logger.log(`Processed row ${i + 1}: Updated ACCOUNTED status and appended rows ${rowNumbers} in managed ledger transactions`);
     }

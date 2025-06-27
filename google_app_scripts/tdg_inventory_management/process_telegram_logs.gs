@@ -10,6 +10,13 @@ const creds = getCredentials();
 // - Retrieved from Credentials.gs or Script Properties.
 const XAI_API_KEY = creds.XAI_API_KEY;
 
+// Telegram Bot API token for sending notifications
+// - Used to authenticate requests to the Telegram Bot API for sending messages.
+// - Example: "7095843169:AAFscsdjnj-AOCV1fhmUp5RN5SliLbQpZaU".
+// - Set your own token in Credentials.gs or Script Properties to enable notifications.
+// - Obtain this from BotFather on Telegram (https://t.me/BotFather).
+const TELEGRAM_TOKEN = creds.TELEGRAM_API_TOKEN;
+
 // Configuration Variables
 const SOURCE_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1qbZZhf-_7xzmDTriaJVWj6OZshyQsFkdsAV8-pyzASQ/edit?gid=0#gid=0';
 const SOURCE_SHEET_NAME = 'Telegram Chat Logs';
@@ -23,6 +30,7 @@ const XAI_API_URL = 'https://api.x.ai/v1/chat/completions';
 
 // Column indices for source sheet
 const TELEGRAM_UPDATE_ID_COL = 0; // Column A
+const CHAT_ID_COL = 1; // Column B (Telegram Chat ID)
 const TELEGRAM_MESSAGE_ID_COL = 3; // Column D
 const CONTRIBUTOR_NAME_COL = 4; // Column E (must match Contributors Column H)
 const MESSAGE_COL = 6; // Column G
@@ -307,6 +315,14 @@ function parseTelegramChatLogs() {
         existingQrCodes.push(qrCode);
         newEntries++;
         
+        // Send Telegram notification for the new QR code
+        const chatId = sourceData[i][CHAT_ID_COL] ? sourceData[i][CHAT_ID_COL].toString().trim() : null;
+        if (chatId) {
+          sendQrCodeNotification(qrCode, finalContributorName, chatId);
+        } else {
+          Logger.log(`No chat ID found for row ${i + 1}, skipping notification for QR code ${qrCode}`);
+        }
+        
         Logger.log(`Added row ${i + 1} with QR code: ${qrCode}`);
       }
     }
@@ -315,10 +331,61 @@ function parseTelegramChatLogs() {
   Logger.log(`Processed ${sourceData.length - 1} rows, added ${newEntries} new entries.`);
 }
 
-// Function to run the script manually or set up a trigger
-function setupTrigger() {
-  ScriptApp.newTrigger('parseTelegramChatLogs')
-    .timeBased()
-    .everyHours(1)
-    .create();
+function sendQrCodeNotification(qrCode, contributorName, chatId) {
+  const token = creds.TELEGRAM_API_TOKEN;
+  if (!token) {
+    Logger.log(`sendQrCodeNotification: Error: TELEGRAM_API_TOKEN not set in Credentials`);
+    return;
+  }
+
+  if (!chatId) {
+    Logger.log(`sendQrCodeNotification: Error: chatId not provided for QR code ${qrCode}`);
+    return;
+  }
+
+  // Get inventory type from Agroverse QR codes sheet
+  const agroverseSpreadsheet = SpreadsheetApp.openByUrl(AGROVERSE_QR_SHEET_URL);
+  const agroverseSheet = agroverseSpreadsheet.getSheetByName(AGROVERSE_QR_SHEET_NAME);
+  const agroverseData = agroverseSheet.getDataRange().getValues();
+  
+  let inventoryType = 'Unknown';
+  for (let i = 1; i < agroverseData.length; i++) {
+    if (agroverseData[i][QR_CODE_COL] === qrCode) {
+      inventoryType = agroverseData[i][INVENTORY_TYPE_COL] || 'Unknown';
+      break;
+    }
+  }
+
+  const apiUrl = `https://api.telegram.org/bot${token}/sendMessage`;
+  const baseOutputSheetLink = "https://truesight.me/submissions/scored-and-to-be-tokenized";
+  const timestamp = new Date().getTime();
+  const outputSheetLink = `${baseOutputSheetLink}?ts=${timestamp}`;
+
+  const messageText = `${qrCode}\n\n New QR code detected ${inventoryType} by ${contributorName}. Recorded in the Google Sheet. \n\nReview here: https://truesight.me/physical-assets/serialized/sold`;
+
+  const payload = {
+    chat_id: chatId,
+    text: messageText
+  };
+
+  const options = {
+    method: 'post',
+    contentType: 'application/json',
+    payload: JSON.stringify(payload),
+    muteHttpExceptions: true
+  };
+
+  try {
+    Logger.log(`sendQrCodeNotification: Sending notification for QR code ${qrCode} to chat ${chatId}`);
+    const response = UrlFetchApp.fetch(apiUrl, options);
+    const status = response.getResponseCode();
+    const responseText = response.getContentText();
+    if (status === 200) {
+      Logger.log(`sendQrCodeNotification: Successfully sent notification for QR code ${qrCode} to chat ${chatId}`);
+    } else {
+      Logger.log(`sendQrCodeNotification: Failed to send notification for QR code ${qrCode}. Status: ${status}, Response: ${responseText}`);
+    }
+  } catch (e) {
+    Logger.log(`sendQrCodeNotification: Error sending Telegram notification for QR code ${qrCode}: ${e.message}`);
+  }
 }

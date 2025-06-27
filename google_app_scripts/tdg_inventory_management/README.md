@@ -144,3 +144,30 @@ This Google Apps Script (`process_telegram_logs.gs`) parses Telegram chat logs s
   3. Save and authorize.
 
 Parsed log entries will appear in your destination sheet, and sold statuses will be updated in the Agroverse QR codes sheet.
+
+## Setting Up a New Ledger for Management by Edgar (agl9)
+
+This section outlines the steps to create and configure a new ledger named `agl9` for management by Edgar within the Agroverse system.
+
+### Steps to Create and Configure the Ledger
+
+1. **Create a New Ledger**
+   - Copy an existing ledger template from [https://agroverse.shop/agl9](https://agroverse.shop/agl9).
+   - Ensure the new ledger is named `agl9` and adheres to the structure of existing ledgers for consistency.
+
+2. **Create a New Tree Planting Entity**
+   - Navigate to [https://truesight.me/members-directory](https://truesight.me/members-directory).
+   - Create a new entity named `Agroverse Tree Planting Contract - agl9`, following the naming convention of existing entities.
+
+3. **Create New Currency Types**
+   - Visit [https://truesight.me/currencies](https://truesight.me/currencies).
+   - Define any new currency types to be tracked for the `agl9` ledger. Ensure currency names match those used in the `offchain asset location` sheet (Column A).
+
+4. **Create Serialized Inventory Items**
+   - Go to [https://truesight.me/physical-assets/serialized](https://truesight.me/physical-assets/serialized).
+   - Create serialized inventory items specific to the `agl9` ledger, ensuring they are linked to the appropriate currency types and inventory manager (Edgar).
+
+### Notes
+- Update the `offchain asset location` sheet in the spreadsheet (`1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU`) to include entries for the `agl9` ledger, listing Edgar as the inventory manager in Column B.
+- Ensure the `Contributors contact information` sheet includes any new contributors or recipients associated with the `agl9` ledger, if applicable.
+- If the new ledger requires integration with the Telegram Chat Logs Parser, update the `Agroverse QR codes` sheet with any new QR codes for serialized inventory items in `agl9`.
