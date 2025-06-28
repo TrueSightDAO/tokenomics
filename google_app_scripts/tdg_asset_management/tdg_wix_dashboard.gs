@@ -530,6 +530,7 @@ function getWixTdgUsdcPriceDataItemId() {
 
 function getUSTreasuryYield() {
   var treasury_yield_url = "https://home.treasury.gov/resource-center/data-chart-center/interest-rates/pages/xml?data=daily_treasury_yield_curve&field_tdr_date_value=" + new Date().getFullYear();
+  Logger.log(treasury_yield_url);
   var xml_response = UrlFetchApp.fetch(treasury_yield_url);
   var document = XmlService.parse(xml_response);
   var root = document.getRootElement();
@@ -549,18 +550,23 @@ function getUSTreasuryYield() {
   var entry_child_nodes = entry.getChildren();
 
   for (var i = 0; i < entry_child_nodes.length; i++) {
-    // Logger.log(entry_child_nodes[i].getName()); 
     if (entry_child_nodes[i].getName() == "content" && !content) {
       content = entry_child_nodes[i];
     }    
   }
+  Logger.log(content.getChildren()[0].getValue()); 
 
-  var interest_rate_date = content.getChildren()[0].getChildren()[0].getValue();
-  var interest_rate = content.getChildren()[0].getChildren()[1].getValue() * 1;
+  var interest_rate_date = content.getChildren()[0].getChildren()[1].getValue();
+  // Logger.log(content.getChildren()[0].getChildren()[0].getValue()); 
+  // Logger.log(content.getChildren()[0].getChildren()[1].getValue()); 
+  // Logger.log(content.getChildren()[0].getChildren()[2].getValue()); 
+
+  var interest_rate = content.getChildren()[0].getChildren()[2].getValue() * 1;
   Logger.log("Interest rate on " + interest_rate_date + " is : "+ interest_rate);
   return interest_rate;
   
 }
+
 
 
 // Constant for the new DataItemID
