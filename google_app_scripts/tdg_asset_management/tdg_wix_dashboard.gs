@@ -1,3 +1,9 @@
+/**
+ * Extended Google Apps Script for managing Agroverse ledger data and TrueSight DAO equity holdings.
+ * Integrates with Wix APIs, Solana blockchain, and Google Sheets.
+ * Includes new functions to fetch ledger URLs, retrieve equity holdings, and calculate total AGL investments.
+ */
+
 // Stores the credentials object retrieved from the getCredentials() function
 const creds = getCredentials();
 
@@ -22,13 +28,157 @@ var tdgIssuedBalanceTab = SpreadsheetApp.openById(ledgerDocId).getSheetByName("L
 // Solana wallet address for the USDT vault
 var solanaUsdtVaultWalletAddress = "BkcbCEnD14C7cYiN6VwpYuGmpVrjfoRwobhQQScBugqQ";
 
+// Function to resolve redirect URL (copied from provided script)
+function resolveRedirect(url) {
+  try {
+    let currentUrl = url;
+    let redirectCount = 0;
+    const maxRedirects = 10;
+
+    while (redirectCount < maxRedirects) {
+      const response = UrlFetchApp.fetch(currentUrl, {
+        followRedirects: false,
+        muteHttpExceptions: true
+      });
+      const responseCode = response.getResponseCode();
+
+      // If not a redirect (2xx or other), return the current URL
+      if (responseCode < 300 || responseCode >= 400) {
+        return currentUrl;
+      }
+
+      // Get the Location header for the redirect
+      const headers = response.getHeaders();
+      const location = headers['Location'] || headers['location'];
+      if (!location) {
+        Logger.log(`No Location header for redirect at ${currentUrl}`);
+        return '';
+      }
+
+      // Update the current URL and increment redirect count
+      currentUrl = location;
+      redirectCount++;
+    }
+
+    Logger.log(`Exceeded maximum redirects (${maxRedirects}) for URL ${url}`);
+    return '';
+  } catch (e) {
+    Logger.log(`Error resolving redirect for URL ${url}: ${e.message}`);
+    return '';
+  }
+}
+
+/**
+ * Fetches unique ledger URLs from the ledger_url column in Wix AgroverseShipments.
+ * @return {Array<string>} Array of unique ledger URLs.
+ */
+function getLedgerUrlsFromWix() {
+  var options = getWixRequestHeader();
+  var request_url = "https://www.wixapis.com/wix-data/v2/items/query?dataCollectionId=AgroverseShipments";
+  
+  var payload = {
+    "query": {
+      "fields": ["ledger_url"]
+    }
+  };
+  
+  options.payload = JSON.stringify(payload);
+  options.method = 'POST';
+  
+  try {
+    var response = UrlFetchApp.fetch(request_url, options);
+    var content = response.getContentText();
+    var response_obj = JSON.parse(content);
+    
+    // Extract unique ledger URLs
+    var ledgerUrls = response_obj.dataItems
+      .map(item => item.data.ledger_url)
+      .filter(url => url && url !== '') // Remove empty or null URLs
+      .filter((url, index, self) => self.indexOf(url) === index); // Ensure uniqueness
+    
+    Logger.log("Unique Ledger URLs fetched from Wix: " + ledgerUrls);
+    return ledgerUrls;
+  } catch (e) {
+    Logger.log("Error fetching ledger URLs from Wix: " + e.message);
+    return [];
+  }
+}
+
+/**
+ * Fetches TrueSight DAO equity holdings (USD) from each ledger's Balance sheet.
+ * @param {Array<string>} ledgerUrls - Array of ledger URLs to process.
+ * @return {Array<number>} Array of USD balances for TrueSight DAO.
+ */
+function getTrueSightDAOEquityHoldings(ledgerUrls) {
+  var balances = [];
+  
+  ledgerUrls.forEach(function(url) {
+    // Resolve the redirect URL to get the actual Google Sheet URL
+    var resolvedUrl = resolveRedirect(url);
+    if (!resolvedUrl || !resolvedUrl.includes('docs.google.com/spreadsheets')) {
+      Logger.log(`Skipping invalid or non-spreadsheet URL: ${resolvedUrl}`);
+      return;
+    }
+    
+    try {
+      // Open the spreadsheet
+      var spreadsheet = SpreadsheetApp.openByUrl(resolvedUrl);
+      var balanceSheet = spreadsheet.getSheetByName("Balance");
+      
+      if (!balanceSheet) {
+        Logger.log(`Balance sheet not found in spreadsheet: ${resolvedUrl}`);
+        return;
+      }
+      
+      // Get all data from the Balance sheet
+      var data = balanceSheet.getDataRange().getValues();
+      
+      // Find rows where Column A = "TrueSight DAO" and Column C = "USD"
+      for (var i = 0; i < data.length; i++) {
+        if (data[i][0] === "TrueSight DAO" && data[i][2] === "USD") {
+          var balance = data[i][1]; // Column B value
+          if (typeof balance === 'number') {
+            balances.push(balance);
+            Logger.log(`TrueSight DAO USD balance from ${resolvedUrl}: ${balance}`);
+          } else {
+            Logger.log(`Invalid balance value for TrueSight DAO in ${resolvedUrl}`);
+          }
+        }
+      }
+    } catch (e) {
+      Logger.log(`Error accessing spreadsheet ${resolvedUrl}: ${e.message}`);
+    }
+  });
+  
+  return balances;
+}
+
+/**
+ * Calculates the total investment holdings in AGL (USD) by summing TrueSight DAO equity holdings.
+ * @return {number} Total USD value of TrueSight DAO holdings across all ledgers.
+ */
+function getInvestmentHoldingsInAGL() {
+  var ledgerUrls = getLedgerUrlsFromWix();
+  var equityHoldings = getTrueSightDAOEquityHoldings(ledgerUrls);
+  var totalHoldings = equityHoldings.reduce(function(sum, balance) {
+    return sum + balance;
+  }, 0);
+  
+  Logger.log("Total TrueSight DAO investment holdings in AGL (USD): " + totalHoldings);
+  return totalHoldings;
+}
+
+/**
+ * Updates the total DAO asset value on Wix, including off-chain assets, USDT vault balance, and AGL investment holdings.
+ */
 function updateTotalDAOAssetOnWix() {
-  var full_asset_value = getOffChainAssetValue() + getUSDTBalanceInVault();
+  var full_asset_value = getOffChainAssetValue() + getUSDTBalanceInVault() + getInvestmentHoldingsInAGL();
   Logger.log("Full amount of Asset in USD value managed off chain: " + full_asset_value);      
 
-  setAssetBalanceOnWix( full_asset_value);
+  setAssetBalanceOnWix(full_asset_value);
   getAssetBalanceOnWix();
 }
+
 
 function getOffChainAssetValue() {
   var assets = offChainAssetBalanceTab.getRange(1,4).getValues().map(function(valueArray) {
