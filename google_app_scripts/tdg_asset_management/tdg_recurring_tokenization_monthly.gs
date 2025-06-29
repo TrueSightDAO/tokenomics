@@ -210,33 +210,39 @@ function tokenizeRecord(record, expected_date) {
       return;
     }
     
-    // Find the last row where Column A is not empty in Ledger history
-    const lastRow = ledgerSheet.getLastRow();
-    let targetRow = 2; // Start after header
-    for (let i = 2; i <= lastRow; i++) {
-      const cellValue = ledgerSheet.getRange(`${CONFIG.LAST_ROW_COLUMN}${i}`).getValue();
-      if (cellValue !== '') {
-        targetRow = i + 1; // Next row after the last non-empty Column A
+    // Find the last non-empty row in Column A of Ledger history
+    Logger.log("Checking where is the last row");
+    const destData = ledgerSheet.getDataRange().getValues();
+    let lastNonEmptyRow = 1; // Start after header
+    for (let i = 1; i < destData.length; i++) {
+      if (destData[i][0] !== '') { // Column A is index 0
+        lastNonEmptyRow = i + 1; // Update to the next row after the last non-empty
       }
     }
     
-    // Add new record to Ledger history at targetRow
-    ledgerSheet.getRange(targetRow, 1, 1, 8).setValues([[
+    // Define the new row data
+    const newRow = [
       record.contributor, // Column A: Contributor from Recurring Transactions
       '', // Column B: Empty as not specified
-      record.startDate, // Column C: Start Date from Recurring Transactions
+      record.description, // Column C: Start Date from Recurring Transactions
       '1TDG For every 1 USD of liquidity injected', // Column D: Hardcoded
       record.amount, // Column E: Amount from Recurring Transactions
       'Successfully Completed / Full Provision Awarded', // Column F: Hardcoded
       record.amount, // Column G: Amount from Recurring Transactions
       expected_date // Column H: Expected tokenization date
-    ]]);
+    ];
+    
+
+    // Insert a new row after the last non-empty row and set values
+    Logger.log("Inserting record");
+    ledgerSheet.insertRowAfter(lastNonEmptyRow);
+    ledgerSheet.getRange(lastNonEmptyRow + 1, 1, 1, newRow.length).setValues([newRow]);
     
     // Update Last Check (Column F) in Recurring Transactions to current date
     const currentDate = Utilities.formatDate(new Date(CONFIG.CURRENT_DATE), 'GMT', 'yyyyMMdd');
     recurringSheet.getRange(record.row, CONFIG.RECURRING_COLUMNS.LAST_CHECK + 1).setValue(currentDate); // Column F is 1-based
     
-    Logger.log(`Row ${record.row} (Contributor: ${record.contributor}): Tokenized for ${expected_date} at Ledger history row ${targetRow}`);
+    Logger.log(`Row ${record.row} (Contributor: ${record.contributor}): Tokenized for ${expected_date} at Ledger history row ${lastNonEmptyRow + 1}`);
     
   } catch (e) {
     Logger.log('Error in tokenizeRecord: ' + e.message);
