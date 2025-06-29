@@ -222,13 +222,16 @@ def get_latest_aws_charges(access_key, secret_key, account_name, start_date):
 
             # Calculate total cost for the period
             total_cost = 0.0
+            print(f"\n\n")
             for result in results:
                 for group in result['Groups']:
+                    service_name = group['Keys'][0]
                     cost = float(group['Metrics']['UnblendedCost']['Amount'])
+                    print(f"  Service: {service_name}, Cost: {cost:.2f} USD")  # <-- Debug line
                     total_cost += cost
                 total_cost_all_months += total_cost
 
-            print(f"\nCosts for {account_name} (Period: {month_start.strftime('%Y%m%d')} to {month_end.strftime('%Y%m%d')}): {total_cost:.2f} USD")
+            print(f"Costs for {account_name} (Period: {month_start.strftime('%Y%m%d')} to {month_end.strftime('%Y%m%d')}): {total_cost:.2f} USD")
             
             all_results.append({
                 'period': {
@@ -246,7 +249,7 @@ def get_latest_aws_charges(access_key, secret_key, account_name, start_date):
         print(f"No valid cost data retrieved for {account_name}.")
         return None
 
-    print(f"\nGrand Total Cost for {account_name} across all periods: {total_cost_all_months:.2f} USD")
+    print(f"\n\nGrand Total Cost for {account_name} across all periods: {total_cost_all_months:.2f} USD\n\n\n\n")
 
     # Save results to a file with period info
     output_data = {
