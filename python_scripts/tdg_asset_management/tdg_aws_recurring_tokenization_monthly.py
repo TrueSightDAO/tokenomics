@@ -343,7 +343,7 @@ def main():
                 start_date_str = result['period']['start']
                 end_date_str = result['period']['end']
                 total_cost = result['total_cost']
-                description = name + " period " + start_date_str + " - " + end_date_str
+                description = name + "\n\nperiod " + start_date_str + " - " + end_date_str
                 # Check if transaction exists in Ledger history
                 if not transactionRecordExist(service, token, description, end_date_str):
                     # Insert new transaction
