@@ -1,0 +1,20 @@
+{
+  "account_name": "NELAN",
+  "periods": [
+    {
+      "period": {
+        "start": "20250401",
+        "end": "20250430"
+      },
+      "total_cost": 1048.8726256667
+    },
+    {
+      "period": {
+        "start": "20250501",
+        "end": "20250531"
+      },
+      "total_cost": 1090.7369868753
+    }
+  ],
+  "grand_total_cost": 2139.609612542
+}
