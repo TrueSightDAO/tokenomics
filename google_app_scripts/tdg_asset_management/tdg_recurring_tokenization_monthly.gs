@@ -223,7 +223,7 @@ function tokenizeRecord(record, expected_date) {
     // Define the new row data
     const newRow = [
       record.contributor, // Column A: Contributor from Recurring Transactions
-      '', // Column B: Empty as not specified
+      'Recurring Tokenizations', // Column B: Empty as not specified
       record.description, // Column C: Start Date from Recurring Transactions
       '1TDG For every 1 USD of liquidity injected', // Column D: Hardcoded
       record.amount, // Column E: Amount from Recurring Transactions
@@ -264,12 +264,12 @@ function processRecurringTransactions() {
 
       // Step 3 & 4: Check each date and tokenize if not already done
       tokenizationDates.forEach(expected_date => {
-        Logger.log("checking " + expected_date);
+        Logger.log(".   checking " + expected_date);
         if (!tokenizedAlready(record.contributor, record.description, expected_date)) {
-          Logger.log("Tokenizing " + expected_date);
+          Logger.log(".   Tokenizing " + expected_date);
           tokenizeRecord(record, expected_date);
         } else {
-          Logger.log(`Row ${record.row} (Contributor: ${record.contributor}): Already tokenized for ${expected_date}`);
+          Logger.log(`.   Row ${record.row} (Contributor: ${record.contributor}): Already tokenized for ${expected_date}`);
         }
       });
     });
