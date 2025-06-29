@@ -113,8 +113,7 @@ function fetchRecurringTransactions() {
         });
       }
     });
-    Logger.log(matchingRecords)
-    
+        
     return matchingRecords;
     
   } catch (e) {
@@ -211,7 +210,7 @@ function tokenizeRecord(record, expected_date) {
     }
     
     // Find the last non-empty row in Column A of Ledger history
-    Logger.log("Checking where is the last row");
+    Logger.log(".   Checking where is the last row");
     const destData = ledgerSheet.getDataRange().getValues();
     let lastNonEmptyRow = 1; // Start after header
     for (let i = 1; i < destData.length; i++) {
@@ -223,7 +222,7 @@ function tokenizeRecord(record, expected_date) {
     // Define the new row data
     const newRow = [
       record.contributor, // Column A: Contributor from Recurring Transactions
-      '', // Column B: Empty as not specified
+      'Recurring Tokenizations', // Column B: Empty as not specified
       record.description, // Column C: Start Date from Recurring Transactions
       '1TDG For every 1 USD of liquidity injected', // Column D: Hardcoded
       record.amount, // Column E: Amount from Recurring Transactions
@@ -234,7 +233,7 @@ function tokenizeRecord(record, expected_date) {
     
 
     // Insert a new row after the last non-empty row and set values
-    Logger.log("Inserting record");
+    Logger.log(".   Inserting record");
     ledgerSheet.insertRowAfter(lastNonEmptyRow);
     ledgerSheet.getRange(lastNonEmptyRow + 1, 1, 1, newRow.length).setValues([newRow]);
     
@@ -242,7 +241,7 @@ function tokenizeRecord(record, expected_date) {
     const currentDate = Utilities.formatDate(new Date(CONFIG.CURRENT_DATE), 'GMT', 'yyyyMMdd');
     recurringSheet.getRange(record.row, CONFIG.RECURRING_COLUMNS.LAST_CHECK + 1).setValue(currentDate); // Column F is 1-based
     
-    Logger.log(`Row ${record.row} (Contributor: ${record.contributor}): Tokenized for ${expected_date} at Ledger history row ${lastNonEmptyRow + 1}`);
+    Logger.log(`.   Row ${record.row} (Contributor: ${record.contributor}): Tokenized for ${expected_date} at Ledger history row ${lastNonEmptyRow + 1}\n\n`);
     
   } catch (e) {
     Logger.log('Error in tokenizeRecord: ' + e.message);
@@ -264,12 +263,12 @@ function processRecurringTransactions() {
 
       // Step 3 & 4: Check each date and tokenize if not already done
       tokenizationDates.forEach(expected_date => {
-        Logger.log("checking " + expected_date);
+        Logger.log(".   checking " + expected_date);
         if (!tokenizedAlready(record.contributor, record.description, expected_date)) {
-          Logger.log("Tokenizing " + expected_date);
+          Logger.log(".   Tokenizing " + expected_date);
           tokenizeRecord(record, expected_date);
         } else {
-          Logger.log(`Row ${record.row} (Contributor: ${record.contributor}): Already tokenized for ${expected_date}`);
+          Logger.log(`.   Row ${record.row} (Contributor: ${record.contributor}): Already tokenized for ${expected_date}`);
         }
       });
     });
