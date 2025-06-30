@@ -34,12 +34,14 @@ def debug_print_env_vars():
             print(f"{key}: {value}")
     print("=== End of Environment Variables ===\n")
 
+    print("Line 37 ")
+    print(os.environ.get('GOOGLE_CREDENTIALS')[:10])
+    print(os.environ.get('GITHUB_WORKSPACE'))
+    print("Line 39")    
+
 def get_google_sheets_service():
     
     credentials_json =  os.environ.get('GOOGLE_CREDENTIALS')
-    print("Line 40 ")
-    print(os.environ.get('AWS_ACCESS_KEY_ID_GARYJOB')[:10])
-    print("Line 42 ")
     credentials_dict = json.loads(credentials_json)
     credentials = service_account.Credentials.from_service_account_info(
         credentials_dict, scopes=SCOPES)
