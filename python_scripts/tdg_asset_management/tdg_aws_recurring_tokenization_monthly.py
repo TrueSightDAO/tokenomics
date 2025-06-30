@@ -35,6 +35,8 @@ def debug_print_env_vars():
             print(f"{key}: {value}")
     print("=== End of Environment Variables ===\n")
 
+    print("Line 38: " + os.getenv('GOOGLE_CREDENTIALS'))
+
 def get_google_sheets_service():
     # Load Google service account credentials
     google_credentials_base64 = os.getenv('GOOGLE_CREDENTIALS')
@@ -317,7 +319,7 @@ def get_latest_aws_charges(access_key, secret_key, account_name, start_date):
 def main():
     # Print all environment variables for debugging
     debug_print_env_vars()
-    
+
     parser = argparse.ArgumentParser(description='Fetch AWS costs or Google Sheet records.')
     subparsers = parser.add_subparsers(dest='command', help='Command to execute')
 
