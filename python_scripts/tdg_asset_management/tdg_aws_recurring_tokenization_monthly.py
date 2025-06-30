@@ -14,10 +14,10 @@ load_dotenv()
 
 # Google Sheets configuration
 # SANDBOX
-SPREADSHEET_ID = '1F90Sq6jSfj8io0RmiUwdydzuWXOZA9siXHWDsj9ItTo'
+# SPREADSHEET_ID = '1F90Sq6jSfj8io0RmiUwdydzuWXOZA9siXHWDsj9ItTo'
 
 # PRODUCTION
-# SPREADSHEET_ID = '1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU'
+SPREADSHEET_ID = '1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU'
 
 
 RECURRING_SHEET_NAME = 'Recurring Transactions'
