@@ -37,17 +37,24 @@ function processAirdrops() {
   }
   
   // Process contact information and match with ledger data
-  var outputData = [['Contributor Name', 'TDG Amount', 'Solana Wallet Address']];
+  var outputData = [['Contributor Name', 'TDG Amount', 'Solana Wallet Address', 'Status']];
   for (var i = 1; i < contactData.length; i++) {
     var contributorName = contactData[i][0].toString().trim();
     var walletAddress = contactData[i][1];
     
     if (contributorMap[contributorName] ) {
       Logger.log("Inserting tabulation " + i + ": Contributor name " + contributorName + ", TDG Amount :" + contributorMap[contributorName].tdgTotal);
+
+      var airdropStatus = 'TO BE AIR DOPPED';
+      if( walletAddress.trim() == '' ) {
+        var airdropStatus = 'MISSING WALLET ADDRESS';
+      }
+
       outputData.push([
         contributorName,
         contributorMap[contributorName].tdgTotal,
-        walletAddress
+        walletAddress,
+        airdropStatus
       ]);
     }
   }
