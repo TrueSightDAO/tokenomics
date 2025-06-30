@@ -13,12 +13,9 @@ from dateutil import relativedelta
 load_dotenv()
 
 # Google Sheets configuration
-# SANDBOX
-# SPREADSHEET_ID = '1F90Sq6jSfj8io0RmiUwdydzuWXOZA9siXHWDsj9ItTo'
 
-# PRODUCTION
-SPREADSHEET_ID = '1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU'
-
+SPREADSHEET_ID = '1F90Sq6jSfj8io0RmiUwdydzuWXOZA9siXHWDsj9ItTo' # SANDBOX
+# SPREADSHEET_ID = '1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU'  # Production
 
 RECURRING_SHEET_NAME = 'Recurring Transactions'
 LEDGER_SHEET_NAME = 'Ledger history'
@@ -127,7 +124,25 @@ def transactionRecordExist(service, contributor_name, description, end_date_str)
 
 def insertTransaction(service, contributor_name, description, amount, end_date_str):
     try:
-        values = [[
+        # Fetch all data from Ledger history to find the last non-empty row in Column A
+        result = service.spreadsheets().values().get(
+            spreadsheetId=SPREADSHEET_ID,
+            range=LEDGER_RANGE_NAME
+        ).execute()
+        values = result.get('values', [])
+        
+        # Find the last non-empty row in Column A (index 0)
+        last_non_empty_row = 1  # Start after header (1-based indexing)
+        if values:
+            for i, row in enumerate(values):
+                if len(row) > 0 and row[0].strip():  # Check if Column A is non-empty
+                    last_non_empty_row = i + 1  # Update to the last non-empty row
+            print(f"Last non-empty row in Ledger history (Column A): {last_non_empty_row}")
+        else:
+            print("Ledger history sheet is empty. Using row 2 (after header).")
+
+        # Define the new row data
+        new_row = [
             contributor_name,  # Column A: Recurring Transactions Column B
             'Recurring Tokenizations',  # Column B
             description,  # Column C: Recurring Transactions Column A
@@ -136,16 +151,18 @@ def insertTransaction(service, contributor_name, description, amount, end_date_s
             'Successfully Completed / Full Provision Awarded',  # Column F
             f"{amount:.2f}",  # Column G: Amount billed
             end_date_str  # Column H: Billing period end date
-        ]]
-        body = {'values': values}
+        ]
+
+        # Append the new row at last_non_empty_row + 1
+        body = {'values': [new_row]}
         result = service.spreadsheets().values().append(
             spreadsheetId=SPREADSHEET_ID,
-            range=LEDGER_RANGE_NAME,
+            range=f'{LEDGER_SHEET_NAME}!A{last_non_empty_row + 1}:H{last_non_empty_row + 1}',
             valueInputOption='RAW',
             insertDataOption='INSERT_ROWS',
             body=body
         ).execute()
-        print(f"Inserted transaction for contributor_name: {contributor_name}, contribution_description: {description}, amount: {amount:.2f}, end date: {end_date_str}")
+        print(f"Inserted transaction for contributor_name: {contributor_name}, description: {description}, amount: {amount:.2f}, end date: {end_date_str} at row {last_non_empty_row + 1}")
         return True
     except Exception as e:
         print(f"Error inserting transaction to Ledger history: {e}")
@@ -167,7 +184,6 @@ def update_start_date(service, row_index):
         print(f"Updated Column F of row {row_index + 1} with current date {today_str}")
     except Exception as e:
         print(f"Error updating start date: {e}")
-
 
 def get_latest_aws_charges(access_key, secret_key, account_name, start_date):
     # Initialize Cost Explorer client with specific credentials
@@ -251,7 +267,7 @@ def get_latest_aws_charges(access_key, secret_key, account_name, start_date):
                 for group in result['Groups']:
                     service_name = group['Keys'][0]
                     cost = float(group['Metrics']['UnblendedCost']['Amount'])
-                    print(f"  Service: {service_name}, Cost: {cost:.2f} USD")  # <-- Debug line
+                    print(f"  Service: {service_name}, Cost: {cost:.2f} USD")  # Debug line
                     total_cost += cost
                 total_cost_all_months += total_cost
 
