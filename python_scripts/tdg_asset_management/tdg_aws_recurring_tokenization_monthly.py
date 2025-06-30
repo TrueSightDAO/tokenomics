@@ -13,7 +13,13 @@ from dateutil import relativedelta
 load_dotenv()
 
 # Google Sheets configuration
-SPREADSHEET_ID = '1F90Sq6jSfj8io0RmiUwdydzuWXOZA9siXHWDsj9ItTo'
+# SANDBOX
+# SPREADSHEET_ID = '1F90Sq6jSfj8io0RmiUwdydzuWXOZA9siXHWDsj9ItTo'
+
+# PRODUCTION
+# SPREADSHEET_ID = '1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU'
+
+
 RECURRING_SHEET_NAME = 'Recurring Transactions'
 LEDGER_SHEET_NAME = 'Ledger history'
 RECURRING_RANGE_NAME = f'{RECURRING_SHEET_NAME}!A:Z'  # Adjust range as needed
@@ -56,7 +62,7 @@ def get_recurring_records_from_ledger():
             if row and 'Edgar AWS' in row[0].strip():
                 start_date = None
                 signature = None
-                token = None
+                contributor_name = None
                 # Get start date from Column F (index 5)
                 if len(row) > 5 and row[5].strip():
                     try:
@@ -66,20 +72,20 @@ def get_recurring_records_from_ledger():
                 # Get signature from Column H (index 7)
                 if len(row) > 7 and row[7].strip():
                     signature = row[7].strip()
-                # Get token from Column B (index 1)
+                # Get contributor_name from Column B (index 1)
                 if len(row) > 1 and row[1].strip():
-                    token = row[1].strip()
+                    contributor_name = row[1].strip()
                 edgar_records.append({
                     'row': row,
                     'start_date': start_date,
                     'signature': signature,
-                    'token': token
+                    'contributor_name': contributor_name
                 })
         
         print("\nRecords with Edgar AWS in Column A:")
         for i, record in enumerate(edgar_records, 1):
             start_date_str = record['start_date'].strftime('%Y%m%d') if record['start_date'] else 'None'
-            print(f"Record {i}: {record['row']}, Start Date: {start_date_str}, Signature: {record['signature'] or 'None'}, Token: {record['token'] or 'None'}")
+            print(f"Record {i}: {record['row']}, Start Date: {start_date_str}, Signature: {record['signature'] or 'None'}, contributor_name: {record['contributor_name'] or 'None'}")
         
         # Save to file
         with open('edgar_records.json', 'w') as f:
@@ -90,7 +96,7 @@ def get_recurring_records_from_ledger():
         print(f"Error reading Recurring Transactions sheet: {e}")
         return []
 
-def transactionRecordExist(service, token, name, end_date_str):
+def transactionRecordExist(service, contributor_name, description, end_date_str):
     try:
         result = service.spreadsheets().values().get(
             spreadsheetId=SPREADSHEET_ID,
@@ -106,25 +112,25 @@ def transactionRecordExist(service, token, name, end_date_str):
         for row in values:
             if len(row) < 8:
                 continue
-            ledger_token = row[0].strip() if row[0] else ''
-            ledger_name = row[2].strip() if row[2] else ''
+            ledger_contributor_name = row[0].strip() if row[0] else ''
+            ledger_description = row[2].strip() if row[2] else ''
             ledger_date = row[7].strip() if row[7] else ''
-            if (ledger_token == token and
-                ledger_name == name and
+            if (ledger_contributor_name == contributor_name and
+                ledger_description == description and
                 ledger_date == end_date_str):
-                print(f"Matching transaction found in Ledger history for token: {token}, name: {name}, date: {end_date_str}")
+                print(f"Matching transaction found in Ledger history for contributor_name: {contributor_name}, description: {ledger_description}, date: {end_date_str}")
                 return True
         return False
     except Exception as e:
         print(f"Error checking Ledger history: {e}")
         return False
 
-def insertTransaction(service, token, name, amount, end_date_str):
+def insertTransaction(service, contributor_name, description, amount, end_date_str):
     try:
         values = [[
-            token,  # Column A: Recurring Transactions Column B
+            contributor_name,  # Column A: Recurring Transactions Column B
             'Recurring Tokenizations',  # Column B
-            name,  # Column C: Recurring Transactions Column A
+            description,  # Column C: Recurring Transactions Column A
             '1TDG For every 1 USD of liquidity injected',  # Column D
             f"{amount:.2f}",  # Column E: Amount billed
             'Successfully Completed / Full Provision Awarded',  # Column F
@@ -139,11 +145,29 @@ def insertTransaction(service, token, name, amount, end_date_str):
             insertDataOption='INSERT_ROWS',
             body=body
         ).execute()
-        print(f"Inserted transaction for token: {token}, name: {name}, amount: {amount:.2f}, end date: {end_date_str}")
+        print(f"Inserted transaction for contributor_name: {contributor_name}, contribution_description: {description}, amount: {amount:.2f}, end date: {end_date_str}")
         return True
     except Exception as e:
         print(f"Error inserting transaction to Ledger history: {e}")
         return False
+
+def update_start_date(service, row_index):
+    try:
+        today_str = datetime.utcnow().strftime('%Y%m%d')
+        body = {
+            'range': f'{RECURRING_SHEET_NAME}!F{row_index + 1}',
+            'values': [[today_str]]
+        }
+        service.spreadsheets().values().update(
+            spreadsheetId=SPREADSHEET_ID,
+            range=body['range'],
+            valueInputOption='RAW',
+            body=body
+        ).execute()
+        print(f"Updated Column F of row {row_index + 1} with current date {today_str}")
+    except Exception as e:
+        print(f"Error updating start date: {e}")
+
 
 def get_latest_aws_charges(access_key, secret_key, account_name, start_date):
     # Initialize Cost Explorer client with specific credentials
@@ -319,13 +343,13 @@ def main():
         for record in edgar_records:
             signature = record['signature']
             start_date = record['start_date']
-            token = record['token']
+            contributor_name = record['contributor_name']
             name = record['row'][0].strip() if record['row'][0] else 'Edgar AWS'
             if not signature:
                 print(f"Skipping record with missing signature: {record['row']}")
                 continue
-            if not token:
-                print(f"Skipping record with missing token: {record['row']}")
+            if not contributor_name:
+                print(f"Skipping record with missing contributor_name: {record['row']}")
                 continue
 
             # Get AWS credentials for the signature
@@ -348,9 +372,11 @@ def main():
                 total_cost = result['total_cost']
                 description = name + "\n\nperiod " + start_date_str + " - " + end_date_str
                 # Check if transaction exists in Ledger history
-                if not transactionRecordExist(service, token, description, end_date_str):
+                if not transactionRecordExist(service, contributor_name, description, end_date_str):
                     # Insert new transaction
-                    insertTransaction(service, token, description, total_cost, end_date_str)
+                    insertTransaction(service, contributor_name, description, total_cost, end_date_str)
+                    row_index = edgar_records.index(record) + 4
+                    update_start_date(service, row_index)
                 else:
                     print(f"Transaction already exists for {signature} for period ending {end_date_str}. Skipping insertion.")
 
