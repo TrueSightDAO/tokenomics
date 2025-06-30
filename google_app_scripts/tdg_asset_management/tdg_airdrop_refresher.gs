@@ -7,7 +7,12 @@ function processAirdrops() {
   var ledgerSheet = ledgerSpreadsheet.getSheetByName('Ledger history');
   var contactSheet = ledgerSpreadsheet.getSheetByName('Contributors contact information');
   var outputSheet = airdropSpreadsheet.getSheetByName('To Be Airdropped');
-  
+
+  // Insert current date in YYYYMMDD format into cell E1
+  var now = new Date();
+  var yyyyMMdd = Utilities.formatDate(now, Session.getScriptTimeZone(), "yyyyMMdd");
+  outputSheet.getRange("E1").setValue(yyyyMMdd);
+
   // Get data from Ledger history
   var ledgerData = ledgerSheet.getDataRange().getValues();
   var contactData = contactSheet.getDataRange().getValues();
@@ -20,9 +25,10 @@ function processAirdrops() {
     var contributorName = ledgerData[i][0].toString().trim();
     var workStatus = ledgerData[i][5];
     var tdgAmount = parseFloat(ledgerData[i][6]) || 0;
-    var solanaHash = ledgerData[i][8];
+    var solanaTrasferHash = ledgerData[i][8];
     
-    if (workStatus == 'Successfully Completed / Full Provision Awarded' && solanaHash.length == 0 ) {
+    if (workStatus == 'Successfully Completed / Full Provision Awarded' && solanaTrasferHash.trim() == '' && tdgAmount > 0 ) {
+      Logger.log("Parsing Row " + i + ": Contributor name " + contributorName + ", TDG Amount :" + tdgAmount);
       if (!contributorMap[contributorName]) {
         contributorMap[contributorName] = { tdgTotal: 0 };
       }
@@ -36,7 +42,8 @@ function processAirdrops() {
     var contributorName = contactData[i][0].toString().trim();
     var walletAddress = contactData[i][1];
     
-    if (contributorMap[contributorName] && walletAddress && walletAddress.trim() !== '') {
+    if (contributorMap[contributorName] ) {
+      Logger.log("Inserting tabulation " + i + ": Contributor name " + contributorName + ", TDG Amount :" + contributorMap[contributorName].tdgTotal);
       outputData.push([
         contributorName,
         contributorMap[contributorName].tdgTotal,
