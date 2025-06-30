@@ -23,6 +23,18 @@ RECURRING_RANGE_NAME = f'{RECURRING_SHEET_NAME}!A:Z'  # Adjust range as needed
 LEDGER_RANGE_NAME = f'{LEDGER_SHEET_NAME}!A:H'  # Adjust range for Ledger history
 SCOPES = ['https://www.googleapis.com/auth/spreadsheets']  # Updated for read/write access
 
+def debug_print_env_vars():
+    """Print all environment variables for debugging, masking sensitive values."""
+    print("\n=== Debugging Environment Variables ===")
+    for key, value in sorted(os.environ.items()):
+        # Mask sensitive values (e.g., AWS keys, Google credentials)
+        if any(keyword in key.lower() for keyword in ['key', 'secret', 'credential', 'password']):
+            masked_value = f"{value[:4]}...{value[-4:]}" if len(value) > 8 else "****"
+            print(f"{key}: {masked_value}")
+        else:
+            print(f"{key}: {value}")
+    print("=== End of Environment Variables ===\n")
+
 def get_google_sheets_service():
     # Load Google service account credentials
     google_credentials_base64 = os.getenv('GOOGLE_CREDENTIALS')
@@ -303,6 +315,9 @@ def get_latest_aws_charges(access_key, secret_key, account_name, start_date):
     return all_results
 
 def main():
+    # Print all environment variables for debugging
+    debug_print_env_vars()
+    
     parser = argparse.ArgumentParser(description='Fetch AWS costs or Google Sheet records.')
     subparsers = parser.add_subparsers(dest='command', help='Command to execute')
 
