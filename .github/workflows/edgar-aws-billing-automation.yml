@@ -34,8 +34,8 @@ jobs:
         env:
           AWS_ACCESS_KEY_ID_GARYJOB: ${{ secrets.AWS_ACCESS_KEY_ID_GARYJOB }}
           AWS_SECRET_ACCESS_KEY_GARYJOB: ${{ secrets.AWS_SECRET_ACCESS_KEY_GARYJOB }}
-          AWS_ACCESS_KEY_ID_NELAN: ${{ secrets.AWS_ACCESS_KEY_ID_JAKOB }}
-          AWS_SECRET_ACCESS_KEY_NELAN: ${{ secrets.AWS_SECRET_ACCESS_KEY_JAKOB }}
+          AWS_ACCESS_KEY_ID_NELAN: ${{ secrets.AWS_ACCESS_KEY_ID_NELAN }}
+          AWS_SECRET_ACCESS_KEY_NELAN: ${{ secrets.AWS_SECRET_ACCESS_KEY_NELAN }}
           GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
           JSON_VALUE: ${{ secrets.JSON_VALUE }}
         run: python tdg_aws_recurring_tokenization_monthly.py aws_process
