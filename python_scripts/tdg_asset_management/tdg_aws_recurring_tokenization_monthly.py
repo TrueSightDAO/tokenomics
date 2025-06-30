@@ -35,37 +35,12 @@ def debug_print_env_vars():
     print("=== End of Environment Variables ===\n")
 
 def get_google_sheets_service():
-    # Try to get GOOGLE_CREDENTIALS using os.environ.get
-    google_credentials_base64 = os.environ.get('GOOGLE_CREDENTIALS')
-    print(f"\n=== Debugging GOOGLE_CREDENTIALS in get_google_sheets_service ===")
-    print(f"os.environ.get('GOOGLE_CREDENTIALS'): {google_credentials_base64 if google_credentials_base64 else 'None'}")
-
-    # Fallback: Search os.environ for a matching key (case-insensitive or similar)
-    if not google_credentials_base64:
-        print("GOOGLE_CREDENTIALS not found, searching for similar keys...")
-        for key in os.environ:
-            if key.strip().lower() in ['google_credentials', 'credentials', 'google_credential']:
-                google_credentials_base64 = os.environ[key]
-                print(f"Found matching key: {key} = {google_credentials_base64[:4]}...{google_credentials_base64[-4:] if len(google_credentials_base64) > 8 else '****'}")
-                break
-        else:
-            raise ValueError("No GOOGLE_CREDENTIALS or similar key found in environment variables")
-
-    # Decode base64-encoded credentials (used in GitHub Secrets)
-    try:
-        credentials_json = base64.b64decode(google_credentials_base64).decode('utf-8')
-        credentials_dict = json.loads(credentials_json)
-    except (base64.binascii.Error, json.JSONDecodeError) as e:
-        print(f"Error decoding GOOGLE_CREDENTIALS: {e}")
-        # Fallback for local .env file (non-base64 JSON string)
-        try:
-            credentials_dict = json.loads(google_credentials_base64)
-        except json.JSONDecodeError as e:
-            print(f"Error parsing GOOGLE_CREDENTIALS as JSON: {e}")
-            raise ValueError("Failed to parse GOOGLE_CREDENTIALS as base64 or JSON")
-
+    
+    credentials_json =  os.environ.get('GOOGLE_CREDENTIALS')
+    credentials_dict = json.loads(credentials_json)
     credentials = service_account.Credentials.from_service_account_info(
         credentials_dict, scopes=SCOPES)
+    
     service = build('sheets', 'v4', credentials=credentials)
     print("Successfully initialized Google Sheets service")
     return service
