@@ -347,6 +347,7 @@ def main():
         get_recurring_records_from_ledger()
 
     elif args.command == 'aws_process':
+        return
         # Fetch Google Sheet service
         service = get_google_sheets_service()
         
