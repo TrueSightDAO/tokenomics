@@ -142,9 +142,24 @@ def transactionRecordExist(service, contributor_name, description, end_date_str)
         print(f"Error checking Ledger history: {e}")
         return False
 
+
 def insertTransaction(service, contributor_name, description, amount, end_date_str):
     try:
-        values = [[
+        # Get the current data from Ledger history sheet
+        result = service.spreadsheets().values().get(
+            spreadsheetId=SPREADSHEET_ID,
+            range=LEDGER_RANGE_NAME
+        ).execute()
+        values = result.get('values', [])
+        
+        # Find the last non-empty row in Column A (index 0)
+        last_non_empty_row = 1  # Start after header
+        for i, row in enumerate(values[1:], start=1):  # Skip header row
+            if row and row[0].strip():  # Check if Column A is non-empty
+                last_non_empty_row = i + 1  # Update to the next row after the last non-empty
+        
+        # Define the new row data
+        new_row = [
             contributor_name,  # Column A: Recurring Transactions Column B
             'Recurring Tokenizations',  # Column B
             description,  # Column C: Recurring Transactions Column A
@@ -153,20 +168,24 @@ def insertTransaction(service, contributor_name, description, amount, end_date_s
             'Successfully Completed / Full Provision Awarded',  # Column F
             f"{amount:.2f}",  # Column G: Amount billed
             end_date_str  # Column H: Billing period end date
-        ]]
-        body = {'values': values}
-        result = service.spreadsheets().values().append(
+        ]
+        
+        # Insert the new row after the last non-empty row
+        range_to_insert = f'{LEDGER_SHEET_NAME}!A{last_non_empty_row + 1}'
+        body = {'values': [new_row]}
+        result = service.spreadsheets().values().update(
             spreadsheetId=SPREADSHEET_ID,
-            range=LEDGER_RANGE_NAME,
+            range=range_to_insert,
             valueInputOption='RAW',
-            insertDataOption='INSERT_ROWS',
             body=body
         ).execute()
-        print(f"Inserted transaction for contributor_name: {contributor_name}, contribution_description: {description}, amount: {amount:.2f}, end date: {end_date_str}")
+        
+        print(f"Inserted transaction for contributor_name: {contributor_name}, contribution_description: {description}, amount: {amount:.2f}, end date: {end_date_str} at row {last_non_empty_row + 1}")
         return True
     except Exception as e:
         print(f"Error inserting transaction to Ledger history: {e}")
         return False
+
 
 def update_start_date(service, row_index):
     try:
