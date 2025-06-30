@@ -1,0 +1,20 @@
+{
+  "account_name": "GARYJOB",
+  "periods": [
+    {
+      "period": {
+        "start": "20250401",
+        "end": "20250430"
+      },
+      "total_cost": 265.36893851220003
+    },
+    {
+      "period": {
+        "start": "20250501",
+        "end": "20250531"
+      },
+      "total_cost": 274.0641047563
+    }
+  ],
+  "grand_total_cost": 539.4330432685001
+}
