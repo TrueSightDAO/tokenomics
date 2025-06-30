@@ -37,10 +37,11 @@ def debug_print_env_vars():
 def get_google_sheets_service():
     
     credentials_json =  os.environ.get('GOOGLE_CREDENTIALS')
+    print(credentials[:10])
     credentials_dict = json.loads(credentials_json)
     credentials = service_account.Credentials.from_service_account_info(
         credentials_dict, scopes=SCOPES)
-    
+
     service = build('sheets', 'v4', credentials=credentials)
     print("Successfully initialized Google Sheets service")
     return service
