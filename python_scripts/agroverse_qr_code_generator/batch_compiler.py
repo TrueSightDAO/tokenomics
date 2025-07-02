@@ -373,6 +373,11 @@ def main():
         # Determine output filename and path (prefixed with 'compiled_')
         filename = sanitize_filename(f"compiled_{farm_name}_{qr_code}.png")
         out_path = os.path.join(args.output_dir, filename)
+        
+        # Check if file already exists
+        if os.path.exists(out_path):
+            print(f"Image already exists, skipping: {out_path}")
+            continue        
 
         # Generate QR and compile image
         url = gdrive.BASE_QR_CHECK_URL + qr_code
