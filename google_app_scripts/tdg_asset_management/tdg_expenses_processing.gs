@@ -7,14 +7,11 @@ const SOURCE_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1qbZZhf-_7xzmDT
 const SOURCE_SHEET_NAME = 'Telegram Chat Logs';
 const SCORED_EXPENSE_SHEET_URL = 'https://docs.google.com/spreadsheets/d/15co4NYVdlhOFK7y2EfyajXJ0aSj7OfezUndYoY6BNrY/edit?gid=0#gid=0';
 const SCORED_EXPENSE_SHEET_NAME = 'Scored Expense Submissions';
-
 // Sandbox
 // const OFFCHAIN_TRANSACTIONS_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1F90Sq6jSfj8io0RmiUwdydzuWXOZA9siXHWDsj9ItTo/edit?usp=drive_web&ouid=115975718038592349436';
-
 // Production
 const OFFCHAIN_TRANSACTIONS_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU/edit#gid=0';
 const OFFCHAIN_TRANSACTIONS_SHEET_NAME = 'offchain transactions';
-
 const CONTRIBUTORS_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU/edit?gid=1460794618#gid=1460794618';
 const CONTRIBUTORS_SHEET_NAME = 'Contributors contact information';
 const TELEGRAM_CHAT_ID = '-1002190388985'; // Fixed chat ID from reference code
@@ -104,13 +101,13 @@ function ReporterExist(reporterName) {
 
 // Function to extract expense details from message using regex
 function extractExpenseDetails(message) {
-  const pattern = /\[DAO Inventory Expense Event\]\n- DAO Member Name: (.*?)\n- Inventory Type: (.*?)\n- Inventory Quantity: (\d+)\n- Expense Description: (.*)/i;
+  const pattern = /\[DAO Inventory Expense Event\]\n- DAO Member Name: (.*?)\n- Inventory Type: (.*?)\n- Inventory Quantity: (\d+\.?\d*)\n- Expense Description: (.*)/i;
   const match = message.match(pattern);
   if (match) {
     return {
       daoMemberName: match[1],
       inventoryType: match[2],
-      quantity: parseInt(match[3], 10),
+      quantity: parseFloat(match[3]),
       description: match[4]
     };
   }
@@ -157,7 +154,7 @@ function sendExpenseNotification(rowData, scoredRowNumber, transactionRowNumber)
 
   const apiUrl = `https://api.telegram.org/bot${token}/sendMessage`;
   const timestamp = new Date().getTime();
-  const outputSheetLink = `${SCORED_EXPENSE_SHEET_URL}&ts=${timestamp}`;
+  const outputSheetLink = `https://truesight.me/physical-transactions/expenses`;
 
   // Format the message with all inserted data
   const messageText = `New DAO Inventory Expense Recorded\n\n` +
@@ -174,7 +171,7 @@ function sendExpenseNotification(rowData, scoredRowNumber, transactionRowNumber)
     `Amount: ${rowData[DEST_AMOUNT]}\n` +
     `Hash Key: ${rowData[DEST_HASH_KEY_COL]}\n` +
     `Offchain Transaction Row: ${transactionRowNumber || 'Not recorded'}\n\n` +
-    `Review here: https://truesight.me/physical-transactions/expenses`;
+    `Review here: ${outputSheetLink}`;
 
   const payload = {
     chat_id: TELEGRAM_CHAT_ID,
@@ -230,6 +227,8 @@ function parseAndProcessTelegramLogs() {
       
       // Extract expense details early to use for hash key generation
       const expenseDetails = extractExpenseDetails(message);
+      Logger.log(message);
+      Logger.log(expenseDetails);
       if (!expenseDetails) {
         Logger.log(`Skipping row ${i + 1} due to invalid expense details`);
         continue;
