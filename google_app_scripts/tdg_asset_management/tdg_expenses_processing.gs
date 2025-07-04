@@ -1,17 +1,3 @@
-function setApiKeys() {
-  // This function should be defined in Credentials.gs
-  // Placeholder to avoid errors if not defined
-}
-
-function getCredentials() {
-  // This function should be defined in Credentials.gs
-  // Return mock credentials for compatibility
-  return {
-    XAI_API_KEY: PropertiesService.getScriptProperties().getProperty('XAI_API_KEY') || '',
-    TELEGRAM_API_TOKEN: PropertiesService.getScriptProperties().getProperty('TELEGRAM_API_TOKEN') || ''
-  };
-}
-
 // Load API keys and configuration settings
 setApiKeys();
 const creds = getCredentials();
@@ -21,10 +7,17 @@ const SOURCE_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1qbZZhf-_7xzmDT
 const SOURCE_SHEET_NAME = 'Telegram Chat Logs';
 const SCORED_EXPENSE_SHEET_URL = 'https://docs.google.com/spreadsheets/d/15co4NYVdlhOFK7y2EfyajXJ0aSj7OfezUndYoY6BNrY/edit?gid=0#gid=0';
 const SCORED_EXPENSE_SHEET_NAME = 'Scored Expense Submissions';
-const OFFCHAIN_TRANSACTIONS_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1F90Sq6jSfj8io0RmiUwdydzuWXOZA9siXHWDsj9ItTo/edit?usp=drive_web&ouid=115975718038592349436';
+
+// Sandbox
+// const OFFCHAIN_TRANSACTIONS_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1F90Sq6jSfj8io0RmiUwdydzuWXOZA9siXHWDsj9ItTo/edit?usp=drive_web&ouid=115975718038592349436';
+
+// Production
+const OFFCHAIN_TRANSACTIONS_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU/edit#gid=0';
 const OFFCHAIN_TRANSACTIONS_SHEET_NAME = 'offchain transactions';
+
 const CONTRIBUTORS_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU/edit?gid=1460794618#gid=1460794618';
 const CONTRIBUTORS_SHEET_NAME = 'Contributors contact information';
+const TELEGRAM_CHAT_ID = '-1002190388985'; // Fixed chat ID from reference code
 
 // Column indices for source sheet (Telegram Chat Logs)
 const TELEGRAM_UPDATE_ID_COL = 0; // Column A
@@ -138,9 +131,9 @@ function InsertExpenseRecords(scoredRow, rowIndex) {
 
     const rowToAppend = [
       scoredRow[DEST_STATUS_DATE_COL], // Column A: Status date
-      `${scoredRow[DEST_EXPENSE_REPORTED_COL]} reported by ${scoredRow[DEST_CHAT_NAME_COL]} Scoring Hash Key: ${scoredRow[DEST_HASH_KEY_COL]}`, // Column B: Description
+      `${scoredRow[DEST_EXPENSE_REPORTED_COL]} reported by ${scoredRow[DEST_CHAT_NAME_COL]} \n\n\nAutomated processing by Edgar via script: https://github.com/TrueSightDAO/tokenomics/blob/main/google_app_scripts/tdg_asset_management/tdg_expenses_processing.gs\n\nEdgar Scoring Hash Key: ${scoredRow[DEST_HASH_KEY_COL]}`, // Column B: Description
       expenseDetails.daoMemberName, // Column C: Fund Handler (DAO Member Name)
-      expenseDetails.quantity, // Column D: Amount (Inventory Quantity)
+      expenseDetails.quantity * -1, // Column D: Amount (Inventory Quantity)
       expenseDetails.inventoryType // Column E: Inventory Type
     ];
 
@@ -151,6 +144,62 @@ function InsertExpenseRecords(scoredRow, rowIndex) {
   } catch (e) {
     Logger.log(`Error inserting into offchain transactions sheet: ${e.message}`);
     return null;
+  }
+}
+
+// Function to send Telegram notification for expense submission
+function sendExpenseNotification(rowData, scoredRowNumber, transactionRowNumber) {
+  const token = creds.TELEGRAM_API_TOKEN;
+  if (!token) {
+    Logger.log(`sendExpenseNotification: Error: TELEGRAM_API_TOKEN not set in Credentials`);
+    return;
+  }
+
+  const apiUrl = `https://api.telegram.org/bot${token}/sendMessage`;
+  const timestamp = new Date().getTime();
+  const outputSheetLink = `${SCORED_EXPENSE_SHEET_URL}&ts=${timestamp}`;
+
+  // Format the message with all inserted data
+  const messageText = `New DAO Inventory Expense Recorded\n\n` +
+    `Scored Expense Submissions Row: ${scoredRowNumber}\n` +
+    `Telegram Update ID: ${rowData[DEST_UPDATE_ID_COL]}\n` +
+    `Chatroom ID: ${rowData[DEST_CHAT_ID_COL]}\n` +
+    `Chatroom Name: ${rowData[DEST_CHAT_NAME_COL]}\n` +
+    `Message ID: ${rowData[DEST_MESSAGE_ID_COL]}\n` +
+    `Reporter Name: ${rowData[DEST_REPORTER_NAME_COL]}\n` +
+    `Expense Reported:\n${rowData[DEST_EXPENSE_REPORTED_COL]}\n` +
+    `Status Date: ${rowData[DEST_STATUS_DATE_COL]}\n` +
+    `Contributor Name: ${rowData[DEST_CONTRIBUTOR_NAME]}\n` +
+    `Currency: ${rowData[DEST_CURRENCY]}\n` +
+    `Amount: ${rowData[DEST_AMOUNT]}\n` +
+    `Hash Key: ${rowData[DEST_HASH_KEY_COL]}\n` +
+    `Offchain Transaction Row: ${transactionRowNumber || 'Not recorded'}\n\n` +
+    `Review here: https://truesight.me/physical-transactions/expenses`;
+
+  const payload = {
+    chat_id: TELEGRAM_CHAT_ID,
+    text: messageText
+  };
+
+  const options = {
+    method: 'post',
+    contentType: 'application/json',
+    payload: JSON.stringify(payload),
+    muteHttpExceptions: true
+  };
+
+  try {
+    Logger.log(`sendExpenseNotification: Sending notification for hash key ${rowData[DEST_HASH_KEY_COL]} to chat ${TELEGRAM_CHAT_ID}`);
+    const response = UrlFetchApp.fetch(apiUrl, options);
+    const status = response.getResponseCode();
+    const responseText = response.getContentText();
+    if (status === 200) {
+      Logger.log(`sendExpenseNotification: Successfully sent notification for hash key ${rowData[DEST_HASH_KEY_COL]} to chat ${TELEGRAM_CHAT_ID}`);
+    } else {
+      Logger.log(`sendExpenseNotification: Failed to send notification for hash key ${rowData[DEST_HASH_KEY_COL]}. Status: ${status}, Response: ${responseText}`);
+    }
+  } catch (e) {
+    Logger.log(`sendExpenseNotification: Error sending Telegram notification for hash key ${rowData[DEST_HASH_KEY_COL]}: ${e.message}`);
   }
 }
 
@@ -217,22 +266,26 @@ function parseAndProcessTelegramLogs() {
           sourceData[i][SALES_DATE_COL], // Column G: Status Date
           expenseDetails.daoMemberName, // Column H: Contributor Name
           expenseDetails.inventoryType, // Column I: Currency (Inventory Type)
-          expenseDetails.quantity, // Column J: Amount
+          expenseDetails.quantity * -1, // Column J: Amount
           hashKey, // Column K: Scoring Hash Key
           '' // Column L: Transaction Line (to be updated)
         ];
         
         // Append to Scored Expense Submissions
         const lastRow = scoredExpenseSheet.getLastRow();
-        scoredExpenseSheet.getRange(lastRow + 1, 1, 1, rowToAppend.length).setValues([rowToAppend]);
+        const scoredRowNumber = lastRow + 1;
+        scoredExpenseSheet.getRange(scoredRowNumber, 1, 1, rowToAppend.length).setValues([rowToAppend]);
         
         // Insert into offchain transactions and get the transaction row number
         const transactionRowNumber = InsertExpenseRecords(rowToAppend, i);
         
         // Update Column L in Scored Expense Submissions with the transaction row number
         if (transactionRowNumber) {
-          scoredExpenseSheet.getRange(lastRow + 1, DEST_TRANSACTION_LINE_COL + 1).setValue(transactionRowNumber);
+          scoredExpenseSheet.getRange(scoredRowNumber, DEST_TRANSACTION_LINE_COL + 1).setValue(transactionRowNumber);
         }
+        
+        // Send Telegram notification
+        sendExpenseNotification(rowToAppend, scoredRowNumber, transactionRowNumber);
         
         // Update existing hash keys and increment counter
         existingHashKeys.push(hashKey);
