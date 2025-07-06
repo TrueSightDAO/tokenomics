@@ -29,7 +29,7 @@
  *    - Check the Logs (View > Logs) for the result: { contributorName: "Name" } or { error: "No matching signature found" }
  *
  * Note: Ensure the spreadsheet ID, sheet names, Wix API key, and QuickNode API key defined in constants below match your setup.
- * The digital signature must exactly match the value in Column R of "Contributors contact information".
+ * The digital signature must exactly match the value in Column R of "Contributors contact information" or Column E of "Contributors Digital Signatures".
  * The getCredentials() function is assumed to be defined elsewhere, providing WIX_API_KEY and QUICKNODE_API_KEY.
  */
 
@@ -39,6 +39,7 @@ const CONTACT_SHEET_NAME = 'Contributors contact information';
 const VOTING_SHEET_NAME = 'Contributors voting weight';
 const LEDGER_SHEET_NAME = 'Ledger history';
 const ASSET_SHEET_NAME = 'off chain asset balance';
+const DIGITAL_SIGNATURES_SHEET_NAME = 'Contributors Digital Signatures';
 const creds = getCredentials(); // Assumed to be defined elsewhere
 const WIX_ACCESS_TOKEN = creds.WIX_API_KEY; // Wix API key
 const QUICKNODE_API_KEY = creds.QUICKNODE_API_KEY; // QuickNode API key
@@ -224,22 +225,36 @@ function getUSDTBalanceInVault() {
 }
 
 /**
- * Finds contributor name by matching signature in Contributors contact information sheet.
+ * Finds contributor name by matching signature in either "Contributors contact information" or "Contributors Digital Signatures" sheet.
  * @param {string} signature - The digital signature to search for.
  * @param {Spreadsheet} spreadsheet - The Google Spreadsheet object.
  * @returns {Object} - { contributorName: string | null, error: string | null }
  */
 function findContributorBySignature(signature, spreadsheet) {
   try {
+    // First check "Contributors contact information" sheet (Column R)
     const contactSheet = spreadsheet.getSheetByName(CONTACT_SHEET_NAME);
-    const contactData = contactSheet.getDataRange().getValues();
-
-    for (let i = 1; i < contactData.length; i++) { // Skip header row
-      if (contactData[i][17] === signature) { // Column R
-        return { contributorName: contactData[i][0], error: null }; // Column A
+    if (contactSheet) {
+      const contactData = contactSheet.getDataRange().getValues();
+      for (let i = 1; i < contactData.length; i++) { // Skip header row
+        if (contactData[i][17] === signature) { // Column R
+          return { contributorName: contactData[i][0], error: null }; // Column A
+        }
       }
     }
-    return { contributorName: null, error: 'No matching signature found' };
+
+    // If not found, check "Contributors Digital Signatures" sheet (Column E)
+    const digitalSignaturesSheet = spreadsheet.getSheetByName(DIGITAL_SIGNATURES_SHEET_NAME);
+    if (digitalSignaturesSheet) {
+      const signatureData = digitalSignaturesSheet.getDataRange().getValues();
+      for (let i = 1; i < signatureData.length; i++) { // Skip header row
+        if (signatureData[i][4] === signature) { // Column E
+          return { contributorName: signatureData[i][0], error: null }; // Column A
+        }
+      }
+    }
+
+    return { contributorName: null, error: 'No matching signature found in either sheet' };
   } catch (error) {
     return { contributorName: null, error: 'Error searching for signature: ' + error.message };
   }
