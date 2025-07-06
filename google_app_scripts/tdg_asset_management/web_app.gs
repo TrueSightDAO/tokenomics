@@ -227,7 +227,7 @@ function getUSDTBalanceInVault() {
 /**
  * Finds contributor name by matching signature in either "Contributors contact information" or "Contributors Digital Signatures" sheet.
  * For "Contributors Digital Signatures", also checks that status is "ACTIVE" in Column D.
- * Updates Column C with current date (YYYYMMDD) when a match is found in digital signatures sheet.
+ * Updates Column C with current timestamp (YYYYMMDD HH:MM:SS) when a match is found in digital signatures sheet.
  * @param {string} signature - The digital signature to search for.
  * @param {Spreadsheet} spreadsheet - The Google Spreadsheet object.
  * @returns {Object} - { contributorName: string | null, error: string | null }
@@ -253,9 +253,9 @@ function findContributorBySignature(signature, spreadsheet) {
       
       for (let i = 1; i < lastRow; i++) { // Skip header row
         if (signatureData[i][4] === signature) { // Column E
-          // Update Column C with current date in YYYYMMDD format (regardless of status)
-          const today = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyyMMdd");
-          digitalSignaturesSheet.getRange(i+1, 3).setValue(today); // Column C (i+1 because we skipped header)
+          // Update Column C with current timestamp in YYYYMMDD HH:MM:SS format (regardless of status)
+          const timestamp = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyyMMdd HH:mm:ss");
+          digitalSignaturesSheet.getRange(i+1, 3).setValue(timestamp); // Column C (i+1 because we skipped header)
           SpreadsheetApp.flush(); // Force immediate update
           
           // Check if status is ACTIVE in Column D

@@ -1,17 +1,3 @@
-function setApiKeys() {
-  // This function should be defined in Credentials.gs
-  // Placeholder to avoid errors if not defined
-}
-
-function getCredentials() {
-  // This function should be defined in Credentials.gs
-  // Return mock credentials for compatibility
-  return {
-    XAI_API_KEY: PropertiesService.getScriptProperties().getProperty('XAI_API_KEY') || '',
-    TELEGRAM_API_TOKEN: PropertiesService.getScriptProperties().getProperty('TELEGRAM_API_TOKEN') || ''
-  };
-}
-
 // Load API keys and configuration settings
 setApiKeys();
 const creds = getCredentials();
