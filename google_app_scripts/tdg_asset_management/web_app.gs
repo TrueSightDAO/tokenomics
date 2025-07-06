@@ -226,6 +226,8 @@ function getUSDTBalanceInVault() {
 
 /**
  * Finds contributor name by matching signature in either "Contributors contact information" or "Contributors Digital Signatures" sheet.
+ * For "Contributors Digital Signatures", also checks that status is "ACTIVE" in Column D.
+ * Updates Column C with current date (YYYYMMDD) when a match is found in digital signatures sheet.
  * @param {string} signature - The digital signature to search for.
  * @param {Spreadsheet} spreadsheet - The Google Spreadsheet object.
  * @returns {Object} - { contributorName: string | null, error: string | null }
@@ -247,9 +249,24 @@ function findContributorBySignature(signature, spreadsheet) {
     const digitalSignaturesSheet = spreadsheet.getSheetByName(DIGITAL_SIGNATURES_SHEET_NAME);
     if (digitalSignaturesSheet) {
       const signatureData = digitalSignaturesSheet.getDataRange().getValues();
-      for (let i = 1; i < signatureData.length; i++) { // Skip header row
+      const lastRow = signatureData.length;
+      
+      for (let i = 1; i < lastRow; i++) { // Skip header row
         if (signatureData[i][4] === signature) { // Column E
-          return { contributorName: signatureData[i][0], error: null }; // Column A
+          // Update Column C with current date in YYYYMMDD format (regardless of status)
+          const today = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyyMMdd");
+          digitalSignaturesSheet.getRange(i+1, 3).setValue(today); // Column C (i+1 because we skipped header)
+          SpreadsheetApp.flush(); // Force immediate update
+          
+          // Check if status is ACTIVE in Column D
+          if (signatureData[i][3] === "ACTIVE") { // Column D
+            return { contributorName: signatureData[i][0], error: null }; // Column A
+          } else {
+            return { 
+              contributorName: null, 
+              error: 'Signature found but status is not ACTIVE in digital signatures sheet' 
+            };
+          }
         }
       }
     }
