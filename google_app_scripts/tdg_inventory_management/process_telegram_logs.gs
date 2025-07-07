@@ -50,6 +50,23 @@ const VALUE_COL = 2; // Column C
 const STATUS_COL = 3; // Column D
 const INVENTORY_TYPE_COL = 8; // Column I
 
+function doGet(e) {
+  const action = e.parameter?.action;
+  if (action === 'parseTelegramChatLogs') {
+    try {
+      Logger.log("Webhook triggered: processing Telegram logs");
+      parseTelegramChatLogs();
+      return ContentService.createTextOutput("✅ Telegram logs processed");
+    } catch (err) {
+      Logger.log("Error in processTelegramLogs: " + err.message);
+      return ContentService.createTextOutput("❌ Error: " + err.message);
+    }
+  }
+
+  return ContentService.createTextOutput("ℹ️ No valid action specified");
+}
+
+
 // Function to check if contributorName is valid (matches Column H in Contributors sheet)
 function isValidContributor(contributorName) {
   try {

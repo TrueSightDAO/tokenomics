@@ -30,6 +30,23 @@ const CONTRIBUTOR_NAME_COL = 3; // Column D
 const QR_CODE_COL = 4; // Column E
 const SALE_PRICE_COL = 5; // Column F
 
+function doGet(e) {
+  const action = e.parameter?.action;
+  if (action === 'processNonAgl4Transactions') {
+    try {
+      Logger.log("Webhook triggered: processing Telegram logs");
+      processNonAgl4Transactions();
+      return ContentService.createTextOutput("✅ Telegram logs processed");
+    } catch (err) {
+      Logger.log("Error in processTelegramLogs: " + err.message);
+      return ContentService.createTextOutput("❌ Error: " + err.message);
+    }
+  }
+
+  return ContentService.createTextOutput("ℹ️ No valid action specified");
+}
+
+
 // Function to resolve redirect URL
 function resolveRedirect(url) {
   try {

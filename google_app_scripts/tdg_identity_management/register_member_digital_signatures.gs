@@ -45,6 +45,23 @@ const CONFIG = {
   }
 };
 
+function doGet(e) {
+  const action = e.parameter?.action;
+  if (action === 'processDigitalSignatureEvents') {
+    try {
+      Logger.log("Webhook triggered: processing Telegram logs");
+      processDigitalSignatureEvents();
+      return ContentService.createTextOutput("✅ Telegram logs processed");
+    } catch (err) {
+      Logger.log("Error in processTelegramLogs: " + err.message);
+      return ContentService.createTextOutput("❌ Error: " + err.message);
+    }
+  }
+
+  return ContentService.createTextOutput("ℹ️ No valid action specified");
+}
+
+
 /**
  * Main function to process digital signature events
  */
