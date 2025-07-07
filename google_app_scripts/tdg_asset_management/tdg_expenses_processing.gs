@@ -299,3 +299,19 @@ function parseAndProcessTelegramLogs() {
     Logger.log(`Error in parseAndProcessTelegramLogs: ${e.message}`);
   }
 }
+
+function doGet(e) {
+  const action = e.parameter?.action;
+  if (action === 'parseAndProcessTelegramLogs') {
+    try {
+      Logger.log("Webhook triggered: processing Telegram logs");
+      parseAndProcessTelegramLogs();
+      return ContentService.createTextOutput("✅ Telegram logs processed");
+    } catch (err) {
+      Logger.log("Error in processTelegramLogs: " + err.message);
+      return ContentService.createTextOutput("❌ Error: " + err.message);
+    }
+  }
+
+  return ContentService.createTextOutput("ℹ️ No valid action specified");
+}

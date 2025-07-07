@@ -22,6 +22,22 @@ var telegramGoogleSheetId = "1qbZZhf-_7xzmDTriaJVWj6OZshyQsFkdsAV8-pyzASQ";
 
 var telegramLogTab = SpreadsheetApp.openById(telegramGoogleSheetId).getSheetByName("Telegram Chat Logs");
 
+function doGet(e) {
+  const action = e.parameter?.action;
+  if (action === 'processTelegramLogs') {
+    try {
+      Logger.log("Webhook triggered: processing Telegram logs");
+      processTelegramLogs();
+      return ContentService.createTextOutput("✅ Telegram logs processed");
+    } catch (err) {
+      Logger.log("Error in processTelegramLogs: " + err.message);
+      return ContentService.createTextOutput("❌ Error: " + err.message);
+    }
+  }
+
+  return ContentService.createTextOutput("ℹ️ No valid action specified");
+}
+
 function processTelegramLogs() {
   setNextAirDropDate();
 

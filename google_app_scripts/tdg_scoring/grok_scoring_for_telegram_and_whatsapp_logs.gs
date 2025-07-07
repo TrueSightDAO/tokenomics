@@ -150,6 +150,24 @@ function processChatLogEntry({ message, username, statusDate, platform, projectN
   return { records: newRecords, count: newRecords.length };
 }
 
+
+function doGet(e) {
+  const action = e.parameter?.action;
+  if (action === 'processTelegramChatLogs') {
+    try {
+      Logger.log("Webhook triggered: processing Telegram logs");
+      processTelegramChatLogs();
+      return ContentService.createTextOutput("✅ Telegram logs processed");
+    } catch (err) {
+      Logger.log("Error in processTelegramLogs: " + err.message);
+      return ContentService.createTextOutput("❌ Error: " + err.message);
+    }
+  }
+
+  return ContentService.createTextOutput("ℹ️ No valid action specified");
+}
+
+
 // Modified to send notification once per chatId
 function processTelegramChatLogs() {
   if (!XAI_API_KEY) {
