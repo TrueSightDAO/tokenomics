@@ -29,6 +29,23 @@ const MESSAGE_COL = 2; // Column C
 const CONTRIBUTOR_NAME_COL = 3; // Column D
 const SALE_PRICE_COL = 5; // Column F
 
+function doGet(e) {
+  const action = e.parameter?.action;
+  if (action === 'processTokenizedTransactions') {
+    try {
+      Logger.log("Webhook triggered: processing Telegram logs");
+      processTokenizedTransactions();
+      return ContentService.createTextOutput("✅ Telegram logs processed");
+    } catch (err) {
+      Logger.log("Error in processTelegramLogs: " + err.message);
+      return ContentService.createTextOutput("❌ Error: " + err.message);
+    }
+  }
+
+  return ContentService.createTextOutput("ℹ️ No valid action specified");
+}
+
+
 // Function to send Telegram notification for completed transactions
 function sendTransactionCompletionNotification(qrCode, contributorName) {
   const token = creds.TELEGRAM_API_TOKEN;
