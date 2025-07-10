@@ -1,5 +1,5 @@
 /**
- * Google Apps Script to handle HTTP GET request for retrieving voting rights and asset information based on a digital signature.
+ * Google Apps Script to handle HTTP GET and POST requests for retrieving voting rights and asset information based on a digital signature.
  * The total_assets value is calculated as the sum of off-chain assets, USDT vault balance, and AGL investment holdings.
  * Asset values (total_assets, asset_per_circulated_voting_right) are formatted to 5 decimal places.
  *
@@ -11,7 +11,11 @@
  * 2. Make an HTTP GET request with the digital signature as a query parameter:
  *    - URL format: <web_app_url>?signature=<publicKeyBase64>
  *    - Example: https://script.google.com/macros/s/<ID>/exec?signature=MIICIjANBgkqhkiG9w0BAQEFAAOCAg8AMI...
- * 3. The response will be a JSON object:
+ * 3. Make an HTTP POST request with a JSON payload:
+ *    - URL: <web_app_url>
+ *    - Payload: { "signature": "<publicKeyBase64>" }
+ *    - Example: curl -X POST -H "Content-Type: application/json" -d '{"signature":"MIICIjANBgkqhkiG9w0BAQEFAAOCAg8AMI..."}' <web_app_url>
+ * 4. The response will be a JSON object:
  *    - Success: {
  *        "contributor_name": <string>,
  *        "voting_rights": <value>,
@@ -19,11 +23,12 @@
  *        "total_assets": <number, 5 decimal places>,
  *        "asset_per_circulated_voting_right": <number, 5 decimal places>
  *      }
- *    - Error: { "error": "No matching signature found" } or { "error": "Signature parameter missing" }
- * 4. Use a tool like curl, Postman, or JavaScript fetch to test:
- *    - curl: curl "<web_app_url>?signature=<publicKeyBase64>"
- *    - JavaScript: fetch("<web_app_url>?signature=<publicKeyBase64>").then(res => res.json())
- * 5. To troubleshoot signature lookup:
+ *    - Error: { "error": "No matching signature found" } or { "error": "Signature parameter missing" } or { "error": "Invalid JSON payload" }
+ * 5. Use a tool like curl, Postman, or JavaScript fetch to test:
+ *    - GET: curl "<web_app_url>?signature=<publicKeyBase64>"
+ *    - POST: curl -X POST -H "Content-Type: application/json" -d '{"signature":"MIICIjANBgkqhkiG9w0BAQEFAAOCAg8AMI..."}' <web_app_url>
+ *    - JavaScript (POST): fetch("<web_app_url>", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ signature: "<publicKeyBase64>" }) }).then(res => res.json())
+ * 6. To troubleshoot signature lookup:
  *    - Open the script editor and run the testSignatureLookup function with a test signature.
  *    - Example: testSignatureLookup("MIICIjANBgkqhkiG9w0BAQEFAAOCAg8AMI...");
  *    - Check the Logs (View > Logs) for the result: { contributorName: "Name" } or { error: "No matching signature found" }
@@ -281,30 +286,26 @@ function findContributorBySignature(signature, spreadsheet) {
  * Test function for troubleshooting signature lookup.
  * @param {string} testSignature - The signature to test (optional, defaults to a sample).
  */
-function testSignatureLookup(testSignature = 'MIICIjANBgkqhkiG9w0BAQEFAAOCAg8AMI...') {
+function testSignatureLookup() {
+  testSignature = "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAuEFYA91EyDGo+1POPNh6VrLgYGtLdY/7F3SKGFrWCEzTDEwRu443r1J91TcZpJkj1eJrdMC/9mmTuK+3CgZ90KxEYuWWWbG128yNnSQ9isr0F2sTQXXEjEWuawalVb/b/qrCK2PDIz1CfvFN3+O0kGwtEEcEqOWuNUlJl8wLBO4TZC/05Fd1JRDkXD4YRN+wr2DrhjazHqZmxRP8NcQmswW4kBCHzAdraM5c/MGPMwolwUaz3MJzi5wk2mAAeFlaQyGInsi8V4L5teNfmFWGKvlfToCbzpbjNZmLK+HklPjIf/n5WuHSSWS+2d+0bicpqsaxysgPbS8lYJyyQtllMwIDAQAB"
   const spreadsheet = SpreadsheetApp.openById(SPREADSHEET_ID);
   const result = findContributorBySignature(testSignature, spreadsheet);
   Logger.log(JSON.stringify(result));
 }
 
-function doGet(e) {
-  // Check for signature parameter
-  const signature = e.parameter.signature;
-  if (!signature) {
-    return ContentService.createTextOutput(
-      JSON.stringify({ error: 'Signature parameter missing' })
-    ).setMimeType(ContentService.MimeType.JSON);
-  }
-
+/**
+ * Processes the core logic for both GET and POST requests.
+ * @param {string} signature - The digital signature to process.
+ * @returns {Object} - JSON response object.
+ */
+function processRequest(signature) {
   // Open the spreadsheet
   const spreadsheet = SpreadsheetApp.openById(SPREADSHEET_ID);
 
   // Step 1: Search for signature using findContributorBySignature
   const { contributorName, error } = findContributorBySignature(signature, spreadsheet);
   if (error) {
-    return ContentService.createTextOutput(
-      JSON.stringify({ error })
-    ).setMimeType(ContentService.MimeType.JSON);
+    return { error };
   }
 
   // Step 2: Find voting weight in "Contributors voting weight" Column H (index 7) where Column C (index 2) matches contributorName
@@ -320,9 +321,7 @@ function doGet(e) {
   }
 
   if (votingRights === null) {
-    return ContentService.createTextOutput(
-      JSON.stringify({ error: 'No matching contributor found in voting weight sheet' })
-    ).setMimeType(ContentService.MimeType.JSON);
+    return { error: 'No matching contributor found in voting weight sheet' };
   }
 
   // Step 3: Get voting_rights_circulated from "Ledger history" cell E1
@@ -336,13 +335,62 @@ function doGet(e) {
   const assetPerCirculatedVotingRight = votingRightsCirculated !== 0 ? totalAssets / votingRightsCirculated : 0;
 
   // Return result with asset values formatted to 5 decimal places
+  return {
+    contributor_name: contributorName,
+    voting_rights: votingRights,
+    voting_rights_circulated: votingRightsCirculated,
+    total_assets: parseFloat(totalAssets.toFixed(5)),
+    asset_per_circulated_voting_right: parseFloat(assetPerCirculatedVotingRight.toFixed(5))
+  };
+}
+
+/**
+ * Handles HTTP GET requests.
+ * @param {Object} e - The event object containing request parameters.
+ * @returns {ContentService} - JSON response.
+ */
+function doGet(e) {
+  // Check for signature parameter
+  const signature = e.parameter.signature;
+  if (!signature) {
+    return ContentService.createTextOutput(
+      JSON.stringify({ error: 'Signature parameter missing' })
+    ).setMimeType(ContentService.MimeType.JSON);
+  }
+
+  // Process the request
+  const result = processRequest(signature);
   return ContentService.createTextOutput(
-    JSON.stringify({
-      contributor_name: contributorName,
-      voting_rights: votingRights,
-      voting_rights_circulated: votingRightsCirculated,
-      total_assets: parseFloat(totalAssets.toFixed(5)),
-      asset_per_circulated_voting_right: parseFloat(assetPerCirculatedVotingRight.toFixed(5))
-    })
+    JSON.stringify(result)
   ).setMimeType(ContentService.MimeType.JSON);
+}
+
+/**
+ * Handles HTTP POST requests.
+ * Expects a JSON payload with a "signature" field.
+ * @param {Object} e - The event object containing request data.
+ * @returns {ContentService} - JSON response.
+ */
+function doPost(e) {
+  try {
+    // Parse the POST data
+    const postData = JSON.parse(e.postData.contents);
+    const signature = postData.signature;
+
+    if (!signature) {
+      return ContentService.createTextOutput(
+        JSON.stringify({ error: 'Signature field missing in JSON payload' })
+      ).setMimeType(ContentService.MimeType.JSON);
+    }
+
+    // Process the request
+    const result = processRequest(signature);
+    return ContentService.createTextOutput(
+      JSON.stringify(result)
+    ).setMimeType(ContentService.MimeType.JSON);
+  } catch (error) {
+    return ContentService.createTextOutput(
+      JSON.stringify({ error: 'Invalid JSON payload or processing error: ' + error.message })
+    ).setMimeType(ContentService.MimeType.JSON);
+  }
 }
