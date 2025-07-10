@@ -1,3 +1,8 @@
+// Load API keys and configuration settings from Credentials.gs
+setApiKeys();
+const creds = getCredentials();
+
+
 /**
  * Resolves redirect URLs to get the final URL.
  * @param {string} url - The URL to resolve.
@@ -251,6 +256,210 @@ function processTelegramChatLogsToInventoryMovement() {
 }
 
 /**
+ * Sends a Telegram notification to the specified chat ID with transaction details.
+ * @param {string} contributionMade - The Contribution Made field from Inventory Movement Column F.
+ * @param {string} ledgerName - The ledger name (e.g., AGL6 or offchain).
+ * @param {string} ledgerUrl - The ledger URL from Inventory Movement Column M.
+ */
+function sendInventoryTransactionNotification(contributionMade, ledgerName, ledgerUrl) {
+  const token = creds.TELEGRAM_API_TOKEN;
+  const chatId = '-1002190388985'; // Fixed chat ID as specified
+  if (!token) {
+    Logger.log(`sendInventoryTransactionNotification: Error: TELEGRAM_API_TOKEN not set in Credentials`);
+    return;
+  }
+
+  const apiUrl = `https://api.telegram.org/bot${token}/sendMessage`;
+
+
+  // Format the notification message with details from contributionMade
+  const messageText = `✅ Transaction successfully updated on ${ledgerName} ledger.\n\nDetails:\n${contributionMade}\n\nReview here: ${ledgerUrl}`;
+
+  const payload = {
+    chat_id: chatId,
+    text: messageText
+  };
+
+  const options = {
+    method: 'post',
+    contentType: 'application/json',
+    payload: JSON.stringify(payload),
+    muteHttpExceptions: true
+  };
+
+  try {
+    Logger.log(`sendInventoryTransactionNotification: Sending notification for transaction on ${ledgerName} to chat ${chatId}`);
+    const response = UrlFetchApp.fetch(apiUrl, options);
+    const status = response.getResponseCode();
+    const responseText = response.getContentText();
+    if (status === 200) {
+      Logger.log(`sendInventoryTransactionNotification: Successfully sent notification for transaction on ${ledgerName} to chat ${chatId}`);
+    } else {
+      Logger.log(`sendInventoryTransactionNotification: Failed to send notification for ${ledgerName}. Status: ${status}, Response: ${responseText}`);
+    }
+  } catch (e) {
+    Logger.log(`sendInventoryTransactionNotification: Error sending Telegram notification for ${ledgerName}: ${e.message}`);
+  }
+}
+
+/**
+ * Parses the "Inventory Movement" sheet for records with status "NEW" in Column N and inserts double-entry
+ * records into the respective ledgers (AGL or offchain). Updates Column O with the row numbers of the
+ * inserted records, sets Column N to "PROCESSED", and sends a Telegram notification with transaction details.
+ * For AGL ledgers, inserts into the "Balance" sheet of the spreadsheet from Column M (ledger_url).
+ * For offchain ledgers, inserts into the "offchain asset location" sheet of the offchain SPREADSHEET_ID.
+ * Double-entry mappings:
+ * Part 1 (Sender/Debit):
+ * - Column A: Status Date (Inventory Movement Column G)
+ * - Column B: Contribution Made (Inventory Movement Column F)
+ * - Column C: Sender Name (Inventory Movement Column H)
+ * - Column D: Amount * -1 (Inventory Movement Column K)
+ * - Column E: Currency (Inventory Movement Column J)
+ * - Column F: "Assets" (for AGL ledgers only)
+ * Part 2 (Recipient/Credit):
+ * - Column A: Status Date (Inventory Movement Column G)
+ * - Column B: Contribution Made (Inventory Movement Column F)
+ * - Column C: Recipient Name (Inventory Movement Column I)
+ * - Column D: Amount (Inventory Movement Column K)
+ * - Column E: Currency (Inventory Movement Column J)
+ * - Column F: "Assets" (for AGL ledgers only)
+ */
+function processInventoryMovementToLedgers() {
+  const INVENTORY_SPREADSHEET_ID = '1qbZZhf-_7xzmDTriaJVWj6OZshyQsFkdsAV8-pyzASQ';
+  const OFFCHAIN_SPREADSHEET_ID = '1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU';
+  const INVENTORY_SHEET_NAME = 'Inventory Movement';
+  const OFFCHAIN_SHEET_NAME = 'offchain transactions';
+  const AGL_SHEET_NAME = 'Balance';
+
+  try {
+    // Open the Inventory Movement spreadsheet
+    const inventorySpreadsheet = SpreadsheetApp.openById(INVENTORY_SPREADSHEET_ID);
+    const inventorySheet = inventorySpreadsheet.getSheetByName(INVENTORY_SHEET_NAME);
+
+    if (!inventorySheet) {
+      Logger.log(`Error: Inventory Movement sheet not found`);
+      return;
+    }
+
+    // Get all data from Inventory Movement (Columns A to N)
+    const inventoryLastRow = inventorySheet.getLastRow();
+    if (inventoryLastRow < 1) {
+      Logger.log('No data in Inventory Movement');
+      return;
+    }
+    const inventoryData = inventorySheet.getRange(1, 1, inventoryLastRow, 14).getValues(); // Columns A to N
+
+    // Process each row in Inventory Movement
+    const updates = []; // Store updates for Column N (status) and Column O (row numbers)
+    inventoryData.forEach((row, index) => {
+      const rowNumber = index + 1;
+      const status = row[13]; // Column N: Status
+      if (status !== 'NEW') {
+        return; // Skip if status is not NEW
+      }
+
+      const ledgerName = row[11]; // Column L: ledger_name
+      const ledgerUrl = row[12]; // Column M: ledger_url
+      const statusDate = row[6]; // Column G: Status Date
+      const contributionMade = row[5]; // Column F: Contribution Made
+      const senderName = row[7]; // Column H: sender_name
+      const recipientName = row[8]; // Column I: recipient_name
+      const currency = row[9]; // Column J: currency (without [AGL#])
+      const amount = row[10]; // Column K: amount
+
+      // Validate required fields
+      if (!statusDate || !contributionMade || !senderName || !recipientName || !currency || !amount) {
+        Logger.log(`Skipping row ${rowNumber}: Missing required fields`);
+        return;
+      }
+
+      let targetSpreadsheetId, targetSheetName;
+      if (ledgerName === 'offchain') {
+        targetSpreadsheetId = OFFCHAIN_SPREADSHEET_ID;
+        targetSheetName = OFFCHAIN_SHEET_NAME;
+      } else {
+        // For AGL ledgers, extract spreadsheet ID from ledger_url
+        targetSpreadsheetId = ledgerUrl.match(/\/d\/([^\/]+)/)?.[1] || '';
+        targetSheetName = AGL_SHEET_NAME;
+      }
+
+      if (!targetSpreadsheetId) {
+        Logger.log(`Skipping row ${rowNumber}: Invalid ledger URL for ${ledgerName}`);
+        return;
+      }
+
+      // Open the target ledger spreadsheet
+      let targetSheet;
+      try {
+        const targetSpreadsheet = SpreadsheetApp.openById(targetSpreadsheetId);
+        targetSheet = targetSpreadsheet.getSheetByName(targetSheetName);
+        if (!targetSheet) {
+          Logger.log(`Error: Sheet ${targetSheetName} not found in spreadsheet ${targetSpreadsheetId} for row ${rowNumber}`);
+          return;
+        }
+      } catch (e) {
+        Logger.log(`Error accessing spreadsheet ${targetSpreadsheetId} for row ${rowNumber}: ${e.message}`);
+        return;
+      }
+
+      // Get the last row of the target sheet
+      const targetLastRow = targetSheet.getLastRow();
+
+      // Prepare double-entry records
+      const doubleEntryRows = [
+        // Part 1: Sender (Debit)
+        [
+          statusDate, // Column A: Status Date
+          contributionMade, // Column B: Contribution Made
+          senderName, // Column C: Sender Name
+          -amount, // Column D: Amount * -1
+          currency, // Column E: Currency
+          ledgerName === 'offchain' ? '' : 'Assets' // Column F: "Assets" for AGL, empty for offchain
+        ],
+        // Part 2: Recipient (Credit)
+        [
+          statusDate, // Column A: Status Date
+          contributionMade, // Column B: Contribution Made
+          recipientName, // Column C: Recipient Name
+          amount, // Column D: Amount
+          currency, // Column E: Currency
+          ledgerName === 'offchain' ? '' : 'Assets' // Column F: "Assets" for AGL, empty for offchain
+        ]
+      ];
+
+      // Insert double-entry records
+      try {
+        targetSheet.getRange(targetLastRow + 1, 1, 2, 6).setValues(doubleEntryRows);
+        // Record the row numbers (1-based) of the inserted records
+        const insertedRowNumbers = `${targetLastRow + 1},${targetLastRow + 2}`;
+        updates.push({ rowNumber, insertedRowNumbers });
+        Logger.log(`Inserted double-entry records for row ${rowNumber} in ${targetSheetName} (rows ${insertedRowNumbers})`);
+
+        // Send Telegram notification
+        sendInventoryTransactionNotification(contributionMade, ledgerName, ledgerUrl);
+      } catch (e) {
+        Logger.log(`Error inserting double-entry records for row ${rowNumber} in ${targetSheetName}: ${e.message}`);
+        return;
+      }
+    });
+
+    // Update Inventory Movement with row numbers and status
+    updates.forEach(update => {
+      inventorySheet.getRange(update.rowNumber, 15).setValue(update.insertedRowNumbers); // Column O
+      inventorySheet.getRange(update.rowNumber, 14).setValue('PROCESSED'); // Column N
+    });
+
+    if (updates.length > 0) {
+      Logger.log(`Processed ${updates.length} records in Inventory Movement`);
+    } else {
+      Logger.log('No new records with status NEW found in Inventory Movement');
+    }
+  } catch (error) {
+    Logger.log(`Error in processInventoryMovementToLedgers: ${error.message}`);
+  }
+}
+
+/**
  * Test function to verify the processInventoryReport function.
  * @param {string} testReport - Optional test report string to process.
  */
@@ -271,4 +480,9 @@ function testProcessInventoryReport() {
     "quantity: 100";
   const resultOffchain = processInventoryReport(testReportOffchain);
   Logger.log(JSON.stringify(resultOffchain, null, 2));
+}
+
+function processTelegramChatLogs() {
+  processTelegramChatLogsToInventoryMovement()
+  processInventoryMovementToLedgers()
 }
