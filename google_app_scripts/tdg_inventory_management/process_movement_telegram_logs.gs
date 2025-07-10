@@ -2,6 +2,17 @@
 setApiKeys();
 const creds = getCredentials();
 
+// Configuration Variables
+const TELEGRAM_CHAT_ID = '-1002190388985'; // Fixed chat ID for Telegram notifications
+const INVENTORY_SPREADSHEET_ID = '1qbZZhf-_7xzmDTriaJVWj6OZshyQsFkdsAV8-pyzASQ';
+const OFFCHAIN_SPREADSHEET_ID = '1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU';
+const TELEGRAM_SHEET_NAME = 'Telegram Chat Logs';
+const INVENTORY_SHEET_NAME = 'Inventory Movement';
+const OFFCHAIN_SHEET_NAME = 'offchain transactions';
+const AGL_SHEET_NAME = 'Balance';
+const OFFCHAIN_ASSET_SHEET_NAME = 'offchain asset location';
+const DEFAULT_AGL_SHEET_NAME = 'Balance'; // Default sheet name for AGL ledgers
+const MAX_REDIRECTS = 10; // Maximum number of redirects to follow in resolveRedirect
 
 /**
  * Resolves redirect URLs to get the final URL.
@@ -13,9 +24,8 @@ function resolveRedirect(url) {
   try {
     let currentUrl = url;
     let redirectCount = 0;
-    const maxRedirects = 10;
 
-    while (redirectCount < maxRedirects) {
+    while (redirectCount < MAX_REDIRECTS) {
       const response = UrlFetchApp.fetch(currentUrl, {
         followRedirects: false,
         muteHttpExceptions: true
@@ -43,7 +53,7 @@ function resolveRedirect(url) {
       console.log("resolve count " + redirectCount);
     }
 
-    Logger.log(`Exceeded maximum redirects (${maxRedirects}) for URL ${url}`);
+    Logger.log(`Exceeded maximum redirects (${MAX_REDIRECTS}) for URL ${url}`);
     return '';
   } catch (e) {
     Logger.log(`Error resolving redirect for URL ${url}: ${e.message}`);
@@ -61,11 +71,6 @@ function resolveRedirect(url) {
  * @return {Object} JSON object containing extracted fields, source details, or an error message.
  */
 function processInventoryReport(reportText) {
-  // Constants for offchain assets
-  const SPREADSHEET_ID = '1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU';
-  const SHEET_NAME = 'offchain asset location';
-  const DEFAULT_AGL_SHEET_NAME = 'Balance'; // Default sheet name for AGL ledgers
-
   try {
     // Validate input
     if (!reportText || typeof reportText !== 'string') {
@@ -125,10 +130,10 @@ function processInventoryReport(reportText) {
     } else {
       // Assume currency is from offchain asset location
       currencySource = {
-        spreadsheet_id: SPREADSHEET_ID,
-        sheet_name: SHEET_NAME,
+        spreadsheet_id: OFFCHAIN_SPREADSHEET_ID,
+        sheet_name: OFFCHAIN_ASSET_SHEET_NAME,
         ledger_name: 'offchain',
-        ledger_url: `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/edit`
+        ledger_url: `https://docs.google.com/spreadsheets/d/${OFFCHAIN_SPREADSHEET_ID}/edit`
       };
     }
 
@@ -167,13 +172,9 @@ function processInventoryReport(reportText) {
  * - Inventory Movement Column N: "NEW"
  */
 function processTelegramChatLogsToInventoryMovement() {
-  const SPREADSHEET_ID = '1qbZZhf-_7xzmDTriaJVWj6OZshyQsFkdsAV8-pyzASQ';
-  const TELEGRAM_SHEET_NAME = 'Telegram Chat Logs';
-  const INVENTORY_SHEET_NAME = 'Inventory Movement';
-
   try {
     // Open the spreadsheet
-    const spreadsheet = SpreadsheetApp.openById(SPREADSHEET_ID);
+    const spreadsheet = SpreadsheetApp.openById(INVENTORY_SPREADSHEET_ID);
     const telegramSheet = spreadsheet.getSheetByName(TELEGRAM_SHEET_NAME);
     const inventorySheet = spreadsheet.getSheetByName(INVENTORY_SHEET_NAME);
 
@@ -263,7 +264,6 @@ function processTelegramChatLogsToInventoryMovement() {
  */
 function sendInventoryTransactionNotification(contributionMade, ledgerName, ledgerUrl) {
   const token = creds.TELEGRAM_API_TOKEN;
-  const chatId = '-1002190388985'; // Fixed chat ID as specified
   if (!token) {
     Logger.log(`sendInventoryTransactionNotification: Error: TELEGRAM_API_TOKEN not set in Credentials`);
     return;
@@ -271,12 +271,11 @@ function sendInventoryTransactionNotification(contributionMade, ledgerName, ledg
 
   const apiUrl = `https://api.telegram.org/bot${token}/sendMessage`;
 
-
   // Format the notification message with details from contributionMade
   const messageText = `✅ Transaction successfully updated on ${ledgerName} ledger.\n\nDetails:\n${contributionMade}\n\nReview here: ${ledgerUrl}`;
 
   const payload = {
-    chat_id: chatId,
+    chat_id: TELEGRAM_CHAT_ID,
     text: messageText
   };
 
@@ -288,12 +287,12 @@ function sendInventoryTransactionNotification(contributionMade, ledgerName, ledg
   };
 
   try {
-    Logger.log(`sendInventoryTransactionNotification: Sending notification for transaction on ${ledgerName} to chat ${chatId}`);
+    Logger.log(`sendInventoryTransactionNotification: Sending notification for transaction on ${ledgerName} to chat ${TELEGRAM_CHAT_ID}`);
     const response = UrlFetchApp.fetch(apiUrl, options);
     const status = response.getResponseCode();
     const responseText = response.getContentText();
     if (status === 200) {
-      Logger.log(`sendInventoryTransactionNotification: Successfully sent notification for transaction on ${ledgerName} to chat ${chatId}`);
+      Logger.log(`sendInventoryTransactionNotification: Successfully sent notification for transaction on ${ledgerName} to chat ${TELEGRAM_CHAT_ID}`);
     } else {
       Logger.log(`sendInventoryTransactionNotification: Failed to send notification for ${ledgerName}. Status: ${status}, Response: ${responseText}`);
     }
@@ -307,7 +306,7 @@ function sendInventoryTransactionNotification(contributionMade, ledgerName, ledg
  * records into the respective ledgers (AGL or offchain). Updates Column O with the row numbers of the
  * inserted records, sets Column N to "PROCESSED", and sends a Telegram notification with transaction details.
  * For AGL ledgers, inserts into the "Balance" sheet of the spreadsheet from Column M (ledger_url).
- * For offchain ledgers, inserts into the "offchain asset location" sheet of the offchain SPREADSHEET_ID.
+ * For offchain ledgers, inserts into the "offchain transactions" sheet of the offchain SPREADSHEET_ID.
  * Double-entry mappings:
  * Part 1 (Sender/Debit):
  * - Column A: Status Date (Inventory Movement Column G)
@@ -325,12 +324,6 @@ function sendInventoryTransactionNotification(contributionMade, ledgerName, ledg
  * - Column F: "Assets" (for AGL ledgers only)
  */
 function processInventoryMovementToLedgers() {
-  const INVENTORY_SPREADSHEET_ID = '1qbZZhf-_7xzmDTriaJVWj6OZshyQsFkdsAV8-pyzASQ';
-  const OFFCHAIN_SPREADSHEET_ID = '1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU';
-  const INVENTORY_SHEET_NAME = 'Inventory Movement';
-  const OFFCHAIN_SHEET_NAME = 'offchain transactions';
-  const AGL_SHEET_NAME = 'Balance';
-
   try {
     // Open the Inventory Movement spreadsheet
     const inventorySpreadsheet = SpreadsheetApp.openById(INVENTORY_SPREADSHEET_ID);
@@ -482,7 +475,10 @@ function testProcessInventoryReport() {
   Logger.log(JSON.stringify(resultOffchain, null, 2));
 }
 
+/**
+ * Runs both processTelegramChatLogsToInventoryMovement and processInventoryMovementToLedgers sequentially.
+ */
 function processTelegramChatLogs() {
-  processTelegramChatLogsToInventoryMovement()
-  processInventoryMovementToLedgers()
+  processTelegramChatLogsToInventoryMovement();
+  processInventoryMovementToLedgers();
 }
