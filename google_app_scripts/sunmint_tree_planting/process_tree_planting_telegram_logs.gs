@@ -22,7 +22,7 @@ function processTelegramLogs() {
   // Create SunMint Tree Planting tab if it doesn't exist
   if (!sunMintTab) {
     sunMintTab = sheet.insertSheet(sunMintTabName);
-    sunMintTab.getRange("A1:L1").setValues([[
+    sunMintTab.getRange("A1:M1").setValues([[
       "Telegram Update ID", 
       "Chatroom ID", 
       "Chatroom Name", 
@@ -34,7 +34,8 @@ function processTelegramLogs() {
       "GitHub Raw URL", 
       "Contributor Name", 
       "Latitude", 
-      "Longitude"
+      "Longitude",
+      "Status"
     ]]);
   }
 
@@ -60,58 +61,86 @@ function processTelegramLogs() {
 
     // Only process [TREE PLANTING EVENT] records
     if (contributionMade && contributionMade.startsWith("[TREE PLANTING EVENT]")) {
-      var fileIds = fileIdsString ? fileIdsString.split(',').map(function(id) { return id.trim(); }) : [];
-      fileIds.forEach(function(fileId) {
-        if (fileId && !processedFileIds.includes(fileId)) {
-          try {
-            // Get file URL from Telegram
-            var fileUrl = getTelegramFileUrl(creds.TELEGRAM_API_TOKEN, fileId);
-            // Download image
-            var imageBlob = UrlFetchApp.fetch(fileUrl).getBlob();
-            // Check if file exists on GitHub; upload if it doesn't
-            var rawUrl = uploadToGitHub(creds.GITHUB_API_TOKEN, imageBlob, fileId);
+      Logger.log(contributionMade);
 
-            // Extract latitude and longitude from contribution_made
-            var lines = contributionMade.split('\n');
-            var latitude = lines.find(line => line.startsWith('- Latitude: '))?.replace('- Latitude: ', '') || 'N/A';
-            var longitude = lines.find(line => line.startsWith('- Longitude: '))?.replace('- Longitude: ', '') || 'N/A';
+      // Extract latitude and longitude from contribution_made
+      var lines = contributionMade.split('\n');
+      var latitude = lines.find(line => line.startsWith('- Latitude: '))?.replace('- Latitude: ', '') || 'N/A';
+      var longitude = lines.find(line => line.startsWith('- Longitude: '))?.replace('- Longitude: ', '') || 'N/A';
 
-            // Extract public signature from contribution_made
-            var publicSignatureMatch = contributionMade.match(/My Digital Signature: ([^\n]+)/);
-            var publicSignature = publicSignatureMatch ? publicSignatureMatch[1].trim() : 'N/A';
+      // Extract public signature from contribution_made
+      var publicSignatureMatch = contributionMade.match(/My Digital Signature: ([^\n]+)/);
+      var publicSignature = publicSignatureMatch ? publicSignatureMatch[1].trim() : 'N/A';
 
-            // Match public signature to contributor name
-            var contributorName = 'Unknown';
-            contributorsData.forEach(function(contributorRow) {
-              if (contributorRow[4] === publicSignature) { // Column E in Contributors Digital Signatures
-                contributorName = contributorRow[0]; // Column A
-              }
-            });
-
-            // Append to SunMint Tree Planting tab
-            sunMintTab.appendRow([
-              row[0], // Column A: telegram_update_id
-              row[1], // Column B: telegram_chatroom_id
-              row[2], // Column C: telegram_chatroom_name
-              row[3], // Column D: telegram_message_id
-              row[4], // Column E: contributor_name (handle)
-              contributionMade, // Column F: contribution_made
-              row[11], // Column G: status_date
-              fileId, // Column H: file_id
-              rawUrl, // Column I: GitHub raw URL
-              contributorName, // Column J: contributor name from Contributors Digital Signatures
-              latitude, // Column K: extracted latitude
-              longitude, // Column L: extracted longitude
-              "NEW"
-            ]);
-            Logger.log(`Processed file_id: ${fileId}, GitHub URL: ${rawUrl}, Latitude: ${latitude}, Longitude: ${longitude}`);
-          } catch (err) {
-            Logger.log(`Error processing file_id ${fileId}: ${err.message}`);
-          }
-        } else if (fileId) {
-          Logger.log(`file_id already processed: ${fileId}`);
+      // Match public signature to contributor name
+      var contributorName = 'Unknown';
+      contributorsData.forEach(function(contributorRow) {
+        if (contributorRow[4] === publicSignature) { // Column E in Contributors Digital Signatures
+          contributorName = contributorRow[0]; // Column A
         }
       });
+
+      // Handle records with file attachments
+      var fileIds = fileIdsString ? fileIdsString.split(',').map(function(id) { return id.trim(); }) : [];
+      if (fileIds.length > 0) {
+        fileIds.forEach(function(fileId) {
+          if (fileId && !processedFileIds.includes(fileId)) {
+            try {
+              // Get file URL from Telegram
+              var fileUrl = getTelegramFileUrl(creds.TELEGRAM_API_TOKEN, fileId);
+              // Download image
+              var imageBlob = UrlFetchApp.fetch(fileUrl).getBlob();
+              // Check if file exists on GitHub; upload if it doesn't
+              var rawUrl = uploadToGitHub(creds.GITHUB_API_TOKEN, imageBlob, fileId);
+
+              // Append to SunMint Tree Planting tab
+              sunMintTab.appendRow([
+                row[0], // Column A: telegram_update_id
+                row[1], // Column B: telegram_chatroom_id
+                row[2], // Column C: telegram_chatroom_name
+                row[3], // Column D: telegram_message_id
+                row[4], // Column E: contributor_name (handle)
+                contributionMade, // Column F: contribution_made
+                row[11], // Column G: status_date
+                fileId, // Column H: file_id
+                rawUrl, // Column I: GitHub raw URL
+                contributorName, // Column J: contributor name from Contributors Digital Signatures
+                latitude, // Column K: extracted latitude
+                longitude, // Column L: extracted longitude
+                "NEW" // Column M: Status
+              ]);
+              Logger.log(`Processed file_id: ${fileId}, GitHub URL: ${rawUrl}, Latitude: ${latitude}, Longitude: ${longitude}`);
+            } catch (err) {
+              Logger.log(`Error processing file_id ${fileId}: ${err.message}`);
+            }
+          } else if (fileId) {
+            Logger.log(`file_id already processed: ${fileId}`);
+          }
+        });
+      } else {
+        // Handle records without file attachments
+        try {
+          // Append to SunMint Tree Planting tab with N/A for File ID and GitHub URL
+          sunMintTab.appendRow([
+            row[0], // Column A: telegram_update_id
+            row[1], // Column B: telegram_chatroom_id
+            row[2], // Column C: telegram_chatroom_name
+            row[3], // Column D: telegram_message_id
+            row[4], // Column E: contributor_name (handle)
+            contributionMade, // Column F: contribution_made
+            row[11], // Column G: status_date
+            "N/A", // Column H: file_id
+            "N/A", // Column I: GitHub raw URL
+            contributorName, // Column J: contributor name from Contributors Digital Signatures
+            latitude, // Column K: extracted latitude
+            longitude, // Column L: extracted longitude
+            "NEW" // Column M: Status
+          ]);
+          Logger.log(`Processed record without file attachment: Latitude: ${latitude}, Longitude: ${longitude}`);
+        } catch (err) {
+          Logger.log(`Error processing record without file attachment: ${err.message}`);
+        }
+      }
     }
   });
 }
@@ -121,7 +150,7 @@ function getProcessedFileIds(sunMintTab) {
   var lastRow = sunMintTab.getLastRow();
   if (lastRow < 2) return [];
   var fileIds = sunMintTab.getRange(2, 8, lastRow - 1, 1).getValues().flat(); // Column H
-  return fileIds.filter(function(id) { return id !== ""; });
+  return fileIds.filter(function(id) { return id !== "" && id !== "N/A"; });
 }
 
 // Get Telegram file URL using file_id
