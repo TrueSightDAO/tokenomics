@@ -12,7 +12,7 @@ const contributorsSheetId = "1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU";
 const contributorsTabName = "Contributors Digital Signatures";
 
 // Function to process file_ids from Telegram Chat Logs and upload to SunMint Tree Planting tab
-function processFileIdsToGitHub() {
+function processTelegramLogs() {
   var sheet = SpreadsheetApp.openById(creds.SHEET_ID);
   var telegramLogTab = sheet.getSheetByName(telegramLogTabName);
   var sunMintTab = sheet.getSheetByName(sunMintTabName);
@@ -68,7 +68,7 @@ function processFileIdsToGitHub() {
             var fileUrl = getTelegramFileUrl(creds.TELEGRAM_API_TOKEN, fileId);
             // Download image
             var imageBlob = UrlFetchApp.fetch(fileUrl).getBlob();
-            // Upload to GitHub and get raw URL
+            // Check if file exists on GitHub; upload if it doesn't
             var rawUrl = uploadToGitHub(creds.GITHUB_API_TOKEN, imageBlob, fileId);
 
             // Extract latitude and longitude from contribution_made
@@ -134,8 +134,44 @@ function getTelegramFileUrl(token, fileId) {
   return `https://api.telegram.org/file/bot${token}/${filePath}`;
 }
 
+// Check if file exists on GitHub
+function checkGitHubFileExists(token, fileId) {
+  var repo = "TrueSightDAO/sunmint";
+  var path = `images/${fileId}.jpg`;
+  var apiUrl = `https://api.github.com/repos/${repo}/contents/${path}`;
+  
+  var options = {
+    method: "GET",
+    headers: {
+      "Authorization": `token ${token}`,
+      "Accept": "application/vnd.github.v3+json"
+    },
+    muteHttpExceptions: true // Prevent throwing errors for 404
+  };
+
+  var response = UrlFetchApp.fetch(apiUrl, options);
+  var status = response.getResponseCode();
+
+  if (status === 200) {
+    var responseData = JSON.parse(response.getContentText());
+    Logger.log(`File exists on GitHub: ${path}`);
+    return `https://raw.githubusercontent.com/${repo}/main/${path}`;
+  } else if (status === 404) {
+    Logger.log(`File does not exist on GitHub: ${path}`);
+    return null;
+  } else {
+    throw new Error(`Failed to check GitHub file: ${response.getContentText()}`);
+  }
+}
+
 // Upload image to GitHub and return raw URL
 function uploadToGitHub(token, imageBlob, fileId) {
+  // Check if file already exists
+  var existingUrl = checkGitHubFileExists(token, fileId);
+  if (existingUrl) {
+    return existingUrl;
+  }
+
   var repo = "TrueSightDAO/sunmint";
   var path = `images/${fileId}.jpg`; // Use file_id as filename to ensure uniqueness
   var apiUrl = `https://api.github.com/repos/${repo}/contents/${path}`;
