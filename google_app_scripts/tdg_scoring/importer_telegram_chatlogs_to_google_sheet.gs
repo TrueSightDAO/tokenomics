@@ -67,6 +67,20 @@ function processTelegramLogs() {
           )
         );
 
+        // Extract file_ids from the photo field, if present
+        var file_ids = [];
+        if (entry.message.photo) {
+          // Use the largest photo size (last in the array)
+          file_ids.push(entry.message.photo[entry.message.photo.length - 1].file_id);
+        }
+        // Handle multiple photos in a media group (if applicable)
+        if (entry.message.media_group_id) {
+          // Note: This assumes media_group_id messages are processed together.
+          // For simplicity, we process each message individually here.
+          // If media_group_id handling is needed, additional logic can group by media_group_id.
+        }
+        var file_ids_string = file_ids.join(',');
+
         var all_contributors = checkAdditionalContributors(contributor_text);
         all_contributors.push(contributor_handle);
 
@@ -79,7 +93,8 @@ function processTelegramLogs() {
             current_contributor_handle,
             "",
             contributor_text,
-            formatDate(entry.message.date) 
+            formatDate(entry.message.date),
+            file_ids_string // Pass file_ids to addTabulationEntry
           );
 
           if (!chat_ids.includes(entry.message.chat.id) && tdg_issued > 0) {
@@ -122,7 +137,8 @@ function addTabulationEntry(
   contributor_name,
   project_name,
   contribution_made,
-  status_date
+  status_date,
+  file_ids // New parameter for file_ids
 ) {
   var open_ai_scoring = checkTdgIssued(contribution_made);
   var openai_result = open_ai_scoring.split(';');
@@ -143,13 +159,16 @@ function addTabulationEntry(
     telegram_chatroom_name,
     telegram_message_id, 
     contributor_name, 
-    "", // Project Name
+    "", // Project Name (Column F)
     contribution_made,
     classification,
     tdg_issue,
     the_status, // Column I: Status
     "", // Column K
-    status_date
+    status_date,
+    "", // Column M (empty)
+    "", // Column N (empty)
+    file_ids // Column O: File IDs
   ]; 
   telegramLogTab.appendRow(data);
   return tdg_issue;
