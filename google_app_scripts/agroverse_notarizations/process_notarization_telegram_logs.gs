@@ -10,8 +10,65 @@ const telegramLogTabName = "Telegram Chat Logs";
 const notarizationTabName = "Document Notarizations";
 const contributorsSheetId = "1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU";
 const contributorsTabName = "Contributors Digital Signatures";
+const TELEGRAM_CHAT_ID = '-1002190388985'; // Your Telegram chat ID for notifications
 
-// Function to process file_ids from Telegram Chat Logs and upload to Document Notarizations tab
+
+// Function to send Telegram notification for notarization submission
+function sendNotarizationNotification(rowData, notarizationRowNumber) {
+  const token = creds.TELEGRAM_API_TOKEN;
+  if (!token) {
+    Logger.log(`sendNotarizationNotification: Error: TELEGRAM_API_TOKEN not set in Credentials`);
+    return;
+  }
+
+  const apiUrl = `https://api.telegram.org/bot${token}/sendMessage`;
+  const timestamp = new Date().getTime();
+  const outputSheetLink = `https://truesight.me/physical-transactions/notarizations`;
+
+  // Format the message with all inserted data
+  const messageText = `📄 New Document Notarization Recorded\n\n` +
+    `Notarization Row: ${notarizationRowNumber}\n` +
+    `Telegram Update ID: ${rowData[0]}\n` +
+    `Chatroom ID: ${rowData[1]}\n` +
+    `Chatroom Name: ${rowData[2]}\n` +
+    `Message ID: ${rowData[3]}\n` +
+    `Contributor Handle: ${rowData[4]}\n` +
+    `Contributor Name: ${rowData[9]}\n` +
+    `Document Type: ${rowData[12]}\n` +
+    `Description: ${rowData[13]}\n` +
+    `GitHub Commit URL: ${rowData[14]}\n` +
+    `GitHub Raw URL: ${rowData[8]}\n` +
+    `Location: ${rowData[10]}, ${rowData[11]}\n\n` +
+    `Review here: ${outputSheetLink}`;
+
+  const payload = {
+    chat_id: TELEGRAM_CHAT_ID,
+    text: messageText,
+    parse_mode: "HTML"
+  };
+
+  const options = {
+    method: 'post',
+    contentType: 'application/json',
+    payload: JSON.stringify(payload),
+    muteHttpExceptions: true
+  };
+
+  try {
+    Logger.log(`sendNotarizationNotification: Sending notification for notarization to chat ${TELEGRAM_CHAT_ID}`);
+    const response = UrlFetchApp.fetch(apiUrl, options);
+    const status = response.getResponseCode();
+    const responseText = response.getContentText();
+    if (status === 200) {
+      Logger.log(`sendNotarizationNotification: Successfully sent notification to chat ${TELEGRAM_CHAT_ID}`);
+    } else {
+      Logger.log(`sendNotarizationNotification: Failed to send notification. Status: ${status}, Response: ${responseText}`);
+    }
+  } catch (e) {
+    Logger.log(`sendNotarizationNotification: Error sending Telegram notification: ${e.message}`);
+  }
+}
+
 function processTelegramLogs() {
   var sheet = SpreadsheetApp.openById(creds.SHEET_ID);
   var telegramLogTab = sheet.getSheetByName(telegramLogTabName);
@@ -22,7 +79,7 @@ function processTelegramLogs() {
   // Create Document Notarizations tab if it doesn't exist
   if (!notarizationTab) {
     notarizationTab = sheet.insertSheet(notarizationTabName);
-    notarizationTab.getRange("A1:O1").setValues([[
+    notarizationTab.getRange("A1:P1").setValues([[
       "Telegram Update ID", 
       "Chatroom ID", 
       "Chatroom Name", 
@@ -36,6 +93,7 @@ function processTelegramLogs() {
       "Latitude", 
       "Longitude",
       "Document Type",
+      "Description",
       "GitHub Commit URL",
       "Status"
     ]]);
@@ -70,6 +128,7 @@ function processTelegramLogs() {
       var latitude = lines.find(line => line.startsWith('- Latitude: '))?.replace('- Latitude: ', '') || 'N/A';
       var longitude = lines.find(line => line.startsWith('- Longitude: '))?.replace('- Longitude: ', '') || 'N/A';
       var documentType = lines.find(line => line.startsWith('- Document Type: '))?.replace('- Document Type: ', '') || 'N/A';
+      var description = lines.find(line => line.startsWith('- Description: '))?.replace('- Description: ', '') || 'N/A';
       var attachedFilename = lines.find(line => line.startsWith('- Attached Filename: '))?.replace('- Attached Filename: ', '') || 'N/A';
       var destinationNotarizedFile = lines.find(line => line.startsWith('- Destination Notarized File Location: '))?.replace('- Destination Notarized File Location: ', '') || 'N/A';
       var notarizedFileName = destinationNotarizedFile.replace('https://github.com/TrueSightDAO/notarizations/', '') || attachedFilename;
@@ -114,10 +173,20 @@ function processTelegramLogs() {
                 latitude, // Column K: extracted latitude
                 longitude, // Column L: extracted longitude
                 documentType, // Column M: document type
-                rawUrl.commitUrl, // Column N: GitHub commit URL
-                "NEW" // Column O: Status
+                description, // Column N: description
+                rawUrl.commitUrl, // Column O: GitHub commit URL
+                "NEW" // Column P: Status
               ]);
-              Logger.log(`Processed file_id: ${fileId}, GitHub Raw URL: ${rawUrl.rawUrl}, Commit URL: ${rawUrl.commitUrl}, Document Type: ${documentType}`);
+              
+              // Send Telegram notification
+              const notarizationRowNumber = notarizationTab.getLastRow();
+              sendNotarizationNotification([
+                row[0], row[1], row[2], row[3], row[4], contributionMade, row[11], fileId,
+                rawUrl.rawUrl, contributorName, latitude, longitude, documentType, description,
+                rawUrl.commitUrl, "NEW"
+              ], notarizationRowNumber);
+              
+              Logger.log(`Processed file_id: ${fileId}, GitHub Raw URL: ${rawUrl.rawUrl}, Commit URL: ${rawUrl.commitUrl}, Document Type: ${documentType}, Description: ${description}`);
             } catch (err) {
               Logger.log(`Error processing file_id ${fileId}: ${err.message}`);
             }
@@ -174,10 +243,20 @@ function processTelegramLogs() {
             latitude, // Column K: extracted latitude
             longitude, // Column L: extracted longitude
             documentType, // Column M: document type
-            rawUrl.commitUrl, // Column N: GitHub commit URL
-            "NEW" // Column O: Status
+            description, // Column N: description
+            rawUrl.commitUrl, // Column O: GitHub commit URL
+            "NEW" // Column P: Status
           ]);
-          Logger.log(`Processed record: File ID: ${fileId}, GitHub Raw URL: ${rawUrl.rawUrl}, Commit URL: ${rawUrl.commitUrl}, Document Type: ${documentType}`);
+          
+          // Send Telegram notification
+          const notarizationRowNumber = notarizationTab.getLastRow();
+          sendNotarizationNotification([
+            row[0], row[1], row[2], row[3], row[4], contributionMade, row[11], fileId,
+            rawUrl.rawUrl, contributorName, latitude, longitude, documentType, description,
+            rawUrl.commitUrl, "NEW"
+          ], notarizationRowNumber);
+          
+          Logger.log(`Processed record: File ID: ${fileId}, GitHub Raw URL: ${rawUrl.rawUrl}, Commit URL: ${rawUrl.commitUrl}, Document Type: ${documentType}, Description: ${description}`);
         } catch (err) {
           Logger.log(`Error processing record without file attachment: ${err.message}`);
         }
@@ -190,7 +269,7 @@ function processTelegramLogs() {
 function getProcessedFileIds(notarizationTab) {
   var lastRow = notarizationTab.getLastRow();
   if (lastRow < 2) return [];
-  var fileIds = notarizationTab.getRange(2, 8, lastRow - 1, 1).getValues().flat(); // Column H
+  var fileIds = notarizationTab.getRange(2, 8, lastRow - 1, 1).getValues().flat(); // Column H (file_id)
   return fileIds.filter(function(id) { return id !== "" && id !== "N/A"; });
 }
 
