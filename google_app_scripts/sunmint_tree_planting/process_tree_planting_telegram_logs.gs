@@ -23,7 +23,7 @@ function sendTreePlantingNotification(rowData, treePlantingRowNumber) {
 
   const apiUrl = `https://api.telegram.org/bot${token}/sendMessage`;
   const timestamp = new Date().getTime();
-  const outputSheetLink = `https://truesight.me/sunmint`;
+  const outputSheetLink = `https://www.agroverse.shop/trees-planted`;
 
   // Format the message with all inserted data
   const messageText = `🌳 New Tree Planting Event Recorded\n\n` +
