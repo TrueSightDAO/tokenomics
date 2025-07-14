@@ -41,7 +41,8 @@ const CONFIG = {
     }
   },
   TELEGRAM: {
-    TOKEN: creds.TELEGRAM_API_TOKEN
+    TOKEN: creds.TELEGRAM_API_TOKEN,
+    CHAT_ID: '-1002190388985' // Fixed chat ID for all notifications
   }
 };
 
@@ -127,7 +128,7 @@ function processRows({sourceData, existingSignatures, signaturesSheet}) {
     
     if (processResult?.valid) {
       registerSignature(signaturesSheet, processResult);
-      sendTelegramNotification(processResult, row);
+      sendTelegramNotification(processResult);
       existingSignatures.push(processResult.signature);
       registeredCount++;
     }
@@ -191,29 +192,28 @@ function registerSignature(sheet, {contributorName, timestamp, signature}) {
 }
 
 /**
- * Send Telegram notification
+ * Send Telegram notification to fixed chat ID
  */
-function sendTelegramNotification(result, sourceRow) {
-  const chatId = sourceRow[CONFIG.SOURCE.COLUMNS.CHAT_ID];
-  
-  if (!CONFIG.TELEGRAM.TOKEN || !chatId) {
-    Logger.log(`⏩ Skipping notification - ${!CONFIG.TELEGRAM.TOKEN ? 'Missing token' : 'Missing chat ID'}`);
+function sendTelegramNotification(result) {
+  if (!CONFIG.TELEGRAM.TOKEN) {
+    Logger.log("⏩ Skipping notification - Missing Telegram token");
     return false;
   }
   
   const message = `✅ Digital signature registered\n\n` +
     `Contributor: ${result.contributorName}\n` +
     `Signature: ${result.signature.substring(0, 20)}...\n` +
-    `Registered by: @${result.telegramHandle.replace(/^@/, '')}`;
+    `Registered by: @${result.telegramHandle.replace(/^@/, '')}\n\n` +
+    `Digital Signature Registry: https://truesight.me/digital-signatures` ;
   
   const payload = {
     method: "sendMessage",
-    chat_id: chatId,
+    chat_id: CONFIG.TELEGRAM.CHAT_ID, // Using fixed chat ID
     text: message,
     parse_mode: "HTML"
   };
   
-  Logger.log(`Sending to chat ${chatId}: ${message.substring(0, 50)}...`);
+  Logger.log(`Sending to fixed chat ${CONFIG.TELEGRAM.CHAT_ID}: ${message.substring(0, 50)}...`);
   
   try {
     const response = UrlFetchApp.fetch(
@@ -268,6 +268,25 @@ function resolveContributorName(telegramHandle) {
 /* TESTING FUNCTIONS   */
 /***********************/
 
+function testTelegramNotification() {
+  const testResult = {
+    valid: true,
+    signature: "TEST_" + Math.random().toString(36).substring(2, 10),
+    contributorName: "Test User",
+    telegramHandle: "testuser",
+    timestamp: new Date().toISOString()
+  };
+  
+  Logger.log("Testing Telegram notification to fixed chat ID...");
+  const success = sendTelegramNotification(testResult);
+  
+  if (success) {
+    Logger.log("✅ Telegram notification test passed");
+  } else {
+    Logger.log("❌ Telegram notification test failed - check logs");
+  }
+}
+
 function testSignatureProcessing() {
   const testData = [
     // Valid test case
@@ -314,47 +333,9 @@ function testSignatureProcessing() {
       registerSignature(mockSheets.signaturesSheet, result);
       
       // Test notification
-      sendTelegramNotification(result, row);
+      sendTelegramNotification(result);
     } else {
       Logger.log(`❌ Should FAIL - Invalid test case`);
     }
   });
-}
-
-function testEndToEnd() {
-  // Mock environment for end-to-end test
-  const mockData = [
-    ["Header"],
-    [
-      1, -100123456789, "Test Chat", 101, "valid_user", "",
-      "[DIGITAL SIGNATURE EVENT]\nTest\nDIGITAL SIGNATURE: TEST_ENDTOEND_123"
-    ]
-  ];
-  
-  const mockSheets = {
-    source: {
-      getDataRange: () => ({ getValues: () => mockData })
-    },
-    signatures: {
-      getDataRange: () => ({ getValues: () => [["Header"]] }),
-      getLastRow: () => 0,
-      getRange: (r, c, nr, nc) => ({
-        setValues: (data) => Logger.log(`Registered: ${data[0].join(", ")}`)
-      })
-    }
-  };
-  
-  // Override loadSheets for test
-  const originalLoadSheets = loadSheets;
-  loadSheets = () => ({
-    sourceData: mockData,
-    signaturesSheet: mockSheets.signatures
-  });
-  
-  Logger.log("Starting end-to-end test...");
-  const processedCount = processDigitalSignatureEvents();
-  Logger.log(`Processed ${processedCount} signatures`);
-  
-  // Restore original
-  loadSheets = originalLoadSheets;
 }
