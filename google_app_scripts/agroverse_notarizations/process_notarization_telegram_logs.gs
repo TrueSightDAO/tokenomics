@@ -15,6 +15,8 @@ const TELEGRAM_CHAT_ID = '-1002190388985'; // Your Telegram chat ID for notifica
 
 // Function to send Telegram notification for notarization submission
 function sendNotarizationNotification(rowData, notarizationRowNumber) {
+
+  Logger.log("Sending notification")
   const token = creds.TELEGRAM_API_TOKEN;
   if (!token) {
     Logger.log(`sendNotarizationNotification: Error: TELEGRAM_API_TOKEN not set in Credentials`);
@@ -23,7 +25,7 @@ function sendNotarizationNotification(rowData, notarizationRowNumber) {
 
   const apiUrl = `https://api.telegram.org/bot${token}/sendMessage`;
   const timestamp = new Date().getTime();
-  const outputSheetLink = `https://truesight.me/physical-transactions/notarizations`;
+  const outputSheetLink = `https://truesight.me/notarizations`;
 
   // Format the message with all inserted data
   const messageText = `📄 New Document Notarization Recorded\n\n` +
