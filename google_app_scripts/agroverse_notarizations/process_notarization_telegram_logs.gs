@@ -12,9 +12,9 @@ const contributorsSheetId = "1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU";
 const contributorsTabName = "Contributors Digital Signatures";
 const TELEGRAM_CHAT_ID = '-1002190388985'; // Your Telegram chat ID for notifications
 
-
 // Function to send Telegram notification for notarization submission
 function sendNotarizationNotification(rowData, notarizationRowNumber) {
+  Logger.log("Sending notification");
   const token = creds.TELEGRAM_API_TOKEN;
   if (!token) {
     Logger.log(`sendNotarizationNotification: Error: TELEGRAM_API_TOKEN not set in Credentials`);
@@ -23,7 +23,7 @@ function sendNotarizationNotification(rowData, notarizationRowNumber) {
 
   const apiUrl = `https://api.telegram.org/bot${token}/sendMessage`;
   const timestamp = new Date().getTime();
-  const outputSheetLink = `https://truesight.me/physical-transactions/notarizations`;
+  const outputSheetLink = `https://truesight.me/notarizations`;
 
   // Format the message with all inserted data
   const messageText = `📄 New Document Notarization Recorded\n\n` +
@@ -69,6 +69,15 @@ function sendNotarizationNotification(rowData, notarizationRowNumber) {
   }
 }
 
+// Function to get list of already processed telegram_message_ids from Document Notarizations tab
+function getProcessedMessageIds(notarizationTab) {
+  var lastRow = notarizationTab.getLastRow();
+  if (lastRow < 2) return [];
+  var messageIds = notarizationTab.getRange(2, 4, lastRow - 1, 1).getValues().flat(); // Column D
+  return messageIds.filter(function(id) { return id !== ""; });
+}
+
+// Function to process file_ids from Telegram Chat Logs and upload to Document Notarizations tab
 function processTelegramLogs() {
   var sheet = SpreadsheetApp.openById(creds.SHEET_ID);
   var telegramLogTab = sheet.getSheetByName(telegramLogTabName);
@@ -99,8 +108,9 @@ function processTelegramLogs() {
     ]]);
   }
 
-  // Get processed file_ids from Document Notarizations tab
+  // Get processed file_ids and message_ids from Document Notarizations tab
   var processedFileIds = getProcessedFileIds(notarizationTab);
+  var processedMessageIds = getProcessedMessageIds(notarizationTab);
 
   // Get data from Telegram Chat Logs (Columns A to O)
   var lastRow = telegramLogTab.getLastRow();
@@ -117,7 +127,14 @@ function processTelegramLogs() {
   // Process each row in Telegram Chat Logs
   dataRange.forEach(function(row, index) {
     var contributionMade = row[6]; // Column G
+    var messageId = row[3]; // Column D: telegram_message_id
     var fileIdsString = row[14]; // Column O
+
+    // Skip if message_id already processed
+    if (processedMessageIds.includes(messageId)) {
+      Logger.log(`Message ID already processed: ${messageId}`);
+      return;
+    }
 
     // Only process [NOTARIZATION EVENT] records
     if (contributionMade && contributionMade.startsWith("[NOTARIZATION EVENT]")) {
@@ -208,7 +225,7 @@ function processTelegramLogs() {
             var prevFileIds = prevFileIdsString ? prevFileIdsString.split(',').map(function(id) { return id.trim(); }) : [];
 
             if (!prevContributionMade && prevFileIds.length > 0) {
-              // Previous row has no contribution_made and has fileVertsion file_ids
+              // Previous row has no contribution_made and has file_ids
               var prevFileId = prevFileIds[0]; // Take the first file_id
               if (prevFileId && !processedFileIds.includes(prevFileId)) {
                 try {
@@ -224,6 +241,8 @@ function processTelegramLogs() {
                   Logger.log(`Error processing file_id from previous row ${prevFileId}: ${err.message}`);
                   // Continue with N/A values if file processing fails
                 }
+              } else if (prevFileId) {
+                Logger.log(`file_id from previous row already processed: ${prevFileId}`);
               }
             }
           }
@@ -318,7 +337,7 @@ function checkGitHubFileExists(token, fileName) {
 
 // Upload file to GitHub and return raw and commit URLs
 function uploadToGitHub(token, fileBlob, fileName, telegramMessage) {
-  Logger.log("Uploaded to Github")
+  Logger.log("Uploaded to Github");
   // Check if file already exists
   var existingUrl = checkGitHubFileExists(token, fileName);
   if (existingUrl) {

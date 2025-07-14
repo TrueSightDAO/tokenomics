@@ -10,6 +10,69 @@ const telegramLogTabName = "Telegram Chat Logs";
 const sunMintTabName = "SunMint Tree Planting";
 const contributorsSheetId = "1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU";
 const contributorsTabName = "Contributors Digital Signatures";
+const TELEGRAM_CHAT_ID = '-1002190388985'; // Your Telegram chat ID for notifications
+
+// Function to send Telegram notification for tree planting event
+function sendTreePlantingNotification(rowData, treePlantingRowNumber) {
+  Logger.log("Sending tree planting notification");
+  const token = creds.TELEGRAM_API_TOKEN;
+  if (!token) {
+    Logger.log(`sendTreePlantingNotification: Error: TELEGRAM_API_TOKEN not set in Credentials`);
+    return;
+  }
+
+  const apiUrl = `https://api.telegram.org/bot${token}/sendMessage`;
+  const timestamp = new Date().getTime();
+  const outputSheetLink = `https://www.agroverse.shop/trees-planted`;
+
+  // Format the message with all inserted data
+  const messageText = `🌳 New Tree Planting Event Recorded\n\n` +
+    `Tree Planting Row: ${treePlantingRowNumber}\n` +
+    `Telegram Update ID: ${rowData[0]}\n` +
+    `Chatroom ID: ${rowData[1]}\n` +
+    `Chatroom Name: ${rowData[2]}\n` +
+    `Message ID: ${rowData[3]}\n` +
+    `Contributor Handle: ${rowData[4]}\n` +
+    `Contributor Name: ${rowData[9]}\n` +
+    `GitHub Raw URL: ${rowData[8]}\n` +
+    `Location: ${rowData[10]}, ${rowData[11]}\n\n` +
+    `Review here: ${outputSheetLink}`;
+
+  const payload = {
+    chat_id: TELEGRAM_CHAT_ID,
+    text: messageText,
+    parse_mode: "HTML"
+  };
+
+  const options = {
+    method: 'post',
+    contentType: 'application/json',
+    payload: JSON.stringify(payload),
+    muteHttpExceptions: true
+  };
+
+  try {
+    Logger.log(`sendTreePlantingNotification: Sending notification for tree planting to chat ${TELEGRAM_CHAT_ID}`);
+    const response = UrlFetchApp.fetch(apiUrl, options);
+    const status = response.getResponseCode();
+    const responseText = response.getContentText();
+    if (status === 200) {
+      Logger.log(`sendTreePlantingNotification: Successfully sent notification to chat ${TELEGRAM_CHAT_ID}`);
+    } else {
+      Logger.log(`sendTreePlantingNotification: Failed to send notification. Status: ${status}, Response: ${responseText}`);
+    }
+  } catch (e) {
+    Logger.log(`sendTreePlantingNotification: Error sending Telegram notification: ${e.message}`);
+  }
+}
+
+// Function to get list of already processed telegram_message_ids from SunMint Tree Planting tab
+function getProcessedMessageIds(sunMintTab) {
+  var lastRow = sunMintTab.getLastRow();
+  if (lastRow < 2) return [];
+  var messageIds = sunMintTab.getRange(2, 4, lastRow - 1, 1).getValues().flat(); // Column D
+  return messageIds.filter(function(id) { return id !== ""; });
+}
 
 // Function to process file_ids from Telegram Chat Logs and upload to SunMint Tree Planting tab
 function processTelegramLogs() {
@@ -39,8 +102,9 @@ function processTelegramLogs() {
     ]]);
   }
 
-  // Get processed file_ids from SunMint Tree Planting tab
+  // Get processed file_ids and message_ids from SunMint Tree Planting tab
   var processedFileIds = getProcessedFileIds(sunMintTab);
+  var processedMessageIds = getProcessedMessageIds(sunMintTab);
 
   // Get data from Telegram Chat Logs (Columns A to O)
   var lastRow = telegramLogTab.getLastRow();
@@ -57,7 +121,14 @@ function processTelegramLogs() {
   // Process each row in Telegram Chat Logs
   dataRange.forEach(function(row, index) {
     var contributionMade = row[6]; // Column G
+    var messageId = row[3]; // Column D: telegram_message_id
     var fileIdsString = row[14]; // Column O
+
+    // Skip if message_id already processed
+    if (processedMessageIds.includes(messageId)) {
+      Logger.log(`Message ID already processed: ${messageId}`);
+      return;
+    }
 
     // Only process [TREE PLANTING EVENT] records
     if (contributionMade && contributionMade.startsWith("[TREE PLANTING EVENT]")) {
@@ -109,6 +180,14 @@ function processTelegramLogs() {
                 longitude, // Column L: extracted longitude
                 "NEW" // Column M: Status
               ]);
+
+              // Send Telegram notification
+              const treePlantingRowNumber = sunMintTab.getLastRow();
+              sendTreePlantingNotification([
+                row[0], row[1], row[2], row[3], row[4], contributionMade, row[11], fileId,
+                rawUrl, contributorName, latitude, longitude, "NEW"
+              ], treePlantingRowNumber);
+
               Logger.log(`Processed file_id: ${fileId}, GitHub URL: ${rawUrl}, Latitude: ${latitude}, Longitude: ${longitude}`);
             } catch (err) {
               Logger.log(`Error processing file_id ${fileId}: ${err.message}`);
@@ -169,6 +248,14 @@ function processTelegramLogs() {
             longitude, // Column L: extracted longitude
             "NEW" // Column M: Status
           ]);
+
+          // Send Telegram notification
+          const treePlantingRowNumber = sunMintTab.getLastRow();
+          sendTreePlantingNotification([
+            row[0], row[1], row[2], row[3], row[4], contributionMade, row[11], fileId,
+            rawUrl, contributorName, latitude, longitude, "NEW"
+          ], treePlantingRowNumber);
+
           Logger.log(`Processed record: File ID: ${fileId}, GitHub URL: ${rawUrl}, Latitude: ${latitude}, Longitude: ${longitude}`);
         } catch (err) {
           Logger.log(`Error processing record without file attachment: ${err.message}`);
