@@ -1,6 +1,6 @@
 /**
  * Gmail-based TDG Identity Management System
- * Processes digital signature events from Gmail emails and maintains a registry
+ * Processes digital signature events from Gmail emails received in the last 24 hours
  */
 
 // Load API keys and configuration settings
@@ -10,8 +10,9 @@ const creds = getCredentials();
 // Configuration Constants
 const CONFIG = {
   SOURCE: {
-    GMAIL_QUERY: 'from:* [DIGITAL SIGNATURE EVENT]', // Query to filter relevant emails
+    GMAIL_QUERY: '[DIGITAL SIGNATURE EVENT]', // Filter emails with this marker
     LABEL: 'Processed', // Optional: Label to mark processed emails
+    TIME_WINDOW_HOURS: 24 // Process emails from the last 24 hours
   },
   SIGNATURES: {
     URL: 'https://docs.google.com/spreadsheets/d/1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU/edit?gid=577022511#gid=577022511',
@@ -48,13 +49,24 @@ function processEmailSignatureEvents() {
   try {
     const { signaturesSheet } = loadSheets();
     const existingSignatures = getExistingSignatures(signaturesSheet);
-    const threads = GmailApp.search(CONFIG.SOURCE.GMAIL_QUERY + ' is:unread');
+    
+    // Calculate timestamp for TIME_WINDOW_HOURS ago
+    const timeWindowAgo = new Date(Date.now() - CONFIG.SOURCE.TIME_WINDOW_HOURS * 60 * 60 * 1000);
+    const formattedDate = Utilities.formatDate(timeWindowAgo, Session.getScriptTimeZone(), 'yyyy/MM/dd');
+    const timeFilter = `after:${formattedDate}`;
+    const searchQuery = `${CONFIG.SOURCE.GMAIL_QUERY} ${timeFilter}`;
+    Logger.log(`Search query: ${searchQuery}`);
+    
+    const threads = GmailApp.search(searchQuery);
+    Logger.log(`Found ${threads.length} threads`);
+    
     let processedCount = 0;
-
     threads.forEach(thread => {
       const messages = thread.getMessages();
+      Logger.log(`Thread ID: ${thread.getId()}, Messages: ${messages.length}`);
       messages.forEach(message => {
-        if (!message.isUnread()) return;
+        Logger.log(`Processing message ID: ${message.getId()}, From: ${message.getFrom()}, Date: ${message.getDate()}`);
+        
         const processResult = processEmailMessage(message, existingSignatures);
         if (processResult?.valid) {
           registerSignature(signaturesSheet, processResult);
@@ -104,9 +116,13 @@ function getExistingSignatures(sheet) {
  */
 function processEmailMessage(message, existingSignatures) {
   const emailContent = message.getPlainBody();
-  const sender = message.getFrom(); // e.g., "John Doe <john.doe@example.com>"
+  Logger.log(`Email content: ${emailContent.substring(0, 100)}...`);
+  const sender = message.getFrom();
   const signature = extractSignature(emailContent);
-  if (!signature) return null;
+  if (!signature) {
+    Logger.log(`No signature found in message ID: ${message.getId()}`);
+    return null;
+  }
 
   // Check for duplicates
   if (existingSignatures.includes(signature)) {
@@ -117,7 +133,10 @@ function processEmailMessage(message, existingSignatures) {
 
   // Resolve contributor name
   const { contributorName, emailAddress } = resolveContributorName(sender);
-  if (!contributorName) return null;
+  if (!contributorName) {
+    Logger.log(`No contributor name resolved for sender: ${sender}`);
+    return null;
+  }
 
   return {
     valid: true,
@@ -259,6 +278,36 @@ function resolveContributorName(sender) {
 function setupTrigger() {
   ScriptApp.newTrigger('processEmailSignatureEvents')
     .timeBased()
-    .everyMinutes(5) // Adjust as needed
+    .everyMinutes(5)
     .create();
+}
+
+/**
+ * Debug function to test email retrieval
+ */
+function debugEmailSearch() {
+  try {
+    const timeWindowAgo = new Date(Date.now() - CONFIG.SOURCE.TIME_WINDOW_HOURS * 60 * 60 * 1000);
+    const formattedDate = Utilities.formatDate(timeWindowAgo, Session.getScriptTimeZone(), 'yyyy/MM/dd');
+    const searchQuery = `${CONFIG.SOURCE.GMAIL_QUERY} after:${formattedDate}`;
+    Logger.log(`Debug search query: ${searchQuery}`);
+    
+    const threads = GmailApp.search(searchQuery);
+    Logger.log(`Found ${threads.length} threads`);
+    
+    threads.forEach(thread => {
+      Logger.log(`Thread ID: ${thread.getId()}`);
+      const messages = thread.getMessages();
+      messages.forEach(message => {
+        Logger.log(`Message ID: ${message.getId()}`);
+        Logger.log(`From: ${message.getFrom()}`);
+        Logger.log(`Subject: ${message.getSubject()}`);
+        Logger.log(`Date: ${message.getDate()}`);
+        Logger.log(`Is Unread: ${message.isUnread()}`);
+        Logger.log(`Content: ${message.getPlainBody().substring(0, 100)}...`);
+      });
+    });
+  } catch (error) {
+    Logger.log(`❌ Debug failed: ${error.message}\n${error.stack}`);
+  }
 }
