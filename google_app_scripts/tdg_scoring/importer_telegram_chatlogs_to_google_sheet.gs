@@ -69,6 +69,28 @@ function processTelegramLogs() {
 
         // Extract file_ids from the photo field, if present
         var file_ids = [];
+        if (entry.message.document) {
+          file_ids.push(entry.message.document.file_id);
+        }
+        if (entry.message.audio) {
+          file_ids.push(entry.message.audio.file_id);
+        }
+        if (entry.message.video) {
+          file_ids.push(entry.message.video.file_id);
+        }
+        if (entry.message.voice) {
+          file_ids.push(entry.message.voice.file_id);
+        }
+        if (entry.message.sticker) {
+          file_ids.push(entry.message.sticker.file_id);
+        }
+        if (entry.message.animation) {
+          file_ids.push(entry.message.animation.file_id);
+        }
+        if (entry.message.video_note) {
+          file_ids.push(entry.message.video_note.file_id);
+        }
+
         if (entry.message.photo) {
           // Use the largest photo size (last in the array)
           file_ids.push(entry.message.photo[entry.message.photo.length - 1].file_id);
