@@ -15,7 +15,7 @@ This folder contains scripts for managing digital identities within TrueSight DA
 
 ## Key Scripts
 
-### [`register_member_digital_signatures.gs`](./register_member_digital_signatures.gs)
+### [`register_member_digital_signatures.gs`](./register_member_digital_signatures_telegram.gs)
 
 **Purpose**: Processes digital signature submissions from Telegram chats and registers them in the DAO's identity system.
 
