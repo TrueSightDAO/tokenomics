@@ -38,7 +38,7 @@ const CONFIG = {
     TOKEN: creds.TELEGRAM_API_TOKEN
   },
   GMAIL: {
-    SENDER: 'your-email@gmail.com' // Your Gmail address for sending replies
+    SENDER: 'admin@truesight.me' // Your Gmail address for sending replies
   }
 };
 
@@ -127,7 +127,7 @@ function processEmailMessage(message, existingSignatures) {
   // Check for duplicates
   if (existingSignatures.includes(signature)) {
     Logger.log(`⏩ Duplicate signature: ${signature.substring(0, 10)}...`);
-    sendEmailReply(message, { signature, isDuplicate: true });
+    // sendEmailReply(message, { signature, isDuplicate: true });
     return null;
   }
 
@@ -151,7 +151,7 @@ function processEmailMessage(message, existingSignatures) {
  * Extract signature from email body
  */
 function extractSignature(message) {
-  const pattern = /\[DIGITAL SIGNATURE EVENT\][\s\S]*?DIGITAL SIGNATURE: ([A-Za-z0-9+/=]+)/i;
+  const pattern = /\[DIGITAL SIGNATURE EVENT\][\s\S]*?DIGITAL SIGNATURE:\s*([A-Za-z0-9+/=]+)/i;
   const match = message?.match(pattern);
   return match?.[1] || null;
 }
@@ -182,8 +182,8 @@ function sendEmailReply(message, { signature, contributorName, isDuplicate = fal
     ? "Digital Signature Registration Failed"
     : "Digital Signature Registered";
   const messageText = isDuplicate
-    ? `Dear Contributor,\n\nThe digital signature (${signature.substring(0, 20)}...) you submitted already exists in our registry.\n\nPlease submit a unique signature.\n\nBest regards,\nTDG Identity Management`
-    : `Dear ${contributorName},\n\nYour digital signature has been registered successfully.\n\nDetails:\nContributor: ${contributorName}\nSignature: ${signature.substring(0, 20)}...\n\nBest regards,\nTDG Identity Management`;
+    ? `Dear Contributor,\n\nThe digital signature (${signature.substring(0, 20)}...) you submitted already exists in our registry.\nDigital Signature Registry: http://truesight.me/digital-signatures\n\nPlease submit a unique signature.\n\nBest regards,\nTDG Identity Management`
+    : `Dear ${contributorName},\n\nYour digital signature has been registered successfully.\n\nDetails:\nContributor: ${contributorName}\nSignature: ${signature}\n\nDigital Signature Registry:  https://truesight.me/digital-signatures\n\nBest regards,\nTDG Identity Management`;
 
   try {
     GmailApp.sendEmail(recipient, subject, messageText, {
@@ -208,7 +208,8 @@ function sendTelegramNotification(result, message) {
   const messageText = `✅ Digital signature registered\n\n` +
     `Contributor: ${result.contributorName}\n` +
     `Signature: ${result.signature.substring(0, 20)}...\n` +
-    `Registered via: ${result.emailAddress}`;
+    `Registered via: ${result.emailAddress}\n\n` + 
+    `Digital Signature Registry: https://truesight.me/digital-signatures` ;
 
   const payload = {
     method: "sendMessage",
@@ -309,5 +310,61 @@ function debugEmailSearch() {
     });
   } catch (error) {
     Logger.log(`❌ Debug failed: ${error.message}\n${error.stack}`);
+  }
+}
+
+/**
+ * Test function to process a specific email by message ID
+ */
+function testSpecificEmail() {
+  const messageId = '1980b36cb60d4aa7'; // Specific message ID to test
+  try {
+    // Retrieve the specific message
+    const message = GmailApp.getMessageById(messageId);
+    if (!message) {
+      Logger.log(`❌ Message ID ${messageId} not found`);
+      return;
+    }
+
+    Logger.log(`Testing message ID: ${message.getId()}`);
+    Logger.log(`From: ${message.getFrom()}`);
+    Logger.log(`Subject: ${message.getSubject()}`);
+    Logger.log(`Date: ${message.getDate()}`);
+    Logger.log(`Is Unread: ${message.isUnread()}`);
+    const emailContent = message.getPlainBody();
+    Logger.log(`Full email content:\n${emailContent}`);
+
+    // Test signature extraction
+    const signature = extractSignature(emailContent);
+    if (!signature) {
+      Logger.log(`❌ No signature extracted from message ID: ${messageId}`);
+      const pattern = /\[DIGITAL SIGNATURE EVENT\][\s\S]*?DIGITAL SIGNATURE:\s*([A-Za-z0-9+/=]+)/i;
+      const match = emailContent?.match(pattern);
+      Logger.log(`Regex match result: ${JSON.stringify(match)}`);
+    } else {
+      Logger.log(`✅ Signature extracted: ${signature}`);
+    }
+
+    // Load existing signatures for duplicate check
+    const { signaturesSheet } = loadSheets();
+    const existingSignatures = getExistingSignatures(signaturesSheet);
+
+    // Process the message
+    const processResult = processEmailMessage(message, existingSignatures);
+    if (processResult?.valid) {
+      Logger.log(`✅ Message processed successfully`);
+      Logger.log(`Contributor: ${processResult.contributorName}`);
+      Logger.log(`Signature: ${processResult.signature}`);
+      Logger.log(`Email Address: ${processResult.emailAddress}`);
+      Logger.log(`Timestamp: ${processResult.timestamp}`);
+      // Optionally register and send notifications for testing
+      // registerSignature(signaturesSheet, processResult);
+      // sendEmailReply(message, processResult);
+      // sendTelegramNotification(processResult, message);
+    } else {
+      Logger.log(`❌ Message processing failed for message ID: ${messageId}`);
+    }
+  } catch (error) {
+    Logger.log(`❌ Test failed for message ID ${messageId}: ${error.message}\n${error.stack}`);
   }
 }
