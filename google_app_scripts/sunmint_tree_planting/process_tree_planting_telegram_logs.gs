@@ -120,7 +120,40 @@ function processTelegramLogs() {
       } else {
         // Handle records without file attachments
         try {
-          // Append to SunMint Tree Planting tab with N/A for File ID and GitHub URL
+          var fileId = "N/A";
+          var rawUrl = "N/A";
+
+          // Check the preceding row for a potential image
+          if (index > 0) {
+            var prevRow = dataRange[index - 1];
+            var prevContributionMade = prevRow[6]; // Column G of previous row
+            var prevFileIdsString = prevRow[14]; // Column O of previous row
+            var prevFileIds = prevFileIdsString ? prevFileIdsString.split(',').map(function(id) { return id.trim(); }) : [];
+
+            if (!prevContributionMade && prevFileIds.length > 0) {
+              // Previous row has no contribution_made and has file_ids
+              var prevFileId = prevFileIds[0]; // Take the first file_id
+              if (prevFileId && !processedFileIds.includes(prevFileId)) {
+                try {
+                  // Get file URL from Telegram
+                  var fileUrl = getTelegramFileUrl(creds.TELEGRAM_API_TOKEN, prevFileId);
+                  // Download image
+                  var imageBlob = UrlFetchApp.fetch(fileUrl).getBlob();
+                  // Check if file exists on GitHub; upload if it doesn't
+                  rawUrl = uploadToGitHub(creds.GITHUB_API_TOKEN, imageBlob, prevFileId);
+                  fileId = prevFileId;
+                  Logger.log(`Associated file_id from previous row: ${fileId}, GitHub URL: ${rawUrl}`);
+                } catch (err) {
+                  Logger.log(`Error processing file_id from previous row ${prevFileId}: ${err.message}`);
+                  // Continue with N/A values if image processing fails
+                }
+              } else if (prevFileId) {
+                Logger.log(`file_id from previous row already processed: ${prevFileId}`);
+              }
+            }
+          }
+
+          // Append to SunMint Tree Planting tab
           sunMintTab.appendRow([
             row[0], // Column A: telegram_update_id
             row[1], // Column B: telegram_chatroom_id
@@ -129,14 +162,14 @@ function processTelegramLogs() {
             row[4], // Column E: contributor_name (handle)
             contributionMade, // Column F: contribution_made
             row[11], // Column G: status_date
-            "N/A", // Column H: file_id
-            "N/A", // Column I: GitHub raw URL
+            fileId, // Column H: file_id (from previous row or "N/A")
+            rawUrl, // Column I: GitHub raw URL (from previous row or "N/A")
             contributorName, // Column J: contributor name from Contributors Digital Signatures
             latitude, // Column K: extracted latitude
             longitude, // Column L: extracted longitude
             "NEW" // Column M: Status
           ]);
-          Logger.log(`Processed record without file attachment: Latitude: ${latitude}, Longitude: ${longitude}`);
+          Logger.log(`Processed record: File ID: ${fileId}, GitHub URL: ${rawUrl}, Latitude: ${latitude}, Longitude: ${longitude}`);
         } catch (err) {
           Logger.log(`Error processing record without file attachment: ${err.message}`);
         }
