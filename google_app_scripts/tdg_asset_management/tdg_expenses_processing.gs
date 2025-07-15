@@ -8,7 +8,6 @@ const SOURCE_SHEET_NAME = 'Telegram Chat Logs';
 const SCORED_EXPENSE_SHEET_URL = 'https://docs.google.com/spreadsheets/d/15co4NYVdlhOFK7y2EfyajXJ0aSj7OfezUndYoY6BNrY/edit?gid=0#gid=0';
 const SCORED_EXPENSE_SHEET_NAME = 'Scored Expense Submissions';
 
-
 // Sandbox
 const OFFCHAIN_TRANSACTIONS_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1F90Sq6jSfj8io0RmiUwdydzuWXOZA9siXHWDsj9ItTo/edit?usp=drive_web&ouid=115975718038592349436';
 
@@ -127,7 +126,6 @@ function extractExpenseDetails(message) {
     submissionSource: match[9] ? match[9].trim() : null
   };
 }
-
 
 // Function to check Telegram file ID and get from previous row if needed
 function getTelegramFileId(sourceSheet, currentRowIndex, sourceData) {
@@ -435,89 +433,139 @@ function doGet(e) {
   return ContentService.createTextOutput("ℹ️ No valid action specified");
 }
 
-
-function testExtractExpenseDetails() {
-  // Define the test payload (including trailing lines from the original context)
-  const testMessage = `[DAO Inventory Expense Event]
-- DAO Member Name: Gary Teh
-- Latitude: 44.440346
-- Longitude: -123.284732
-- Inventory Type: USD
-- Inventory Quantity: 1
-- Description: Testing expense to ensure edgars expense recognition actually works 
-- Attached Filename: IMG_9164.gif
-- Destination Expense File Location: https://github.com/TrueSightDAO/.github/tree/main/assets/expense_20250715195712_gary_teh_img_9164.gif
-- Submission Source: https://dapp.truesight.me/report_dao_expenses.html?timestamp=1752609243802
---------
-
-My Digital Signature: MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA1y5wLWcmZJ9qWdvJl7yoGj1wxR8fjxZVezo9IkwodBEZ6q2tIyKIpk8XyEokycPQ/M9ZocYr57manzU53Zh+V1DnvUnvHZpgSvPSw/wnBKuXNxg+1uy8h10X+2iBXsJBoK5cM20q1RxsGH4GBsDvPzLervRQVZPe12ht/VPVd0PbYPUBVVfs8q2KlaWrq7ZH4cJ0FHB1Km0cjgYs2rps0AgsyKseb8jCkQ788VFZwePZZzMRA6OXHCIuVFxbnAPZlNvckCFz+b2oM132aYaqgbkk2IgAbShxUuEwuv6yb2mQapsavUUShxMK8AHmyJ39v5lQ2xiTQTougTwTG5MzYwIDAQAB
-
-Request Transaction ID: QPDeDrxTyvinTRn5sS+Oed8NYKOyydA3Fa5TYCgm7bY66V0TtIzRcdQKfjyaGIj5k709Cdy4HYvIuRP9K1XrjByIUtMAoEUFMKFHfliZIBE+DFfQQWN4M2Cdl+PUp1t0gGr83zJT3FBfjymDFFfetRrisNpj9lknWyOTF1NulXCV9D4MDHRqiw/E1bgT5lGujAOygq3YyXJEoBKFUJP5H97L9xSXjQQF7FtnhSLvJ94OFd1NPqC9ukUqzHB2aQ0zO/BFXfrdVnZ80xNSCVY9N3mK7TS+BTGoTXL05aOmAnLR1dBGhSSVZuQyDOqx+jGzFMYSSd6AW3YXIKcJItw8Jw==
-
-This submission was generated using https://dapp.truesight.me/report_dao_expenses.html?timestamp=1752609243802
-
-Verify submission here: https://dapp.truesight.me/verify_request.html
-`;
-
-  // Expected output
-  const expected = {
-    daoMemberName: "Gary Teh",
-    latitude: "44.440346",
-    longitude: "-123.284732",
-    inventoryType: "USD",
-    quantity: 1,
-    description: "Testing expense to ensure edgars expense recognition actually works",
-    attachedFilename: "IMG_9164.gif",
-    destinationFileLocation: "https://github.com/TrueSightDAO/.github/tree/main/assets/expense_20250715195712_gary_teh_img_9164.gif",
-    submissionSource: "https://dapp.truesight.me/report_dao_expenses.html?timestamp=1752609243802"
-  };
-
-  // Call the function to test
-  const result = extractExpenseDetails(testMessage);
-
-  // Log the input message for reference
-  Logger.log(`Input Message:\n${testMessage}`);
-
-  // Verify the result
-  if (!result) {
-    Logger.log("Test Failed: extractExpenseDetails returned null");
-    // Try partial matches to diagnose where the regex fails
-    const partialPatterns = [
-      /\[DAO Inventory Expense Event\].*?(?=\n\s*-|$)/i, // Up to first field
-      /\[DAO Inventory Expense Event\]\n\s*- DAO Member Name:\s*(.*?)(?=\n\s*-|$)/i, // Up to DAO Member Name
-      /\[DAO Inventory Expense Event\].*?- Inventory Type:\s*(.*?)(?=\n\s*-|$)/i, // Up to Inventory Type
-      /\[DAO Inventory Expense Event\].*?- Description:\s*(.*?)(?=\n\s*-|$)/i, // Up to Description
-      /\[DAO Inventory Expense Event\].*?(?:\n\s*-+\s*\n\s*My Digital Signature:.*)?$/i // Up to signature
-    ];
-    partialPatterns.forEach((pattern, index) => {
-      const match = testMessage.match(pattern);
-      Logger.log(`Partial Pattern ${index + 1} Match: ${JSON.stringify(match)}`);
-    });
-    return;
-  }
-
-  // Log the result for debugging
-  Logger.log("Test Result: " + JSON.stringify(result));
-
-  // Check each field
-  let testPassed = true;
-  for (const key in expected) {
-    if (result[key] !== expected[key]) {
-      Logger.log(`Test Failed: Mismatch in ${key}. Expected: ${expected[key]}, Got: ${result[key]}`);
-      testPassed = false;
+// New test function to process a specific row from the source sheet
+function testParseAndProcessRow() {
+  rowNumber = 5946;
+  try {
+    // Validate row number
+    if (!Number.isInteger(rowNumber) || rowNumber < 2) {
+      Logger.log(`Invalid row number: ${rowNumber}. Must be an integer >= 2.`);
+      return;
     }
-  }
 
-  // Additional check for quantity to ensure it's a number
-  if (typeof result.quantity !== "number") {
-    Logger.log("Test Failed: Quantity is not a number. Got: " + result.quantity);
-    testPassed = false;
-  }
+    // Load sheets
+    const sourceSpreadsheet = SpreadsheetApp.openByUrl(SOURCE_SHEET_URL);
+    const scoredExpenseSpreadsheet = SpreadsheetApp.openByUrl(SCORED_EXPENSE_SHEET_URL);
+    const sourceSheet = sourceSpreadsheet.getSheetByName(SOURCE_SHEET_NAME);
+    const scoredExpenseSheet = scoredExpenseSpreadsheet.getSheetByName(SCORED_EXPENSE_SHEET_NAME);
+    
+    // Get source data and check if row exists
+    const sourceData = sourceSheet.getDataRange().getValues();
+    if (rowNumber > sourceData.length) {
+      Logger.log(`Row ${rowNumber} does not exist in ${SOURCE_SHEET_NAME}. Total rows: ${sourceData.length}`);
+      return;
+    }
 
-  // Log the final test result
-  if (testPassed) {
-    Logger.log("Test Passed: extractExpenseDetails correctly parsed the payload");
-  } else {
-    Logger.log("Test Failed: One or more fields did not match expected values");
+    // Get scored data for hash key check
+    const scoredData = scoredExpenseSheet.getDataRange().getValues();
+    const existingHashKeys = scoredData.slice(1).map(row => row[DEST_HASH_KEY_COL]).filter(key => key);
+    
+    const expensePattern = /\[DAO Inventory Expense Event\]/i;
+    const i = rowNumber - 1; // Adjust for 0-based indexing
+
+    // Get message and log it
+    const message = sourceData[i][MESSAGE_COL];
+    Logger.log(`Testing row ${rowNumber} with message:\n${message}`);
+
+    // Step 1: Extract expense details
+    const expenseDetails = extractExpenseDetails(message);
+    Logger.log(`Expense Details: ${JSON.stringify(expenseDetails)}`);
+    if (!expenseDetails) {
+      Logger.log(`Test Failed: Skipping row ${rowNumber} due to invalid expense details`);
+      // Log partial matches for debugging
+      const partialPatterns = [
+        /\[DAO Inventory Expense Event\].*?(?=\n\s*-|$)/i, // Up to first field
+        /\[DAO Inventory Expense Event\]\n\s*- DAO Member Name:\s*(.*?)(?=\n\s*-|$)/i, // Up to DAO Member Name
+        /\[DAO Inventory Expense Event\].*?- Inventory Type:\s*(.*?)(?=\n\s*-|$)/i, // Up to Inventory Type
+        /\[DAO Inventory Expense Event\].*?- Description:\s*(.*?)(?=\n\s*-|$)/i, // Up to Description
+        /\[DAO Inventory Expense Event\].*?(?:\n\s*-+\s*\n\s*My Digital Signature:.*)?$/i // Up to signature
+      ];
+      partialPatterns.forEach((pattern, index) => {
+        const match = message.match(pattern);
+        Logger.log(`Partial Pattern ${index + 1} Match: ${JSON.stringify(match)}`);
+      });
+      return;
+    }
+
+    // Step 2: Generate hash key
+    const hashKey = generateHashKey(
+      sourceData[i][TELEGRAM_MESSAGE_ID_COL],
+      expenseDetails.daoMemberName,
+      sourceData[i][SALES_DATE_COL]
+    );
+    Logger.log(`Generated Hash Key: ${hashKey}`);
+    if (!hashKey) {
+      Logger.log(`Test Failed: Failed to generate hash key for row ${rowNumber}`);
+      return;
+    }
+
+    // Step 3: Check if the message is a DAO expense event and not already processed
+    if (!expensePattern.test(message)) {
+      Logger.log(`Test Failed: Row ${rowNumber} does not contain a DAO Inventory Expense Event`);
+      return;
+    }
+    if (existingHashKeys.includes(hashKey)) {
+      Logger.log(`Test Failed: Row ${rowNumber} already processed (hash key: ${hashKey})`);
+      return;
+    }
+    Logger.log(`Pattern match: ${expensePattern.test(message)}, Not processed: ${!existingHashKeys.includes(hashKey)}`);
+
+    // Step 4: Validate reporter
+    const reporterName = sourceData[i][CONTRIBUTOR_NAME_COL];
+    if (!ReporterExist(reporterName)) {
+      Logger.log(`Test Failed: Skipping row ${rowNumber} due to invalid reporter: ${reporterName}`);
+      return;
+    }
+    Logger.log(`Reporter ${reporterName} validated successfully`);
+
+    // Step 5: Check file upload if applicable
+    let fileUploadStatus = "N/A";
+    if (expenseDetails.attachedFilename && expenseDetails.destinationFileLocation) {
+      const fileId = getTelegramFileId(sourceSheet, i, sourceData);
+      Logger.log(`File ID: ${fileId}`);
+      if (fileId && !checkFileExistsInGitHub(expenseDetails.destinationFileLocation)) {
+        const uploaded = uploadFileToGitHub(fileId, expenseDetails.destinationFileLocation, message);
+        fileUploadStatus = uploaded ? "Success" : "Failed";
+        Logger.log(`File Upload Status: ${fileUploadStatus} for ${expenseDetails.attachedFilename}`);
+      } else if (!fileId) {
+        fileUploadStatus = "No Telegram file ID found";
+        Logger.log(`No Telegram file ID found for row ${rowNumber}`);
+      } else {
+        fileUploadStatus = "File already exists";
+        Logger.log(`File already exists at ${expenseDetails.destinationFileLocation}, skipping upload`);
+      }
+    }
+
+    // Step 6: Simulate appending to scored expense sheet
+    const rowToAppend = [
+      sourceData[i][TELEGRAM_UPDATE_ID_COL],
+      sourceData[i][CHAT_ID_COL],
+      sourceData[i][CHAT_NAME_COL],
+      sourceData[i][TELEGRAM_MESSAGE_ID_COL],
+      reporterName,
+      message,
+      sourceData[i][SALES_DATE_COL],
+      expenseDetails.daoMemberName,
+      expenseDetails.inventoryType,
+      expenseDetails.quantity * -1,
+      hashKey,
+      ''
+    ];
+    Logger.log(`Simulated Scored Row: ${JSON.stringify(rowToAppend)}`);
+
+    // Step 7: Simulate inserting into offchain transactions sheet
+    const transactionRowNumber = InsertExpenseRecords(rowToAppend, i);
+    Logger.log(`Transaction Row Number: ${transactionRowNumber || 'Not recorded'}`);
+
+    // Step 8: Simulate sending notification
+    if (transactionRowNumber) {
+      sendExpenseNotification(rowToAppend, `SimulatedRow_${rowNumber}`, transactionRowNumber);
+    }
+
+    // Log test success
+    Logger.log(`Test Passed: Successfully processed row ${rowNumber} with hash key: ${hashKey}`);
+    Logger.log(`Summary: File Upload: ${fileUploadStatus}, Transaction Row: ${transactionRowNumber || 'Not recorded'}`);
+  } catch (e) {
+    Logger.log(`Test Failed: Error processing row ${rowNumber}: ${e.message}`);
   }
 }
