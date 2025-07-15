@@ -99,25 +99,35 @@ function ReporterExist(reporterName) {
   }
 }
 
-// Function to extract expense details from message using regex
 function extractExpenseDetails(message) {
-  const pattern = /\[DAO Inventory Expense Event\]\n- DAO Member Name: (.*?)\n- (?:Latitude: (.*?)\n- Longitude: (.*?)\n- )?Inventory Type: (.*?)\n- Inventory Quantity: (\d+\.?\d*)\n- Description: (.*?)(?:\n- Attached Filename: (.*?))?(?:\n- Destination Expense File Location: (.*?))?(?:\n- Submission Source: (.*?))?(?:\n-+\nMy Digital Signature:.*)?$/i;
+  // Normalize line endings and trim leading/trailing whitespace
+  message = message.replace(/\r\n/g, '\n').trim();
+  
+  // Updated regex with more flexible whitespace handling and trailing content
+  const pattern = /\[DAO Inventory Expense Event\]\n\s*- DAO Member Name:\s*(.*?)\n\s*- (?:Latitude:\s*(.*?)\n\s*- Longitude:\s*(.*?)\n\s*- )?Inventory Type:\s*(.*?)\n\s*- Inventory Quantity:\s*(\d+\.?\d*)\n\s*- Description:\s*(.*?)(?:\n\s*- Attached Filename:\s*(.*?))?(?:\n\s*- Destination Expense File Location:\s*(.*?))?(?:\n\s*- Submission Source:\s*(.*?))?(?:(?:\n\s*-+\s*\n\s*My Digital Signature:.*?(?:\n\s*Request Transaction ID:.*?)?)?(?:\n\s*This submission was generated using.*?(?:\n\s*Verify submission here:.*?)?)?)?$/i;
+  
   const match = message.match(pattern);
-  if (match) {
-    return {
-      daoMemberName: match[1],
-      latitude: match[2] || null,
-      longitude: match[3] || null,
-      inventoryType: match[4],
-      quantity: parseFloat(match[5]),
-      description: match[6],
-      attachedFilename: match[7] || null,
-      destinationFileLocation: match[8] || null,
-      submissionSource: match[9] || null
-    };
+  if (!match) {
+    Logger.log(`Regex failed to match message: ${message}`);
+    // Log partial matches for debugging
+    const partialPattern = /\[DAO Inventory Expense Event\].*?(?=\n\s*-|$)/i;
+    Logger.log(`Partial match: ${JSON.stringify(message.match(partialPattern))}`);
+    return null;
   }
-  return null;
+  
+  return {
+    daoMemberName: match[1].trim(),
+    latitude: match[2] ? match[2].trim() : null,
+    longitude: match[3] ? match[3].trim() : null,
+    inventoryType: match[4].trim(),
+    quantity: parseFloat(match[5]),
+    description: match[6].trim(),
+    attachedFilename: match[7] ? match[7].trim() : null,
+    destinationFileLocation: match[8] ? match[8].trim() : null,
+    submissionSource: match[9] ? match[9].trim() : null
+  };
 }
+
 
 // Function to check Telegram file ID and get from previous row if needed
 function getTelegramFileId(sourceSheet, currentRowIndex, sourceData) {
@@ -422,4 +432,91 @@ function doGet(e) {
   }
 
   return ContentService.createTextOutput("ℹ️ No valid action specified");
+}
+
+
+function testExtractExpenseDetails() {
+  // Define the test payload (including trailing lines from the original context)
+  const testMessage = `[DAO Inventory Expense Event]
+- DAO Member Name: Gary Teh
+- Latitude: 44.440346
+- Longitude: -123.284732
+- Inventory Type: USD
+- Inventory Quantity: 1
+- Description: Testing expense to ensure edgars expense recognition actually works 
+- Attached Filename: IMG_9164.gif
+- Destination Expense File Location: https://github.com/TrueSightDAO/.github/tree/main/assets/expense_20250715195712_gary_teh_img_9164.gif
+- Submission Source: https://dapp.truesight.me/report_dao_expenses.html?timestamp=1752609243802
+--------
+
+My Digital Signature: MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA1y5wLWcmZJ9qWdvJl7yoGj1wxR8fjxZVezo9IkwodBEZ6q2tIyKIpk8XyEokycPQ/M9ZocYr57manzU53Zh+V1DnvUnvHZpgSvPSw/wnBKuXNxg+1uy8h10X+2iBXsJBoK5cM20q1RxsGH4GBsDvPzLervRQVZPe12ht/VPVd0PbYPUBVVfs8q2KlaWrq7ZH4cJ0FHB1Km0cjgYs2rps0AgsyKseb8jCkQ788VFZwePZZzMRA6OXHCIuVFxbnAPZlNvckCFz+b2oM132aYaqgbkk2IgAbShxUuEwuv6yb2mQapsavUUShxMK8AHmyJ39v5lQ2xiTQTougTwTG5MzYwIDAQAB
+
+Request Transaction ID: QPDeDrxTyvinTRn5sS+Oed8NYKOyydA3Fa5TYCgm7bY66V0TtIzRcdQKfjyaGIj5k709Cdy4HYvIuRP9K1XrjByIUtMAoEUFMKFHfliZIBE+DFfQQWN4M2Cdl+PUp1t0gGr83zJT3FBfjymDFFfetRrisNpj9lknWyOTF1NulXCV9D4MDHRqiw/E1bgT5lGujAOygq3YyXJEoBKFUJP5H97L9xSXjQQF7FtnhSLvJ94OFd1NPqC9ukUqzHB2aQ0zO/BFXfrdVnZ80xNSCVY9N3mK7TS+BTGoTXL05aOmAnLR1dBGhSSVZuQyDOqx+jGzFMYSSd6AW3YXIKcJItw8Jw==
+
+This submission was generated using https://dapp.truesight.me/report_dao_expenses.html?timestamp=1752609243802
+
+Verify submission here: https://dapp.truesight.me/verify_request.html
+`;
+
+  // Expected output
+  const expected = {
+    daoMemberName: "Gary Teh",
+    latitude: "44.440346",
+    longitude: "-123.284732",
+    inventoryType: "USD",
+    quantity: 1,
+    description: "Testing expense to ensure edgars expense recognition actually works",
+    attachedFilename: "IMG_9164.gif",
+    destinationFileLocation: "https://github.com/TrueSightDAO/.github/tree/main/assets/expense_20250715195712_gary_teh_img_9164.gif",
+    submissionSource: "https://dapp.truesight.me/report_dao_expenses.html?timestamp=1752609243802"
+  };
+
+  // Call the function to test
+  const result = extractExpenseDetails(testMessage);
+
+  // Log the input message for reference
+  Logger.log(`Input Message:\n${testMessage}`);
+
+  // Verify the result
+  if (!result) {
+    Logger.log("Test Failed: extractExpenseDetails returned null");
+    // Try partial matches to diagnose where the regex fails
+    const partialPatterns = [
+      /\[DAO Inventory Expense Event\].*?(?=\n\s*-|$)/i, // Up to first field
+      /\[DAO Inventory Expense Event\]\n\s*- DAO Member Name:\s*(.*?)(?=\n\s*-|$)/i, // Up to DAO Member Name
+      /\[DAO Inventory Expense Event\].*?- Inventory Type:\s*(.*?)(?=\n\s*-|$)/i, // Up to Inventory Type
+      /\[DAO Inventory Expense Event\].*?- Description:\s*(.*?)(?=\n\s*-|$)/i, // Up to Description
+      /\[DAO Inventory Expense Event\].*?(?:\n\s*-+\s*\n\s*My Digital Signature:.*)?$/i // Up to signature
+    ];
+    partialPatterns.forEach((pattern, index) => {
+      const match = testMessage.match(pattern);
+      Logger.log(`Partial Pattern ${index + 1} Match: ${JSON.stringify(match)}`);
+    });
+    return;
+  }
+
+  // Log the result for debugging
+  Logger.log("Test Result: " + JSON.stringify(result));
+
+  // Check each field
+  let testPassed = true;
+  for (const key in expected) {
+    if (result[key] !== expected[key]) {
+      Logger.log(`Test Failed: Mismatch in ${key}. Expected: ${expected[key]}, Got: ${result[key]}`);
+      testPassed = false;
+    }
+  }
+
+  // Additional check for quantity to ensure it's a number
+  if (typeof result.quantity !== "number") {
+    Logger.log("Test Failed: Quantity is not a number. Got: " + result.quantity);
+    testPassed = false;
+  }
+
+  // Log the final test result
+  if (testPassed) {
+    Logger.log("Test Passed: extractExpenseDetails correctly parsed the payload");
+  } else {
+    Logger.log("Test Failed: One or more fields did not match expected values");
+  }
 }
