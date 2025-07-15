@@ -7,10 +7,14 @@ const SOURCE_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1qbZZhf-_7xzmDT
 const SOURCE_SHEET_NAME = 'Telegram Chat Logs';
 const SCORED_EXPENSE_SHEET_URL = 'https://docs.google.com/spreadsheets/d/15co4NYVdlhOFK7y2EfyajXJ0aSj7OfezUndYoY6BNrY/edit?gid=0#gid=0';
 const SCORED_EXPENSE_SHEET_NAME = 'Scored Expense Submissions';
+
+
 // Sandbox
-// const OFFCHAIN_TRANSACTIONS_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1F90Sq6jSfj8io0RmiUwdydzuWXOZA9siXHWDsj9ItTo/edit?usp=drive_web&ouid=115975718038592349436';
+const OFFCHAIN_TRANSACTIONS_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1F90Sq6jSfj8io0RmiUwdydzuWXOZA9siXHWDsj9ItTo/edit?usp=drive_web&ouid=115975718038592349436';
+
 // Production
-const OFFCHAIN_TRANSACTIONS_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU/edit#gid=0';
+// const OFFCHAIN_TRANSACTIONS_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU/edit#gid=0';
+
 const OFFCHAIN_TRANSACTIONS_SHEET_NAME = 'offchain transactions';
 const CONTRIBUTORS_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU/edit?gid=1460794618#gid=1460794618';
 const CONTRIBUTORS_SHEET_NAME = 'Contributors contact information';
@@ -25,6 +29,7 @@ const CONTRIBUTOR_NAME_COL = 4; // Column E (Reporter Name)
 const MESSAGE_COL = 6; // Column G (Expense Reported)
 const SALES_DATE_COL = 11; // Column L (Status Date)
 const HASH_KEY_COL = 13; // Column N (Scoring Hash Key)
+const TELEGRAM_FILE_ID_COL = 14; // Column O (Telegram File ID)
 
 // Column indices for Scored Expense Submissions sheet
 const DEST_UPDATE_ID_COL = 0; // Column A
@@ -57,11 +62,9 @@ function generateHashKey(messageId, daoMemberName, salesDate) {
     const digest = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, input);
     // Convert byte array to hex string
     const hash = digest.map(byte => {
-      // Convert signed byte to unsigned hex
       const hex = (byte & 0xFF).toString(16);
       return hex.length === 1 ? '0' + hex : hex;
     }).join('');
-    // Return first 16 characters for brevity
     return hash.substring(0, 16);
   } catch (e) {
     Logger.log(`Error generating hash key: ${e.message}`);
@@ -69,21 +72,18 @@ function generateHashKey(messageId, daoMemberName, salesDate) {
   }
 }
 
-// Function to check if reporterName exists in Contributors sheet Column H (case-insensitive, with or without @)
+// Function to check if reporterName exists in Contributors sheet Column H
 function ReporterExist(reporterName) {
   try {
     const contributorsSpreadsheet = SpreadsheetApp.openByUrl(CONTRIBUTORS_SHEET_URL);
     const contributorsSheet = contributorsSpreadsheet.getSheetByName(CONTRIBUTORS_SHEET_NAME);
     const contributorsData = contributorsSheet.getDataRange().getValues();
     
-    // Normalize reporterName for comparison
     const normalizedReporterName = reporterName.toLowerCase().replace(/^@/, '');
     
-    // Skip header row
     for (let i = 1; i < contributorsData.length; i++) {
       const telegramHandle = contributorsData[i][TELEGRAM_HANDLE_COL_CONTRIBUTORS];
       if (telegramHandle) {
-        // Normalize telegram handle for comparison
         const normalizedHandle = telegramHandle.toLowerCase().replace(/^@/, '');
         Logger.log(normalizedHandle + " versus " + normalizedReporterName);
         if (normalizedHandle === normalizedReporterName) {
@@ -101,17 +101,126 @@ function ReporterExist(reporterName) {
 
 // Function to extract expense details from message using regex
 function extractExpenseDetails(message) {
-  const pattern = /\[DAO Inventory Expense Event\]\n- DAO Member Name: (.*?)\n- Inventory Type: (.*?)\n- Inventory Quantity: (\d+\.?\d*)\n- Expense Description: (.*)/i;
+  const pattern = /\[DAO Inventory Expense Event\]\n- DAO Member Name: (.*?)\n- (?:Latitude: (.*?)\n- Longitude: (.*?)\n- )?Inventory Type: (.*?)\n- Inventory Quantity: (\d+\.?\d*)\n- Description: (.*?)(?:\n- Attached Filename: (.*?))?(?:\n- Destination Expense File Location: (.*?))?(?:\n- Submission Source: (.*?))?(?:\n-+\nMy Digital Signature:.*)?$/i;
   const match = message.match(pattern);
   if (match) {
     return {
       daoMemberName: match[1],
-      inventoryType: match[2],
-      quantity: parseFloat(match[3]),
-      description: match[4]
+      latitude: match[2] || null,
+      longitude: match[3] || null,
+      inventoryType: match[4],
+      quantity: parseFloat(match[5]),
+      description: match[6],
+      attachedFilename: match[7] || null,
+      destinationFileLocation: match[8] || null,
+      submissionSource: match[9] || null
     };
   }
   return null;
+}
+
+// Function to check Telegram file ID and get from previous row if needed
+function getTelegramFileId(sourceSheet, currentRowIndex, sourceData) {
+  try {
+    // Check current row's Column O
+    let fileId = sourceData[currentRowIndex][TELEGRAM_FILE_ID_COL];
+    if (fileId) {
+      return fileId;
+    }
+    
+    // If not found, check previous row
+    if (currentRowIndex > 1) {
+      fileId = sourceData[currentRowIndex - 1][TELEGRAM_FILE_ID_COL];
+      return fileId || null;
+    }
+    
+    return null;
+  } catch (e) {
+    Logger.log(`Error checking Telegram file ID: ${e.message}`);
+    return null;
+  }
+}
+
+// Function to check if file exists in GitHub
+function checkFileExistsInGitHub(fileUrl) {
+  try {
+    const options = {
+      method: 'get',
+      muteHttpExceptions: true
+    };
+    const response = UrlFetchApp.fetch(fileUrl, options);
+    return response.getResponseCode() === 200;
+  } catch (e) {
+    Logger.log(`Error checking file existence in GitHub: ${e.message}`);
+    return false;
+  }
+}
+
+// Function to upload file to GitHub
+function uploadFileToGitHub(fileId, destinationUrl, commitMessage) {
+  try {
+    const token = creds.GITHUB_API_TOKEN;
+    if (!token) {
+      Logger.log(`uploadFileToGitHub: Error: GITHUB_API_TOKEN not set in Credentials`);
+      return false;
+    }
+
+    // Get file content from Telegram
+    const telegramApiUrl = `https://api.telegram.org/bot${creds.TELEGRAM_API_TOKEN}/getFile?file_id=${fileId}`;
+    const fileResponse = UrlFetchApp.fetch(telegramApiUrl);
+    const fileData = JSON.parse(fileResponse.getContentText());
+    
+    if (!fileData.ok) {
+      Logger.log(`Failed to get file info from Telegram: ${fileData.description}`);
+      return false;
+    }
+
+    const filePath = fileData.result.file_path;
+    const fileContentResponse = UrlFetchApp.fetch(`https://api.telegram.org/file/bot${creds.TELEGRAM_API_TOKEN}/${filePath}`);
+    const fileContent = Utilities.base64Encode(fileContentResponse.getBlob().getBytes());
+
+    // Parse GitHub URL to get repo details
+    const urlPattern = /github\.com\/([^\/]+)\/([^\/]+)\/tree\/([^\/]+)\/(.+)/i;
+    const match = destinationUrl.match(urlPattern);
+    if (!match) {
+      Logger.log(`Invalid GitHub URL format: ${destinationUrl}`);
+      return false;
+    }
+
+    const [, owner, repo, branch, path] = match;
+    
+    // GitHub API request to create/update file
+    const githubApiUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${path}`;
+    const payload = {
+      message: commitMessage,
+      content: fileContent,
+      branch: branch
+    };
+
+    const options = {
+      method: 'put',
+      headers: {
+        'Authorization': `token ${token}`,
+        'Accept': 'application/vnd.github.v3+json'
+      },
+      contentType: 'application/json',
+      payload: JSON.stringify(payload),
+      muteHttpExceptions: true
+    };
+
+    const response = UrlFetchApp.fetch(githubApiUrl, options);
+    const status = response.getResponseCode();
+    if (status === 200 || status === 201) {
+      Logger.log(`Successfully uploaded file to GitHub: ${destinationUrl}`);
+      return true;
+    } else {
+      Logger.log(`Failed to upload file to GitHub. Status: ${status}, Response: ${response.getContentText()}`);
+      return false;
+    }
+  } catch (e) {
+    Logger.log(`Error uploading file to GitHub: ${e.message}`);
+    return false;
+  }
 }
 
 // Function to insert records into offchain transactions sheet
@@ -127,17 +236,17 @@ function InsertExpenseRecords(scoredRow, rowIndex) {
     }
 
     const rowToAppend = [
-      scoredRow[DEST_STATUS_DATE_COL], // Column A: Status date
-      `${scoredRow[DEST_EXPENSE_REPORTED_COL]} reported by ${scoredRow[DEST_CHAT_NAME_COL]} \n\n\nAutomated processing by Edgar via script: https://github.com/TrueSightDAO/tokenomics/blob/main/google_app_scripts/tdg_asset_management/tdg_expenses_processing.gs\n\nEdgar Scoring Hash Key: ${scoredRow[DEST_HASH_KEY_COL]}`, // Column B: Description
-      expenseDetails.daoMemberName, // Column C: Fund Handler (DAO Member Name)
-      expenseDetails.quantity * -1, // Column D: Amount (Inventory Quantity)
-      expenseDetails.inventoryType // Column E: Inventory Type
+      scoredRow[DEST_STATUS_DATE_COL],
+      `${scoredRow[DEST_EXPENSE_REPORTED_COL]} reported by ${scoredRow[DEST_CHAT_NAME_COL]} \n\n\nAutomated processing by Edgar via script: https://github.com/TrueSightDAO/tokenomics/blob/main/google_app_scripts/tdg_asset_management/tdg_expenses_processing.gs\n\nEdgar Scoring Hash Key: ${scoredRow[DEST_HASH_KEY_COL]}`,
+      expenseDetails.daoMemberName,
+      expenseDetails.quantity * -1,
+      expenseDetails.inventoryType
     ];
 
     const lastRow = offchainSheet.getLastRow();
     offchainSheet.getRange(lastRow + 1, 1, 1, rowToAppend.length).setValues([rowToAppend]);
     Logger.log(`Inserted transaction record at row ${lastRow + 1} for hash key ${scoredRow[DEST_HASH_KEY_COL]}`);
-    return lastRow + 1; // Return the 1-based row number
+    return lastRow + 1;
   } catch (e) {
     Logger.log(`Error inserting into offchain transactions sheet: ${e.message}`);
     return null;
@@ -153,10 +262,8 @@ function sendExpenseNotification(rowData, scoredRowNumber, transactionRowNumber)
   }
 
   const apiUrl = `https://api.telegram.org/bot${token}/sendMessage`;
-  const timestamp = new Date().getTime();
   const outputSheetLink = `https://truesight.me/physical-transactions/expenses`;
 
-  // Format the message with all inserted data
   const messageText = `New DAO Inventory Expense Recorded\n\n` +
     `Scored Expense Submissions Row: ${scoredRowNumber}\n` +
     `Telegram Update ID: ${rowData[DEST_UPDATE_ID_COL]}\n` +
@@ -203,29 +310,22 @@ function sendExpenseNotification(rowData, scoredRowNumber, transactionRowNumber)
 // Main function to parse and process Telegram logs for DAO expense events
 function parseAndProcessTelegramLogs() {
   try {
-    // Get source and destination spreadsheets
     const sourceSpreadsheet = SpreadsheetApp.openByUrl(SOURCE_SHEET_URL);
     const scoredExpenseSpreadsheet = SpreadsheetApp.openByUrl(SCORED_EXPENSE_SHEET_URL);
     const sourceSheet = sourceSpreadsheet.getSheetByName(SOURCE_SHEET_NAME);
     const scoredExpenseSheet = scoredExpenseSpreadsheet.getSheetByName(SCORED_EXPENSE_SHEET_NAME);
     
-    // Get data from source and destination sheets
     const sourceData = sourceSheet.getDataRange().getValues();
     const scoredData = scoredExpenseSheet.getDataRange().getValues();
     
-    // Get existing hash keys from Scored Expense Submissions sheet to check for duplicates
     const existingHashKeys = scoredData.slice(1).map(row => row[DEST_HASH_KEY_COL]).filter(key => key);
     
     let newEntries = 0;
-    
-    // Pattern for DAO Inventory Expense Event
     const expensePattern = /\[DAO Inventory Expense Event\]/i;
     
-    // Process source data, skipping header row
     for (let i = 1; i < sourceData.length; i++) {
       const message = sourceData[i][MESSAGE_COL];
       
-      // Extract expense details early to use for hash key generation
       const expenseDetails = extractExpenseDetails(message);
       Logger.log(message);
       Logger.log(expenseDetails);
@@ -234,7 +334,6 @@ function parseAndProcessTelegramLogs() {
         continue;
       }
       
-      // Generate hash key
       const hashKey = generateHashKey(
         sourceData[i][TELEGRAM_MESSAGE_ID_COL],
         expenseDetails.daoMemberName,
@@ -244,49 +343,58 @@ function parseAndProcessTelegramLogs() {
       Logger.log(message + " \npattern match: " + expensePattern.test(message) + " \nprocessed: " + existingHashKeys.includes(hashKey));
       Logger.log("To process: " + (expensePattern.test(message) && !existingHashKeys.includes(hashKey)));
       
-      // Check if message matches the expense pattern and hash key is not already processed
       if (expensePattern.test(message) && !existingHashKeys.includes(hashKey)) {
         Logger.log("Line 148: new line detected");
-        // Validate reporter name against Contributors sheet
         const reporterName = sourceData[i][CONTRIBUTOR_NAME_COL];
         if (!ReporterExist(reporterName)) {
           Logger.log(`Skipping row ${i + 1} due to invalid reporter: ${reporterName}`);
           continue;
         }
         
-        // Prepare row for Scored Expense Submissions
+        // Check for Telegram file ID and upload if needed
+        if (expenseDetails.attachedFilename && expenseDetails.destinationFileLocation) {
+          const fileId = getTelegramFileId(sourceSheet, i, sourceData);
+          if (fileId && !checkFileExistsInGitHub(expenseDetails.destinationFileLocation)) {
+            const uploaded = uploadFileToGitHub(fileId, expenseDetails.destinationFileLocation, message);
+            if (uploaded) {
+              Logger.log(`Successfully uploaded file ${expenseDetails.attachedFilename} for row ${i + 1}`);
+            } else {
+              Logger.log(`Failed to upload file ${expenseDetails.attachedFilename} for row ${i + 1}`);
+            }
+          } else if (!fileId) {
+            Logger.log(`No Telegram file ID found for row ${i + 1}`);
+          } else {
+            Logger.log(`File already exists at ${expenseDetails.destinationFileLocation}, skipping upload`);
+          }
+        }
+        
         const rowToAppend = [
-          sourceData[i][TELEGRAM_UPDATE_ID_COL], // Column A: Telegram Update ID
-          sourceData[i][CHAT_ID_COL], // Column B: Telegram Chatroom ID
-          sourceData[i][CHAT_NAME_COL], // Column C: Telegram Chatroom Name
-          sourceData[i][TELEGRAM_MESSAGE_ID_COL], // Column D: Telegram Message ID
-          reporterName, // Column E: Reporter Name
-          message, // Column F: Expense Reported
-          sourceData[i][SALES_DATE_COL], // Column G: Status Date
-          expenseDetails.daoMemberName, // Column H: Contributor Name
-          expenseDetails.inventoryType, // Column I: Currency (Inventory Type)
-          expenseDetails.quantity * -1, // Column J: Amount
-          hashKey, // Column K: Scoring Hash Key
-          '' // Column L: Transaction Line (to be updated)
+          sourceData[i][TELEGRAM_UPDATE_ID_COL],
+          sourceData[i][CHAT_ID_COL],
+          sourceData[i][CHAT_NAME_COL],
+          sourceData[i][TELEGRAM_MESSAGE_ID_COL],
+          reporterName,
+          message,
+          sourceData[i][SALES_DATE_COL],
+          expenseDetails.daoMemberName,
+          expenseDetails.inventoryType,
+          expenseDetails.quantity * -1,
+          hashKey,
+          ''
         ];
         
-        // Append to Scored Expense Submissions
         const lastRow = scoredExpenseSheet.getLastRow();
         const scoredRowNumber = lastRow + 1;
         scoredExpenseSheet.getRange(scoredRowNumber, 1, 1, rowToAppend.length).setValues([rowToAppend]);
         
-        // Insert into offchain transactions and get the transaction row number
         const transactionRowNumber = InsertExpenseRecords(rowToAppend, i);
         
-        // Update Column L in Scored Expense Submissions with the transaction row number
         if (transactionRowNumber) {
           scoredExpenseSheet.getRange(scoredRowNumber, DEST_TRANSACTION_LINE_COL + 1).setValue(transactionRowNumber);
         }
         
-        // Send Telegram notification
         sendExpenseNotification(rowToAppend, scoredRowNumber, transactionRowNumber);
         
-        // Update existing hash keys and increment counter
         existingHashKeys.push(hashKey);
         newEntries++;
         
