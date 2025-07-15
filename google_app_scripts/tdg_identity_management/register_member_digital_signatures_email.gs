@@ -182,8 +182,8 @@ function sendEmailReply(message, { signature, contributorName, isDuplicate = fal
     ? "Digital Signature Registration Failed"
     : "Digital Signature Registered";
   const messageText = isDuplicate
-    ? `Dear Contributor,\n\nThe digital signature (${signature.substring(0, 20)}...) you submitted already exists in our registry.\nDigital Signature Registry: http://truesight.me/digital-signatures\n\nPlease submit a unique signature.\n\nBest regards,\nTDG Identity Management`
-    : `Dear ${contributorName},\n\nYour digital signature has been registered successfully.\n\nDetails:\nContributor: ${contributorName}\nSignature: ${signature}\n\nDigital Signature Registry:  https://truesight.me/digital-signatures\n\nBest regards,\nTDG Identity Management`;
+    ? `Dear Contributor,\n\nThe digital signature (${signature.substring(0, 20)}...) you submitted already exists in our registry.\nDigital Signature Registry: http://truesight.me/digital-signatures\n\nPlease submit a unique signature.\n\nBest regards,\nTrueSight DAO`
+    : `Dear ${contributorName},\n\nYour digital signature has been registered successfully.\n\nDetails:\nContributor: ${contributorName}\nSignature: ${signature}\n\nDigital Signature Registry:  https://truesight.me/digital-signatures\n\nBest regards,\nTrueSight DAO`;
 
   try {
     GmailApp.sendEmail(recipient, subject, messageText, {
