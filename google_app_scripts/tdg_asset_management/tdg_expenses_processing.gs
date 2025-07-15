@@ -9,10 +9,10 @@ const SCORED_EXPENSE_SHEET_URL = 'https://docs.google.com/spreadsheets/d/15co4NY
 const SCORED_EXPENSE_SHEET_NAME = 'Scored Expense Submissions';
 
 // Sandbox
-const OFFCHAIN_TRANSACTIONS_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1F90Sq6jSfj8io0RmiUwdydzuWXOZA9siXHWDsj9ItTo/edit?usp=drive_web&ouid=115975718038592349436';
+// const OFFCHAIN_TRANSACTIONS_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1F90Sq6jSfj8io0RmiUwdydzuWXOZA9siXHWDsj9ItTo/edit?usp=drive_web&ouid=115975718038592349436';
 
 // Production
-// const OFFCHAIN_TRANSACTIONS_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU/edit#gid=0';
+const OFFCHAIN_TRANSACTIONS_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU/edit#gid=0';
 
 const OFFCHAIN_TRANSACTIONS_SHEET_NAME = 'offchain transactions';
 const CONTRIBUTORS_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU/edit?gid=1460794618#gid=1460794618';
@@ -127,40 +127,50 @@ function extractExpenseDetails(message) {
   };
 }
 
-// Function to check Telegram file ID and get from previous row if needed
-function getTelegramFileId(sourceSheet, currentRowIndex, sourceData) {
+// Function to generate a unique GitHub filename with a running number
+function generateUniqueGitHubFilename(originalUrl, index) {
   try {
-    // Check current row's Column O
-    let fileId = sourceData[currentRowIndex][TELEGRAM_FILE_ID_COL];
-    if (fileId) {
-      return fileId;
+    // Parse the original URL to extract path components
+    const urlPattern = /github\.com\/([^\/]+)\/([^\/]+)\/tree\/([^\/]+)\/(.+?)(\.[^.]+)$/i;
+    const match = originalUrl.match(urlPattern);
+    if (!match) {
+      Logger.log(`Invalid GitHub URL format for generating unique filename: ${originalUrl}`);
+      return null;
     }
-    
-    // If not found, check previous row
-    if (currentRowIndex > 1) {
-      fileId = sourceData[currentRowIndex - 1][TELEGRAM_FILE_ID_COL];
-      return fileId || null;
-    }
-    
-    return null;
+
+    const [, owner, repo, branch, pathWithoutExtension, extension] = match;
+    // Generate new filename with running number
+    const newPath = `${pathWithoutExtension}_${index}${extension}`;
+    const newUrl = `https://github.com/${owner}/${repo}/tree/${branch}/${newPath}`;
+    return newUrl;
   } catch (e) {
-    Logger.log(`Error checking Telegram file ID: ${e.message}`);
+    Logger.log(`Error generating unique GitHub filename: ${e.message}`);
     return null;
   }
 }
 
-// Function to check if file exists in GitHub
-function checkFileExistsInGitHub(fileUrl) {
+// Function to check Telegram file ID and get from current or previous row
+function getTelegramFileId(sourceSheet, currentRowIndex, sourceData) {
   try {
-    const options = {
-      method: 'get',
-      muteHttpExceptions: true
-    };
-    const response = UrlFetchApp.fetch(fileUrl, options);
-    return response.getResponseCode() === 200;
+    // Check current row's Column O
+    let fileIds = sourceData[currentRowIndex][TELEGRAM_FILE_ID_COL];
+    if (fileIds && typeof fileIds === 'string') {
+      // Split comma-separated file IDs and filter out empty values
+      return fileIds.split(',').map(id => id.trim()).filter(id => id);
+    }
+    
+    // If not found, check previous row
+    if (currentRowIndex > 1) {
+      fileIds = sourceData[currentRowIndex - 1][TELEGRAM_FILE_ID_COL];
+      if (fileIds && typeof fileIds === 'string') {
+        return fileIds.split(',').map(id => id.trim()).filter(id => id);
+      }
+    }
+    
+    return [];
   } catch (e) {
-    Logger.log(`Error checking file existence in GitHub: ${e.message}`);
-    return false;
+    Logger.log(`Error checking Telegram file ID: ${e.message}`);
+    return [];
   }
 }
 
@@ -359,21 +369,45 @@ function parseAndProcessTelegramLogs() {
           continue;
         }
         
-        // Check for Telegram file ID and upload if needed
+        // Check for Telegram file IDs and upload if needed
         if (expenseDetails.attachedFilename && expenseDetails.destinationFileLocation) {
-          const fileId = getTelegramFileId(sourceSheet, i, sourceData);
-          Logger.log("processing file id " + fileId);
-          if (fileId && !checkFileExistsInGitHub(expenseDetails.destinationFileLocation)) {
-            const uploaded = uploadFileToGitHub(fileId, expenseDetails.destinationFileLocation, message);
+          const fileIds = getTelegramFileId(sourceSheet, i, sourceData);
+          Logger.log(`Processing file IDs: ${fileIds.join(', ')}`);
+          
+          // Process the first file ID with the original destination URL
+          if (fileIds.length > 0 && !checkFileExistsInGitHub(expenseDetails.destinationFileLocation)) {
+            const uploaded = uploadFileToGitHub(fileIds[0], expenseDetails.destinationFileLocation, message);
             if (uploaded) {
-              Logger.log(`Successfully uploaded file ${expenseDetails.attachedFilename} for row ${i + 1}`);
+              Logger.log(`Successfully uploaded primary file ${expenseDetails.attachedFilename} for row ${i + 1} to ${expenseDetails.destinationFileLocation}`);
             } else {
-              Logger.log(`Failed to upload file ${expenseDetails.attachedFilename} for row ${i + 1}`);
+              Logger.log(`Failed to upload primary file ${expenseDetails.attachedFilename} for row ${i + 1}`);
             }
-          } else if (!fileId) {
-            Logger.log(`No Telegram file ID found for row ${i + 1}`);
+          } else if (fileIds.length === 0) {
+            Logger.log(`No Telegram file IDs found for row ${i + 1}`);
           } else {
-            Logger.log(`File already exists at ${expenseDetails.destinationFileLocation}, skipping upload`);
+            Logger.log(`Primary file already exists at ${expenseDetails.destinationFileLocation}, skipping upload`);
+          }
+
+          // Process additional unique file IDs
+          const processedFileIds = [fileIds[0]]; // Track processed file IDs to ensure uniqueness
+          for (let j = 1; j < fileIds.length; j++) {
+            const fileId = fileIds[j];
+            if (fileId && !processedFileIds.includes(fileId)) {
+              const newDestinationUrl = generateUniqueGitHubFilename(expenseDetails.destinationFileLocation, j);
+              if (newDestinationUrl && !checkFileExistsInGitHub(newDestinationUrl)) {
+                const uploaded = uploadFileToGitHub(fileId, newDestinationUrl, `Additional file for ${message}`);
+                if (uploaded) {
+                  Logger.log(`Successfully uploaded additional file ${fileId} for row ${i + 1} to ${newDestinationUrl}`);
+                } else {
+                  Logger.log(`Failed to upload additional file ${fileId} for row ${i + 1} to ${newDestinationUrl}`);
+                }
+              } else if (!newDestinationUrl) {
+                Logger.log(`Failed to generate unique filename for additional file ID ${fileId} for row ${i + 1}`);
+              } else {
+                Logger.log(`Additional file already exists at ${newDestinationUrl}, skipping upload`);
+              }
+              processedFileIds.push(fileId);
+            }
           }
         }
         
@@ -433,9 +467,9 @@ function doGet(e) {
   return ContentService.createTextOutput("ℹ️ No valid action specified");
 }
 
-// New test function to process a specific row from the source sheet
+// Test function to process a specific row from the source sheet
 function testParseAndProcessRow() {
-  rowNumber = 5946;
+  rowNumber = 5948
   try {
     // Validate row number
     if (!Number.isInteger(rowNumber) || rowNumber < 2) {
@@ -519,21 +553,67 @@ function testParseAndProcessRow() {
     Logger.log(`Reporter ${reporterName} validated successfully`);
 
     // Step 5: Check file upload if applicable
-    let fileUploadStatus = "N/A";
+    let fileUploadStatus = [];
     if (expenseDetails.attachedFilename && expenseDetails.destinationFileLocation) {
-      const fileId = getTelegramFileId(sourceSheet, i, sourceData);
-      Logger.log(`File ID: ${fileId}`);
-      if (fileId && !checkFileExistsInGitHub(expenseDetails.destinationFileLocation)) {
-        const uploaded = uploadFileToGitHub(fileId, expenseDetails.destinationFileLocation, message);
-        fileUploadStatus = uploaded ? "Success" : "Failed";
-        Logger.log(`File Upload Status: ${fileUploadStatus} for ${expenseDetails.attachedFilename}`);
-      } else if (!fileId) {
-        fileUploadStatus = "No Telegram file ID found";
-        Logger.log(`No Telegram file ID found for row ${rowNumber}`);
+      const fileIds = getTelegramFileId(sourceSheet, i, sourceData);
+      Logger.log(`File IDs: ${fileIds.join(', ')}`);
+      
+      // Process the first file ID with the original destination URL
+      if (fileIds.length > 0 && !checkFileExistsInGitHub(expenseDetails.destinationFileLocation)) {
+        const uploaded = uploadFileToGitHub(fileIds[0], expenseDetails.destinationFileLocation, message);
+        fileUploadStatus.push({
+          fileId: fileIds[0],
+          destination: expenseDetails.destinationFileLocation,
+          status: uploaded ? "Success" : "Failed"
+        });
+        Logger.log(`Primary File Upload Status: ${uploaded ? "Success" : "Failed"} for ${expenseDetails.attachedFilename}`);
+      } else if (fileIds.length === 0) {
+        fileUploadStatus.push({ fileId: null, destination: null, status: "No Telegram file IDs found" });
+        Logger.log(`No Telegram file IDs found for row ${rowNumber}`);
       } else {
-        fileUploadStatus = "File already exists";
-        Logger.log(`File already exists at ${expenseDetails.destinationFileLocation}, skipping upload`);
+        fileUploadStatus.push({
+          fileId: fileIds[0],
+          destination: expenseDetails.destinationFileLocation,
+          status: "File already exists"
+        });
+        Logger.log(`Primary file already exists at ${expenseDetails.destinationFileLocation}, skipping upload`);
       }
+
+      // Process additional unique file IDs
+      const processedFileIds = [fileIds[0]]; // Track processed file IDs to ensure uniqueness
+      for (let j = 1; j < fileIds.length; j++) {
+        const fileId = fileIds[j];
+        if (fileId && !processedFileIds.includes(fileId)) {
+          const newDestinationUrl = generateUniqueGitHubFilename(expenseDetails.destinationFileLocation, j);
+          if (newDestinationUrl && !checkFileExistsInGitHub(newDestinationUrl)) {
+            const uploaded = uploadFileToGitHub(fileId, newDestinationUrl, `Additional file for ${message}`);
+            fileUploadStatus.push({
+              fileId: fileId,
+              destination: newDestinationUrl,
+              status: uploaded ? "Success" : "Failed"
+            });
+            Logger.log(`Additional File Upload Status: ${uploaded ? "Success" : "Failed"} for ${fileId} to ${newDestinationUrl}`);
+          } else if (!newDestinationUrl) {
+            fileUploadStatus.push({
+              fileId: fileId,
+              destination: null,
+              status: "Failed to generate unique filename"
+            });
+            Logger.log(`Failed to generate unique filename for additional file ID ${fileId} for row ${rowNumber}`);
+          } else {
+            fileUploadStatus.push({
+              fileId: fileId,
+              destination: newDestinationUrl,
+              status: "File already exists"
+            });
+            Logger.log(`Additional file already exists at ${newDestinationUrl}, skipping upload`);
+          }
+          processedFileIds.push(fileId);
+        }
+      }
+    } else {
+      fileUploadStatus.push({ fileId: null, destination: null, status: "No attached filename or destination" });
+      Logger.log(`No attached filename or destination for row ${rowNumber}`);
     }
 
     // Step 6: Simulate appending to scored expense sheet
@@ -564,8 +644,23 @@ function testParseAndProcessRow() {
 
     // Log test success
     Logger.log(`Test Passed: Successfully processed row ${rowNumber} with hash key: ${hashKey}`);
-    Logger.log(`Summary: File Upload: ${fileUploadStatus}, Transaction Row: ${transactionRowNumber || 'Not recorded'}`);
+    Logger.log(`Summary: File Uploads: ${JSON.stringify(fileUploadStatus)}, Transaction Row: ${transactionRowNumber || 'Not recorded'}`);
   } catch (e) {
     Logger.log(`Test Failed: Error processing row ${rowNumber}: ${e.message}`);
+  }
+}
+
+// Function to check if file exists in GitHub
+function checkFileExistsInGitHub(fileUrl) {
+  try {
+    const options = {
+      method: 'get',
+      muteHttpExceptions: true
+    };
+    const response = UrlFetchApp.fetch(fileUrl, options);
+    return response.getResponseCode() === 200;
+  } catch (e) {
+    Logger.log(`Error checking file existence in GitHub: ${e.message}`);
+    return false;
   }
 }
