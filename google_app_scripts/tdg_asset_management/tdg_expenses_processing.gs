@@ -364,6 +364,7 @@ function parseAndProcessTelegramLogs() {
         // Check for Telegram file ID and upload if needed
         if (expenseDetails.attachedFilename && expenseDetails.destinationFileLocation) {
           const fileId = getTelegramFileId(sourceSheet, i, sourceData);
+          Logger.log("processing file id " + fileId);
           if (fileId && !checkFileExistsInGitHub(expenseDetails.destinationFileLocation)) {
             const uploaded = uploadFileToGitHub(fileId, expenseDetails.destinationFileLocation, message);
             if (uploaded) {
