@@ -5,7 +5,7 @@ Batch compile QR codes into labeled images.
 Fetch QR code values and farm names from a Google Sheet,
 generate QR codes pointing to the check URL, embed each QR code
 into a template image, annotate above with farm name and below with serial.
-Save compiled images to an output directory.
+Save compiled images to an output directory and a to_print subdirectory for new images.
 """
 import argparse
 import os
@@ -30,7 +30,7 @@ QR_BASE_SIZE = 300            # base QR size for blank canvas before scaling (px
 QR_RATIO = 0.5                 # QR size as fraction of template width when template provided
 
 # Font size defaults (in pixels)
-DEFAULT_HARVEST_FONT_SIZE = 20 # default font size for harvest line
+DEFAULT_HARVEST_FONT_SIZE = 20 # default font size for harvest/pledge line
 DEFAULT_INFO_FONT_SIZE = 30   # default font size for info line
 DEFAULT_PLANT_FONT_SIZE = 25   # default font size for plant line
 MIN_FONT_RATIO = 0.02          # minimum font size as fraction of canvas height
@@ -38,15 +38,14 @@ MIN_FONT_SIZE = 8              # absolute minimum font size in pixels
 
 # Spacing ratios relative to canvas height
 SIDE_MARGIN_RATIO = 0.05       # horizontal side margin as fraction of canvas width
-QR_TO_HARVEST_RATIO = 0.00001    # vertical space from QR to harvest line
-HARVEST_TO_INFO_RATIO = 0.10   # vertical space from harvest to info line
+QR_TO_HARVEST_RATIO = 0.00001  # vertical space from QR to harvest/pledge line
+HARVEST_TO_INFO_RATIO = 0.10   # vertical space from harvest/pledge to info line
 INFO_TO_PLANT_RATIO = 0.07     # vertical space from info to plant line
-# bottom margin as fraction of canvas height
 BOTTOM_MARGIN_RATIO = 0.05     # bottom margin as fraction of canvas height
 
 # Manual fixed positions (in pixels) to override dynamic layout. Set to None to use auto-layout
 FIXED_QR_Y = -25              # override QR Y position (px); e.g., -30
-FIXED_HARVEST_Y = 240         # override harvest text Y position (px)
+FIXED_HARVEST_Y = 240         # override harvest/pledge text Y position (px)
 FIXED_INFO_Y = 265            # override info text Y position (px)
 FIXED_PLANT_Y = 298           # override plant text Y position (px)
 
@@ -63,12 +62,12 @@ def extract_sheet_id(sheet_url: str) -> str:
 
 def fetch_rows(credentials_path: str, sheet_url: str, sheet_name: str):
     """
-    Fetch rows from Google Sheet, returning list of tuples (qr_code, farm_name).
+    Fetch rows from Google Sheet, returning list of tuples (qr_code, farm_name, state, country, year, is_cacao).
     """
     client = gdrive.GDrive(credentials_path=credentials_path)
     sheet_id = extract_sheet_id(sheet_url)
     service = build('sheets', 'v4', credentials=client.creds)
-    # We expect columns: A=QR code, E=Farm Name, F=State, G=Country, H=Year
+    # We expect columns: A=QR code, B=URL, E=Farm Name, F=State, G=Country, H=Year
     range_name = f"'{sheet_name}'!A2:H"
     result = service.spreadsheets().values().get(
         spreadsheetId=sheet_id, range=range_name
@@ -79,12 +78,15 @@ def fetch_rows(credentials_path: str, sheet_url: str, sheet_name: str):
         if not row:
             continue
         qr_code = row[0].strip()
+        url = row[1].strip() if len(row) >= 2 else ''
         farm_name = row[4].strip() if len(row) >= 5 else ''
         state = row[5].strip() if len(row) >= 6 else ''
         country = row[6].strip() if len(row) >= 7 else ''
         year = row[7].strip() if len(row) >= 8 else ''
+        # Determine if item is cacao based on URL in column B
+        is_cacao = url.startswith('https://www.agroverse.shop')
         if qr_code:
-            rows.append((qr_code, farm_name, state, country, year))
+            rows.append((qr_code, farm_name, state, country, year, is_cacao))
     return rows
 
 
@@ -133,6 +135,7 @@ def compile_image(template_path: str,
                   country: str,
                   year: str,
                   serial: str,
+                  is_cacao: bool,
                   font_family: str = DEFAULT_FONT_FAMILY,
                   harvest_font_size: int = DEFAULT_HARVEST_FONT_SIZE,
                   info_font_size: int = DEFAULT_INFO_FONT_SIZE,
@@ -140,10 +143,11 @@ def compile_image(template_path: str,
                   ignore_max_width: bool = False):
     """
     Embed QR code into the provided template image, annotate below with:
-      Harvest <year>
+      Harvest <year> (for cacao, if year exists) or Pledge Year <year> (for non-cacao, if year exists) or Pledge Confirmed
       Farm Name, State, Country
       Your tree is getting planted
     Spacing and font sizes are set explicitly or use defaults.
+    :param is_cacao: True if item is cacao, False otherwise.
     :param ignore_max_width: if True, skip auto-resizing to fit text width constraints.
     """
     # Determine canvas size and QR size; blank canvas is scaled up by factor
@@ -176,7 +180,11 @@ def compile_image(template_path: str,
             return mask.size
 
     # Prepare text lines
-    harvest_text = f"Harvest {year}" if year else serial
+    if is_cacao:
+        harvest_text = f"Harvest {year}" if year else "Pledge Confirmed"
+    else:
+        harvest_text = f"Restoring Rainforest since {year}" if year else "Restoring Rainforest"
+
     info_parts = [farm_name]
     if state:
         info_parts.append(state)
@@ -222,32 +230,6 @@ def compile_image(template_path: str,
     f_info = load_font(f_info_size)
     f_plant = load_font(f_plant_size)
 
-    # Optionally ensure text fits within max_width
-    # if not ignore_max_width:
-    #     # Harvest line
-    #     while True:
-    #         w, _ = text_size(harvest_text, f_harvest)
-    #         if w <= max_width or f_harvest_size <= min_font:
-    #             break
-    #         f_harvest_size -= 1
-    #         f_harvest = load_font(f_harvest_size)
-
-    #     # Info line
-    #     while True:
-    #         w, _ = text_size(info_text, f_info)
-    #         if w <= max_width or f_info_size <= min_font:
-    #             break
-    #         f_info_size -= 1
-    #         f_info = load_font(f_info_size)
-
-    #     # Plant line
-    #     while True:
-    #         w, _ = text_size(plant_text, f_plant)
-    #         if w <= max_width or f_plant_size <= min_font:
-    #             break
-    #         f_plant_size -= 1
-    #         f_plant = load_font(f_plant_size)
-
     # Measure text heights
     _, h1 = text_size(harvest_text, f_harvest)
     _, h2 = text_size(info_text, f_info)
@@ -273,7 +255,7 @@ def compile_image(template_path: str,
     info_y    = FIXED_INFO_Y    if FIXED_INFO_Y    is not None else harvest_y + h1 + m2
     plant_y   = FIXED_PLANT_Y   if FIXED_PLANT_Y   is not None else info_y    + h2 + m3
 
-    # Draw harvest text (centered horizontally)
+    # Draw harvest/pledge text (centered horizontally)
     w_harvest, _ = text_size(harvest_text, f_harvest)
     x = (bg_w - w_harvest) // 2
     draw.text((x, harvest_y), harvest_text, fill="black", font=f_harvest)
@@ -325,9 +307,14 @@ def main():
         "--border", type=int, default=8, help="QR code border size (in boxes; increased default for better margins)"
     )
     parser.add_argument(
-        "--logo", dest="logo",
+        "--cacao-logo", dest="cacao_logo",
+        default=os.path.join(os.path.dirname(__file__), "agroverse_logo.jpg"),
+        help="Path to logo image for cacao items (default: agroverse_logo.jpg)"
+    )
+    parser.add_argument(
+        "--non-cacao-logo", dest="non_cacao_logo",
         default=os.path.join(os.path.dirname(__file__), "truesight_icon.png"),
-        help="Path to logo image to embed at center of QR code (optional)"
+        help="Path to logo image for non-cacao items (default: truesight_icon.png)"
     )
     parser.add_argument(
         "--logo-ratio", dest="logo_ratio", type=float, default=0.2,
@@ -344,7 +331,7 @@ def main():
     parser.add_argument(
         "--harvest-font-size", dest="harvest_font_size", type=int,
         default=DEFAULT_HARVEST_FONT_SIZE,
-        help="Explicit font size in px for harvest line"
+        help="Explicit font size in px for harvest/pledge line"
     )
     parser.add_argument(
         "--info-font-size", dest="info_font_size", type=int,
@@ -363,13 +350,17 @@ def main():
     args = parser.parse_args()
     # If requested, disable logo embedding
     if getattr(args, 'no_logo', False):
-        args.logo = None
+        args.cacao_logo = None
+        args.non_cacao_logo = None
 
-    # Prepare output folder
+    # Prepare output folder and to_print subdirectory
     os.makedirs(args.output_dir, exist_ok=True)
-    # Fetch rows: list of (qr_code, farm_name, state, country, year)
+    to_print_dir = os.path.join(args.output_dir, "to_print")
+    os.makedirs(to_print_dir, exist_ok=True)
+
+    # Fetch rows: list of (qr_code, farm_name, state, country, year, is_cacao)
     rows = fetch_rows(args.credentials, args.sheet_url, args.sheet_name)
-    for qr_code, farm_name, state, country, year in rows:
+    for qr_code, farm_name, state, country, year, is_cacao in rows:
         # Determine output filename and path (prefixed with 'compiled_')
         filename = sanitize_filename(f"compiled_{farm_name}_{qr_code}.png")
         out_path = os.path.join(args.output_dir, filename)
@@ -379,13 +370,16 @@ def main():
             print(f"Image already exists, skipping: {out_path}")
             continue        
 
+        # Select logo based on item type
+        logo_path = args.cacao_logo if is_cacao else args.non_cacao_logo
+
         # Generate QR and compile image
         url = gdrive.BASE_QR_CHECK_URL + qr_code
         qr_img = generate_qr_image(
             url,
             box_size=args.box_size,
             border=args.border,
-            logo_path=args.logo,
+            logo_path=logo_path,
             logo_ratio=args.logo_ratio,
         )
         compiled = compile_image(
@@ -396,15 +390,20 @@ def main():
             country,
             year,
             qr_code,
+            is_cacao,
             font_family=args.font_family,
             harvest_font_size=args.harvest_font_size,
             info_font_size=args.info_font_size,
             plant_font_size=args.plant_font_size,
             ignore_max_width=args.ignore_max_width,
         )
-        # Save the compiled image
+        # Save the compiled image to main output directory
         compiled.save(out_path)
         print(f"Saved compiled image: {out_path}")
+        # Save a copy to to_print directory for new images
+        to_print_path = os.path.join(to_print_dir, filename)
+        compiled.save(to_print_path)
+        print(f"Saved copy to print: {to_print_path}")
 
 
 if __name__ == "__main__":
