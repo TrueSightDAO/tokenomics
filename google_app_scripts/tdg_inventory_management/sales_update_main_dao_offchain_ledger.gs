@@ -151,7 +151,7 @@ function processTokenizedTransactions() {
         [
           salesDate, // Column A: Sales Date
           message, // Column B: Message
-          'Agroverse Tree Planting Contract - agl4', // Column C: Fixed value
+          'SunMint Planting Contract - agl4', // Column C: Fixed value
           1, // Column D: 1
           'Cacao Tree To Be Planted', // Column E: Fixed value
           '', // Column F: Empty
