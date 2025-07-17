@@ -326,7 +326,7 @@ def main():
     )
     parser.add_argument(
         "--logo", dest="logo",
-        default=os.path.join(os.path.dirname(__file__), "agroverse_logo.jpg"),
+        default=os.path.join(os.path.dirname(__file__), "truesight_icon.png"),
         help="Path to logo image to embed at center of QR code (optional)"
     )
     parser.add_argument(

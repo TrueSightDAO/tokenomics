@@ -89,9 +89,13 @@ function resolveRedirect(url) {
 
 // Function to extract AGL contract name from URL
 function extractAglContractName(url) {
-  const prefix = 'https://www.agroverse.shop/';
-  if (url.startsWith(prefix)) {
-    return url.slice(prefix.length);
+  const prefix_type_1 = 'https://www.agroverse.shop/';
+  const prefix_type_2 = 'https://truesight.me/sunmint/';
+  if (url.startsWith(prefix_type_1)) {
+    return url.slice(prefix_type_1.length);
+
+  } else if(url.startsWith(prefix_type_2)) {
+    return url.slice(prefix_type_2.length);
   }
   return '';
 }
@@ -225,7 +229,7 @@ function processNonAgl4Transactions() {
         [
           salesDate, // Column A: Sales Date
           message, // Column B: Value
-          `Agroverse Tree Planting Contract - ${aglContractName}`, // Column C
+          `SunMint Tree Planting Contract - ${aglContractName}`, // Column C
           1, // Column D: 1
           'Cacao Tree To Be Planted', // Column E: Cacao Tree To Be Planted
           'Liability' // Column F: Liability
