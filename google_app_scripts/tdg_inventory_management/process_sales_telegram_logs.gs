@@ -61,11 +61,24 @@ function doGet(e) {
       Logger.log("Error in processTelegramLogs: " + err.message);
       return ContentService.createTextOutput("❌ Error: " + err.message);
     }
+  } else if (action === 'processSpecificRow') {
+    const rowIndex = parseInt(e.parameter?.rowIndex, 10);
+    if (isNaN(rowIndex) || rowIndex < 2) {
+      Logger.log(`Invalid rowIndex: ${e.parameter?.rowIndex}`);
+      return ContentService.createTextOutput("❌ Error: Invalid or missing rowIndex (must be >= 2)");
+    }
+    try {
+      Logger.log(`Processing specific row: ${rowIndex}`);
+      processSpecificRow(rowIndex);
+      return ContentService.createTextOutput(`✅ Row ${rowIndex} processed`);
+    } catch (err) {
+      Logger.log(`Error processing row ${rowIndex}: ${err.message}`);
+      return ContentService.createTextOutput(`❌ Error processing row ${rowIndex}: ${err.message}`);
+    }
   }
 
   return ContentService.createTextOutput("ℹ️ No valid action specified");
 }
-
 
 // Function to check if contributorName is valid (matches Column H in Contributors sheet)
 function isValidContributor(contributorName) {
@@ -77,8 +90,14 @@ function isValidContributor(contributorName) {
     // Skip header row
     for (let i = 1; i < contributorsData.length; i++) {
       const telegramHandle = contributorsData[i][TELEGRAM_HANDLE_COL_CONTRIBUTORS];
+      const currentContributorName = contributorsData[i][CONTRIBUTOR_NAME_COL_CONTRIBUTORS];
+
       // Check contributorName as-is and with @ prepended
       if (telegramHandle === contributorName || telegramHandle === `@${contributorName}`) {
+        return true;
+
+      } else if (currentContributorName === contributorName) {
+
         return true;
       }
     }
@@ -262,11 +281,15 @@ function parseTelegramChatLogs() {
     /sold for/i,
     /sold by/i,
     /\[QR CODE EVENT\]/i,
+    /\[SALES EVENT\]/i,
     /qr_code=/i
   ];
   
   // Pattern for extracting Telegram handle
   const telegramHandlePattern = /@([A-Za-z0-9_]+)/;
+  
+  // Pattern for extracting reporter name from [SALES EVENT] "Sold by" line
+  const salesEventReporterPattern = /\[SALES EVENT\][\s\S]*?- Sold by: ([^\n]+)/i;
   
   // Parse source data, skipping header row
   for (let i = 1; i < sourceData.length; i++) {
@@ -275,8 +298,19 @@ function parseTelegramChatLogs() {
     
     // Check if message matches any pattern and hasn't been processed
     if (patterns.some(pattern => pattern.test(message)) && !existingMessageIds.includes(telegramMessageId)) {
+      // Initialize contributorName and telegramHandle
+      let contributorName = sourceData[i][CONTRIBUTOR_NAME_COL];
+      let telegramHandle = null;
+      
+      // Check if message is a [SALES EVENT] and extract reporter name
+      if (message.match(/\[SALES EVENT\]/i)) {
+        const reporterMatch = message.match(salesEventReporterPattern);
+        if (reporterMatch && reporterMatch[1]) {
+          contributorName = reporterMatch[1].trim();
+        }
+      }
+      
       // Validate contributorName against Contributors sheet Column H
-      const contributorName = sourceData[i][CONTRIBUTOR_NAME_COL];
       if (!isValidContributor(contributorName)) {
         Logger.log(`Skipping row ${i + 1} due to invalid contributor: ${contributorName}`);
         continue;
@@ -293,11 +327,13 @@ function parseTelegramChatLogs() {
           continue;
         }
         
-        // Extract Telegram handle from message
-        const handleMatch = message.match(telegramHandlePattern);
-        let telegramHandle = handleMatch ? handleMatch[0] : null; // e.g., "@kikiscocoa" or null
+        // Extract Telegram handle from message (only if not a [SALES EVENT])
+        if (!message.match(/\[SALES EVENT\]/i)) {
+          const handleMatch = message.match(telegramHandlePattern);
+          telegramHandle = handleMatch ? handleMatch[0] : null; // e.g., "@kikiscocoa" or null
+        }
         
-        // Get reporter name from Contributors sheet
+        // Get reporter name from Contributors sheet (or use extracted name for [SALES EVENT])
         const finalContributorName = getReporterName(telegramHandle, contributorName);
         
         // Get sales date from source sheet
@@ -346,6 +382,140 @@ function parseTelegramChatLogs() {
   }
   
   Logger.log(`Processed ${sourceData.length - 1} rows, added ${newEntries} new entries.`);
+}
+
+// Function to process a specific row from the source sheet
+function processSpecificRow() {
+  rowIndex = 6013;
+  // Get source and destination spreadsheets
+  const sourceSpreadsheet = SpreadsheetApp.openByUrl(SOURCE_SHEET_URL);
+  const destinationSpreadsheet = SpreadsheetApp.openByUrl(DESTINATION_SHEET_URL);
+  const sourceSheet = sourceSpreadsheet.getSheetByName(SOURCE_SHEET_NAME);
+  const destinationSheet = destinationSpreadsheet.getSheetByName(DESTINATION_SHEET_NAME);
+  
+  // Validate rowIndex
+  if (rowIndex < 2) {
+    Logger.log(`Invalid rowIndex: ${rowIndex}. Must be >= 2 (header row is 1).`);
+    throw new Error(`Invalid rowIndex: ${rowIndex}. Must be >= 2.`);
+  }
+  
+  // Get total rows in source sheet
+  const lastRow = sourceSheet.getLastRow();
+  if (rowIndex > lastRow) {
+    Logger.log(`Row ${rowIndex} does not exist. Sheet has ${lastRow} rows.`);
+    throw new Error(`Row ${rowIndex} does not exist. Sheet has ${lastRow} rows.`);
+  }
+  
+  // Get data for the specific row (1-based index, adjust to 0-based for array)
+  const sourceData = sourceSheet.getRange(rowIndex, 1, 1, sourceSheet.getLastColumn()).getValues();
+  const destData = destinationSheet.getDataRange().getValues();
+  
+  // Get existing Telegram Message IDs and QR codes from destination sheet
+  const existingMessageIds = destData.slice(1).map(row => row[DEST_MESSAGE_ID_COL]); // Column B
+  const existingQrCodes = destData.slice(1).map(row => row[DEST_QR_CODE_COL]).filter(qr => qr); // Column E
+  
+  // Simple patterns for initial matching
+  const patterns = [
+    /sold for/i,
+    /sold by/i,
+    /\[QR CODE EVENT\]/i,
+    /\[SALES EVENT\]/i,
+    /qr_code=/i
+  ];
+  
+  // Pattern for extracting Telegram handle
+  const telegramHandlePattern = /@([A-Za-z0-9_]+)/;
+  
+  // Pattern for extracting reporter name from [SALES EVENT] "Sold by" line
+  const salesEventReporterPattern = /\[SALES EVENT\][\s\S]*?- Sold by: ([^\n]+)/i;
+  
+  // Process the specific row
+  const message = sourceData[0][MESSAGE_COL];
+  const telegramMessageId = sourceData[0][TELEGRAM_MESSAGE_ID_COL];
+  
+  // Check if message matches any pattern and hasn't been processed
+  if (patterns.some(pattern => pattern.test(message)) && !existingMessageIds.includes(telegramMessageId)) {
+    // Initialize contributorName and telegramHandle
+    let contributorName = sourceData[0][CONTRIBUTOR_NAME_COL];
+    let telegramHandle = null;
+    
+    // Check if message is a [SALES EVENT] and extract reporter name
+    if (message.match(/\[SALES EVENT\]/i)) {
+      const reporterMatch = message.match(salesEventReporterPattern);
+      if (reporterMatch && reporterMatch[1]) {
+        contributorName = reporterMatch[1].trim();
+      }
+    }
+    
+    // Validate contributorName against Contributors sheet
+    if (!isValidContributor(contributorName)) {
+      Logger.log(`Skipping row ${rowIndex} due to invalid contributor: ${contributorName}`);
+      return;
+    }
+    
+    // Call Grok API to extract QR code and sale price
+    const { qrCode, salePrice } = callGrokApi(message);
+    
+    // If valid data returned, prepare row
+    if (qrCode && salePrice) {
+      // Check if QR code already exists
+      if (existingQrCodes.includes(qrCode)) {
+        Logger.log(`Skipping row ${rowIndex} due to duplicate QR code: ${qrCode}`);
+        return;
+      }
+      
+      // Extract Telegram handle from message (only if not a [SALES EVENT])
+      if (!message.match(/\[SALES EVENT\]/i)) {
+        const handleMatch = message.match(telegramHandlePattern);
+        telegramHandle = handleMatch ? handleMatch[0] : null; // e.g., "@kikiscocoa" or null
+      }
+      
+      // Get reporter name from Contributors sheet (or use extracted name for [SALES EVENT])
+      const finalContributorName = getReporterName(telegramHandle, contributorName);
+      
+      // Get sales date from source sheet
+      const salesDate = sourceData[0][SALES_DATE_COL] || '';
+      
+      // Update Agroverse QR codes sheet status to SOLD
+      updateAgroverseQrStatus(qrCode);
+      
+      // Get value from Agroverse QR codes sheet
+      const agroverseValue = getAgroverseValue(qrCode);
+      
+      // Get inventory type from Agroverse QR codes sheet
+      const inventoryType = getAgroverseInventoryType(qrCode);
+      
+      // Prepare row to append
+      const rowToAppend = [
+        sourceData[0][TELEGRAM_UPDATE_ID_COL], // Column A: Telegram Update ID
+        telegramMessageId, // Column B: Telegram Message ID
+        message, // Column C: Message
+        finalContributorName, // Column D: Contributor Name (from Contributors sheet or fallback)
+        qrCode, // Column E: QR Code
+        salePrice, // Column F: Sale Price
+        agroverseValue, // Column G: Value from Agroverse QR codes Column C
+        salesDate, // Column H: Sales Date from source Column L
+        inventoryType // Column I: Inventory Type from Agroverse QR codes Column I
+      ];
+      
+      // Append the row to the destination sheet
+      destinationSheet.getRange(destinationSheet.getLastRow() + 1, 1, 1, rowToAppend.length).setValues([rowToAppend]);
+      
+      // Send Telegram notification for the new QR code
+      const chatId = sourceData[0][CHAT_ID_COL] ? sourceData[0][CHAT_ID_COL].toString().trim() : null;
+      if (chatId) {
+        sendQrCodeNotification(qrCode, finalContributorName, chatId);
+      } else {
+        Logger.log(`No chat ID found for row ${rowIndex}, skipping notification for QR code ${qrCode}`);
+      }
+      
+      Logger.log(`Processed row ${rowIndex} with QR code: ${qrCode}`);
+    } else {
+      Logger.log(`No valid QR code or sale price found in row ${rowIndex}`);
+    }
+  } else {
+    Logger.log(`Row ${rowIndex} skipped: Message does not match patterns or already processed`);
+  }
 }
 
 function sendQrCodeNotification(qrCode, contributorName, chatId) {
