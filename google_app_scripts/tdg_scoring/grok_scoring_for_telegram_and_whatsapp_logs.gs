@@ -63,7 +63,7 @@ const FILE_LOG_SHEET_URL = creds.FILE_LOG_SHEET_URL;
 const XAI_API_URL = creds.XAI_API_URL;
 
 // Endpoint URL for OpenAI’s API service
-// - The web address for OpenAI API requests (e.g., for equinox/solstice calculations).
+// - The web address for OpenAI API requests (e.g.for equinox/solstice calculations).
 // - Default: "https://api.openai.com/v1/chat/completions". Update if OpenAI changes their endpoint.
 const OPENAI_API_URL = creds.OPENAI_API_URL;
 
@@ -119,6 +119,21 @@ function processChatLogEntry({ message, username, statusDate, platform, projectN
   const contributors = getContributorsFromMessage(message, username, platform).split(';').filter(c => c);
   Logger.log(`processChatLogEntry: Contributors identified: ${contributors.join(', ') || 'none'}`);
   
+  // Check for [CONTRIBUTION EVENT] and extract file details
+  const contributionDetails = platform === "Telegram" ? extractContributionDetails(message) : null;
+  let fileIds = [];
+
+  Logger.log("contributionDetails: ");
+  Logger.log(contributionDetails);
+  if (platform === "Telegram" && contributionDetails && contributionDetails.attachedFilename && contributionDetails.destinationFileLocation && telegramSheet && rowIndex !== null) {
+    Logger.log("file processing check condiction past ");
+    // Retrieve file IDs from Column O (1-based index 15)
+    const fileIdsString = telegramSheet.getRange(rowIndex - 1, 15).getValue().toString().trim();
+    Logger.log("fileIdsString: " + fileIdsString);
+    fileIds = fileIdsString ? fileIdsString.split(',').map(id => id.trim()).filter(id => id) : [];
+    Logger.log(`processChatLogEntry: Found ${fileIds.length} file IDs for row ${rowIndex - 1}: ${fileIds.join(', ')}`);
+  }
+
   const newRecords = [];
   if (scoringResult.classification !== "Unknown" && scoringResult.classification !== "Unexpected response format" && scoringResult.classification !== "Grok API error") {
     contributors.forEach(contributor => {
@@ -145,11 +160,38 @@ function processChatLogEntry({ message, username, statusDate, platform, projectN
         });
       }
     });
+
+    // Process file uploads for [CONTRIBUTION EVENT] messages
+    Logger.log("Processing file ids ")
+    if (fileIds.length > 0 && contributionDetails && contributionDetails.attachedFilename && contributionDetails.destinationFileLocation) {
+      const processedFileIds = [];
+      fileIds.forEach((fileId, index) => {
+        Logger.log("Processing file id " + fileId);
+        if (!processedFileIds.includes(fileId)) {
+          let destinationUrl = index === 0 ? contributionDetails.destinationFileLocation : generateUniqueGitHubFilename(contributionDetails.destinationFileLocation, index);
+          // Override with default GitHub location if not provided
+          if (!destinationUrl || destinationUrl === "No file attached") {
+            const filename = contributionDetails.attachedFilename || `file_${fileId}.bin`;
+            destinationUrl = `https://github.com/TrueSightDAO/.github/tree/main/assets/${filename}`;
+          }
+          if (!checkFileExistsInGitHub(destinationUrl)) {
+            const uploaded = uploadFileToGitHub(fileId, destinationUrl, message);
+            if (uploaded) {
+              Logger.log(`processChatLogEntry: Successfully uploaded file ${fileId} for contribution event to ${destinationUrl}`);
+            } else {
+              Logger.log(`processChatLogEntry: Failed to upload file ${fileId} for contribution event to ${destinationUrl}`);
+            }
+          } else {
+            Logger.log(`processChatLogEntry: File already exists at ${destinationUrl}, skipping upload`);
+          }
+          processedFileIds.push(fileId);
+        }
+      });
+    }
   }
 
   return { records: newRecords, count: newRecords.length };
 }
-
 
 function doGet(e) {
   const action = e.parameter?.action;
@@ -166,7 +208,6 @@ function doGet(e) {
 
   return ContentService.createTextOutput("ℹ️ No valid action specified");
 }
-
 
 // Modified to send notification once per chatId
 function processTelegramChatLogs() {
@@ -330,7 +371,6 @@ function processSingleWhatsappChatlog(fileUrl) {
   processIntermediateSheet(intermediateSheet, fileName, fileUrl, projectName, totalLines, startLine);
 }
 
-
 function createOrGetIntermediateSheet(fileName) {
   const folder = DriveApp.getFolderById(INTERMEDIATE_FOLDER_ID);
   const sheetName = `${fileName} Parsed Records`;
@@ -469,7 +509,6 @@ function getLastProcessedLine(fileName) {
   Logger.log(`getLastProcessedLine: No last processed line found for ${fileName}`);
   return null;
 }
-
 
 function checkTdgIssued(message, sender, platform) {
   const payload = `We issue 100TDG for every 1 hour of contribution and 1TDG for every 1 USD of contribution. Based on the ${platform} message from ${sender}: "${message}", determine the classification and TDG tokens to award. Options are: '100TDG For every 1 hour of human effort', '1TDG For every 1 USD of liquidity injected', or 'Unknown'. Return ONLY this format: "classification; TDGs Issued" (e.g., "100TDG For every 1 hour of human effort; 25.00"). TDG must be proportional to time (e.g., 15 minutes = 25.00 TDG, calculated as 100 * 15/60) or match USD spent (e.g., $607 = 607.00 TDG). No extra text, explanations, or labels. Example: for "I spent $607 for flight tickets," return "1TDG For every 1 USD of liquidity injected; 607.00".`;
@@ -885,18 +924,6 @@ function getClosestEquinoxOrSolstice() {
   }
 }
 
-function testSingleChatlog() {
-  const testUrl = "https://drive.google.com/file/d/1jiHHgE7aRPQDcRk4dAIli6-IuvhMKBlq/view?usp=drive_link";
-  Logger.log(`testSingleChatlog: Starting test with URL: ${testUrl}`);
-  processSingleWhatsappChatlog(testUrl);
-}
-
-function testGetClosestEquinoxOrSolstice() {
-  Logger.log(`testGetClosestEquinoxOrSolstice: Starting test`);
-  const date = getClosestEquinoxOrSolstice();
-  Logger.log(`testGetClosestEquinoxOrSolstice: Test result: Closest Equinox or Solstice date is ${date}`);
-}
-
 function sendTelegramNotification(chatId, contributorUsernames) {
   const token = PropertiesService.getScriptProperties().getProperty('TELEGRAM_API_TOKEN') || creds.TELEGRAM_API_TOKEN || telegramBotKey; // Fallback to telegramBotKey
   if (!token) {
@@ -906,7 +933,7 @@ function sendTelegramNotification(chatId, contributorUsernames) {
 
   Logger.log(`sendTelegramNotification: Using token (first 10 chars): ${token.substring(0, 10)}...`); // Debug token
 
-  const apiUrl = `https://api.telegram.org/bot${token}/sendMessage`; // Fix: Use token, not TELEGRAM_TOKEN
+  const apiUrl = `https://api.telegram.org/bot${token}/sendMessage`;
   const contributorNamesString = contributorUsernames.map(name => `@${name}`).join(", ");
 
   const baseOutputSheetLink = "https://truesight.me/submissions/scored-and-to-be-tokenized";
@@ -1077,3 +1104,263 @@ function resolveAllUnknownUsers() {
 function testFindContributorName() {
   findContributorName('@Andrea');
 }
+
+function extractContributionDetails(message) {
+  // Normalize line endings and trim whitespace
+  message = message.replace(/\r\n/g, '\n').trim();
+  
+  // More flexible regex to match [CONTRIBUTION EVENT] format
+  const pattern = /\[CONTRIBUTION EVENT\]\n\s*- Type:\s*(.*?)\n\s*- Amount:\s*(\d+\.?\d*)\n\s*- Description:\s*((?:.|\n)*?)\n\s*- Contributor\(s\):\s*(.*?)\n\s*- TDG Issued:\s*((?:.|\n)*?)\n\s*- Attached Filename:\s*(.*?)\n\s*- Destination Contribution File Location:\s*(.*?)(?:\n\s*-+\s*\n\s*My Digital Signature:.*)?$/i;
+  
+  const match = message.match(pattern);
+  if (!match) {
+    Logger.log(`extractContributionDetails: Regex failed to match contribution message: ${message}`);
+    
+    // Fallback parsing to extract fields line by line
+    const lines = message.split('\n').map(line => line.trim());
+    let contributionDetails = {
+      type: null,
+      amount: null,
+      description: null,
+      contributors: null,
+      tdgIssued: null,
+      attachedFilename: null,
+      destinationFileLocation: null
+    };
+    
+    let currentField = null;
+    let descriptionLines = [];
+    
+    for (let line of lines) {
+      if (line.startsWith('[CONTRIBUTION EVENT]')) continue;
+      if (line.startsWith('- Type:')) {
+        contributionDetails.type = line.replace(/^- Type:\s*/, '').trim();
+        currentField = null;
+      } else if (line.startsWith('- Amount:')) {
+        const amountMatch = line.match(/^- Amount:\s*(\d+\.?\d*)/);
+        contributionDetails.amount = amountMatch ? parseFloat(amountMatch[1]) : null;
+        currentField = null;
+      } else if (line.startsWith('- Description:')) {
+        descriptionLines = [line.replace(/^- Description:\s*/, '').trim()];
+        currentField = 'description';
+      } else if (line.startsWith('- Contributor(s):')) {
+        contributionDetails.contributors = line.replace(/^- Contributor\(s\):\s*/, '').trim();
+        currentField = null;
+      } else if (line.startsWith('- TDG Issued:')) {
+        contributionDetails.tdgIssued = line.replace(/^- TDG Issued:\s*/, '').trim();
+        currentField = null;
+      } else if (line.startsWith('- Attached Filename:')) {
+        const filename = line.replace(/^- Attached Filename:\s*/, '').trim();
+        contributionDetails.attachedFilename = filename === 'None' ? null : filename;
+        currentField = null;
+      } else if (line.startsWith('- Destination Contribution File Location:')) {
+        const location = line.replace(/^- Destination Contribution File Location:\s*/, '').trim();
+        contributionDetails.destinationFileLocation = location === 'No file attached' ? null : location;
+        currentField = null;
+      } else if (line.startsWith('---') || line.startsWith('My Digital Signature:')) {
+        break; // Stop parsing at signature or separator
+      } else if (currentField === 'description' && line) {
+        descriptionLines.push(line);
+      }
+    }
+    
+    if (descriptionLines.length > 0) {
+      contributionDetails.description = descriptionLines.join(' ');
+    }
+    
+    // Check if all required fields were found
+    if (contributionDetails.type && contributionDetails.amount !== null && contributionDetails.description && contributionDetails.contributors && contributionDetails.tdgIssued) {
+      Logger.log(`extractContributionDetails: Fallback parsing succeeded: ${JSON.stringify(contributionDetails)}`);
+      return contributionDetails;
+    }
+    
+    Logger.log(`extractContributionDetails: Fallback parsing failed, missing required fields: ${JSON.stringify(contributionDetails)}`);
+    return null;
+  }
+  
+  return {
+    type: match[1].trim(),
+    amount: parseFloat(match[2]),
+    description: match[3].trim(),
+    contributors: match[4].trim(),
+    tdgIssued: match[5].trim(),
+    attachedFilename: match[6].trim() === 'None' ? null : match[6].trim(),
+    destinationFileLocation: match[7].trim() === 'No file attached' ? null : match[7].trim()
+  };
+}
+
+// Function to generate a unique GitHub filename with a running number
+function generateUniqueGitHubFilename(originalUrl, index) {
+  try {
+    const urlPattern = /github\.com\/([^\/]+)\/([^\/]+)\/tree\/([^\/]+)\/(.+?)(\.[^.]+)$/i;
+    const match = originalUrl.match(urlPattern);
+    if (!match) {
+      Logger.log(`generateUniqueGitHubFilename: Invalid GitHub URL format for generating unique filename: ${originalUrl}`);
+      return null;
+    }
+
+    const [, owner, repo, branch, pathWithoutExtension, extension] = match;
+    const newPath = `${pathWithoutExtension}_${index}${extension}`;
+    const newUrl = `https://github.com/${owner}/${repo}/tree/${branch}/${newPath}`;
+    Logger.log(`generateUniqueGitHubFilename: Generated new URL: ${newUrl} for index ${index}`);
+    return newUrl;
+  } catch (e) {
+    Logger.log(`generateUniqueGitHubFilename: Error generating unique GitHub filename: ${e.message}`);
+    return null;
+  }
+}
+
+// Function to upload file to GitHub
+function uploadFileToGitHub(fileId, destinationUrl, commitMessage) {
+  try {
+    const token = creds.GITHUB_API_TOKEN;
+    if (!token) {
+      Logger.log(`uploadFileToGitHub: Error: GITHUB_API_TOKEN not set in Credentials`);
+      return false;
+    }
+
+    const telegramApiUrl = `https://api.telegram.org/bot${creds.TELEGRAM_TOKEN}/getFile?file_id=${fileId}`;
+    const fileResponse = UrlFetchApp.fetch(telegramApiUrl);
+    const fileData = JSON.parse(fileResponse.getContentText());
+    
+    if (!fileData.ok) {
+      Logger.log(`uploadFileToGitHub: Failed to get file info from Telegram: ${fileData.description}`);
+      return false;
+    }
+
+    const filePath = fileData.result.file_path;
+    const fileContentResponse = UrlFetchApp.fetch(`https://api.telegram.org/file/bot${creds.TELEGRAM_TOKEN}/${filePath}`);
+    const fileContent = Utilities.base64Encode(fileContentResponse.getBlob().getBytes());
+
+    const urlPattern = /github\.com\/([^\/]+)\/([^\/]+)\/tree\/([^\/]+)\/(.+)/i;
+    const match = destinationUrl.match(urlPattern);
+    if (!match) {
+      Logger.log(`uploadFileToGitHub: Invalid GitHub URL format: ${destinationUrl}`);
+      return false;
+    }
+
+    const [, owner, repo, branch, path] = match;
+    
+    const githubApiUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${path}`;
+    const payload = {
+      message: commitMessage,
+      content: fileContent,
+      branch: branch
+    };
+
+    const options = {
+      method: 'put',
+      headers: {
+        'Authorization': `token ${token}`,
+        'Accept': 'application/vnd.github.v3+json'
+      },
+      contentType: 'application/json',
+      payload: JSON.stringify(payload),
+      muteHttpExceptions: true
+    };
+
+    const response = UrlFetchApp.fetch(githubApiUrl, options);
+    const status = response.getResponseCode();
+    if (status === 200 || status === 201) {
+      Logger.log(`uploadFileToGitHub: Successfully uploaded file to GitHub: ${destinationUrl}`);
+      return true;
+    } else {
+      Logger.log(`uploadFileToGitHub: Failed to upload file to GitHub. Status: ${status}, Response: ${response.getContentText()}`);
+      return false;
+    }
+  } catch (e) {
+    Logger.log(`uploadFileToGitHub: Error uploading file to GitHub: ${e.message}`);
+    return false;
+  }
+}
+
+// Function to check if file exists in GitHub
+function checkFileExistsInGitHub(fileUrl) {
+  try {
+    const options = {
+      method: 'get',
+      muteHttpExceptions: true
+    };
+    const response = UrlFetchApp.fetch(fileUrl, options);
+    const status = response.getResponseCode();
+    if (status === 200) {
+      Logger.log(`checkFileExistsInGitHub: File exists at ${fileUrl}`);
+      return true;
+    } else {
+      Logger.log(`checkFileExistsInGitHub: File does not exist at ${fileUrl} (Status: ${status})`);
+      return false;
+    }
+  } catch (e) {
+    Logger.log(`checkFileExistsInGitHub: Error checking file existence in GitHub: ${e.message}`);
+    return false;
+  }
+}
+
+
+function testProcessTelegramRow() {
+  rowIndex = 6016
+  if (!XAI_API_KEY) {
+    Logger.log(`testProcessTelegramRow: Error: Please set XAI_API_KEY in Script Properties.`);
+    return;
+  }
+
+  const telegramSpreadsheet = SpreadsheetApp.openByUrl(TELEGRAM_SHEET_URL);
+  const telegramSheet = telegramSpreadsheet.getSheetByName("Telegram Chat Logs");
+
+  if (!telegramSheet) {
+    Logger.log(`testProcessTelegramRow: Error: Sheet "Telegram Chat Logs" not found in ${TELEGRAM_SHEET_URL}`);
+    return;
+  }
+
+  const data = telegramSheet.getDataRange().getValues();
+  if (rowIndex < 1 || rowIndex >= data.length) {
+    Logger.log(`testProcessTelegramRow: Error: Invalid row index ${rowIndex + 1}. Must be between 2 and ${data.length}.`);
+    return;
+  }
+
+  const row = data[rowIndex];
+  const dateStr = row[11] ? row[11].toString().trim() : "";
+  const username = row[4] ? row[4].toString() : "Unknown";
+  const message = row[6] ? row[6].toString().trim() : "";
+  const existingHash = row[13] ? row[13].toString().trim() : "";
+
+  Logger.log(message);
+
+  Logger.log(`testProcessTelegramRow: Testing row ${rowIndex + 1}: ${dateStr} - ${username} - ${message}`);
+
+  if (existingHash) {
+    Logger.log(`testProcessTelegramRow: Row ${rowIndex + 1} already processed with hash ${existingHash}. Skipping.`);
+    return;
+  }
+
+  const { records, count } = processChatLogEntry({
+    message,
+    username,
+    statusDate: dateStr,
+    platform: "Telegram",
+    projectName: "telegram_chatlog",
+    rowIndex: rowIndex,
+    telegramSheet: telegramSheet
+  });
+
+  if (records.length > 0) {
+    writeToGoogleSheet(records, "Telegram");
+    const messageHash = generateUniqueHash(username, message, dateStr);
+    telegramSheet.getRange(rowIndex + 1, 14).setValue(messageHash);
+    Logger.log(`testProcessTelegramRow: Processed row ${rowIndex + 1} with ${count} records, hash ${messageHash} inserted`);
+
+    const chatId = getChatIdForRow(row, telegramSheet, rowIndex);
+    if (chatId) {
+      const contributorUsernames = records.map(record => record.telegramHandle.startsWith('@') ? record.telegramHandle.slice(1) : record.telegramHandle);
+      // sendTelegramNotification(chatId, contributorUsernames);
+      Logger.log(`testProcessTelegramRow: Sent notification to chat ${chatId} for contributors: ${contributorUsernames.join(', ')}`);
+    }
+  } else {
+    const messageHash = generateUniqueHash(username, message, dateStr);
+    telegramSheet.getRange(rowIndex + 1, 14).setValue(messageHash);
+    Logger.log(`testProcessTelegramRow: No records generated for row ${rowIndex + 1}, hash ${messageHash} inserted`);
+  }
+
+  Logger.log(`testProcessTelegramRow: Completed testing row ${rowIndex + 1} with ${count} records processed`);
+}
+
