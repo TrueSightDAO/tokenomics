@@ -115,18 +115,25 @@ function processChatLogEntry({ message, username, statusDate, platform, projectN
   const scoringResult = checkTdgIssued(message, actualName, platform);
   Logger.log(`processChatLogEntry: Scoring result for ${message} by ${actualName}: ${scoringResult.classification}; ${scoringResult.tdgIssued}`);
   
-  // Get contributors as handles
-  const contributors = getContributorsFromMessage(message, username, platform).split(';').filter(c => c);
-  Logger.log(`processChatLogEntry: Contributors identified: ${contributors.join(', ') || 'none'}`);
-  
   // Check for [CONTRIBUTION EVENT] and extract file details
   const contributionDetails = platform === "Telegram" ? extractContributionDetails(message) : null;
   let fileIds = [];
 
   Logger.log("contributionDetails: ");
   Logger.log(contributionDetails);
+
+  // Use explicit contributors from contributionDetails if available, otherwise fall back to getContributorsFromMessage
+  let contributors = [];
+  if (platform === "Telegram" && contributionDetails && contributionDetails.contributors) {
+    contributors = contributionDetails.contributors.split(',').map(c => c.trim()).filter(c => c);
+    Logger.log(`processChatLogEntry: Using explicit contributors from contributionDetails: ${contributors.join(', ') || 'none'}`);
+  } else {
+    contributors = getContributorsFromMessage(message, username, platform).split(';').filter(c => c);
+    Logger.log(`processChatLogEntry: Contributors identified via getContributorsFromMessage: ${contributors.join(', ') || 'none'}`);
+  }
+
   if (platform === "Telegram" && contributionDetails && contributionDetails.attachedFilename && contributionDetails.destinationFileLocation && telegramSheet && rowIndex !== null) {
-    Logger.log("file processing check condiction past ");
+    Logger.log("file processing check condition passed");
     // Retrieve file IDs from Column O (1-based index 15)
     const fileIdsString = telegramSheet.getRange(rowIndex - 1, 15).getValue().toString().trim();
     Logger.log("fileIdsString: " + fileIdsString);
@@ -162,7 +169,7 @@ function processChatLogEntry({ message, username, statusDate, platform, projectN
     });
 
     // Process file uploads for [CONTRIBUTION EVENT] messages
-    Logger.log("Processing file ids ")
+    Logger.log("Processing file ids");
     if (fileIds.length > 0 && contributionDetails && contributionDetails.attachedFilename && contributionDetails.destinationFileLocation) {
       const processedFileIds = [];
       fileIds.forEach((fileId, index) => {
