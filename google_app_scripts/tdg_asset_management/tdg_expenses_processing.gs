@@ -5,7 +5,7 @@ const creds = getCredentials();
 // Configuration Variables
 const SOURCE_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1qbZZhf-_7xzmDTriaJVWj6OZshyQsFkdsAV8-pyzASQ/edit?gid=0#gid=0';
 const SOURCE_SHEET_NAME = 'Telegram Chat Logs';
-const SCORED_EXPENSE_SHEET_URL = 'https://docs.google.com/spreadsheets/d/15co4NYVdlhOFK7y2EfyajXJ0aSj7OfezUndYoY6BNrY/edit?gid=0#gid=0';
+const SCORED_EXPENSE_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1qbZZhf-_7xzmDTriaJVWj6OZshyQsFkdsAV8-pyzASQ/edit?gid=0#gid=0';;
 const SCORED_EXPENSE_SHEET_NAME = 'Scored Expense Submissions';
 
 // Sandbox
