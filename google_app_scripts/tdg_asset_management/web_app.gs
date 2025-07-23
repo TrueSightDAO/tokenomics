@@ -2,6 +2,7 @@
  * Google Apps Script to handle HTTP GET request for retrieving voting rights and asset information based on a digital signature.
  * The total_assets value is calculated as the sum of off-chain assets, USDT vault balance, and AGL investment holdings.
  * Asset values (total_assets, asset_per_circulated_voting_right) are formatted to 5 decimal places.
+ * If query parameter full=true, returns full response; otherwise, returns only contributor_name.
  *
  * Instructions to call this endpoint:
  * 1. Deploy this script as a web app:
@@ -9,20 +10,21 @@
  *    - Set "Execute as" to "Me" and "Who has access" to "Anyone" (or restrict as needed).
  *    - Click Deploy and copy the web app URL (e.g., https://script.google.com/macros/s/<ID>/exec).
  * 2. Make an HTTP GET request with the digital signature as a query parameter:
- *    - URL format: <web_app_url>?signature=<publicKeyBase64>
- *    - Example: https://script.google.com/macros/s/<ID>/exec?signature=MIICIjANBgkqhkiG9w0BAQEFAAOCAg8AMI...
+ *    - URL format: <web_app_url>?signature=<publicKeyBase64>&full=true
+ *    - Example: https://script.google.com/macros/s/<ID>/exec?signature=MIICIjANBgkqhkiG9w0BAQEFAAOCAg8AMI...&full=true
  * 3. The response will be a JSON object:
- *    - Success: {
+ *    - If full=true: {
  *        "contributor_name": <string>,
  *        "voting_rights": <value>,
  *        "voting_rights_circulated": <value>,
  *        "total_assets": <number, 5 decimal places>,
  *        "asset_per_circulated_voting_right": <number, 5 decimal places>
  *      }
+ *    - If full=false or omitted: { "contributor_name": <string> }
  *    - Error: { "error": "No matching signature found" } or { "error": "Signature parameter missing" }
  * 4. Use a tool like curl, Postman, or JavaScript fetch to test:
- *    - curl: curl "<web_app_url>?signature=<publicKeyBase64>"
- *    - JavaScript: fetch("<web_app_url>?signature=<publicKeyBase64>").then(res => res.json())
+ *    - curl: curl "<web_app_url>?signature=<publicKeyBase64>&full=true"
+ *    - JavaScript: fetch("<web_app_url>?signature=<publicKeyBase64>&full=true").then(res => res.json())
  * 5. To troubleshoot signature lookup:
  *    - Open the script editor and run the testSignatureLookup function with a test signature.
  *    - Example: testSignatureLookup("MIICIjANBgkqhkiG9w0BAQEFAAOCAg8AMI...");
@@ -307,6 +309,16 @@ function doGet(e) {
     ).setMimeType(ContentService.MimeType.JSON);
   }
 
+  // Check for full=true query parameter
+  const isFullResponse = e.parameter.full === 'true';
+
+  // If full=false or omitted, return only contributor_name
+  if (!isFullResponse) {
+    return ContentService.createTextOutput(
+      JSON.stringify({ contributor_name: contributorName })
+    ).setMimeType(ContentService.MimeType.JSON);
+  }
+
   // Step 2: Find voting weight in "Contributors voting weight" Column H (index 7) where Column C (index 2) matches contributorName
   const votingSheet = spreadsheet.getSheetByName(VOTING_SHEET_NAME);
   const votingData = votingSheet.getDataRange().getValues();
@@ -335,7 +347,7 @@ function doGet(e) {
   // Step 5: Calculate asset_per_circulated_voting_right
   const assetPerCirculatedVotingRight = votingRightsCirculated !== 0 ? totalAssets / votingRightsCirculated : 0;
 
-  // Return result with asset values formatted to 5 decimal places
+  // Return full result with asset values formatted to 5 decimal places
   return ContentService.createTextOutput(
     JSON.stringify({
       contributor_name: contributorName,
