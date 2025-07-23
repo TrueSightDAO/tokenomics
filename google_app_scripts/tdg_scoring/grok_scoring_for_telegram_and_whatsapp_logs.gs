@@ -150,7 +150,19 @@ function processChatLogEntry({ message, username, statusDate, platform, projectN
         const contributorActualName = platform === "Telegram" ? (getTelegramActualName(contributorWithoutAt).actualName || contributor) : contributor;
         
         const foundInContributors = isContributorFound(contributor, platform);
-        const tdgPerContributor = (parseFloat(scoringResult.tdgIssued) / contributors.length).toFixed(2);
+
+        let tdgPerContributor = 0.00; // Default value to prevent undefined error
+
+        if (platform === "Telegram" && contributionDetails && contributionDetails.tdgIssued) {
+          Logger.log("Using explicit TDG amount specified");
+          tdgPerContributor = parseFloat(contributionDetails.tdgIssued) || 0.00; // Fallback to 0 if parsing fails
+        } else if (scoringResult && scoringResult.tdgIssued && !isNaN(parseFloat(scoringResult.tdgIssued))) {
+          Logger.log("Using TDG amount suggested by Grok");
+          tdgPerContributor = parseFloat(scoringResult.tdgIssued).toFixed(2);
+        } else {
+          Logger.log("No valid TDG amount available, defaulting to 0.00");
+        }
+
         newRecords.push({
           contributor: contributorActualName, // Actual name for output sheet
           telegramHandle: contributor,       // Original handle for notifications
