@@ -135,8 +135,8 @@ function processChatLogEntry({ message, username, statusDate, platform, projectN
   if (platform === "Telegram" && contributionDetails && contributionDetails.attachedFilename && contributionDetails.destinationFileLocation && telegramSheet && rowIndex !== null) {
     Logger.log("file processing check condition passed");
     // Retrieve file IDs from Column O (1-based index 15)
-    const fileIdsString = telegramSheet.getRange(rowIndex - 1, 15).getValue().toString().trim();
-    Logger.log("fileIdsString: " + fileIdsString);
+    const fileIdsString = telegramSheet.getRange(rowIndex, 15).getValue().toString().trim();
+
     fileIds = fileIdsString ? fileIdsString.split(',').map(id => id.trim()).filter(id => id) : [];
     Logger.log(`processChatLogEntry: Found ${fileIds.length} file IDs for row ${rowIndex - 1}: ${fileIds.join(', ')}`);
   }
@@ -1226,7 +1226,8 @@ function uploadFileToGitHub(fileId, destinationUrl, commitMessage) {
       return false;
     }
 
-    const telegramApiUrl = `https://api.telegram.org/bot${creds.TELEGRAM_TOKEN}/getFile?file_id=${fileId}`;
+    const telegramApiUrl = `https://api.telegram.org/bot${creds.TELEGRAM_API_TOKEN}/getFile?file_id=${fileId}`;
+    Logger.log(telegramApiUrl);
     const fileResponse = UrlFetchApp.fetch(telegramApiUrl);
     const fileData = JSON.parse(fileResponse.getContentText());
     
@@ -1236,7 +1237,7 @@ function uploadFileToGitHub(fileId, destinationUrl, commitMessage) {
     }
 
     const filePath = fileData.result.file_path;
-    const fileContentResponse = UrlFetchApp.fetch(`https://api.telegram.org/file/bot${creds.TELEGRAM_TOKEN}/${filePath}`);
+    const fileContentResponse = UrlFetchApp.fetch(`https://api.telegram.org/file/bot${creds.TELEGRAM_API_TOKEN}/${filePath}`);
     const fileContent = Utilities.base64Encode(fileContentResponse.getBlob().getBytes());
 
     const urlPattern = /github\.com\/([^\/]+)\/([^\/]+)\/tree\/([^\/]+)\/(.+)/i;
@@ -1305,7 +1306,7 @@ function checkFileExistsInGitHub(fileUrl) {
 
 
 function testProcessTelegramRow() {
-  rowIndex = 6016
+  rowIndex = 6042
   if (!XAI_API_KEY) {
     Logger.log(`testProcessTelegramRow: Error: Please set XAI_API_KEY in Script Properties.`);
     return;
@@ -1371,3 +1372,10 @@ function testProcessTelegramRow() {
   Logger.log(`testProcessTelegramRow: Completed testing row ${rowIndex + 1} with ${count} records processed`);
 }
 
+
+function testUploadFileToGitHub(fileId, destinationUrl, message) {
+  fileId = "AgACAgEAAyEFAASCjq75AAIaZWiBA7uSthMZUR3LGz-P5gNpaNMoAAKFsTEbKVoJRIM-lE9iWKLqAQADAgADeQADNgQ"
+  destinationUrl= "https://github.com/TrueSightDAO/.github/tree/main/assets/contribution_20250723154626_gary_teh_img_9606.png"
+  message = "Testing upload"
+  uploadFileToGitHub(fileId, destinationUrl, message);
+}
