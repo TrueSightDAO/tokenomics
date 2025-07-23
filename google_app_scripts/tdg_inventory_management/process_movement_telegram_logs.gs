@@ -77,6 +77,8 @@ function processInventoryReport(reportText) {
       return { error: 'Invalid or empty report text' };
     }
 
+    Logger.log(reportText);
+
     // Expected format: [INVENTORY MOVEMENT] manager name: ... \nrecipient name: ... \ninventory item: ... \nquantity: ...
     const lines = reportText.split('\n').map(line => line.trim());
     
@@ -86,20 +88,20 @@ function processInventoryReport(reportText) {
     }
 
     // Extract fields using regex for key-value pairs
-    const managerMatch = lines.find(line => line.startsWith('manager name:'));
-    const recipientMatch = lines.find(line => line.startsWith('recipient name:'));
-    const itemMatch = lines.find(line => line.startsWith('inventory item:'));
-    const quantityMatch = lines.find(line => line.startsWith('quantity:'));
+    const managerMatch = lines.find(line => line.startsWith('- Manager Name:'));
+    const recipientMatch = lines.find(line => line.startsWith('- Recipient Name:'));
+    const itemMatch = lines.find(line => line.startsWith('- Inventory Item:'));
+    const quantityMatch = lines.find(line => line.startsWith('- Quantity:'));
 
     if (!managerMatch || !recipientMatch || !itemMatch || !quantityMatch) {
       return { error: 'Invalid report format: Missing required fields' };
     }
 
     // Extract values
-    const managerName = managerMatch.replace('manager name:', '').trim();
-    const recipientName = recipientMatch.replace('recipient name:', '').trim();
-    const currency = itemMatch.replace('inventory item:', '').trim();
-    const quantity = parseFloat(quantityMatch.replace('quantity:', '').trim());
+    const managerName = managerMatch.replace('- Manager Name:', '').trim();
+    const recipientName = recipientMatch.replace('- Recipient Name:', '').trim();
+    const currency = itemMatch.replace('- Inventory Item:', '').trim();
+    const quantity = parseFloat(quantityMatch.replace('- Quantity:', '').trim());
 
     // Validate quantity
     if (isNaN(quantity) || quantity <= 0) {
@@ -118,7 +120,7 @@ function processInventoryReport(reportText) {
     const aglMatch = currency.match(/^\[(AGL\d+)\]\s*(.+)$/);
     if (aglMatch) {
       const ledgerName = aglMatch[1];
-      // Resolve the ledger URL from https://www.agroverse.shop/[ledger_name]
+      // Resolve the ledger URL from https://www.agroverse.shop/[ledgerName]
       const agroverseUrl = `https://www.agroverse.shop/${ledgerName}`.toLowerCase();
       const resolvedUrl = resolveRedirect(agroverseUrl);
       currencySource = {
@@ -153,7 +155,8 @@ function processInventoryReport(reportText) {
 
 /**
  * Parses the "Telegram Chat Logs" sheet (Column G) for entries matching the [INVENTORY MOVEMENT] pattern,
- * processes them using processInventoryReport, and inserts new records into the "Inventory Movement" sheet.
+ * processes them using processInventoryReport, uploads associated files to GitHub if available,
+ * and inserts new records into the "Inventory Movement" sheet.
  * Skips records already existing in "Inventory Movement" based on Telegram Update ID (Column A).
  * Maps columns as follows:
  * - Telegram Chat Logs Column A (Telegram Update ID) -> Inventory Movement Column A
@@ -195,14 +198,14 @@ function processTelegramChatLogsToInventoryMovement() {
       Logger.log('No data in Telegram Chat Logs');
       return;
     }
-    // Read up to Column L (12th column) to include Status Date
-    const telegramData = telegramSheet.getRange(1, 1, telegramLastRow, 12).getValues(); // Columns A to L
+    // Read up to Column O (15th column) to include file IDs
+    const telegramData = telegramSheet.getRange(1, 1, telegramLastRow, 15).getValues(); // Columns A to O
 
     // Prepare array to collect new rows for batch insertion
     const newRows = [];
 
     // Process each row in Telegram Chat Logs
-    telegramData.forEach(row => {
+    telegramData.forEach((row, index) => {
       const updateId = row[0]; // Column A: Telegram Update ID
       const contribution = row[6]; // Column G: Contribution Made
 
@@ -213,10 +216,49 @@ function processTelegramChatLogsToInventoryMovement() {
 
       // Check if Contribution Made matches [INVENTORY MOVEMENT] pattern
       if (typeof contribution === 'string' && contribution.trim().startsWith('[INVENTORY MOVEMENT]')) {
+        // Get file IDs from the previous row (if it exists)
+        const fileIdsString = (index > 0 && telegramData[index - 1][14]) ? telegramData[index - 1][14].toString().trim() : '';
+
         const reportResult = processInventoryReport(contribution);
         if (reportResult.error) {
           Logger.log(`Error processing contribution for Update ID ${updateId}: ${reportResult.error}`);
           return;
+        }
+
+        // Extract file-related fields from contribution
+        const lines = contribution.split('\n').map(line => line.trim());
+        const attachedFilenameMatch = lines.find(line => line.startsWith('- Attached Filename:'));
+        const destinationMatch = lines.find(line => line.startsWith('- Destination Inventory File Location:'));
+        const attachedFilename = attachedFilenameMatch ? attachedFilenameMatch.replace('- Attached Filename:', '').trim() : null;
+        const destinationInventoryFileLocation = destinationMatch ? destinationMatch.replace('- Destination Inventory File Location:', '').trim() : null;
+
+        // Process file uploads if file IDs and destination are available
+        if (fileIdsString && attachedFilename && destinationInventoryFileLocation && destinationInventoryFileLocation !== 'No file attached') {
+          const fileIds = fileIdsString.split(',').map(id => id.trim()).filter(id => id);
+          Logger.log(`Processing ${fileIds.length} file IDs for Update ID ${updateId}: ${fileIds.join(', ')}`);
+          
+          fileIds.forEach((fileId, fileIndex) => {
+            // Generate unique destination URL for multiple files
+            let destinationUrl = fileIndex === 0 ? destinationInventoryFileLocation : generateUniqueGitHubFilename(destinationInventoryFileLocation, fileIndex);
+            if (!destinationUrl) {
+              Logger.log(`Failed to generate destination URL for file ID ${fileId} at Update ID ${updateId}`);
+              return;
+            }
+
+            // Check if file already exists in GitHub
+            if (!checkFileExistsInGitHub(destinationUrl)) {
+              const uploaded = uploadFileToGitHub(fileId, destinationUrl, `Inventory movement file upload for ${attachedFilename}`);
+              if (uploaded) {
+                Logger.log(`Successfully uploaded file ${fileId} for Update ID ${updateId} to ${destinationUrl}`);
+              } else {
+                Logger.log(`Failed to upload file ${fileId} for Update ID ${updateId} to ${destinationUrl}`);
+              }
+            } else {
+              Logger.log(`File already exists at ${destinationUrl} for Update ID ${updateId}, skipping upload`);
+            }
+          });
+        } else {
+          Logger.log(`No file upload required for Update ID ${updateId}: File IDs: ${fileIdsString}, Filename: ${attachedFilename}, Destination: ${destinationInventoryFileLocation}`);
         }
 
         // Map currency to original value by removing [AGL#] prefix
@@ -458,19 +500,19 @@ function processInventoryMovementToLedgers() {
  */
 function testProcessInventoryReport() {
   const testReport = "[INVENTORY MOVEMENT]\n" +
-    "manager name: Gary Teh\n" +
-    "recipient name: @alexadoglio\n" +
-    "inventory item: [AGL6] Brazilian Reis\n" +
-    "quantity: 1";
+    "- Manager Name: Gary Teh\n" +
+    "- Recipient Name: @alexadoglio\n" +
+    "- Inventory Item: [AGL6] Brazilian Reis\n" +
+    "- Quantity: 1";
   const result = processInventoryReport(testReport);
   Logger.log(JSON.stringify(result, null, 2));
 
   // Test offchain asset
   const testReportOffchain = "[INVENTORY MOVEMENT]\n" +
-    "manager name: Gary Teh\n" +
-    "recipient name: @alexadoglio\n" +
-    "inventory item: USD\n" +
-    "quantity: 100";
+    "- Manager Name: Gary Teh\n" +
+    "- Recipient Name: @alexadoglio\n" +
+    "- Inventory Item: USD\n" +
+    "- Quantity: 100";
   const resultOffchain = processInventoryReport(testReportOffchain);
   Logger.log(JSON.stringify(resultOffchain, null, 2));
 }
@@ -481,4 +523,112 @@ function testProcessInventoryReport() {
 function processTelegramChatLogs() {
   processTelegramChatLogsToInventoryMovement();
   processInventoryMovementToLedgers();
+}
+
+// Function to generate a unique GitHub filename with a running number
+function generateUniqueGitHubFilename(originalUrl, index) {
+  try {
+    const urlPattern = /github\.com\/([^\/]+)\/([^\/]+)\/tree\/([^\/]+)\/(.+?)(\.[^.]+)$/i;
+    const match = originalUrl.match(urlPattern);
+    if (!match) {
+      Logger.log(`generateUniqueGitHubFilename: Invalid GitHub URL format for generating unique filename: ${originalUrl}`);
+      return null;
+    }
+
+    const [, owner, repo, branch, pathWithoutExtension, extension] = match;
+    const newPath = `${pathWithoutExtension}_${index}${extension}`;
+    const newUrl = `https://github.com/${owner}/${repo}/tree/${branch}/${newPath}`;
+    Logger.log(`generateUniqueGitHubFilename: Generated new URL: ${newUrl} for index ${index}`);
+    return newUrl;
+  } catch (e) {
+    Logger.log(`generateUniqueGitHubFilename: Error generating unique GitHub filename: ${e.message}`);
+    return null;
+  }
+}
+
+// Function to upload file to GitHub
+function uploadFileToGitHub(fileId, destinationUrl, commitMessage) {
+  try {
+    const token = creds.GITHUB_API_TOKEN;
+    if (!token) {
+      Logger.log(`uploadFileToGitHub: Error: GITHUB_API_TOKEN not set in Credentials`);
+      return false;
+    }
+
+    const telegramApiUrl = `https://api.telegram.org/bot${creds.TELEGRAM_API_TOKEN}/getFile?file_id=${fileId}`;
+    Logger.log(telegramApiUrl);
+    const fileResponse = UrlFetchApp.fetch(telegramApiUrl);
+    const fileData = JSON.parse(fileResponse.getContentText());
+    
+    if (!fileData.ok) {
+      Logger.log(`uploadFileToGitHub: Failed to get file info from Telegram: ${fileData.description}`);
+      return false;
+    }
+
+    const filePath = fileData.result.file_path;
+    const fileContentResponse = UrlFetchApp.fetch(`https://api.telegram.org/file/bot${creds.TELEGRAM_API_TOKEN}/${filePath}`);
+    const fileContent = Utilities.base64Encode(fileContentResponse.getBlob().getBytes());
+
+    const urlPattern = /github\.com\/([^\/]+)\/([^\/]+)\/tree\/([^\/]+)\/(.+)/i;
+    const match = destinationUrl.match(urlPattern);
+    if (!match) {
+      Logger.log(`uploadFileToGitHub: Invalid GitHub URL format: ${destinationUrl}`);
+      return false;
+    }
+
+    const [, owner, repo, branch, path] = match;
+    
+    const githubApiUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${path}`;
+    const payload = {
+      message: commitMessage,
+      content: fileContent,
+      branch: branch
+    };
+
+    const options = {
+      method: 'put',
+      headers: {
+        'Authorization': `token ${token}`,
+        'Accept': 'application/vnd.github.v3+json'
+      },
+      contentType: 'application/json',
+      payload: JSON.stringify(payload),
+      muteHttpExceptions: true
+    };
+
+    const response = UrlFetchApp.fetch(githubApiUrl, options);
+    const status = response.getResponseCode();
+    if (status === 200 || status === 201) {
+      Logger.log(`uploadFileToGitHub: Successfully uploaded file to GitHub: ${destinationUrl}`);
+      return true;
+    } else {
+      Logger.log(`uploadFileToGitHub: Failed to upload file to GitHub. Status: ${status}, Response: ${response.getContentText()}`);
+      return false;
+    }
+  } catch (e) {
+    Logger.log(`uploadFileToGitHub: Error uploading file to GitHub: ${e.message}`);
+    return false;
+  }
+}
+
+// Function to check if file exists in GitHub
+function checkFileExistsInGitHub(fileUrl) {
+  try {
+    const options = {
+      method: 'get',
+      muteHttpExceptions: true
+    };
+    const response = UrlFetchApp.fetch(fileUrl, options);
+    const status = response.getResponseCode();
+    if (status === 200) {
+      Logger.log(`checkFileExistsInGitHub: File exists at ${fileUrl}`);
+      return true;
+    } else {
+      Logger.log(`checkFileExistsInGitHub: File does not exist at ${fileUrl} (Status: ${status})`);
+      return false;
+    }
+  } catch (e) {
+    Logger.log(`checkFileExistsInGitHub: Error checking file existence in GitHub: ${e.message}`);
+    return false;
+  }
 }
