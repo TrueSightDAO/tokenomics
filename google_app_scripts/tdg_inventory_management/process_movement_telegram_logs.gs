@@ -120,7 +120,7 @@ function processInventoryReport(reportText) {
     const aglMatch = currency.match(/^\[(AGL\d+)\]\s*(.+)$/);
     if (aglMatch) {
       const ledgerName = aglMatch[1];
-      // Resolve the ledger URL from https://www.agroverse.shop/[ledger_name]
+      // Resolve the ledger URL from https://www.agroverse.shop/[ledgerName]
       const agroverseUrl = `https://www.agroverse.shop/${ledgerName}`.toLowerCase();
       const resolvedUrl = resolveRedirect(agroverseUrl);
       currencySource = {
@@ -208,7 +208,6 @@ function processTelegramChatLogsToInventoryMovement() {
     telegramData.forEach((row, index) => {
       const updateId = row[0]; // Column A: Telegram Update ID
       const contribution = row[6]; // Column G: Contribution Made
-      const fileIdsString = row[14] ? row[14].toString().trim() : ''; // Column O: File IDs
 
       // Skip if updateId is empty or already exists in Inventory Movement
       if (!updateId || existingUpdateIds.includes(updateId)) {
@@ -217,6 +216,9 @@ function processTelegramChatLogsToInventoryMovement() {
 
       // Check if Contribution Made matches [INVENTORY MOVEMENT] pattern
       if (typeof contribution === 'string' && contribution.trim().startsWith('[INVENTORY MOVEMENT]')) {
+        // Get file IDs from the previous row (if it exists)
+        const fileIdsString = (index > 0 && telegramData[index - 1][14]) ? telegramData[index - 1][14].toString().trim() : '';
+
         const reportResult = processInventoryReport(contribution);
         if (reportResult.error) {
           Logger.log(`Error processing contribution for Update ID ${updateId}: ${reportResult.error}`);
@@ -498,19 +500,19 @@ function processInventoryMovementToLedgers() {
  */
 function testProcessInventoryReport() {
   const testReport = "[INVENTORY MOVEMENT]\n" +
-    "manager name: Gary Teh\n" +
-    "recipient name: @alexadoglio\n" +
-    "inventory item: [AGL6] Brazilian Reis\n" +
-    "quantity: 1";
+    "- Manager Name: Gary Teh\n" +
+    "- Recipient Name: @alexadoglio\n" +
+    "- Inventory Item: [AGL6] Brazilian Reis\n" +
+    "- Quantity: 1";
   const result = processInventoryReport(testReport);
   Logger.log(JSON.stringify(result, null, 2));
 
   // Test offchain asset
   const testReportOffchain = "[INVENTORY MOVEMENT]\n" +
-    "manager name: Gary Teh\n" +
-    "recipient name: @alexadoglio\n" +
-    "inventory item: USD\n" +
-    "quantity: 100";
+    "- Manager Name: Gary Teh\n" +
+    "- Recipient Name: @alexadoglio\n" +
+    "- Inventory Item: USD\n" +
+    "- Quantity: 100";
   const resultOffchain = processInventoryReport(testReportOffchain);
   Logger.log(JSON.stringify(resultOffchain, null, 2));
 }
