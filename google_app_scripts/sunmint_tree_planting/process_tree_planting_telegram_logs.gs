@@ -11,8 +11,8 @@ const TELEGRAM_CHAT_ID = '-1002190388985';
 
 // Helper: extract filename from Photo URL line
 function extractFilenameFromPhotoURL(contributionText) {
-  const match = contributionText.match(/- Photo URL: (.+\/([^\/]+))$/m);
-  return match ? match[2] : null;
+  const match = contributionText.match(/- Photo URL: .+\/([^\/]+\.(?:jpg|jpeg|png|gif))$/m);
+  return match ? match[1] : null;
 }
 
 // Helper: extract Species
@@ -127,12 +127,12 @@ function checkGitHubFileExists(token, filename) {
   }
 }
 
-// Upload image to GitHub and return raw URL
-function uploadToGitHub(token, imageBlob, filename) {
+// Upload image to GitHub and return commit URL
+function uploadToGitHub(token, imageBlob, filename, contributionMade) {
   // Check if file already exists
   const existingUrl = checkGitHubFileExists(token, filename);
   if (existingUrl) {
-    return existingUrl;
+    return null; // Return null to indicate no new commit was created
   }
 
   const repo = "TrueSightDAO/sunmint";
@@ -141,7 +141,7 @@ function uploadToGitHub(token, imageBlob, filename) {
   const base64Content = Utilities.base64Encode(imageBlob.getBytes());
 
   const payload = {
-    message: `Upload image ${filename}`,
+    message: contributionMade, // Use full contributionMade as commit message
     content: base64Content
   };
 
@@ -157,9 +157,9 @@ function uploadToGitHub(token, imageBlob, filename) {
 
   const response = UrlFetchApp.fetch(apiUrl, options);
   const responseData = JSON.parse(response.getContentText());
-  if (!responseData.content) throw new Error("Failed to upload to GitHub: " + response.getContentText());
+  if (!responseData.content || !responseData.commit) throw new Error("Failed to upload to GitHub: " + response.getContentText());
 
-  return `https://raw.githubusercontent.com/${repo}/main/${path}`;
+  return responseData.commit.html_url; // Return the commit URL
 }
 
 // Main processing function
@@ -182,13 +182,13 @@ function processTelegramLogs() {
       "Contribution Made",       // F
       "Status Date",             // G
       "File ID",                 // H
-      "Photo URL",               // I  <- changed from GitHub URL
+      "Photo URL",               // I
       "Contributor Name",        // J
       "Latitude",                // K
       "Longitude",               // L
       "Status",                  // M
-      "Species",                 // N  <- new column
-      "GitHub Raw URL"           // O  <- optional for your use or can be removed
+      "Species",                 // N
+      "GitHub Commit URL"        // O  <- changed to GitHub Commit URL
     ]]);
   }
 
@@ -255,7 +255,7 @@ function processTelegramLogs() {
               const fileNameToUse = filenameFromPhotoURL || (fileId + '.jpg');
               const fileUrl = getTelegramFileUrl(creds.TELEGRAM_API_TOKEN, fileId);
               const imageBlob = UrlFetchApp.fetch(fileUrl).getBlob();
-              const rawUrl = uploadToGitHub(creds.GITHUB_API_TOKEN, imageBlob, fileNameToUse);
+              const commitUrl = uploadToGitHub(creds.GITHUB_API_TOKEN, imageBlob, fileNameToUse, contributionMade);
 
               sunMintTab.appendRow([
                 row[0], // A
@@ -272,13 +272,13 @@ function processTelegramLogs() {
                 longitude, // L
                 "NEW", // M
                 species, // N
-                rawUrl // O
+                commitUrl || "N/A" // O
               ]);
 
               const treePlantingRowNumber = sunMintTab.getLastRow();
               sendTreePlantingNotification([
                 row[0], row[1], row[2], row[3], row[4], contributionMade, row[11], fileId,
-                photoUrl, contributorName, latitude, longitude, "NEW", species, rawUrl
+                photoUrl, contributorName, latitude, longitude, "NEW", species, commitUrl || "N/A"
               ], treePlantingRowNumber);
 
               Logger.log(`Processed file_id: ${fileId}, filename: ${fileNameToUse}`);
@@ -293,7 +293,7 @@ function processTelegramLogs() {
         // No files attached, check previous row or skip image upload
         try {
           let fileId = "N/A";
-          let rawUrl = "N/A";
+          let commitUrl = "N/A";
           const fileNameToUse = filenameFromPhotoURL || "N/A";
 
           // Check previous row for file
@@ -310,7 +310,7 @@ function processTelegramLogs() {
                   fileId = prevFileId;
                   const fileUrl = getTelegramFileUrl(creds.TELEGRAM_API_TOKEN, fileId);
                   const imageBlob = UrlFetchApp.fetch(fileUrl).getBlob();
-                  rawUrl = uploadToGitHub(creds.GITHUB_API_TOKEN, imageBlob, fileNameToUse);
+                  commitUrl = uploadToGitHub(creds.GITHUB_API_TOKEN, imageBlob, fileNameToUse, contributionMade);
                   Logger.log(`Associated file_id from previous row: ${fileId}, filename: ${fileNameToUse}`);
                 } catch (err) {
                   Logger.log(`Error processing file_id from previous row ${prevFileId}: ${err.message}`);
@@ -336,13 +336,13 @@ function processTelegramLogs() {
             longitude, // L
             "NEW", // M
             species, // N
-            rawUrl // O
+            commitUrl // O
           ]);
 
           const treePlantingRowNumber = sunMintTab.getLastRow();
           sendTreePlantingNotification([
             row[0], row[1], row[2], row[3], row[4], contributionMade, row[11], fileId,
-            photoUrl, contributorName, latitude, longitude, "NEW", species, rawUrl
+            photoUrl, contributorName, latitude, longitude, "NEW", species, commitUrl
           ], treePlantingRowNumber);
 
           Logger.log(`Processed record without file attachment: ${fileId}, filename: ${fileNameToUse}`);
