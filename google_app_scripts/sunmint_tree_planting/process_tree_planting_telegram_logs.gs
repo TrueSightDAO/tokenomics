@@ -1,31 +1,38 @@
 // Load API keys and configuration settings from Credentials.gs
-// - setApiKeys(): Stores sensitive API keys in Google Apps Script’s Script Properties for security.
-// - getCredentials(): Retrieves all configuration details (API keys, Sheet ID) as an object.
-// - These steps ensure keys and settings are centralized and not hardcoded here.
 setApiKeys();
 const creds = getCredentials();
 
-// Tab names in the Google Sheet
+// Tab names and constants
 const telegramLogTabName = "Telegram Chat Logs";
 const sunMintTabName = "SunMint Tree Planting";
 const contributorsSheetId = "1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU";
 const contributorsTabName = "Contributors Digital Signatures";
-const TELEGRAM_CHAT_ID = '-1002190388985'; // Your Telegram chat ID for notifications
+const TELEGRAM_CHAT_ID = '-1002190388985';
 
-// Function to send Telegram notification for tree planting event
+// Helper: extract filename from Photo URL line
+function extractFilenameFromPhotoURL(contributionText) {
+  const match = contributionText.match(/- Photo URL: (.+\/([^\/]+))$/m);
+  return match ? match[2] : null;
+}
+
+// Helper: extract Species
+function extractSpecies(contributionText) {
+  const match = contributionText.match(/- Species: (.+)$/m);
+  return match ? match[1].trim() : 'Unknown';
+}
+
+// Send Telegram notification
 function sendTreePlantingNotification(rowData, treePlantingRowNumber) {
   Logger.log("Sending tree planting notification");
   const token = creds.TELEGRAM_API_TOKEN;
   if (!token) {
-    Logger.log(`sendTreePlantingNotification: Error: TELEGRAM_API_TOKEN not set in Credentials`);
+    Logger.log(`sendTreePlantingNotification: Error: TELEGRAM_API_TOKEN not set`);
     return;
   }
 
   const apiUrl = `https://api.telegram.org/bot${token}/sendMessage`;
-  const timestamp = new Date().getTime();
   const outputSheetLink = `https://www.agroverse.shop/trees-planted`;
 
-  // Format the message with all inserted data
   const messageText = `🌳 New Tree Planting Event Recorded\n\n` +
     `Tree Planting Row: ${treePlantingRowNumber}\n` +
     `Telegram Update ID: ${rowData[0]}\n` +
@@ -34,7 +41,7 @@ function sendTreePlantingNotification(rowData, treePlantingRowNumber) {
     `Message ID: ${rowData[3]}\n` +
     `Contributor Handle: ${rowData[4]}\n` +
     `Contributor Name: ${rowData[9]}\n` +
-    `GitHub Raw URL: ${rowData[8]}\n` +
+    `Photo URL: ${rowData[8]}\n` +
     `Location: ${rowData[10]}, ${rowData[11]}\n\n` +
     `Review here: ${outputSheetLink}`;
 
@@ -52,257 +59,64 @@ function sendTreePlantingNotification(rowData, treePlantingRowNumber) {
   };
 
   try {
-    Logger.log(`sendTreePlantingNotification: Sending notification for tree planting to chat ${TELEGRAM_CHAT_ID}`);
+    Logger.log(`Sending notification to chat ${TELEGRAM_CHAT_ID}`);
     const response = UrlFetchApp.fetch(apiUrl, options);
     const status = response.getResponseCode();
-    const responseText = response.getContentText();
     if (status === 200) {
-      Logger.log(`sendTreePlantingNotification: Successfully sent notification to chat ${TELEGRAM_CHAT_ID}`);
+      Logger.log(`Notification sent successfully.`);
     } else {
-      Logger.log(`sendTreePlantingNotification: Failed to send notification. Status: ${status}, Response: ${responseText}`);
+      Logger.log(`Failed to send notification. Status: ${status}, Response: ${response.getContentText()}`);
     }
   } catch (e) {
-    Logger.log(`sendTreePlantingNotification: Error sending Telegram notification: ${e.message}`);
+    Logger.log(`Error sending Telegram notification: ${e.message}`);
   }
 }
 
-// Function to get list of already processed telegram_message_ids from SunMint Tree Planting tab
+// Get processed message IDs
 function getProcessedMessageIds(sunMintTab) {
-  var lastRow = sunMintTab.getLastRow();
+  const lastRow = sunMintTab.getLastRow();
   if (lastRow < 2) return [];
-  var messageIds = sunMintTab.getRange(2, 4, lastRow - 1, 1).getValues().flat(); // Column D
-  return messageIds.filter(function(id) { return id !== ""; });
+  const messageIds = sunMintTab.getRange(2, 4, lastRow - 1, 1).getValues().flat();
+  return messageIds.filter(id => id !== "");
 }
 
-// Function to process file_ids from Telegram Chat Logs and upload to SunMint Tree Planting tab
-function processTelegramLogs() {
-  var sheet = SpreadsheetApp.openById(creds.SHEET_ID);
-  var telegramLogTab = sheet.getSheetByName(telegramLogTabName);
-  var sunMintTab = sheet.getSheetByName(sunMintTabName);
-  var contributorsSheet = SpreadsheetApp.openById(contributorsSheetId);
-  var contributorsTab = contributorsSheet.getSheetByName(contributorsTabName);
-
-  // Create SunMint Tree Planting tab if it doesn't exist
-  if (!sunMintTab) {
-    sunMintTab = sheet.insertSheet(sunMintTabName);
-    sunMintTab.getRange("A1:M1").setValues([[
-      "Telegram Update ID", 
-      "Chatroom ID", 
-      "Chatroom Name", 
-      "Message ID", 
-      "Contributor Handle", 
-      "Contribution Made", 
-      "Status Date", 
-      "File ID", 
-      "GitHub Raw URL", 
-      "Contributor Name", 
-      "Latitude", 
-      "Longitude",
-      "Status"
-    ]]);
-  }
-
-  // Get processed file_ids and message_ids from SunMint Tree Planting tab
-  var processedFileIds = getProcessedFileIds(sunMintTab);
-  var processedMessageIds = getProcessedMessageIds(sunMintTab);
-
-  // Get data from Telegram Chat Logs (Columns A to O)
-  var lastRow = telegramLogTab.getLastRow();
-  if (lastRow < 2) {
-    Logger.log("No data in Telegram Chat Logs tab");
-    return;
-  }
-  var dataRange = telegramLogTab.getRange(2, 1, lastRow - 1, 15).getValues();
-
-  // Get contributor signatures from Contributors Digital Signatures tab
-  var contributorsLastRow = contributorsTab.getLastRow();
-  var contributorsData = contributorsLastRow > 1 ? contributorsTab.getRange(2, 1, contributorsLastRow - 1, 5).getValues() : [];
-
-  // Process each row in Telegram Chat Logs
-  dataRange.forEach(function(row, index) {
-    var contributionMade = row[6]; // Column G
-    var messageId = row[3]; // Column D: telegram_message_id
-    var fileIdsString = row[14]; // Column O
-
-    // Skip if message_id already processed
-    if (processedMessageIds.includes(messageId)) {
-      Logger.log(`Message ID already processed: ${messageId}`);
-      return;
-    }
-
-    // Only process [TREE PLANTING EVENT] records
-    if (contributionMade && contributionMade.startsWith("[TREE PLANTING EVENT]")) {
-      Logger.log(contributionMade);
-
-      // Extract latitude and longitude from contribution_made
-      var lines = contributionMade.split('\n');
-      var latitude = lines.find(line => line.startsWith('- Latitude: '))?.replace('- Latitude: ', '') || 'N/A';
-      var longitude = lines.find(line => line.startsWith('- Longitude: '))?.replace('- Longitude: ', '') || 'N/A';
-
-      // Extract public signature from contribution_made
-      var publicSignatureMatch = contributionMade.match(/My Digital Signature: ([^\n]+)/);
-      var publicSignature = publicSignatureMatch ? publicSignatureMatch[1].trim() : 'N/A';
-
-      // Match public signature to contributor name
-      var contributorName = 'Unknown';
-      contributorsData.forEach(function(contributorRow) {
-        if (contributorRow[4] === publicSignature) { // Column E in Contributors Digital Signatures
-          contributorName = contributorRow[0]; // Column A
-        }
-      });
-
-      // Handle records with file attachments
-      var fileIds = fileIdsString ? fileIdsString.split(',').map(function(id) { return id.trim(); }) : [];
-      if (fileIds.length > 0) {
-        fileIds.forEach(function(fileId) {
-          if (fileId && !processedFileIds.includes(fileId)) {
-            try {
-              // Get file URL from Telegram
-              var fileUrl = getTelegramFileUrl(creds.TELEGRAM_API_TOKEN, fileId);
-              // Download image
-              var imageBlob = UrlFetchApp.fetch(fileUrl).getBlob();
-              // Check if file exists on GitHub; upload if it doesn't
-              var rawUrl = uploadToGitHub(creds.GITHUB_API_TOKEN, imageBlob, fileId);
-
-              // Append to SunMint Tree Planting tab
-              sunMintTab.appendRow([
-                row[0], // Column A: telegram_update_id
-                row[1], // Column B: telegram_chatroom_id
-                row[2], // Column C: telegram_chatroom_name
-                row[3], // Column D: telegram_message_id
-                row[4], // Column E: contributor_name (handle)
-                contributionMade, // Column F: contribution_made
-                row[11], // Column G: status_date
-                fileId, // Column H: file_id
-                rawUrl, // Column I: GitHub raw URL
-                contributorName, // Column J: contributor name from Contributors Digital Signatures
-                latitude, // Column K: extracted latitude
-                longitude, // Column L: extracted longitude
-                "NEW" // Column M: Status
-              ]);
-
-              // Send Telegram notification
-              const treePlantingRowNumber = sunMintTab.getLastRow();
-              sendTreePlantingNotification([
-                row[0], row[1], row[2], row[3], row[4], contributionMade, row[11], fileId,
-                rawUrl, contributorName, latitude, longitude, "NEW"
-              ], treePlantingRowNumber);
-
-              Logger.log(`Processed file_id: ${fileId}, GitHub URL: ${rawUrl}, Latitude: ${latitude}, Longitude: ${longitude}`);
-            } catch (err) {
-              Logger.log(`Error processing file_id ${fileId}: ${err.message}`);
-            }
-          } else if (fileId) {
-            Logger.log(`file_id already processed: ${fileId}`);
-          }
-        });
-      } else {
-        // Handle records without file attachments
-        try {
-          var fileId = "N/A";
-          var rawUrl = "N/A";
-
-          // Check the preceding row for a potential image
-          if (index > 0) {
-            var prevRow = dataRange[index - 1];
-            var prevContributionMade = prevRow[6]; // Column G of previous row
-            var prevFileIdsString = prevRow[14]; // Column O of previous row
-            var prevFileIds = prevFileIdsString ? prevFileIdsString.split(',').map(function(id) { return id.trim(); }) : [];
-
-            if (!prevContributionMade && prevFileIds.length > 0) {
-              // Previous row has no contribution_made and has file_ids
-              var prevFileId = prevFileIds[0]; // Take the first file_id
-              if (prevFileId && !processedFileIds.includes(prevFileId)) {
-                try {
-                  // Get file URL from Telegram
-                  var fileUrl = getTelegramFileUrl(creds.TELEGRAM_API_TOKEN, prevFileId);
-                  // Download image
-                  var imageBlob = UrlFetchApp.fetch(fileUrl).getBlob();
-                  // Check if file exists on GitHub; upload if it doesn't
-                  rawUrl = uploadToGitHub(creds.GITHUB_API_TOKEN, imageBlob, prevFileId);
-                  fileId = prevFileId;
-                  Logger.log(`Associated file_id from previous row: ${fileId}, GitHub URL: ${rawUrl}`);
-                } catch (err) {
-                  Logger.log(`Error processing file_id from previous row ${prevFileId}: ${err.message}`);
-                  // Continue with N/A values if image processing fails
-                }
-              } else if (prevFileId) {
-                Logger.log(`file_id from previous row already processed: ${prevFileId}`);
-              }
-            }
-          }
-
-          // Append to SunMint Tree Planting tab
-          sunMintTab.appendRow([
-            row[0], // Column A: telegram_update_id
-            row[1], // Column B: telegram_chatroom_id
-            row[2], // Column C: telegram_chatroom_name
-            row[3], // Column D: telegram_message_id
-            row[4], // Column E: contributor_name (handle)
-            contributionMade, // Column F: contribution_made
-            row[11], // Column G: status_date
-            fileId, // Column H: file_id (from previous row or "N/A")
-            rawUrl, // Column I: GitHub raw URL (from previous row or "N/A")
-            contributorName, // Column J: contributor name from Contributors Digital Signatures
-            latitude, // Column K: extracted latitude
-            longitude, // Column L: extracted longitude
-            "NEW" // Column M: Status
-          ]);
-
-          // Send Telegram notification
-          const treePlantingRowNumber = sunMintTab.getLastRow();
-          sendTreePlantingNotification([
-            row[0], row[1], row[2], row[3], row[4], contributionMade, row[11], fileId,
-            rawUrl, contributorName, latitude, longitude, "NEW"
-          ], treePlantingRowNumber);
-
-          Logger.log(`Processed record: File ID: ${fileId}, GitHub URL: ${rawUrl}, Latitude: ${latitude}, Longitude: ${longitude}`);
-        } catch (err) {
-          Logger.log(`Error processing record without file attachment: ${err.message}`);
-        }
-      }
-    }
-  });
-}
-
-// Get list of already processed file_ids from SunMint Tree Planting tab
+// Get processed file IDs
 function getProcessedFileIds(sunMintTab) {
-  var lastRow = sunMintTab.getLastRow();
+  const lastRow = sunMintTab.getLastRow();
   if (lastRow < 2) return [];
-  var fileIds = sunMintTab.getRange(2, 8, lastRow - 1, 1).getValues().flat(); // Column H
-  return fileIds.filter(function(id) { return id !== "" && id !== "N/A"; });
+  const fileIds = sunMintTab.getRange(2, 8, lastRow - 1, 1).getValues().flat();
+  return fileIds.filter(id => id !== "" && id !== "N/A");
 }
 
-// Get Telegram file URL using file_id
+// Get Telegram file URL
 function getTelegramFileUrl(token, fileId) {
-  var getFileUrl = `https://api.telegram.org/bot${token}/getFile?file_id=${fileId}`;
-  var response = UrlFetchApp.fetch(getFileUrl);
-  var fileData = JSON.parse(response.getContentText());
+  const getFileUrl = `https://api.telegram.org/bot${token}/getFile?file_id=${fileId}`;
+  const response = UrlFetchApp.fetch(getFileUrl);
+  const fileData = JSON.parse(response.getContentText());
   if (!fileData.ok) throw new Error("Failed to get file path: " + fileData.description);
-  var filePath = fileData.result.file_path;
+  const filePath = fileData.result.file_path;
   return `https://api.telegram.org/file/bot${token}/${filePath}`;
 }
 
 // Check if file exists on GitHub
-function checkGitHubFileExists(token, fileId) {
-  var repo = "TrueSightDAO/sunmint";
-  var path = `images/${fileId}.jpg`;
-  var apiUrl = `https://api.github.com/repos/${repo}/contents/${path}`;
-  
-  var options = {
+function checkGitHubFileExists(token, filename) {
+  const repo = "TrueSightDAO/sunmint";
+  const path = `images/${filename}`;
+  const apiUrl = `https://api.github.com/repos/${repo}/contents/${path}`;
+
+  const options = {
     method: "GET",
     headers: {
       "Authorization": `token ${token}`,
       "Accept": "application/vnd.github.v3+json"
     },
-    muteHttpExceptions: true // Prevent throwing errors for 404
+    muteHttpExceptions: true
   };
 
-  var response = UrlFetchApp.fetch(apiUrl, options);
-  var status = response.getResponseCode();
+  const response = UrlFetchApp.fetch(apiUrl, options);
+  const status = response.getResponseCode();
 
   if (status === 200) {
-    var responseData = JSON.parse(response.getContentText());
     Logger.log(`File exists on GitHub: ${path}`);
     return `https://raw.githubusercontent.com/${repo}/main/${path}`;
   } else if (status === 404) {
@@ -314,24 +128,24 @@ function checkGitHubFileExists(token, fileId) {
 }
 
 // Upload image to GitHub and return raw URL
-function uploadToGitHub(token, imageBlob, fileId) {
+function uploadToGitHub(token, imageBlob, filename) {
   // Check if file already exists
-  var existingUrl = checkGitHubFileExists(token, fileId);
+  const existingUrl = checkGitHubFileExists(token, filename);
   if (existingUrl) {
     return existingUrl;
   }
 
-  var repo = "TrueSightDAO/sunmint";
-  var path = `images/${fileId}.jpg`; // Use file_id as filename to ensure uniqueness
-  var apiUrl = `https://api.github.com/repos/${repo}/contents/${path}`;
-  var base64Content = Utilities.base64Encode(imageBlob.getBytes());
-  
-  var payload = {
-    message: `Upload image ${fileId}.jpg`,
+  const repo = "TrueSightDAO/sunmint";
+  const path = `images/${filename}`;
+  const apiUrl = `https://api.github.com/repos/${repo}/contents/${path}`;
+  const base64Content = Utilities.base64Encode(imageBlob.getBytes());
+
+  const payload = {
+    message: `Upload image ${filename}`,
     content: base64Content
   };
 
-  var options = {
+  const options = {
     method: "PUT",
     headers: {
       "Authorization": `token ${token}`,
@@ -341,10 +155,201 @@ function uploadToGitHub(token, imageBlob, fileId) {
     payload: JSON.stringify(payload)
   };
 
-  var response = UrlFetchApp.fetch(apiUrl, options);
-  var responseData = JSON.parse(response.getContentText());
+  const response = UrlFetchApp.fetch(apiUrl, options);
+  const responseData = JSON.parse(response.getContentText());
   if (!responseData.content) throw new Error("Failed to upload to GitHub: " + response.getContentText());
-  
-  // Return raw URL
+
   return `https://raw.githubusercontent.com/${repo}/main/${path}`;
+}
+
+// Main processing function
+function processTelegramLogs() {
+  const sheet = SpreadsheetApp.openById(creds.SHEET_ID);
+  let telegramLogTab = sheet.getSheetByName(telegramLogTabName);
+  let sunMintTab = sheet.getSheetByName(sunMintTabName);
+  const contributorsSheet = SpreadsheetApp.openById(contributorsSheetId);
+  const contributorsTab = contributorsSheet.getSheetByName(contributorsTabName);
+
+  // Create tab if not exists
+  if (!sunMintTab) {
+    sunMintTab = sheet.insertSheet(sunMintTabName);
+    sunMintTab.getRange("A1:O1").setValues([[
+      "Telegram Update ID",      // A
+      "Chatroom ID",             // B
+      "Chatroom Name",           // C
+      "Message ID",              // D
+      "Contributor Handle",      // E
+      "Contribution Made",       // F
+      "Status Date",             // G
+      "File ID",                 // H
+      "Photo URL",               // I  <- changed from GitHub URL
+      "Contributor Name",        // J
+      "Latitude",                // K
+      "Longitude",               // L
+      "Status",                  // M
+      "Species",                 // N  <- new column
+      "GitHub Raw URL"           // O  <- optional for your use or can be removed
+    ]]);
+  }
+
+  const processedFileIds = getProcessedFileIds(sunMintTab);
+  const processedMessageIds = getProcessedMessageIds(sunMintTab);
+
+  const lastRow = telegramLogTab.getLastRow();
+  if (lastRow < 2) {
+    Logger.log("No data in Telegram Chat Logs tab");
+    return;
+  }
+  const dataRange = telegramLogTab.getRange(2, 1, lastRow - 1, 15).getValues();
+
+  const contributorsLastRow = contributorsTab.getLastRow();
+  const contributorsData = contributorsLastRow > 1 ? contributorsTab.getRange(2, 1, contributorsLastRow - 1, 5).getValues() : [];
+
+  dataRange.forEach(function(row, index) {
+    const contributionMade = row[6]; // Column G
+    const messageId = row[3]; // Column D
+    const fileIdsString = row[14]; // Column O
+
+    if (processedMessageIds.includes(messageId)) {
+      Logger.log(`Message ID already processed: ${messageId}`);
+      return;
+    }
+
+    if (contributionMade && contributionMade.startsWith("[TREE PLANTING EVENT]")) {
+      Logger.log(contributionMade);
+
+      // Extract latitude, longitude
+      const lines = contributionMade.split('\n');
+      const latitude = lines.find(l => l.startsWith('- Latitude: '))?.replace('- Latitude: ', '') || 'N/A';
+      const longitude = lines.find(l => l.startsWith('- Longitude: '))?.replace('- Longitude: ', '') || 'N/A';
+
+      // Extract Species
+      const species = extractSpecies(contributionMade);
+
+      // Extract Photo URL
+      const photoUrlMatch = contributionMade.match(/- Photo URL: (.+)$/m);
+      const photoUrl = photoUrlMatch ? photoUrlMatch[1].trim() : 'N/A';
+
+      // Extract public signature
+      const publicSignatureMatch = contributionMade.match(/My Digital Signature: ([^\n]+)/);
+      const publicSignature = publicSignatureMatch ? publicSignatureMatch[1].trim() : 'N/A';
+
+      // Match contributor name by public signature
+      let contributorName = 'Unknown';
+      contributorsData.forEach(function(contributorRow) {
+        if (contributorRow[4] === publicSignature) {
+          contributorName = contributorRow[0];
+        }
+      });
+
+      // Extract filename from Photo URL or fallback to fileId.jpg
+      const filenameFromPhotoURL = extractFilenameFromPhotoURL(contributionMade);
+
+      // Process files attached or from previous row
+      const fileIds = fileIdsString ? fileIdsString.split(',').map(id => id.trim()) : [];
+
+      if (fileIds.length > 0) {
+        fileIds.forEach(function(fileId) {
+          if (fileId && !processedFileIds.includes(fileId)) {
+            try {
+              const fileNameToUse = filenameFromPhotoURL || (fileId + '.jpg');
+              const fileUrl = getTelegramFileUrl(creds.TELEGRAM_API_TOKEN, fileId);
+              const imageBlob = UrlFetchApp.fetch(fileUrl).getBlob();
+              const rawUrl = uploadToGitHub(creds.GITHUB_API_TOKEN, imageBlob, fileNameToUse);
+
+              sunMintTab.appendRow([
+                row[0], // A
+                row[1], // B
+                row[2], // C
+                row[3], // D
+                row[4], // E
+                contributionMade, // F
+                row[11], // G
+                fileId, // H
+                photoUrl, // I
+                contributorName, // J
+                latitude, // K
+                longitude, // L
+                "NEW", // M
+                species, // N
+                rawUrl // O
+              ]);
+
+              const treePlantingRowNumber = sunMintTab.getLastRow();
+              sendTreePlantingNotification([
+                row[0], row[1], row[2], row[3], row[4], contributionMade, row[11], fileId,
+                photoUrl, contributorName, latitude, longitude, "NEW", species, rawUrl
+              ], treePlantingRowNumber);
+
+              Logger.log(`Processed file_id: ${fileId}, filename: ${fileNameToUse}`);
+            } catch (err) {
+              Logger.log(`Error processing file_id ${fileId}: ${err.message}`);
+            }
+          } else if (fileId) {
+            Logger.log(`file_id already processed: ${fileId}`);
+          }
+        });
+      } else {
+        // No files attached, check previous row or skip image upload
+        try {
+          let fileId = "N/A";
+          let rawUrl = "N/A";
+          const fileNameToUse = filenameFromPhotoURL || "N/A";
+
+          // Check previous row for file
+          if (index > 0) {
+            const prevRow = dataRange[index - 1];
+            const prevContributionMade = prevRow[6];
+            const prevFileIdsString = prevRow[14];
+            const prevFileIds = prevFileIdsString ? prevFileIdsString.split(',').map(id => id.trim()) : [];
+
+            if (!prevContributionMade && prevFileIds.length > 0) {
+              const prevFileId = prevFileIds[0];
+              if (prevFileId && !processedFileIds.includes(prevFileId)) {
+                try {
+                  fileId = prevFileId;
+                  const fileUrl = getTelegramFileUrl(creds.TELEGRAM_API_TOKEN, fileId);
+                  const imageBlob = UrlFetchApp.fetch(fileUrl).getBlob();
+                  rawUrl = uploadToGitHub(creds.GITHUB_API_TOKEN, imageBlob, fileNameToUse);
+                  Logger.log(`Associated file_id from previous row: ${fileId}, filename: ${fileNameToUse}`);
+                } catch (err) {
+                  Logger.log(`Error processing file_id from previous row ${prevFileId}: ${err.message}`);
+                }
+              } else if (prevFileId) {
+                Logger.log(`file_id from previous row already processed: ${prevFileId}`);
+              }
+            }
+          }
+
+          sunMintTab.appendRow([
+            row[0], // A
+            row[1], // B
+            row[2], // C
+            row[3], // D
+            row[4], // E
+            contributionMade, // F
+            row[11], // G
+            fileId, // H
+            photoUrl, // I
+            contributorName, // J
+            latitude, // K
+            longitude, // L
+            "NEW", // M
+            species, // N
+            rawUrl // O
+          ]);
+
+          const treePlantingRowNumber = sunMintTab.getLastRow();
+          sendTreePlantingNotification([
+            row[0], row[1], row[2], row[3], row[4], contributionMade, row[11], fileId,
+            photoUrl, contributorName, latitude, longitude, "NEW", species, rawUrl
+          ], treePlantingRowNumber);
+
+          Logger.log(`Processed record without file attachment: ${fileId}, filename: ${fileNameToUse}`);
+        } catch (err) {
+          Logger.log(`Error processing record without file attachment: ${err.message}`);
+        }
+      }
+    }
+  });
 }
