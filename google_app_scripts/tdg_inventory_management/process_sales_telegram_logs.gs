@@ -20,8 +20,8 @@ const TELEGRAM_TOKEN = creds.TELEGRAM_API_TOKEN;
 // Configuration Variables
 const SOURCE_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1qbZZhf-_7xzmDTriaJVWj6OZshyQsFkdsAV8-pyzASQ/edit?gid=0#gid=0';
 const SOURCE_SHEET_NAME = 'Telegram Chat Logs';
-const DESTINATION_SHEET_URL = 'https://docs.google.com/spreadsheets/d/18bAVJfV-u57LBUgnCKB4kg65YOzvTfR3PZJ5WS9IVos/edit?gid=0#gid=0';
-const DESTINATION_SHEET_NAME = 'Scored Chatlogs';
+const DESTINATION_SHEET_URL = 'docs.google.com/spreadsheets/d/1qbZZhf-_7xzmDTriaJVWj6OZshyQsFkdsAV8-pyzASQ/edit?gid=1003674539#gid=1003674539';
+const DESTINATION_SHEET_NAME = 'QR Code Sales';
 const CONTRIBUTORS_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU/edit?gid=1460794618#gid=1460794618';
 const CONTRIBUTORS_SHEET_NAME = 'Contributors contact information';
 const AGROVERSE_QR_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU/edit?gid=472328231#gid=472328231';
@@ -238,7 +238,8 @@ Message: "${message}"`;
         model: 'grok-3',
         messages: [{ role: 'user', content: prompt }],
         max_tokens: 200
-      })
+      }),
+      muteHttpExceptions: true // To inspect full response
     };
     
     const response = UrlFetchApp.fetch(XAI_API_URL, options);
