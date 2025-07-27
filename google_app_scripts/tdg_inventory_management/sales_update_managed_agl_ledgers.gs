@@ -13,8 +13,8 @@ const creds = getCredentials();
 const TELEGRAM_TOKEN = creds.TELEGRAM_API_TOKEN;
 
 // Configuration Variables
-const SOURCE_SHEET_URL = 'https://docs.google.com/spreadsheets/d/18bAVJfV-u57LBUgnCKB4kg65YOzvTfR3PZJ5WS9IVos/edit?gid=0#gid=0';
-const SOURCE_SHEET_NAME = 'Scored Chatlogs';
+const SOURCE_SHEET_URL = 'docs.google.com/spreadsheets/d/1qbZZhf-_7xzmDTriaJVWj6OZshyQsFkdsAV8-pyzASQ/edit?gid=1003674539#gid=1003674539';
+const SOURCE_SHEET_NAME = 'QR Code Sales';
 const OFFCHAIN_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU/edit?gid=995916231#gid=995916231';
 const OFFCHAIN_SHEET_NAME = 'offchain transactions';
 const DEST_SHEET_NAME = 'Transactions';
