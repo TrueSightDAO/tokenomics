@@ -24,7 +24,7 @@ from PIL import Image, ImageDraw, ImageFont
 
 # Layout and scaling constants
 CANVAS_BASE_WIDTH = 450        # base width for blank canvas (px)
-CANVAS_BASE_HEIGHT = 354       # base height for blank canvas (px)
+CANVAS_BASE_HEIGHT = 350       # base height for blank canvas (px)
 CANVAS_SCALE = 1              # scale factor for blank canvas
 QR_BASE_SIZE = 320            # base QR size for blank canvas before scaling (px)
 QR_RATIO = 0.5                 # QR size as fraction of template width when template provided
@@ -33,6 +33,7 @@ QR_RATIO = 0.5                 # QR size as fraction of template width when temp
 DEFAULT_HARVEST_FONT_SIZE = 18 # default font size for harvest/pledge line
 DEFAULT_INFO_FONT_SIZE = 25   # default font size for info line
 DEFAULT_PLANT_FONT_SIZE = 20   # default font size for plant line
+DEFAULT_SERIAL_FONT_SIZE = 10   # default font size for plant line
 MIN_FONT_RATIO = 0.02          # minimum font size as fraction of canvas height
 MIN_FONT_SIZE = 6              # absolute minimum font size in pixels
 
@@ -41,13 +42,15 @@ SIDE_MARGIN_RATIO = 0.05       # horizontal side margin as fraction of canvas wi
 QR_TO_HARVEST_RATIO = 0.0001  # vertical space from QR to harvest/pledge line
 HARVEST_TO_INFO_RATIO = 0.10   # vertical space from harvest/pledge to info line
 INFO_TO_PLANT_RATIO = 0.07     # vertical space from info to plant line
+PLANT_TO_SERIAL_RATIO = 0.07   # vertical space from plant to serial line
 BOTTOM_MARGIN_RATIO = 0.05     # bottom margin as fraction of canvas height
 
 # Manual fixed positions (in pixels) to override dynamic layout. Set to None to use auto-layout
 FIXED_QR_Y = -25              # override QR Y position (px); e.g., -30
 FIXED_HARVEST_Y = 255         # override harvest/pledge text Y position (px)
 FIXED_INFO_Y = 275            # override info text Y position (px)
-FIXED_PLANT_Y = 307           # override plant text Y position (px)
+FIXED_PLANT_Y = 305           # override plant text Y position (px)
+FIXED_SERIAL_Y = 330          # override serial text Y position (px)
 
 # Default font family for text
 DEFAULT_FONT_FAMILY = "Helvetica.ttc"
@@ -146,6 +149,7 @@ def compile_image(template_path: str,
       Harvest <year> (for cacao, if year exists) or Pledge Year <year> (for non-cacao, if year exists) or Pledge Confirmed
       Farm Name, State, Country
       Your tree is getting planted
+      <serial>
     Spacing and font sizes are set explicitly or use defaults.
     :param is_cacao: True if item is cacao, False otherwise.
     :param ignore_max_width: if True, skip auto-resizing to fit text width constraints.
@@ -192,6 +196,7 @@ def compile_image(template_path: str,
         info_parts.append(country)
     info_text = ", ".join(info_parts)
     plant_text = "Your tree is getting planted"
+    serial_text = serial
 
     # Determine fonts and spacing
     side_margin = int(bg_w * SIDE_MARGIN_RATIO)
@@ -224,25 +229,29 @@ def compile_image(template_path: str,
     f_harvest_size = max(min_font, harvest_font_size)
     f_info_size = max(min_font, info_font_size)
     f_plant_size = max(min_font, plant_font_size)
+    f_serial_size = max(min_font, DEFAULT_SERIAL_FONT_SIZE)  # Use same font size as plant text
 
     # Load fonts
     f_harvest = load_font(f_harvest_size)
     f_info = load_font(f_info_size)
     f_plant = load_font(f_plant_size)
+    f_serial = load_font(f_serial_size)
 
     # Measure text heights
     _, h1 = text_size(harvest_text, f_harvest)
     _, h2 = text_size(info_text, f_info)
     _, h3 = text_size(plant_text, f_plant)
+    _, h4 = text_size(serial_text, f_serial)
 
     # Vertical spacing
     m1 = int(bg_h * QR_TO_HARVEST_RATIO)
     m2 = int(bg_h * HARVEST_TO_INFO_RATIO)
     m3 = int(bg_h * INFO_TO_PLANT_RATIO)
+    m4 = int(bg_h * PLANT_TO_SERIAL_RATIO)
     bottom_margin = int(bg_h * BOTTOM_MARGIN_RATIO)
 
     # Compute dynamic starting Y so content sits above bottom margin
-    total_h = qr_h + m1 + h1 + m2 + h2 + m3 + h3
+    total_h = qr_h + m1 + h1 + m2 + h2 + m3 + h3 + m4 + h4
     dynamic_start_y = bg_h - bottom_margin - total_h
 
     # Paste QR code (centered horizontally)
@@ -254,6 +263,7 @@ def compile_image(template_path: str,
     harvest_y = FIXED_HARVEST_Y if FIXED_HARVEST_Y is not None else qr_y + qr_h + m1
     info_y    = FIXED_INFO_Y    if FIXED_INFO_Y    is not None else harvest_y + h1 + m2
     plant_y   = FIXED_PLANT_Y   if FIXED_PLANT_Y   is not None else info_y    + h2 + m3
+    serial_y  = FIXED_SERIAL_Y  if FIXED_SERIAL_Y  is not None else plant_y   + h3 + m4
 
     # Draw harvest/pledge text (centered horizontally)
     w_harvest, _ = text_size(harvest_text, f_harvest)
@@ -269,6 +279,11 @@ def compile_image(template_path: str,
     w_plant, _ = text_size(plant_text, f_plant)
     x = (bg_w - w_plant) // 2
     draw.text((x, plant_y), plant_text, fill="black", font=f_plant)
+
+    # Draw serial text
+    w_serial, _ = text_size(serial_text, f_serial)
+    x = (bg_w - w_serial) // 2
+    draw.text((x, serial_y), serial_text, fill="black", font=f_serial)
 
     return template
 
