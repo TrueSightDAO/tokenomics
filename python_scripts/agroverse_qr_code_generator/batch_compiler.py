@@ -33,7 +33,7 @@ QR_RATIO = 0.5                 # QR size as fraction of template width when temp
 DEFAULT_HARVEST_FONT_SIZE = 18 # default font size for harvest/pledge line
 DEFAULT_INFO_FONT_SIZE = 25   # default font size for info line
 DEFAULT_PLANT_FONT_SIZE = 20   # default font size for plant line
-DEFAULT_SERIAL_FONT_SIZE = 10   # default font size for plant line
+DEFAULT_SERIAL_FONT_SIZE = 22   # default font size for plant line
 MIN_FONT_RATIO = 0.02          # minimum font size as fraction of canvas height
 MIN_FONT_SIZE = 6              # absolute minimum font size in pixels
 
@@ -44,13 +44,14 @@ HARVEST_TO_INFO_RATIO = 0.10   # vertical space from harvest/pledge to info line
 INFO_TO_PLANT_RATIO = 0.07     # vertical space from info to plant line
 PLANT_TO_SERIAL_RATIO = 0.07   # vertical space from plant to serial line
 BOTTOM_MARGIN_RATIO = 0.05     # bottom margin as fraction of canvas height
+RIGHT_MARGIN_SERIAL_RATIO = 0.05
 
 # Manual fixed positions (in pixels) to override dynamic layout. Set to None to use auto-layout
-FIXED_QR_Y = -25              # override QR Y position (px); e.g., -30
-FIXED_HARVEST_Y = 255         # override harvest/pledge text Y position (px)
-FIXED_INFO_Y = 275            # override info text Y position (px)
-FIXED_PLANT_Y = 305           # override plant text Y position (px)
-FIXED_SERIAL_Y = 330          # override serial text Y position (px)
+FIXED_QR_Y = -30              # override QR Y position (px); e.g., -30
+FIXED_HARVEST_Y = 250         # override harvest/pledge text Y position (px)
+FIXED_INFO_Y = 270            # override info text Y position (px)
+FIXED_PLANT_Y = 300           # override plant text Y position (px)
+FIXED_SERIAL_Y = 325          # override serial text Y position (px)
 
 # Default font family for text
 DEFAULT_FONT_FAMILY = "Helvetica.ttc"
@@ -131,6 +132,8 @@ def generate_qr_image(url: str, box_size: int = 10, border: int = 4, logo_path: 
     return img
 
 
+
+
 def compile_image(template_path: str,
                   qr_img: Image.Image,
                   farm_name: str,
@@ -145,11 +148,12 @@ def compile_image(template_path: str,
                   plant_font_size: int = DEFAULT_PLANT_FONT_SIZE,
                   ignore_max_width: bool = False):
     """
-    Embed QR code into the provided template image, annotate below with:
-      Harvest <year> (for cacao, if year exists) or Pledge Year <year> (for non-cacao, if year exists) or Pledge Confirmed
-      Farm Name, State, Country
-      Your tree is getting planted
-      <serial>
+    Embed QR code into the provided template image, annotate with:
+      - Above QR: (none)
+      - Below QR: Harvest <year> (for cacao, if year exists) or Pledge Year <year> (for non-cacao, if year exists) or Pledge Confirmed
+                  Farm Name, State, Country
+                  Your tree is getting planted
+      - Right side, vertical: <serial> (rotated 90 degrees counterclockwise)
     Spacing and font sizes are set explicitly or use defaults.
     :param is_cacao: True if item is cacao, False otherwise.
     :param ignore_max_width: if True, skip auto-resizing to fit text width constraints.
@@ -183,6 +187,26 @@ def compile_image(template_path: str,
             mask = fnt.getmask(txt)
             return mask.size
 
+    # Helper to load a TrueType font by given family or path, with fallbacks
+    def load_font(size):
+        try:
+            return ImageFont.truetype('cour.ttf', size)  # Prefer Courier New for clear underscore rendering
+        except Exception:
+            try:
+                return ImageFont.truetype('arial.ttf', size)
+            except Exception:
+                try:
+                    return ImageFont.truetype(font_family, size)
+                except Exception:
+                    base, ext = os.path.splitext(font_family)
+                    if not ext:
+                        for try_ext in ('.ttf', '.ttc'):
+                            try:
+                                return ImageFont.truetype(font_family + try_ext, size)
+                            except Exception:
+                                continue
+                    return ImageFont.load_default()
+
     # Prepare text lines
     if is_cacao:
         harvest_text = f"Harvest {year}" if year else "Pledge Confirmed"
@@ -197,39 +221,20 @@ def compile_image(template_path: str,
     info_text = ", ".join(info_parts)
     plant_text = "Your tree is getting planted"
     serial_text = serial
+    print(f"Rendering serial text: '{serial_text}'")  # Debug to confirm underscore
 
     # Determine fonts and spacing
     side_margin = int(bg_w * SIDE_MARGIN_RATIO)
+    right_margin_serial = int(bg_w * RIGHT_MARGIN_SERIAL_RATIO)
     max_width = bg_w - 2 * side_margin
     # Minimum font size (absolute or relative to canvas height)
     min_font = max(MIN_FONT_SIZE, int(bg_h * MIN_FONT_RATIO))
-
-    # Helper to load a TrueType font by given family or path, with fallbacks
-    def load_font(size):
-        # Try font_family as given (path or name)
-        try:
-            return ImageFont.truetype(font_family, size)
-        except Exception:
-            # If no extension, try common ones
-            base, ext = os.path.splitext(font_family)
-            if not ext:
-                for try_ext in ('.ttf', '.ttc'):
-                    try:
-                        return ImageFont.truetype(font_family + try_ext, size)
-                    except Exception:
-                        continue
-        # Fallback to a known system font
-        try:
-            return ImageFont.truetype('arial.ttf', size)
-        except Exception:
-            # Last resort: PIL default bitmap font
-            return ImageFont.load_default()
 
     # Set font sizes, ensuring they meet minimum constraints
     f_harvest_size = max(min_font, harvest_font_size)
     f_info_size = max(min_font, info_font_size)
     f_plant_size = max(min_font, plant_font_size)
-    f_serial_size = max(min_font, DEFAULT_SERIAL_FONT_SIZE)  # Use same font size as plant text
+    f_serial_size = max(min_font, DEFAULT_SERIAL_FONT_SIZE)
 
     # Load fonts
     f_harvest = load_font(f_harvest_size)
@@ -241,17 +246,16 @@ def compile_image(template_path: str,
     _, h1 = text_size(harvest_text, f_harvest)
     _, h2 = text_size(info_text, f_info)
     _, h3 = text_size(plant_text, f_plant)
-    _, h4 = text_size(serial_text, f_serial)
+    w_serial, h_serial = text_size(serial_text, f_serial)
 
-    # Vertical spacing
+    # Vertical spacing for text below QR
     m1 = int(bg_h * QR_TO_HARVEST_RATIO)
     m2 = int(bg_h * HARVEST_TO_INFO_RATIO)
     m3 = int(bg_h * INFO_TO_PLANT_RATIO)
-    m4 = int(bg_h * PLANT_TO_SERIAL_RATIO)
     bottom_margin = int(bg_h * BOTTOM_MARGIN_RATIO)
 
-    # Compute dynamic starting Y so content sits above bottom margin
-    total_h = qr_h + m1 + h1 + m2 + h2 + m3 + h3 + m4 + h4
+    # Compute dynamic starting Y so content (excluding serial) sits above bottom margin
+    total_h = qr_h + m1 + h1 + m2 + h2 + m3 + h3
     dynamic_start_y = bg_h - bottom_margin - total_h
 
     # Paste QR code (centered horizontally)
@@ -259,11 +263,10 @@ def compile_image(template_path: str,
     qr_y = FIXED_QR_Y if FIXED_QR_Y is not None else dynamic_start_y
     template.paste(qr_img, (qr_x, qr_y), qr_img)
 
-    # Determine Y positions for text (manual override or dynamic)
+    # Determine Y positions for text below QR (manual override or dynamic)
     harvest_y = FIXED_HARVEST_Y if FIXED_HARVEST_Y is not None else qr_y + qr_h + m1
     info_y    = FIXED_INFO_Y    if FIXED_INFO_Y    is not None else harvest_y + h1 + m2
     plant_y   = FIXED_PLANT_Y   if FIXED_PLANT_Y   is not None else info_y    + h2 + m3
-    serial_y  = FIXED_SERIAL_Y  if FIXED_SERIAL_Y  is not None else plant_y   + h3 + m4
 
     # Draw harvest/pledge text (centered horizontally)
     w_harvest, _ = text_size(harvest_text, f_harvest)
@@ -280,12 +283,22 @@ def compile_image(template_path: str,
     x = (bg_w - w_plant) // 2
     draw.text((x, plant_y), plant_text, fill="black", font=f_plant)
 
-    # Draw serial text
-    w_serial, _ = text_size(serial_text, f_serial)
-    x = (bg_w - w_serial) // 2
-    draw.text((x, serial_y), serial_text, fill="black", font=f_serial)
+    # Draw serial text (vertical, on the right)
+    padding = 10
+    serial_img = Image.new('RGBA', (w_serial + padding, h_serial + padding), (255, 255, 255, 0))
+    serial_draw = ImageDraw.Draw(serial_img)
+    serial_draw.text((padding // 2, padding // 2), serial_text, fill="black", font=f_serial)
+    serial_img = serial_img.rotate(90, expand=True, resample=Image.Resampling.LANCZOS)
+    sw, sh = serial_img.size
+    serial_x = bg_w - right_margin_serial - sw
+    serial_y = (bg_h - sh) // 2
+    qr_right_edge = qr_x + qr_w
+    if serial_x < qr_right_edge + side_margin:
+        serial_x = qr_right_edge + side_margin
+    template.paste(serial_img, (serial_x, serial_y), serial_img)
 
     return template
+
 
 
 def sanitize_filename(s: str) -> str:
@@ -323,7 +336,7 @@ def main():
     )
     parser.add_argument(
         "--cacao-logo", dest="cacao_logo",
-        default=os.path.join(os.path.dirname(__file__), "agroverse_logo.jpg"),
+        default=os.path.join(os.path.dirname(__file__), "agroverse_logo.jpeg"),
         help="Path to logo image for cacao items (default: agroverse_logo.jpg)"
     )
     parser.add_argument(
