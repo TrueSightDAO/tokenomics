@@ -21,6 +21,18 @@ function extractSpecies(contributionText) {
   return match ? match[1].trim() : 'Unknown';
 }
 
+// Helper: extract Cost
+function extractCost(contributionText) {
+  const match = contributionText.match(/- Cost: (.+)$/m);
+  return match ? match[1].trim() : 'N/A';
+}
+
+// Helper: extract Planting Time
+function extractPlantingTime(contributionText) {
+  const match = contributionText.match(/- Planting Time: (.+)$/m);
+  return match ? match[1].trim() : 'N/A';
+}
+
 // Send Telegram notification
 function sendTreePlantingNotification(rowData, treePlantingRowNumber) {
   Logger.log("Sending tree planting notification");
@@ -42,7 +54,10 @@ function sendTreePlantingNotification(rowData, treePlantingRowNumber) {
     `Contributor Handle: ${rowData[4]}\n` +
     `Contributor Name: ${rowData[9]}\n` +
     `Photo URL: ${rowData[8]}\n` +
-    `Location: ${rowData[10]}, ${rowData[11]}\n\n` +
+    `Location: ${rowData[10]}, ${rowData[11]}\n` +
+    `Species: ${rowData[13]}\n` +
+    `Cost: ${rowData[14]}\n` +
+    `Planting Time: ${rowData[15]}\n\n` +
     `Review here: ${outputSheetLink}`;
 
   const payload = {
@@ -173,7 +188,7 @@ function processTelegramLogs() {
   // Create tab if not exists
   if (!sunMintTab) {
     sunMintTab = sheet.insertSheet(sunMintTabName);
-    sunMintTab.getRange("A1:O1").setValues([[
+    sunMintTab.getRange("A1:Q1").setValues([[
       "Telegram Update ID",      // A
       "Chatroom ID",             // B
       "Chatroom Name",           // C
@@ -188,7 +203,9 @@ function processTelegramLogs() {
       "Longitude",               // L
       "Status",                  // M
       "Species",                 // N
-      "GitHub Commit URL"        // O  <- changed to GitHub Commit URL
+      "GitHub Commit URL",       // O
+      "Cost",                    // P
+      "Planting Time"            // Q
     ]]);
   }
 
@@ -218,13 +235,13 @@ function processTelegramLogs() {
     if (contributionMade && contributionMade.startsWith("[TREE PLANTING EVENT]")) {
       Logger.log(contributionMade);
 
-      // Extract latitude, longitude
+      // Extract latitude, longitude, species, cost, planting time
       const lines = contributionMade.split('\n');
       const latitude = lines.find(l => l.startsWith('- Latitude: '))?.replace('- Latitude: ', '') || 'N/A';
       const longitude = lines.find(l => l.startsWith('- Longitude: '))?.replace('- Longitude: ', '') || 'N/A';
-
-      // Extract Species
       const species = extractSpecies(contributionMade);
+      const cost = extractCost(contributionMade);
+      const plantingTime = extractPlantingTime(contributionMade);
 
       // Extract Photo URL
       const photoUrlMatch = contributionMade.match(/- Photo URL: (.+)$/m);
@@ -272,13 +289,16 @@ function processTelegramLogs() {
                 longitude, // L
                 "NEW", // M
                 species, // N
-                commitUrl || "N/A" // O
+                commitUrl || "N/A", // O
+                cost, // P
+                plantingTime // Q
               ]);
 
               const treePlantingRowNumber = sunMintTab.getLastRow();
               sendTreePlantingNotification([
                 row[0], row[1], row[2], row[3], row[4], contributionMade, row[11], fileId,
-                photoUrl, contributorName, latitude, longitude, "NEW", species, commitUrl || "N/A"
+                photoUrl, contributorName, latitude, longitude, "NEW", species, commitUrl || "N/A",
+                cost, plantingTime
               ], treePlantingRowNumber);
 
               Logger.log(`Processed file_id: ${fileId}, filename: ${fileNameToUse}`);
@@ -336,13 +356,16 @@ function processTelegramLogs() {
             longitude, // L
             "NEW", // M
             species, // N
-            commitUrl // O
+            commitUrl, // O
+            cost, // P
+            plantingTime // Q
           ]);
 
           const treePlantingRowNumber = sunMintTab.getLastRow();
           sendTreePlantingNotification([
             row[0], row[1], row[2], row[3], row[4], contributionMade, row[11], fileId,
-            photoUrl, contributorName, latitude, longitude, "NEW", species, commitUrl
+            photoUrl, contributorName, latitude, longitude, "NEW", species, commitUrl,
+            cost, plantingTime
           ], treePlantingRowNumber);
 
           Logger.log(`Processed record without file attachment: ${fileId}, filename: ${fileNameToUse}`);
