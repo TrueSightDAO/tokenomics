@@ -4,6 +4,21 @@
 // - Adjust this to filter out old data you don’t want to process.
 const IGNORE_BEFORE_DATE = "20250316";
 
+// List of DAO-specific event strings to skip during message processing
+// - Messages containing these strings will be ignored to avoid errors in TDG scoring
+// - Add or remove strings as needed to filter out specific event types
+const SKIP_MESSAGE_STRINGS = [
+  '[DIGITAL SIGNATURE EVENT]',
+  '[VOTING RIGHTS WITHDRAWAL REQUEST]',
+  '[QR CODE EVENT]',
+  '[SALES EVENT]',
+  '[DAO Inventory Expense Event]',
+  '[INVENTORY MOVEMENT]',
+  '[FARM REGISTRATION]',
+  '[TREE PLANTING EVENT]',
+  '[NOTARIZATION EVENT]'
+];
+
 // Load API keys and configuration settings from Credentials.gs
 // - setApiKeys(): Stores sensitive API keys in Google Apps Script’s Script Properties for security.
 // - getCredentials(): Retrieves all configuration details (API keys, URLs, IDs) as an object.
@@ -79,6 +94,11 @@ function processChatLogEntry({ message, username, statusDate, platform, projectN
 
   if (!message) {
     Logger.log(`processChatLogEntry: Skipping invalid record: ${statusDate} - ${username} - ${message} (Reason: Missing contribution message)`);
+    return { records: [], count: 0 };
+  }
+
+  if (shouldSkipMessage(message)) {
+    Logger.log(`processChatLogEntry: Skipping DAO-specific event: ${statusDate} - ${username} - ${message}`);
     return { records: [], count: 0 };
   }
 
@@ -1390,4 +1410,21 @@ function testUploadFileToGitHub(fileId, destinationUrl, message) {
   destinationUrl= "https://github.com/TrueSightDAO/.github/tree/main/assets/contribution_20250723154626_gary_teh_img_9606.png"
   message = "Testing upload"
   uploadFileToGitHub(fileId, destinationUrl, message);
+}
+
+
+/**
+ * Checks if a message contains any DAO-specific event strings that should be skipped.
+ * @param {string} message - The chat log message to check.
+ * @returns {boolean} - True if the message contains a string to skip, false otherwise.
+ */
+function shouldSkipMessage(message) {
+  const messageUpper = message.toUpperCase();
+  const shouldSkip = SKIP_MESSAGE_STRINGS.some(skipString => messageUpper.includes(skipString));
+  
+  if (shouldSkip) {
+    Logger.log(`shouldSkipMessage: Skipping message due to DAO-specific event: ${message}`);
+  }
+  
+  return shouldSkip;
 }
