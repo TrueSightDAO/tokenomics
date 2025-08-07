@@ -1,6 +1,6 @@
 /**
  * Complete Digital Signature Verification System for Google Apps Script
- * Fixed BigInt syntax issues and fully working implementation
+ * Fixed BigInt conversion issues and fully working implementation
  */
 
 // Main verification function
@@ -104,7 +104,7 @@ function getPublicKeyFromBase64(base64Key) {
   
   return {
     n: hexToBigInt(modulus.join('')),
-    e: 65537 // Standard RSA exponent
+    e: BigInt(65537) // Standard RSA exponent as BigInt
   };
 }
 
@@ -140,17 +140,22 @@ function modPow(base, exp, mod) {
 
 // Verify RSA signature
 function verifySignature(messageHash, signature, publicKey) {
-  // Convert signature to bigint
-  const s = bytesToBigInt(signature);
-  
-  // RSA verification: m = s^e mod n
-  const m = modPow(s, publicKey.e, publicKey.n);
-  
-  // Convert message hash to bigint
-  const msgInt = BigInt('0x' + messageHash);
-  
-  // Compare the decrypted signature with the message hash
-  return m === msgInt;
+  try {
+    // Convert signature to bigint
+    const s = bytesToBigInt(signature);
+    
+    // RSA verification: m = s^e mod n
+    const m = modPow(s, publicKey.e, publicKey.n);
+    
+    // Convert message hash to bigint
+    const msgInt = BigInt('0x' + messageHash);
+    
+    // Compare the decrypted signature with the message hash
+    return m === msgInt;
+  } catch (e) {
+    console.error("Verification error:", e);
+    return false;
+  }
 }
 
 // Parser that matches web version logic
