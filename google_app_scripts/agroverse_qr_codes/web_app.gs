@@ -3,47 +3,28 @@
  */
 
 // ===== Configuration =====
-// Full URL of your Google Spreadsheet (e.g. https://docs.google.com/spreadsheets/d/.../edit)
 var SHEET_URL = 'https://docs.google.com/spreadsheets/d/1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU/edit?gid=472328231';
-// Name of the sheet/tab within the spreadsheet
 var QR_CODE_SHEET_NAME = 'Agroverse QR codes';
-// Query parameter name for QR code lookups
 var QR_CODE_PARAM = 'qr_code';
-// Query parameter name for Email lookup
 var EMAIL_ADDRESS_PARAM = 'email_address';
-// Spreadsheet header row number (where column names appear)
+var LIST_PARAM = 'list';
 var HEADER_ROW = 2;
-// First data row number (where QR code values begin)
 var DATA_START_ROW = 2;
-// Deployed URL of this web app (replace {SCRIPT_ID} with actual ID)
 var DEPLOYMENT_URL = 'https://script.google.com/macros/s/AKfycbxigq4-J0izShubqIC5k6Z7fgNRyVJLakfQ34HPuENiSpxuCG-wSq0g-wOAedZzzgaL/exec';
-// Example URL for usage instructions
 var DEPLOYMENT_EXAMPLE = 'https://script.google.com/macros/s/AKfycbxigq4-J0izShubqIC5k6Z7fgNRyVJLakfQ34HPuENiSpxuCG-wSq0g-wOAedZzzgaL/exec?qr_code=2025BF_20250521_PROPANE_1&email_address=something@garyteh.com';
 
 /**
  * Handles GET requests to this web app.
  *
- * Expects a 'qr_code' and 'email_address' query parameter.
+ * Expects either:
+ * - 'qr_code' and 'email_address' query parameters for updating email.
+ * - 'list=true' query parameter to return QR codes where column D = 'MINTED'.
  *
  * @param {Object} e Event object containing parameters.
- * @return {ContentService.TextOutput|HtmlService.HtmlOutput} JSON response or HTML-based redirect.
+ * @return {ContentService.TextOutput} JSON response with results or error.
  */
 function doGet(e) {
   try {
-    // Validate query parameters
-    var qrCode = e.parameter[QR_CODE_PARAM];
-    var emailAddress = e.parameter[EMAIL_ADDRESS_PARAM];
-
-    if (!qrCode || !emailAddress) {
-      return ContentService.createTextOutput(
-        JSON.stringify({
-          status: 'error',
-          message: 'Missing required parameters: qr_code and email_address',
-          example: DEPLOYMENT_EXAMPLE + '&' + EMAIL_ADDRESS_PARAM + '=user@example.com'
-        })
-      ).setMimeType(ContentService.MimeType.JSON);
-    }
-
     // Open the spreadsheet and sheet
     var spreadsheet = SpreadsheetApp.openByUrl(SHEET_URL);
     var sheet = spreadsheet.getSheetByName(QR_CODE_SHEET_NAME);
@@ -56,7 +37,51 @@ function doGet(e) {
       ).setMimeType(ContentService.MimeType.JSON);
     }
 
-    // Get all data in Column A (QR codes) starting from DATA_START_ROW
+    // Check if the request is for listing minted QR codes
+    if (e.parameter[LIST_PARAM] === 'true') {
+      var lastRow = sheet.getLastRow();
+      if (lastRow < DATA_START_ROW) {
+        return ContentService.createTextOutput(
+          JSON.stringify({
+            status: 'error',
+            message: 'No data found in sheet starting from row ' + DATA_START_ROW
+          })
+        ).setMimeType(ContentService.MimeType.JSON);
+      }
+
+      // Get QR codes (column A) and status (column D)
+      var dataRange = sheet.getRange(DATA_START_ROW, 1, lastRow - DATA_START_ROW + 1, 4).getValues();
+      var mintedQrCodes = [];
+
+      // Filter rows where column D (index 3) is 'MINTED'
+      for (var i = 0; i < dataRange.length; i++) {
+        if (dataRange[i][3] === 'MINTED') {
+          mintedQrCodes.push(dataRange[i][0]); // QR code from column A
+        }
+      }
+
+      return ContentService.createTextOutput(
+        JSON.stringify({
+          status: 'success',
+          qr_codes: mintedQrCodes
+        })
+      ).setMimeType(ContentService.MimeType.JSON);
+    }
+
+    // Existing logic for QR code and email update
+    var qrCode = e.parameter[QR_CODE_PARAM];
+    var emailAddress = e.parameter[EMAIL_ADDRESS_PARAM];
+
+    if (!qrCode || !emailAddress) {
+      return ContentService.createTextOutput(
+        JSON.stringify({
+          status: 'error',
+          message: 'Missing required parameters: qr_code and email_address',
+          example: DEPLOYMENT_EXAMPLE
+        })
+      ).setMimeType(ContentService.MimeType.JSON);
+    }
+
     var lastRow = sheet.getLastRow();
     if (lastRow < DATA_START_ROW) {
       return ContentService.createTextOutput(
