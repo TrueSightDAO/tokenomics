@@ -364,10 +364,10 @@ function parseAndProcessTelegramLogs() {
       if (expensePattern.test(message) && !existingHashKeys.includes(hashKey)) {
         Logger.log("Line 148: new line detected");
         const reporterName = sourceData[i][CONTRIBUTOR_NAME_COL];
-        if (!ReporterExist(reporterName)) {
-          Logger.log(`Skipping row ${i + 1} due to invalid reporter: ${reporterName}`);
-          continue;
-        }
+        // if (!ReporterExist(reporterName)) {
+        //   Logger.log(`Skipping row ${i + 1} due to invalid reporter: ${reporterName}`);
+        //   continue;
+        // }
         
         // Check for Telegram file IDs and upload if needed
         if (expenseDetails.attachedFilename && expenseDetails.destinationFileLocation) {
@@ -546,11 +546,11 @@ function testParseAndProcessRow() {
 
     // Step 4: Validate reporter
     const reporterName = sourceData[i][CONTRIBUTOR_NAME_COL];
-    if (!ReporterExist(reporterName)) {
-      Logger.log(`Test Failed: Skipping row ${rowNumber} due to invalid reporter: ${reporterName}`);
-      return;
-    }
-    Logger.log(`Reporter ${reporterName} validated successfully`);
+    // if (!ReporterExist(reporterName)) {
+    //   Logger.log(`Test Failed: Skipping row ${rowNumber} due to invalid reporter: ${reporterName}`);
+    //   return;
+    // }
+    // Logger.log(`Reporter ${reporterName} validated successfully`);
 
     // Step 5: Check file upload if applicable
     let fileUploadStatus = [];
