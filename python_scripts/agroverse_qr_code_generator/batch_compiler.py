@@ -19,6 +19,7 @@ except ImportError:
 
 import qrcode
 from qrcode.constants import ERROR_CORRECT_M
+from qrcode.constants import ERROR_CORRECT_H
 
 from PIL import Image, ImageDraw, ImageFont
 
@@ -48,9 +49,9 @@ RIGHT_MARGIN_SERIAL_RATIO = 0.05
 
 # Manual fixed positions (in pixels) to override dynamic layout. Set to None to use auto-layout
 FIXED_QR_Y = -30              # override QR Y position (px); e.g., -30
-FIXED_HARVEST_Y = 250         # override harvest/pledge text Y position (px)
-FIXED_INFO_Y = 270            # override info text Y position (px)
-FIXED_PLANT_Y = 300           # override plant text Y position (px)
+FIXED_HARVEST_Y = 260         # override harvest/pledge text Y position (px)
+FIXED_INFO_Y = 280            # override info text Y position (px)
+FIXED_PLANT_Y = 310           # override plant text Y position (px)
 FIXED_SERIAL_Y = 325          # override serial text Y position (px)
 
 # Default font family for text
@@ -106,7 +107,7 @@ def generate_qr_image(url: str, box_size: int = 10, border: int = 4, logo_path: 
     """
     qr = qrcode.QRCode(
         version=None,
-        error_correction=ERROR_CORRECT_M,
+        error_correction=ERROR_CORRECT_H,
         box_size=box_size,
         border=border,
     )
