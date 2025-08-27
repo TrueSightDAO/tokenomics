@@ -27,7 +27,7 @@ from qrcode.constants import ERROR_CORRECT_H
 from PIL import Image
 
 # Configuration
-GITHUB_TOKEN = os.environ.get('GITHUB_TOKEN')
+GITHUB_TOKEN = os.environ.get('QR_CODE_REPOSITORY_TOKEN')
 GITHUB_REPOSITORY = 'TrueSightDAO/qr_codes'
 # Use current directory for temporary file storage
 GITHUB_WORKSPACE = os.getcwd()
