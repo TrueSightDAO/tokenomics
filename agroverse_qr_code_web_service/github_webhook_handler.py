@@ -29,7 +29,8 @@ from PIL import Image
 # Configuration
 GITHUB_TOKEN = os.environ.get('GITHUB_TOKEN')
 GITHUB_REPOSITORY = os.environ.get('GITHUB_REPOSITORY', 'TrueSightDAO/qr_codes')
-GITHUB_WORKSPACE = os.environ.get('GITHUB_WORKSPACE', 'qr_codes')
+# Use current directory for temporary file storage
+GITHUB_WORKSPACE = os.getcwd()
 
 class GitHubWebhookHandler:
     def __init__(self, github_token=None):
@@ -71,53 +72,71 @@ class GitHubWebhookHandler:
         return output_path
     
     def setup_git(self):
-        """Configure git for GitHub Actions"""
-        self.log("Setting up git configuration")
-        
-        # Configure git user
-        subprocess.run([
-            "git", "config", "--global", "user.name", "GitHub Actions"
-        ], check=True)
-        
-        subprocess.run([
-            "git", "config", "--global", "user.email", "actions@github.com"
-        ], check=True)
-        
-        # Configure git to use token for authentication
-        if self.github_token:
-            subprocess.run([
-                "git", "remote", "set-url", "origin", 
-                f"https://x-access-token:{self.github_token}@github.com/{GITHUB_REPOSITORY}.git"
-            ], check=True)
+        """Configure git for GitHub Actions (no longer needed with API approach)"""
+        self.log("Git setup not needed - using GitHub API directly")
+        pass
     
-    def commit_and_push(self, qr_code_value, commit_message=None):
-        """Commit and push the QR code image to GitHub"""
+    def upload_to_github(self, qr_code_value, qr_image_path, commit_message=None):
+        """Upload QR code image to GitHub using API"""
         if not commit_message:
             commit_message = f"Add QR code: {qr_code_value} [skip ci]"
         
-        self.log(f"Committing QR code: {qr_code_value}")
+        self.log(f"Uploading QR code to GitHub: {qr_code_value}")
         
-        # Get the full path to the QR code image
-        qr_image_path = os.path.join(self.workspace, f"{qr_code_value}.png")
-        
-        # Verify the file exists before trying to add it
+        # Verify the file exists
         if not os.path.exists(qr_image_path):
             raise FileNotFoundError(f"QR code image not found at: {qr_image_path}")
         
-        self.log(f"Adding file to git: {qr_image_path}")
+        # Read the file and encode to base64
+        with open(qr_image_path, 'rb') as f:
+            file_content = f.read()
         
-        # Add the file using the full path
-        subprocess.run(["git", "add", qr_image_path], check=True)
+        import base64
+        base64_content = base64.b64encode(file_content).decode('utf-8')
         
-        # Commit
-        subprocess.run([
-            "git", "commit", "-m", commit_message
-        ], check=True)
+        # GitHub API URL
+        repo = GITHUB_REPOSITORY
+        path = f"{qr_code_value}.png"
+        api_url = f"https://api.github.com/repos/{repo}/contents/{path}"
         
-        # Push
-        subprocess.run(["git", "push"], check=True)
+        # Prepare payload
+        payload = {
+            "message": commit_message,
+            "content": base64_content
+        }
         
-        self.log(f"Successfully pushed {qr_code_value}.png to GitHub")
+        # Prepare headers
+        headers = {
+            "Authorization": f"token {self.github_token}",
+            "Accept": "application/vnd.github.v3+json",
+            "Content-Type": "application/json"
+        }
+        
+        # Make the API request
+        response = requests.put(api_url, json=payload, headers=headers)
+        
+        if response.status_code not in [200, 201]:
+            error_msg = f"Failed to upload to GitHub: {response.status_code} - {response.text}"
+            self.log(f"ERROR: {error_msg}")
+            raise Exception(error_msg)
+        
+        response_data = response.json()
+        
+        if not response_data.get('content'):
+            raise Exception(f"Failed to upload to GitHub: {response.text}")
+        
+        # Return URLs
+        raw_url = f"https://raw.githubusercontent.com/{repo}/main/{path}"
+        commit_url = response_data['commit']['html_url']
+        
+        self.log(f"✅ Successfully uploaded {qr_code_value}.png to GitHub")
+        self.log(f"Raw URL: {raw_url}")
+        self.log(f"Commit URL: {commit_url}")
+        
+        return {
+            'raw_url': raw_url,
+            'commit_url': commit_url
+        }
     
     def handle_webhook_request(self, product_name, landing_page_url=None, auto_commit=True):
         """Handle webhook request for QR code generation"""
@@ -152,11 +171,11 @@ class GitHubWebhookHandler:
             else:
                 raise FileNotFoundError(f"QR code image was not created at: {qr_image_path}")
             
-            # Step 4: Commit and push to GitHub
+            # Step 4: Upload to GitHub
             if auto_commit:
-                self.log("Step 4: Committing and pushing to GitHub...")
+                self.log("Step 4: Uploading to GitHub...")
                 commit_message = f"Add QR code for {product_name}: {qr_code_value} [skip ci]"
-                self.commit_and_push(qr_code_value, commit_message)
+                upload_result = self.upload_to_github(qr_code_value, qr_image_path, commit_message)
             
             # Return success result
             result = {
@@ -168,6 +187,13 @@ class GitHubWebhookHandler:
                 'landing_page': landing_page_url,
                 'timestamp': datetime.now().isoformat()
             }
+            
+            # Add upload information if auto_commit was enabled
+            if auto_commit:
+                result.update({
+                    'raw_url': upload_result['raw_url'],
+                    'commit_url': upload_result['commit_url']
+                })
             
             self.log("QR code generation completed successfully!")
             return result
