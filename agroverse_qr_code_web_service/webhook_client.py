@@ -70,7 +70,7 @@ class WebhookClient:
             print(f"❌ Invalid JSON response: {e}")
             return None
     
-    def trigger_repository_dispatch(self, product_name, event_type='qr_code_generation'):
+    def trigger_repository_dispatch(self, product_name, event_type='qr-code-generation'):
         """
         Trigger GitHub Actions workflow via repository_dispatch event
         
