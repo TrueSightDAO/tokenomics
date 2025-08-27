@@ -37,12 +37,7 @@ jobs:
         token: ${{ secrets.GITHUB_TOKEN }}
         path: tokenomics
     
-    - name: Checkout qr_codes repository (assets)
-      uses: actions/checkout@v4
-      with:
-        repository: TrueSightDAO/qr_codes
-        token: ${{ secrets.GITHUB_TOKEN }}
-        path: qr_codes
+    # No longer need to checkout qr_codes repository since we're using GitHub API
     
     - name: Set up Python
       uses: actions/setup-python@v4
@@ -71,25 +66,9 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         GITHUB_REPOSITORY: TrueSightDAO/qr_codes
-        GITHUB_WORKSPACE: qr_codes
       run: |
-        # Debug: Check what directories exist
-        echo "Current directory: $(pwd)"
-        echo "Directory contents:"
-        ls -la
-        
-        echo "Checking if qr_codes directory exists:"
-        ls -la qr_codes/ || echo "qr_codes directory not found!"
-        
-        # Copy the Python script to the qr_codes directory
-        cp tokenomics/agroverse_qr_code_web_service/github_webhook_handler.py qr_codes/
-        
-        # Change to qr_codes directory
-        cd qr_codes
-        
-        echo "Now in qr_codes directory: $(pwd)"
-        echo "qr_codes directory contents:"
-        ls -la
+        # Change to the agroverse_qr_code_web_service directory
+        cd tokenomics/agroverse_qr_code_web_service
         
         # Create a temporary script to handle arguments properly
         cat > run_webhook.sh << 'EOF'
@@ -123,9 +102,6 @@ jobs:
           "results.json" \
           "${{ steps.extract-product.outputs.landing_page_url }}" \
           "${{ steps.extract-product.outputs.no_commit }}"
-        
-        # Copy results back to tokenomics directory for artifact upload
-        cp results.json ../tokenomics/agroverse_qr_code_web_service/
         
         # Display results
         cat results.json
