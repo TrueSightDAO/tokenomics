@@ -28,7 +28,7 @@ from PIL import Image
 
 # Configuration
 GITHUB_TOKEN = os.environ.get('GITHUB_TOKEN')
-GITHUB_REPOSITORY = os.environ.get('GITHUB_REPOSITORY', 'TrueSightDAO/qr_codes')
+GITHUB_REPOSITORY = 'TrueSightDAO/qr_codes'
 # Use current directory for temporary file storage
 GITHUB_WORKSPACE = os.getcwd()
 
