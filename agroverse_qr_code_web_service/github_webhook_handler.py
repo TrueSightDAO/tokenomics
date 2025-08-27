@@ -97,8 +97,17 @@ class GitHubWebhookHandler:
         
         self.log(f"Committing QR code: {qr_code_value}")
         
-        # Add the file
-        subprocess.run(["git", "add", f"{qr_code_value}.png"], check=True)
+        # Get the full path to the QR code image
+        qr_image_path = os.path.join(self.workspace, f"{qr_code_value}.png")
+        
+        # Verify the file exists before trying to add it
+        if not os.path.exists(qr_image_path):
+            raise FileNotFoundError(f"QR code image not found at: {qr_image_path}")
+        
+        self.log(f"Adding file to git: {qr_image_path}")
+        
+        # Add the file using the full path
+        subprocess.run(["git", "add", qr_image_path], check=True)
         
         # Commit
         subprocess.run([
@@ -133,7 +142,15 @@ class GitHubWebhookHandler:
             # Step 3: Create QR code image
             self.log("Step 3: Creating QR code image...")
             qr_image_path = os.path.join(self.workspace, f"{qr_code_value}.png")
+            self.log(f"Creating QR code at path: {qr_image_path}")
             self.create_qr_image(qr_code_value, landing_page_url, qr_image_path)
+            
+            # Verify the file was created
+            if os.path.exists(qr_image_path):
+                self.log(f"✅ QR code image created successfully at: {qr_image_path}")
+                self.log(f"File size: {os.path.getsize(qr_image_path)} bytes")
+            else:
+                raise FileNotFoundError(f"QR code image was not created at: {qr_image_path}")
             
             # Step 4: Commit and push to GitHub
             if auto_commit:

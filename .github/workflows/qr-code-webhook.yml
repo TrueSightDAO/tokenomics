@@ -73,7 +73,23 @@ jobs:
         GITHUB_REPOSITORY: TrueSightDAO/qr_codes
         GITHUB_WORKSPACE: qr_codes
       run: |
-        cd tokenomics/agroverse_qr_code_web_service
+        # Debug: Check what directories exist
+        echo "Current directory: $(pwd)"
+        echo "Directory contents:"
+        ls -la
+        
+        echo "Checking if qr_codes directory exists:"
+        ls -la qr_codes/ || echo "qr_codes directory not found!"
+        
+        # Copy the Python script to the qr_codes directory
+        cp tokenomics/agroverse_qr_code_web_service/github_webhook_handler.py qr_codes/
+        
+        # Change to qr_codes directory
+        cd qr_codes
+        
+        echo "Now in qr_codes directory: $(pwd)"
+        echo "qr_codes directory contents:"
+        ls -la
         
         # Create a temporary script to handle arguments properly
         cat > run_webhook.sh << 'EOF'
@@ -107,6 +123,9 @@ jobs:
           "results.json" \
           "${{ steps.extract-product.outputs.landing_page_url }}" \
           "${{ steps.extract-product.outputs.no_commit }}"
+        
+        # Copy results back to tokenomics directory for artifact upload
+        cp results.json ../tokenomics/agroverse_qr_code_web_service/
         
         # Display results
         cat results.json
