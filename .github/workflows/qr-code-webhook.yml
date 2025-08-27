@@ -94,7 +94,7 @@ jobs:
         cat results.json
     
     - name: Upload results as artifact
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: qr-code-results
         path: tokenomics/agroverse_qr_code_web_service/results.json
