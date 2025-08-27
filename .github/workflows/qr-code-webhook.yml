@@ -76,19 +76,38 @@ jobs:
       run: |
         cd tokenomics/agroverse_qr_code_web_service
         
-        # Build command arguments
-        CMD_ARGS="'${{ steps.extract-product.outputs.product_name }}'"
+        # Create a temporary script to handle arguments properly
+        cat > run_webhook.sh << 'EOF'
+        #!/bin/bash
+        set -e
         
-        if [ -n "${{ steps.extract-product.outputs.google_script_url }}" ]; then
-          CMD_ARGS="$CMD_ARGS --google-script-url '${{ steps.extract-product.outputs.google_script_url }}'"
+        PRODUCT_NAME="$1"
+        OUTPUT_FILE="$2"
+        GOOGLE_SCRIPT_URL="$3"
+        NO_COMMIT="$4"
+        
+        CMD="python github_webhook_handler.py \"$PRODUCT_NAME\" --output-file \"$OUTPUT_FILE\""
+        
+        if [ -n "$GOOGLE_SCRIPT_URL" ]; then
+          CMD="$CMD --google-script-url \"$GOOGLE_SCRIPT_URL\""
         fi
         
-        if [ "${{ steps.extract-product.outputs.no_commit }}" = "true" ]; then
-          CMD_ARGS="$CMD_ARGS --no-commit"
+        if [ "$NO_COMMIT" = "true" ]; then
+          CMD="$CMD --no-commit"
         fi
+        
+        echo "Running: $CMD"
+        eval $CMD
+        EOF
+        
+        chmod +x run_webhook.sh
         
         # Run the webhook handler
-        python github_webhook_handler.py $CMD_ARGS --output-file results.json
+        ./run_webhook.sh \
+          "${{ steps.extract-product.outputs.product_name }}" \
+          "results.json" \
+          "${{ steps.extract-product.outputs.google_script_url }}" \
+          "${{ steps.extract-product.outputs.no_commit }}"
         
         # Display results
         cat results.json
