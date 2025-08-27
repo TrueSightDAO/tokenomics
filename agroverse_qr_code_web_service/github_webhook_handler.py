@@ -3,10 +3,9 @@
 GitHub Actions Webhook Handler for QR Code Generation
 
 This script can be triggered by GitHub Actions webhooks to:
-1. Call Google App Script webhook to create QR code record
-2. Generate QR code images
-3. Upload them to GitHub repository
-4. Complete the full workflow from product name to deployed QR code
+1. Generate QR code images from product data
+2. Upload them to GitHub repository
+3. Complete the QR code generation workflow
 
 Usage:
 - Can be triggered by repository_dispatch events
@@ -28,14 +27,12 @@ from qrcode.constants import ERROR_CORRECT_H
 from PIL import Image
 
 # Configuration
-GOOGLE_APP_SCRIPT_URL = os.environ.get('GOOGLE_APP_SCRIPT_URL', 'YOUR_DEPLOYED_SCRIPT_URL_HERE')
 GITHUB_TOKEN = os.environ.get('GITHUB_TOKEN')
 GITHUB_REPOSITORY = os.environ.get('GITHUB_REPOSITORY', 'TrueSightDAO/qr_codes')
 GITHUB_WORKSPACE = os.environ.get('GITHUB_WORKSPACE', 'qr_codes')
 
 class GitHubWebhookHandler:
-    def __init__(self, google_script_url=None, github_token=None):
-        self.google_script_url = google_script_url or GOOGLE_APP_SCRIPT_URL
+    def __init__(self, github_token=None):
         self.github_token = github_token or GITHUB_TOKEN
         self.workspace = GITHUB_WORKSPACE
         
@@ -44,28 +41,17 @@ class GitHubWebhookHandler:
         print(f"[{datetime.now().isoformat()}] {message}")
         sys.stdout.flush()
     
-    def call_google_app_script_webhook(self, product_name):
-        """Call Google App Script webhook to create QR code record"""
-        self.log(f"Calling Google App Script webhook for product: {product_name}")
+    def generate_qr_code_value(self, product_name):
+        """Generate QR code value from product name and current date"""
+        today = datetime.now()
+        date_str = today.strftime('%Y%m%d')
+        year = today.year
         
-        url = self.google_script_url
-        payload = {
-            'product_name': product_name
-        }
-        headers = {
-            'Content-Type': 'application/json'
-        }
+        # Create a simple hash of the product name for uniqueness
+        import hashlib
+        product_hash = hashlib.md5(product_name.encode()).hexdigest()[:8]
         
-        response = requests.post(url, json=payload, headers=headers)
-        
-        if response.status_code != 200:
-            raise Exception(f"Failed to call Google App Script webhook: {response.text}")
-            
-        data = response.json()
-        if data['status'] != 'success':
-            raise Exception(f"Google App Script webhook failed: {data.get('message', 'Unknown error')}")
-            
-        return data['data']
+        return f"{year}_{date_str}_{product_hash}"
     
     def create_qr_image(self, qr_code_value, landing_page_url, output_path):
         """Create QR code image"""
@@ -124,22 +110,21 @@ class GitHubWebhookHandler:
         
         self.log(f"Successfully pushed {qr_code_value}.png to GitHub")
     
-    def handle_webhook_request(self, product_name, auto_commit=True):
+    def handle_webhook_request(self, product_name, landing_page_url=None, auto_commit=True):
         """Handle webhook request for QR code generation"""
-        self.log(f"Starting webhook QR code generation for product: {product_name}")
+        self.log(f"Starting QR code generation for product: {product_name}")
         
         try:
-            # Step 1: Call Google App Script webhook to create QR code record
-            self.log("Step 1: Calling Google App Script webhook...")
-            google_result = self.call_google_app_script_webhook(product_name)
+            # Step 1: Generate QR code value
+            self.log("Step 1: Generating QR code value...")
+            qr_code_value = self.generate_qr_code_value(product_name)
             
-            qr_code_value = google_result['qr_code']
-            landing_page = google_result['landing_page']
-            row_added = google_result['row_added']
+            # Use provided landing page URL or create a default one
+            if not landing_page_url:
+                landing_page_url = f"https://agroverse.com/product/{qr_code_value}"
             
-            self.log(f"Google App Script created QR code record: {qr_code_value}")
-            self.log(f"Landing page: {landing_page}")
-            self.log(f"Sheet row: {row_added}")
+            self.log(f"Generated QR code value: {qr_code_value}")
+            self.log(f"Landing page: {landing_page_url}")
             
             # Step 2: Setup git
             self.log("Step 2: Setting up git...")
@@ -148,7 +133,7 @@ class GitHubWebhookHandler:
             # Step 3: Create QR code image
             self.log("Step 3: Creating QR code image...")
             qr_image_path = os.path.join(self.workspace, f"{qr_code_value}.png")
-            self.create_qr_image(qr_code_value, landing_page, qr_image_path)
+            self.create_qr_image(qr_code_value, landing_page_url, qr_image_path)
             
             # Step 4: Commit and push to GitHub
             if auto_commit:
@@ -161,10 +146,9 @@ class GitHubWebhookHandler:
                 'success': True,
                 'product_name': product_name,
                 'qr_code': qr_code_value,
-                'github_url': google_result['github_url'],
+                'github_url': f"https://github.com/{GITHUB_REPOSITORY}/blob/main/{qr_code_value}.png",
                 'local_image_path': qr_image_path,
-                'row_added': row_added,
-                'landing_page': landing_page,
+                'landing_page': landing_page_url,
                 'timestamp': datetime.now().isoformat()
             }
             
@@ -184,7 +168,7 @@ class GitHubWebhookHandler:
 def main():
     parser = argparse.ArgumentParser(description="GitHub Actions Webhook Handler for QR Code Generation")
     parser.add_argument("product_name", help="Name of the product to generate QR code for")
-    parser.add_argument("--google-script-url", help="Google App Script deployment URL")
+    parser.add_argument("--landing-page-url", help="Landing page URL for the QR code")
     parser.add_argument("--github-token", help="GitHub personal access token")
     parser.add_argument("--no-commit", action="store_true", help="Don't commit to GitHub")
     parser.add_argument("--output-file", help="Output file for results (JSON)")
@@ -192,15 +176,13 @@ def main():
     args = parser.parse_args()
     
     # Initialize handler
-    handler = GitHubWebhookHandler(
-        google_script_url=args.google_script_url,
-        github_token=args.github_token
-    )
+    handler = GitHubWebhookHandler(github_token=args.github_token)
     
     try:
         # Handle the webhook request
         result = handler.handle_webhook_request(
-            args.product_name, 
+            args.product_name,
+            landing_page_url=args.landing_page_url,
             auto_commit=not args.no_commit
         )
         

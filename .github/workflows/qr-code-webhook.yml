@@ -59,17 +59,16 @@ jobs:
       run: |
         if [ "${{ github.event_name }}" = "repository_dispatch" ]; then
           echo "product_name=${{ github.event.client_payload.product_name }}" >> $GITHUB_OUTPUT
-          echo "google_script_url=${{ github.event.client_payload.google_script_url || '' }}" >> $GITHUB_OUTPUT
+          echo "landing_page_url=${{ github.event.client_payload.landing_page_url || '' }}" >> $GITHUB_OUTPUT
           echo "no_commit=${{ github.event.client_payload.no_commit || 'false' }}" >> $GITHUB_OUTPUT
         else
           echo "product_name=${{ github.event.inputs.product_name }}" >> $GITHUB_OUTPUT
-          echo "google_script_url=${{ github.event.inputs.google_script_url || '' }}" >> $GITHUB_OUTPUT
+          echo "landing_page_url=${{ github.event.inputs.landing_page_url || '' }}" >> $GITHUB_OUTPUT
           echo "no_commit=${{ github.event.inputs.no_commit || 'false' }}" >> $GITHUB_OUTPUT
         fi
     
     - name: Generate QR Code
       env:
-        GOOGLE_APP_SCRIPT_URL: ${{ steps.extract-product.outputs.google_script_url || env.GOOGLE_APP_SCRIPT_URL }}
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         GITHUB_REPOSITORY: TrueSightDAO/qr_codes
         GITHUB_WORKSPACE: qr_codes
@@ -83,13 +82,13 @@ jobs:
         
         PRODUCT_NAME="$1"
         OUTPUT_FILE="$2"
-        GOOGLE_SCRIPT_URL="$3"
+        LANDING_PAGE_URL="$3"
         NO_COMMIT="$4"
         
         CMD="python github_webhook_handler.py \"$PRODUCT_NAME\" --output-file \"$OUTPUT_FILE\""
         
-        if [ -n "$GOOGLE_SCRIPT_URL" ]; then
-          CMD="$CMD --google-script-url \"$GOOGLE_SCRIPT_URL\""
+        if [ -n "$LANDING_PAGE_URL" ]; then
+          CMD="$CMD --landing-page-url \"$LANDING_PAGE_URL\""
         fi
         
         if [ "$NO_COMMIT" = "true" ]; then
@@ -106,7 +105,7 @@ jobs:
         ./run_webhook.sh \
           "${{ steps.extract-product.outputs.product_name }}" \
           "results.json" \
-          "${{ steps.extract-product.outputs.google_script_url }}" \
+          "${{ steps.extract-product.outputs.landing_page_url }}" \
           "${{ steps.extract-product.outputs.no_commit }}"
         
         # Display results
