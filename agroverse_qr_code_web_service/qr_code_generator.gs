@@ -44,6 +44,40 @@ function doGet(e) {
   }
 }
 
+// ===== Webhook Endpoint for Python Script =====
+function doPost(e) {
+  try {
+    // Parse JSON payload
+    var payload = JSON.parse(e.postData.contents);
+    var productName = payload.product_name;
+    
+    if (!productName) {
+      return createErrorResponse('Missing required parameter: product_name');
+    }
+    
+    // Generate QR code record in Google Sheets
+    var result = generateQRCode(productName);
+    var resultData = JSON.parse(result.getContent());
+    
+    if (resultData.status === 'success') {
+      return createSuccessResponse({
+        action: 'webhook_generate',
+        product_name: productName,
+        qr_code: resultData.data.qr_code,
+        row_added: resultData.data.row_added,
+        github_url: resultData.data.github_url,
+        landing_page: resultData.data.landing_page || '',
+        message: 'QR code record created successfully. Python script should now generate the image.'
+      });
+    } else {
+      return result; // Return the error response
+    }
+    
+  } catch (error) {
+    return createErrorResponse('Error processing webhook request: ' + error.message);
+  }
+}
+
 // ===== Product Search Function =====
 function searchProduct(productName) {
   var spreadsheet = SpreadsheetApp.openByUrl(SPREADSHEET_URL);
@@ -107,10 +141,10 @@ function generateQRCode(productName) {
   // Generate QR code value
   var qrCodeValue = generateQRCodeValue(productData.year);
   
-  // Add new row to QR codes sheet
+  // Add new row to QR codes sheet after the last non-empty row in column A
   var newRowData = createQRCodeRow(qrCodeValue, productData);
-  var lastRow = qrCodesSheet.getLastRow();
-  qrCodesSheet.getRange(lastRow + 1, 1, 1, newRowData.length).setValues([newRowData]);
+  var insertRow = findLastNonEmptyRowInColumnA(qrCodesSheet) + 1;
+  qrCodesSheet.getRange(insertRow, 1, 1, newRowData.length).setValues([newRowData]);
   
   // Commit changes
   SpreadsheetApp.flush();
@@ -119,7 +153,7 @@ function generateQRCode(productName) {
     action: 'generate',
     product_name: productName,
     qr_code: qrCodeValue,
-    row_added: lastRow + 1,
+    row_added: insertRow,
     github_url: GITHUB_REPO_URL + qrCodeValue + '.png'
   });
 }
@@ -163,14 +197,32 @@ function generateQRCodeValue(year) {
   return yearPrefix + '_' + dateStr + '_' + runningNumber;
 }
 
+function findLastNonEmptyRowInColumnA(sheet) {
+  var lastRow = sheet.getLastRow();
+  if (lastRow < 2) return 1; // Return row 1 if sheet is empty or only has header
+  
+  // Get all values in column A from row 2 to last row
+  var columnAValues = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
+  
+  // Find the last non-empty row
+  for (var i = columnAValues.length - 1; i >= 0; i--) {
+    var value = columnAValues[i][0];
+    if (value && value.toString().trim() !== '') {
+      return i + 2; // +2 because we started from row 2 and i is 0-based
+    }
+  }
+  
+  return 1; // Return row 1 if no non-empty values found
+}
+
 function findNextRunningNumber(yearPrefix, dateStr) {
   var spreadsheet = SpreadsheetApp.openByUrl(SPREADSHEET_URL);
   var qrCodesSheet = spreadsheet.getSheetByName(QR_CODES_SHEET_NAME);
   
-  var lastRow = qrCodesSheet.getLastRow();
-  if (lastRow < 2) return 1;
+  var lastNonEmptyRow = findLastNonEmptyRowInColumnA(qrCodesSheet);
+  if (lastNonEmptyRow < 2) return 1;
   
-  var qrCodeColumn = qrCodesSheet.getRange(2, 1, lastRow - 1, 1).getValues();
+  var qrCodeColumn = qrCodesSheet.getRange(2, 1, lastNonEmptyRow - 1, 1).getValues();
   var maxNumber = 0;
   var pattern = new RegExp('^' + yearPrefix + '_' + dateStr + '_(\\d+)$');
   
@@ -203,7 +255,16 @@ function createQRCodeRow(qrCodeValue, productData) {
     productData.year, // Column H: Year
     productData.product_name, // Column I: Product name
     dateStr, // Column J: Current date
-    GITHUB_REPO_URL + qrCodeValue + '.png' // Column K: GitHub URL
+    GITHUB_REPO_URL + qrCodeValue + '.png', // Column K: GitHub URL
+    '', // Column L: Email (placeholder)
+    '', // Column M: (placeholder)
+    '', // Column N: (placeholder)
+    '', // Column O: (placeholder)
+    productData.product_image, // Column P: Product image from column D
+    '', // Column Q: (placeholder)
+    '', // Column R: (placeholder)
+    '', // Column S: (placeholder)
+    25 // Column T: Price (default value)
   ];
 }
 
@@ -243,4 +304,12 @@ function testGenerateQRCode() {
   };
   var result = doGet(testEvent);
   Logger.log(result.getContent());
+}
+
+function testFindLastNonEmptyRow() {
+  var spreadsheet = SpreadsheetApp.openByUrl(SPREADSHEET_URL);
+  var qrCodesSheet = spreadsheet.getSheetByName(QR_CODES_SHEET_NAME);
+  var lastNonEmptyRow = findLastNonEmptyRowInColumnA(qrCodesSheet);
+  Logger.log('Last non-empty row in column A: ' + lastNonEmptyRow);
+  Logger.log('Next row to insert: ' + (lastNonEmptyRow + 1));
 }
