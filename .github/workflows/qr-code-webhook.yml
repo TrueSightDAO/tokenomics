@@ -8,30 +8,10 @@ on:
   # Trigger via workflow_dispatch (manual trigger)
   workflow_dispatch:
     inputs:
-      product_name:
-        description: 'Product name to generate QR code for'
+      sheet_row:
+        description: 'Row number from Agroverse QR codes sheet to generate QR code for'
         required: true
-        type: string
-      landing_page_url:
-        description: 'Landing page URL for the QR code'
-        required: false
-        type: string
-      farm_name:
-        description: 'Farm name for the QR code'
-        required: false
-        type: string
-      state:
-        description: 'State for the QR code'
-        required: false
-        type: string
-      country:
-        description: 'Country for the QR code'
-        required: false
-        type: string
-      year:
-        description: 'Year for the QR code'
-        required: false
-        type: string
+        type: number
       no_commit:
         description: 'Skip committing to repository'
         required: false
@@ -65,31 +45,22 @@ jobs:
         python -m pip install --upgrade pip
         pip install qrcode[pil] requests pillow
     
-    - name: Extract product name from webhook
-      id: extract-product
+    - name: Extract parameters from webhook
+      id: extract-params
       run: |
         if [ "${{ github.event_name }}" = "repository_dispatch" ]; then
-          echo "product_name=${{ github.event.client_payload.product_name }}" >> $GITHUB_OUTPUT
-          echo "landing_page_url=${{ github.event.client_payload.landing_page_url || '' }}" >> $GITHUB_OUTPUT
-          echo "farm_name=${{ github.event.client_payload.farm_name || '' }}" >> $GITHUB_OUTPUT
-          echo "state=${{ github.event.client_payload.state || '' }}" >> $GITHUB_OUTPUT
-          echo "country=${{ github.event.client_payload.country || '' }}" >> $GITHUB_OUTPUT
-          echo "year=${{ github.event.client_payload.year || '' }}" >> $GITHUB_OUTPUT
+          echo "sheet_row=${{ github.event.client_payload.sheet_row }}" >> $GITHUB_OUTPUT
           echo "no_commit=${{ github.event.client_payload.no_commit || 'false' }}" >> $GITHUB_OUTPUT
         else
-          echo "product_name=${{ github.event.inputs.product_name }}" >> $GITHUB_OUTPUT
-          echo "landing_page_url=${{ github.event.inputs.landing_page_url || '' }}" >> $GITHUB_OUTPUT
-          echo "farm_name=${{ github.event.inputs.farm_name || '' }}" >> $GITHUB_OUTPUT
-          echo "state=${{ github.event.inputs.state || '' }}" >> $GITHUB_OUTPUT
-          echo "country=${{ github.event.inputs.country || '' }}" >> $GITHUB_OUTPUT
-          echo "year=${{ github.event.inputs.year || '' }}" >> $GITHUB_OUTPUT
+          echo "sheet_row=${{ github.event.inputs.sheet_row }}" >> $GITHUB_OUTPUT
           echo "no_commit=${{ github.event.inputs.no_commit || 'false' }}" >> $GITHUB_OUTPUT
         fi
     
     - name: Generate QR Code
       env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        QR_CODE_REPOSITORY_TOKEN: ${{ secrets.QR_CODE_REPOSITORY_TOKEN }}
         GITHUB_REPOSITORY: TrueSightDAO/qr_codes
+ate in t        GDRIVE_KEY: ${{ secrets.GDRIVE_KEY }}
       run: |
         # Change to the agroverse_qr_code_web_service directory
         cd tokenomics/agroverse_qr_code_web_service
@@ -99,36 +70,11 @@ jobs:
         #!/bin/bash
         set -e
         
-        PRODUCT_NAME="$1"
+        SHEET_ROW="$1"
         OUTPUT_FILE="$2"
-        LANDING_PAGE_URL="$3"
-        FARM_NAME="$4"
-        STATE="$5"
-        COUNTRY="$6"
-        YEAR="$7"
-        NO_COMMIT="$8"
+        NO_COMMIT="$3"
         
-        CMD="python github_webhook_handler.py \"$PRODUCT_NAME\" --output-file \"$OUTPUT_FILE\""
-        
-        if [ -n "$LANDING_PAGE_URL" ]; then
-          CMD="$CMD --landing-page-url \"$LANDING_PAGE_URL\""
-        fi
-        
-        if [ -n "$FARM_NAME" ]; then
-          CMD="$CMD --farm-name \"$FARM_NAME\""
-        fi
-        
-        if [ -n "$STATE" ]; then
-          CMD="$CMD --state \"$STATE\""
-        fi
-        
-        if [ -n "$COUNTRY" ]; then
-          CMD="$CMD --country \"$COUNTRY\""
-        fi
-        
-        if [ -n "$YEAR" ]; then
-          CMD="$CMD --year \"$YEAR\""
-        fi
+        CMD="python github_webhook_handler.py --sheet-row \"$SHEET_ROW\" --output-file \"$OUTPUT_FILE\""
         
         if [ "$NO_COMMIT" = "true" ]; then
           CMD="$CMD --no-commit"
@@ -142,14 +88,9 @@ jobs:
         
         # Run the webhook handler
         ./run_webhook.sh \
-          "${{ steps.extract-product.outputs.product_name }}" \
+          "${{ steps.extract-params.outputs.sheet_row }}" \
           "results.json" \
-          "${{ steps.extract-product.outputs.landing_page_url }}" \
-          "${{ steps.extract-product.outputs.farm_name }}" \
-          "${{ steps.extract-product.outputs.state }}" \
-          "${{ steps.extract-product.outputs.country }}" \
-          "${{ steps.extract-product.outputs.year }}" \
-          "${{ steps.extract-product.outputs.no_commit }}"
+          "${{ steps.extract-params.outputs.no_commit }}"
         
         # Display results
         cat results.json
