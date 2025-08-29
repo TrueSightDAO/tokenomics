@@ -70,7 +70,7 @@ class WebhookClient:
             print(f"❌ Invalid JSON response: {e}")
             return None
     
-    def trigger_repository_dispatch(self, product_name, event_type='qr-code-generation'):
+    def trigger_repository_dispatch(self, product_name, landing_page_url=None, farm_name=None, state=None, country=None, year=None, event_type='qr-code-generation'):
         """
         Trigger GitHub Actions workflow via repository_dispatch event
         
@@ -90,6 +90,11 @@ class WebhookClient:
             'event_type': event_type,
             'client_payload': {
                 'product_name': product_name,
+                'landing_page_url': landing_page_url,
+                'farm_name': farm_name,
+                'state': state,
+                'country': country,
+                'year': year,
                 'timestamp': datetime.now().isoformat()
             }
         }
@@ -215,6 +220,11 @@ def main():
     parser.add_argument("product_name", help="Name of the product to generate QR code for")
     parser.add_argument("--method", choices=['google', 'dispatch', 'workflow', 'issue'], 
                        default='google', help="Method to trigger QR code generation")
+    parser.add_argument("--landing-page-url", help="Landing page URL for the QR code")
+    parser.add_argument("--farm-name", help="Farm name for the QR code")
+    parser.add_argument("--state", help="State for the QR code")
+    parser.add_argument("--country", help="Country for the QR code")
+    parser.add_argument("--year", help="Year for the QR code")
     parser.add_argument("--google-script-url", help="Google App Script deployment URL")
     parser.add_argument("--github-token", help="GitHub personal access token")
     parser.add_argument("--repository", help="GitHub repository (owner/repo)")
@@ -231,7 +241,14 @@ def main():
     if args.method == 'google':
         result = client.call_google_app_script_webhook(args.product_name)
     elif args.method == 'dispatch':
-        result = client.trigger_repository_dispatch(args.product_name)
+        result = client.trigger_repository_dispatch(
+            args.product_name,
+            landing_page_url=args.landing_page_url,
+            farm_name=args.farm_name,
+            state=args.state,
+            country=args.country,
+            year=args.year
+        )
     elif args.method == 'workflow':
         result = client.trigger_workflow_dispatch(args.product_name, args.workflow_id)
     elif args.method == 'issue':
