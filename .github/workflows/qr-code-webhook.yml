@@ -60,7 +60,7 @@ jobs:
       env:
         QR_CODE_REPOSITORY_TOKEN: ${{ secrets.QR_CODE_REPOSITORY_TOKEN }}
         GITHUB_REPOSITORY: TrueSightDAO/qr_codes
-ate in t        GDRIVE_KEY: ${{ secrets.GDRIVE_KEY }}
+        GDRIVE_KEY: ${{ secrets.GDRIVE_KEY }}
       run: |
         # Change to the agroverse_qr_code_web_service directory
         cd tokenomics/agroverse_qr_code_web_service
