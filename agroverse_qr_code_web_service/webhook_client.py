@@ -70,7 +70,7 @@ class WebhookClient:
             print(f"❌ Invalid JSON response: {e}")
             return None
     
-    def trigger_repository_dispatch(self, product_name, event_type='qr-code-generation'):
+    def trigger_repository_dispatch(self, sheet_row=None, product_name=None, landing_page_url=None, farm_name=None, state=None, country=None, year=None, event_type='qr-code-generation'):
         """
         Trigger GitHub Actions workflow via repository_dispatch event
         
@@ -86,12 +86,28 @@ class WebhookClient:
             'Authorization': f'token {self.github_token}',
             'Accept': 'application/vnd.github.v3+json'
         }
+        
+        # Build client_payload based on what's provided
+        client_payload = {
+            'timestamp': datetime.now().isoformat()
+        }
+        
+        if sheet_row is not None:
+            client_payload['sheet_row'] = sheet_row
+        else:
+            # Fallback to individual parameters
+            client_payload.update({
+                'product_name': product_name,
+                'landing_page_url': landing_page_url,
+                'farm_name': farm_name,
+                'state': state,
+                'country': country,
+                'year': year
+            })
+        
         payload = {
             'event_type': event_type,
-            'client_payload': {
-                'product_name': product_name,
-                'timestamp': datetime.now().isoformat()
-            }
+            'client_payload': client_payload
         }
         
         try:
@@ -212,9 +228,15 @@ This issue will trigger the QR code generation workflow.
 
 def main():
     parser = argparse.ArgumentParser(description="Webhook Client for QR Code Generation")
-    parser.add_argument("product_name", help="Name of the product to generate QR code for")
+    parser.add_argument("--sheet-row", type=int, help="Row number from Agroverse QR codes sheet to generate QR code for")
+    parser.add_argument("--product-name", help="Product name to generate QR code for (alternative to sheet-row)")
     parser.add_argument("--method", choices=['google', 'dispatch', 'workflow', 'issue'], 
                        default='google', help="Method to trigger QR code generation")
+    parser.add_argument("--landing-page-url", help="Landing page URL for the QR code")
+    parser.add_argument("--farm-name", help="Farm name for the QR code")
+    parser.add_argument("--state", help="State for the QR code")
+    parser.add_argument("--country", help="Country for the QR code")
+    parser.add_argument("--year", help="Year for the QR code")
     parser.add_argument("--google-script-url", help="Google App Script deployment URL")
     parser.add_argument("--github-token", help="GitHub personal access token")
     parser.add_argument("--repository", help="GitHub repository (owner/repo)")
@@ -228,13 +250,38 @@ def main():
         repository=args.repository
     )
     
+    # Validate that either sheet_row or product_name is provided
+    if not args.sheet_row and not args.product_name:
+        print("❌ Error: Either --sheet-row or --product-name must be provided")
+        sys.exit(1)
+    
     if args.method == 'google':
+        # For Google method, we still need a product name
+        if not args.product_name:
+            print("❌ Error: --product-name is required for Google method")
+            sys.exit(1)
         result = client.call_google_app_script_webhook(args.product_name)
     elif args.method == 'dispatch':
-        result = client.trigger_repository_dispatch(args.product_name)
+        result = client.trigger_repository_dispatch(
+            sheet_row=args.sheet_row,
+            product_name=args.product_name,
+            landing_page_url=args.landing_page_url,
+            farm_name=args.farm_name,
+            state=args.state,
+            country=args.country,
+            year=args.year
+        )
     elif args.method == 'workflow':
+        # For workflow dispatch, we need a product name
+        if not args.product_name:
+            print("❌ Error: --product-name is required for workflow method")
+            sys.exit(1)
         result = client.trigger_workflow_dispatch(args.product_name, args.workflow_id)
     elif args.method == 'issue':
+        # For issue method, we need a product name
+        if not args.product_name:
+            print("❌ Error: --product-name is required for issue method")
+            sys.exit(1)
         result = client.create_issue_with_webhook(args.product_name)
     
     if result:

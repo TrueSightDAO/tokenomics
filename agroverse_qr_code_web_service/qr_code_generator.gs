@@ -149,12 +149,17 @@ function generateQRCode(productName) {
   // Commit changes
   SpreadsheetApp.flush();
   
+  // Trigger GitHub Actions webhook to generate QR code image
+  var webhookResult = triggerGitHubWebhook(insertRow);
+  
   return createSuccessResponse({
     action: 'generate',
     product_name: productName,
     qr_code: qrCodeValue,
     row_added: insertRow,
-    github_url: GITHUB_REPO_URL + qrCodeValue + '.png'
+    github_url: GITHUB_REPO_URL + qrCodeValue + '.png',
+    webhook_triggered: webhookResult.success,
+    webhook_message: webhookResult.message
   });
 }
 
@@ -282,6 +287,93 @@ function createErrorResponse(message) {
   })).setMimeType(ContentService.MimeType.JSON);
 }
 
+// ===== GitHub Actions Webhook Trigger =====
+function triggerGitHubWebhook(sheetRow) {
+  try {
+    // GitHub repository and workflow configuration
+    var githubRepo = 'TrueSightDAO/tokenomics';
+    var workflowId = 'qr-code-webhook.yml';
+    var githubToken = getGitHubToken(); // You'll need to set this up
+    
+    if (!githubToken) {
+      return {
+        success: false,
+        message: 'GitHub token not configured'
+      };
+    }
+    
+    // Prepare the webhook payload
+    var payload = {
+      ref: 'main',
+      inputs: {
+        sheet_row: sheetRow.toString(),
+        no_commit: 'false'
+      }
+    };
+    
+    // Make the API call to trigger the workflow
+    var url = 'https://api.github.com/repos/' + githubRepo + '/actions/workflows/' + workflowId + '/dispatches';
+    var options = {
+      method: 'POST',
+      headers: {
+        'Authorization': 'token ' + githubToken,
+        'Accept': 'application/vnd.github.v3+json',
+        'Content-Type': 'application/json'
+      },
+      payload: JSON.stringify(payload)
+    };
+    
+    var response = UrlFetchApp.fetch(url, options);
+    var responseCode = response.getResponseCode();
+    
+    if (responseCode === 204) {
+      return {
+        success: true,
+        message: 'GitHub Actions webhook triggered successfully for row ' + sheetRow
+      };
+    } else {
+      var responseText = response.getContentText();
+      return {
+        success: false,
+        message: 'Failed to trigger webhook. Response: ' + responseCode + ' - ' + responseText
+      };
+    }
+    
+  } catch (error) {
+    return {
+      success: false,
+      message: 'Error triggering webhook: ' + error.message
+    };
+  }
+}
+
+// ===== GitHub Token Management =====
+function getGitHubToken() {
+  // Option 1: Get from Script Properties (recommended for production)
+  var scriptProperties = PropertiesService.getScriptProperties();
+  var token = scriptProperties.getProperty('GITHUB_TOKEN');
+  
+  if (token) {
+    return token;
+  }
+  
+  // Option 2: Get from environment variable (for development)
+  // Note: This might not work in Google Apps Script environment
+  try {
+    var envToken = process.env.GITHUB_TOKEN;
+    if (envToken) {
+      return envToken;
+    }
+  } catch (e) {
+    // Environment variable access not available
+  }
+  
+  // Option 3: Hardcoded token (not recommended for production)
+  // return 'your_github_token_here';
+  
+  return null;
+}
+
 // ===== Utility Functions for Manual Testing =====
 
 function testSearchProduct() {
@@ -312,4 +404,10 @@ function testFindLastNonEmptyRow() {
   var lastNonEmptyRow = findLastNonEmptyRowInColumnA(qrCodesSheet);
   Logger.log('Last non-empty row in column A: ' + lastNonEmptyRow);
   Logger.log('Next row to insert: ' + (lastNonEmptyRow + 1));
+}
+
+function testWebhookTrigger() {
+  // Test webhook trigger for row 708
+  var result = triggerGitHubWebhook(708);
+  Logger.log('Webhook trigger result: ' + JSON.stringify(result));
 }

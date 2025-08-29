@@ -1,0 +1,38 @@
+# Local configuration files (contain sensitive data)
+local_config.py
+.env
+*.env
+
+# Generated QR code images
+to_upload/
+*.png
+
+# Python cache files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+
+# Virtual environment
+venv/
+env/
+ENV/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Log files
+*.log
+
+# Temporary files
+*.tmp
+*.temp

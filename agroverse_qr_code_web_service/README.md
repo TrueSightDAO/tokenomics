@@ -12,9 +12,18 @@ This service generates QR codes from product information stored in Google Sheets
 agroverse_qr_code_web_service/
 ├── README.md                           # This file - Complete documentation
 ├── requirements.txt                    # Python dependencies
+├── .gitignore                          # Git ignore rules (excludes sensitive files)
 
 ├── github_webhook_handler.py           # GitHub Actions webhook handler
 ├── webhook_client.py                   # Webhook client for external triggers
+├── test_qr_generation.py               # Test script for local QR generation
+├── run_test.sh                         # Shell script to run tests with virtual environment
+├── local_config_template.py            # Template for local configuration
+├── local_config.py                     # Local config (not in git - contains tokens)
+
+├── to_upload/                          # Directory for generated QR code images
+├── agroverse_logo.jpeg                 # Logo for cacao products
+├── truesight_icon.png                  # Logo for non-cacao products
 └── qr_code_generator.gs                # Google App Script for Google Sheets operations
 
 Repository Root:
@@ -75,6 +84,7 @@ This system uses two repositories:
    - Add these secrets:
      - `GOOGLE_APP_SCRIPT_URL`: Your Google App Script deployment URL
      - `GITHUB_TOKEN`: GitHub personal access token (with repo access to both repositories)
+     - `GDRIVE_KEY`: Google Sheets service account credentials JSON (entire JSON content as string)
 
 #### **Assets Repository Setup** (`TrueSightDAO/qr_codes`):
 
@@ -119,16 +129,192 @@ This system uses two repositories:
    - Create a GitHub personal access token
    - Ensure you have write access to both `TrueSightDAO/tokenomics` and `TrueSightDAO/qr_codes` repositories
 
+## 🧪 **Testing**
+
+### **Local Testing**
+
+You can test the QR code generation locally without triggering GitHub Actions:
+
+#### **Method 1: Direct Test (Recommended)**
+```bash
+# Test with default parameters
+python github_webhook_handler.py --test
+
+# Test with custom parameters
+python github_webhook_handler.py --test \
+  --product-name "My Test Product" \
+  --farm-name "Test Farm" \
+  --state "California" \
+  --country "USA" \
+  --year "2024" \
+  --landing-page-url "https://agroverse.com/product/test" \
+  --is-cacao
+
+# Test with Agroverse QR codes sheet row (requires Google Sheets API)
+python github_webhook_handler.py --test --sheet-row 708
+```
+
+#### **Method 2: Test Script**
+```bash
+# Run the test script with multiple examples
+python test_qr_generation.py
+
+# Or use the convenience script (activates virtual environment automatically)
+./run_test.sh
+```
+
+#### **What the Test Does:**
+1. ✅ Generates a QR code with the same design as `batch_compiler.py`
+2. ✅ Embeds appropriate logos (agroverse for cacao, truesight for non-cacao)
+3. ✅ Creates a local image file in `to_upload/` directory
+4. ✅ Uploads the image to [TrueSightDAO/qr_codes](https://github.com/TrueSightDAO/qr_codes)
+5. ✅ Opens the image automatically (if supported by your OS)
+6. ✅ Shows detailed results and URLs
+
+#### **Test Output Example:**
+```
+🧪 Testing QR Code Generation...
+📝 Product: Caramelized Cacao Kraft Pouch...
+🏡 Farm: San Francisco AGL10, California, USA
+📅 Year: 2024
+🔗 Landing Page: https://agroverse.com/product/test
+
+✅ Test completed successfully!
+📱 QR Code: 2024_20241215_abc123
+🖼️  Local Image: /path/to/2024_20241215_abc123.png
+🌐 GitHub URL: https://github.com/TrueSightDAO/qr_codes/blob/main/2024_20241215_abc123.png
+📎 Raw URL: https://raw.githubusercontent.com/TrueSightDAO/qr_codes/main/2024_20241215_abc123.png
+🔗 Commit URL: https://github.com/TrueSightDAO/qr_codes/commit/abc123...
+📊 File Size: 12345 bytes
+📁 File exists locally: ✅
+🖼️  Opened image with default app
+```
+
+### **Requirements for Testing:**
+- Python 3.7+
+- Required packages: `qrcode[pil]`, `requests`, `pillow`
+- GitHub token with access to `TrueSightDAO/qr_codes` repository
+- Set environment variable: `QR_CODE_REPOSITORY_TOKEN=your_github_token`
+
+### **For Google Sheet Testing:**
+- Google Sheets API: `google-api-python-client`, `google-auth-httplib2`, `google-auth-oauthlib`
+- Service account credentials file: `python_scripts/agroverse_qr_code_generator/gdrive_key.json`
+- Tests against "Agroverse QR codes" sheet (results from `qr_code_generator.gs`)
+
+### **Setting up GitHub Token:**
+
+#### **Option 1: Local Configuration File (Recommended for Development)**
+```bash
+# Copy the template and update with your token
+cp local_config_template.py local_config.py
+
+# Edit local_config.py with your actual GitHub token
+# The file is already in .gitignore, so it won't be committed
+```
+
+#### **Option 2: Environment Variable**
+```bash
+# Set the environment variable for the current session
+export QR_CODE_REPOSITORY_TOKEN=your_github_token_here
+
+# Or add to your shell profile for persistence
+echo 'export QR_CODE_REPOSITORY_TOKEN=your_github_token_here' >> ~/.zshrc
+source ~/.zshrc
+```
+
+#### **GitHub Token Requirements:**
+- **Scope:** `repo` (for both tokenomics and qr_codes repositories)
+- **Get Token:** https://github.com/settings/tokens
+- **Permissions:** Read/write access to both repositories
+
+#### **Google Sheets API Setup:**
+- **Service Account:** Create a Google Cloud service account with Google Sheets API access
+- **Credentials File:** Download the JSON credentials file
+- **For Local Development:** Place the JSON file at the path specified in `local_config.py`
+- **For GitHub Actions:** Copy the entire JSON content and set it as the `GDRIVE_KEY` repository secret
+
+### **Local Development Setup:**
+```bash
+# Option 1: Use existing virtual environment (recommended)
+source /Users/garyjob/Applications/tokenomics/python_scripts/venv/bin/activate
+
+# Option 2: Install dependencies locally
+pip install -r requirements.txt
+```
+
 ## 🎯 **Usage Methods**
+
+### **🚀 Simplified Parameter System**
+
+The system now supports a much simpler approach using **sheet row numbers** instead of passing multiple individual parameters:
+
+#### **Benefits of Sheet Row Approach:**
+- **🎯 Single Parameter**: Just specify the row number from the "Agroverse QR codes" sheet
+- **🔄 Data Consistency**: All data comes from the same source (Google Sheet)
+- **🛡️ Less Error-Prone**: No risk of mismatched parameters
+- **📝 Easier Maintenance**: Changes to data only need to be made in one place
+- **⚡ Faster Setup**: No need to look up individual field values
+- **📁 Dynamic Upload Location**: QR codes are uploaded to the exact location specified in column K of the sheet
+
+#### **Example Comparison:**
+
+**Old Way (Multiple Parameters):**
+```bash
+python webhook_client.py --product-name "8 Ounce Package Kraft Pouch - Ilheus, Brazil 2024" \
+  --farm-name "Oscar Farm" \
+  --state "Bahia" \
+  --country "Brazil" \
+  --year "2024" \
+  --landing-page-url "https://www.agroverse.shop/shipments/agl4" \
+  --method dispatch
+```
+
+**New Way (Single Parameter):**
+```bash
+python webhook_client.py --sheet-row 458 --method dispatch
+```
+
+### **📁 Dynamic Upload Location Feature**
+
+The system now automatically uploads QR codes to the exact location specified in **Column K** of the "Agroverse QR codes" sheet:
+
+#### **How It Works:**
+1. **Column K** contains the GitHub URL where the QR code should be uploaded
+2. **URL Format**: `https://github.com/owner/repo/blob/branch/filename.png`
+3. **Automatic Parsing**: The system extracts repository and file path from the URL
+4. **Precise Upload**: QR codes are uploaded to the exact location specified
+
+#### **Example:**
+If Column K contains: `https://github.com/TrueSightDAO/qr_codes/blob/main/Gary_Land_20250829_GARY_TEST.png`
+
+The system will:
+- ✅ Extract repository: `TrueSightDAO/qr_codes`
+- ✅ Extract path: `Gary_Land_20250829_GARY_TEST.png`
+- ✅ Upload QR code to that exact location
+- ✅ Return the correct raw URL: `https://raw.githubusercontent.com/TrueSightDAO/qr_codes/main/Gary_Land_20250829_GARY_TEST.png`
+
+#### **Benefits:**
+- **🎯 Precise Control**: Upload to any repository and path specified in the sheet
+- **🔄 Flexible Organization**: Organize QR codes in different folders or repositories
+- **📝 Centralized Management**: All upload locations managed in the Google Sheet
+- **🛡️ No Hardcoding**: No need to modify code for different upload locations
+- **🔄 File Override**: Automatically overrides existing files instead of creating duplicates
 
 ### **Method 1: Local Workflow**
 
-### **Method 1: GitHub Actions Webhook**
+### **Method 1: GitHub Actions Webhook (Simplified)**
 
-Trigger via repository_dispatch event:
+Trigger via repository_dispatch event using sheet row number:
 
 ```bash
-python webhook_client.py "Caramelized Cacao Kraft Pouch - Alibaba:269035810001023771 + Caramelized Cacao Beans CP340993299BR San Francisco AGL10" \
+# Using sheet row (recommended - much simpler!)
+python webhook_client.py --sheet-row 708 \
+  --github-token YOUR_TOKEN \
+  --repository TrueSightDAO/tokenomics \
+  --method dispatch
+
+# Or using individual parameters (legacy method)
+python webhook_client.py --product-name "Caramelized Cacao Kraft Pouch - Alibaba:269035810001023771 + Caramelized Cacao Beans CP340993299BR San Francisco AGL10" \
   --github-token YOUR_TOKEN \
   --repository TrueSightDAO/tokenomics \
   --method dispatch \
@@ -140,7 +326,14 @@ python webhook_client.py "Caramelized Cacao Kraft Pouch - Alibaba:26903581000102
 Trigger via workflow_dispatch (manual trigger):
 
 ```bash
-python webhook_client.py "Caramelized Cacao Kraft Pouch - Alibaba:269035810001023771 + Caramelized Cacao Beans CP340993299BR San Francisco AGL10" \
+# Using sheet row (recommended - much simpler!)
+python webhook_client.py --sheet-row 708 \
+  --github-token YOUR_TOKEN \
+  --repository TrueSightDAO/tokenomics \
+  --method workflow
+
+# Or using individual parameters (legacy method)
+python webhook_client.py --product-name "Caramelized Cacao Kraft Pouch - Alibaba:269035810001023771 + Caramelized Cacao Beans CP340993299BR San Francisco AGL10" \
   --github-token YOUR_TOKEN \
   --repository TrueSightDAO/tokenomics \
   --method workflow \
@@ -152,7 +345,15 @@ python webhook_client.py "Caramelized Cacao Kraft Pouch - Alibaba:26903581000102
 Create a GitHub issue and trigger webhook:
 
 ```bash
-python webhook_client.py "Caramelized Cacao Kraft Pouch - Alibaba:269035810001023771 + Caramelized Cacao Beans CP340993299BR San Francisco AGL10" \
+# Using sheet row (recommended - much simpler!)
+python webhook_client.py --sheet-row 708 \
+  --github-token YOUR_TOKEN \
+  --repository TrueSightDAO/tokenomics \
+  --method issue \
+  --issue-title "Generate QR Code for Row 708"
+
+# Or using individual parameters (legacy method)
+python webhook_client.py --product-name "Caramelized Cacao Kraft Pouch - Alibaba:269035810001023771 + Caramelized Cacao Beans CP340993299BR San Francisco AGL10" \
   --github-token YOUR_TOKEN \
   --repository TrueSightDAO/tokenomics \
   --method issue \
@@ -165,6 +366,19 @@ python webhook_client.py "Caramelized Cacao Kraft Pouch - Alibaba:26903581000102
 Trigger directly via GitHub API:
 
 ```bash
+# Using sheet row (recommended - much simpler!)
+curl -X POST \
+  -H "Authorization: token YOUR_TOKEN" \
+  -H "Accept: application/vnd.github.v3+json" \
+  https://api.github.com/repos/TrueSightDAO/tokenomics/dispatches \
+  -d '{
+    "event_type": "qr-code-generation",
+    "client_payload": {
+      "sheet_row": 708
+    }
+  }'
+
+# Or using individual parameters (legacy method)
 curl -X POST \
   -H "Authorization: token YOUR_TOKEN" \
   -H "Accept: application/vnd.github.v3+json" \
@@ -193,8 +407,9 @@ curl -X POST \
 
 1. **Product Search** - Searches the "Currencies" sheet for matching products
 2. **QR Code Generation** - Creates a new record in the "Agroverse QR codes" sheet
-3. **Image Creation** - Generates the actual QR code image
-4. **GitHub Deployment** - Commits and pushes to the repository
+3. **Automated Webhook** - Google App Script automatically triggers GitHub Actions webhook
+4. **Image Creation** - Generates the actual QR code image
+5. **GitHub Deployment** - Commits and pushes to the repository
 
 ### **QR Code Value Format:**
 
@@ -282,6 +497,37 @@ When using issue-based triggering, results are automatically posted as comments:
 **Timestamp:** 2024-12-15T10:30:00
 ```
 
+## 🤖 **Automated Webhook Trigger**
+
+### **How It Works:**
+
+When you call the Google App Script to generate a QR code, it now automatically:
+
+1. **Creates the QR code record** in the "Agroverse QR codes" sheet
+2. **Triggers GitHub Actions webhook** with the row number
+3. **Generates the QR code image** via Python script
+4. **Uploads to GitHub** at the specified location
+
+### **Setup Required:**
+
+1. **GitHub Token Configuration:**
+   ```javascript
+   // In Google Apps Script, go to Project Settings → Script Properties
+   // Add a new property:
+   // Key: GITHUB_TOKEN
+   // Value: your_github_personal_access_token
+   ```
+
+2. **Token Permissions:**
+   - The token needs `repo` scope to trigger workflows
+   - It should have access to `TrueSightDAO/tokenomics` repository
+
+### **Benefits:**
+- **🔄 Fully Automated**: No manual intervention needed
+- **⚡ Instant Trigger**: QR code image generation starts immediately
+- **📊 Consistent Process**: Same workflow every time
+- **🛡️ Secure**: Uses GitHub token for authentication
+
 ## 🌐 **HTML/JavaScript Frontend (Recommended)**
 
 The easiest way to use this service is through a simple HTML/JavaScript frontend that calls the Google App Script directly.
@@ -337,9 +583,25 @@ const result = await generateQRCode(
     'https://script.google.com/macros/s/YOUR_SCRIPT_ID/exec'
 );
 
+// Example Response:
+// {
+//   "status": "success",
+//   "data": {
+//     "action": "generate",
+//     "product_name": "Caramelized Cacao Kraft Pouch - Alibaba:269035810001023771 + Caramelized Cacao Beans CP340993299BR San Francisco AGL10",
+//     "qr_code": "2025_20241215_1",
+//     "row_added": 15,
+//     "github_url": "https://github.com/TrueSightDAO/qr_codes/blob/main/2025_20241215_1.png",
+//     "webhook_triggered": true,
+//     "webhook_message": "GitHub Actions webhook triggered successfully for row 15"
+//   }
+// }
+
 if (result.status === 'success') {
     console.log('QR Code:', result.data.qr_code);
     console.log('GitHub URL:', result.data.github_url);
+    console.log('Webhook Triggered:', result.data.webhook_triggered);
+    console.log('Webhook Message:', result.data.webhook_message);
 }
 ```
 
@@ -349,14 +611,14 @@ if (result.status === 'success') {
 
 | Method | What It Does | When to Use | Pros | Cons |
 |--------|-------------|-------------|------|------|
-| **Google** | Calls Google App Script directly | Simple testing, no QR image generation | Fast, no GitHub token needed | Only creates Google Sheets record |
+| **Google** | Calls Google App Script directly | Simple testing, automated QR image generation | Fast, automated webhook trigger | Requires GitHub token setup in GAS |
 | **Dispatch** | Triggers GitHub Actions workflow | Automated systems, external integrations | Full workflow (Google Sheets + QR image), automated | Requires GitHub token, slower |
 | **Workflow** | Manual GitHub Actions trigger | Manual testing, one-off runs | Full workflow, manual control | Requires GitHub token, manual process |
 | **Issue** | Creates GitHub issue + triggers workflow | Issue-based workflows | Trackable, commentable | Requires GitHub token, creates issues |
 
 ### **1. Direct Google App Script Call (Google Sheets Only)**
 
-**What it does:** Only creates the QR code record in Google Sheets (no QR image generation)
+**What it does:** Creates the QR code record in Google Sheets + automatically triggers QR image generation
 
 ```bash
 python webhook_client.py "Caramelized Cacao Kraft Pouch - Alibaba:269035810001023771 + Caramelized Cacao Beans CP340993299BR San Francisco AGL10" \
@@ -364,7 +626,7 @@ python webhook_client.py "Caramelized Cacao Kraft Pouch - Alibaba:26903581000102
   --google-script-url "https://script.google.com/macros/s/YOUR_SCRIPT_ID/exec"
 ```
 
-**Use when:** You only need the Google Sheets record, not the actual QR code image
+**Use when:** You want the complete automated workflow (recommended for most use cases)
 
 ### **2. GitHub Actions Repository Dispatch (Full Workflow)**
 
@@ -402,8 +664,8 @@ python webhook_client.py "Caramelized Cacao Kraft Pouch - Alibaba:26903581000102
 - **"I want to track requests as GitHub issues"** → Use **Method 4 (Issue)**
 
 **📋 Simple Flow:**
-1. **Method 1**: Product name → Google Sheets record only
-2. **Method 2**: Product name → Google Sheets record + QR image + GitHub upload
+1. **Method 1**: Product name → Google Sheets record + automated QR image generation
+2. **Method 2**: Product name → Google Sheets record + QR image + GitHub upload (external trigger)
 3. **Method 3**: Same as Method 2, but manual trigger
 4. **Method 4**: Same as Method 2, but creates GitHub issue first
 
@@ -602,11 +864,13 @@ logging.basicConfig(level=logging.DEBUG)
 
 ### **Advanced Features:**
 
-1. **Webhook Signatures** - Verify webhook authenticity
-2. **Retry Logic** - Automatic retry on failures
-3. **Parallel Processing** - Generate multiple QR codes simultaneously
-4. **Caching** - Cache frequently requested QR codes
-5. **Notifications** - Slack/email notifications on completion
+1. **Dynamic Upload Location** - Uploads QR codes to the exact location specified in column K of the Google Sheet
+2. **Conflict Resolution** - Automatically handles duplicate QR codes by overriding existing files
+3. **Webhook Signatures** - Verify webhook authenticity
+4. **Retry Logic** - Automatic retry on failures
+5. **Parallel Processing** - Generate multiple QR codes simultaneously
+6. **Caching** - Cache frequently requested QR codes
+7. **Notifications** - Slack/email notifications on completion
 
 ## 🆘 **Support**
 
