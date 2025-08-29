@@ -38,8 +38,12 @@ GITHUB_REPOSITORY = 'TrueSightDAO/qr_codes'
 # Use to_upload directory for temporary file storage
 GITHUB_WORKSPACE = os.path.join(os.getcwd(), 'to_upload')
 
-# Google Sheets configuration
-SHEET_URL = "https://docs.google.com/spreadsheets/d/1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU/edit?gid=1552160318#gid=1552160318"
+# PRODUCTION: Google Sheets configuration
+# SHEET_URL = "https://docs.google.com/spreadsheets/d/1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU/edit?gid=1552160318#gid=1552160318"
+
+# SANDBOX: Google Sheets configuration
+SHEET_URL = "https://docs.google.com/spreadsheets/d/1qSi_-VSj7yiJl0Ak-Q3lch-l4mrH37cEw8EmQwS_6a4/edit?gid=472328231#gid=472328231"
+
 CURRENCIES_SHEET_NAME = "Currencies"
 QR_CODES_SHEET_NAME = "Agroverse QR codes"
 
