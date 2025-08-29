@@ -1,15 +1,15 @@
 {
   "success": true,
-  "product_name": "SunMint Tree Planting Pledge - QR Code",
-  "qr_code": "20250829_GARY_TEST",
-  "github_url": "https://github.com/TrueSightDAO/qr_codes/blob/main/20250829_GARY_TEST.png",
-  "local_image_path": "/Users/garyjob/Applications/tokenomics/agroverse_qr_code_web_service/to_upload/20250829_GARY_TEST.png",
-  "landing_page": "https://www.truesight.me/sunmint-tree-planting-pledges/sef1",
-  "farm_name": "Gary Land",
-  "state": "No State",
-  "country": "My Country",
-  "year": "2025",
-  "timestamp": "2025-08-29T12:45:33.000411",
-  "raw_url": "https://raw.githubusercontent.com/TrueSightDAO/qr_codes/main/Gary_Land_20250829_GARY_TEST.png",
-  "commit_url": "https://github.com/TrueSightDAO/qr_codes/commit/bb29fea09426d24060d02ce57058df9b61a5a8b8"
+  "product_name": "8 Ounce Package Kraft Pouch - Ilheus, Brazil 2024",
+  "qr_code": "2024OSCAR_20250826_NIBS_78",
+  "github_url": "https://github.com/TrueSightDAO/qr_codes/blob/main/2024OSCAR_20250826_NIBS_78.png",
+  "local_image_path": "/Users/garyjob/Applications/tokenomics/agroverse_qr_code_web_service/to_upload/2024OSCAR_20250826_NIBS_78.png",
+  "landing_page": "https://www.agroverse.shop/shipments/agl4",
+  "farm_name": "Oscar Farm",
+  "state": "Bahia",
+  "country": "Brazil",
+  "year": "2024",
+  "timestamp": "2025-08-29T12:57:45.245957",
+  "raw_url": "https://raw.githubusercontent.com/TrueSightDAO/qr_codes/main/2024OSCAR_20250826_NIBS_78.png",
+  "commit_url": "https://github.com/TrueSightDAO/qr_codes/commit/5f635d0cd58084e4df3b7d858bf278ff8e9ec05e"
 }
