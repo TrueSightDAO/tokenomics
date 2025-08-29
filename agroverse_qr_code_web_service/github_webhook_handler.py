@@ -225,7 +225,7 @@ class GitHubWebhookHandler:
         
         return f"{year}_{date_str}_{product_hash}"
     
-    def create_qr_image(self, qr_code_value, landing_page_url, output_path, farm_name=None, state=None, country=None, year=None, is_cacao=False):
+    def create_qr_image(self, qr_code_value, output_path, farm_name=None, state=None, country=None, year=None, is_cacao=False):
         """Create QR code image with the same design as batch_compiler.py"""
         self.log(f"Creating QR code image: {qr_code_value}")
         
@@ -267,14 +267,17 @@ class GitHubWebhookHandler:
         # Select logo based on item type
         logo_path = cacao_logo_path if is_cacao else non_cacao_logo_path
         
-        # Generate QR code
+        # Generate QR code with BASE_QR_CHECK_URL (from batch_compiler.py)
+        BASE_QR_CHECK_URL = 'https://edgar.truesight.me/agroverse/qr-code-check?qr_code='
+        qr_url = BASE_QR_CHECK_URL + qr_code_value
+        
         qr = qrcode.QRCode(
             version=None,
             error_correction=ERROR_CORRECT_H,
             box_size=10,
             border=8,  # Increased border for better margins
         )
-        qr.add_data(landing_page_url)
+        qr.add_data(qr_url)
         qr.make(fit=True)
         
         qr_img = qr.make_image(fill_color="black", back_color="white").convert("RGBA")
@@ -338,8 +341,11 @@ class GitHubWebhookHandler:
                     except Exception:
                         return ImageFont.load_default()
         
-        # Prepare text lines
-        harvest_text = f"Restoring Rainforest since {year}" if year else "Restoring Rainforest"
+        # Prepare text lines (matching batch_compiler.py logic)
+        if is_cacao:
+            harvest_text = f"Harvest {year}" if year else "Pledge Confirmed"
+        else:
+            harvest_text = f"Restoring Rainforest since {year}" if year else "Restoring Rainforest"
         
         info_parts = [farm_name] if farm_name else []
         if state:
@@ -349,7 +355,7 @@ class GitHubWebhookHandler:
         info_text = ", ".join(info_parts) if info_parts else "Agroverse Farm"
         
         plant_text = "Your tree is getting planted"
-        serial_text = qr_code_value
+        serial_text = qr_code_value  # This should be the QR code value from column A
         
         # Determine fonts and spacing
         side_margin = int(bg_w * SIDE_MARGIN_RATIO)
@@ -577,15 +583,22 @@ class GitHubWebhookHandler:
         self.log(f"Starting QR code generation for product: {product_name}")
         
         try:
-            # Step 1: Generate QR code value
-            self.log("Step 1: Generating QR code value...")
-            qr_code_value = self.generate_qr_code_value(product_name)
+            # Step 1: Get QR code value from sheet data or generate one
+            self.log("Step 1: Getting QR code value...")
+            if sheet_data and sheet_data.get('qr_code_value'):
+                # Use QR code value from sheet data (column A)
+                qr_code_value = sheet_data['qr_code_value']
+                self.log(f"Using QR code value from sheet: {qr_code_value}")
+            else:
+                # Generate QR code value (fallback)
+                qr_code_value = self.generate_qr_code_value(product_name)
+                self.log(f"Generated QR code value: {qr_code_value}")
             
             # Use provided landing page URL or create a default one
             if not landing_page_url:
                 landing_page_url = f"https://agroverse.com/product/{qr_code_value}"
             
-            self.log(f"Generated QR code value: {qr_code_value}")
+            self.log(f"QR code value: {qr_code_value}")
             self.log(f"Landing page: {landing_page_url}")
             self.log(f"Farm info: {farm_name}, {state}, {country}, {year}")
             self.log(f"Product type: {'Cacao' if is_cacao else 'Non-cacao'}")
@@ -598,7 +611,7 @@ class GitHubWebhookHandler:
             self.log("Step 3: Creating QR code image...")
             qr_image_path = os.path.join(self.workspace, f"{qr_code_value}.png")
             self.log(f"Creating QR code at path: {qr_image_path}")
-            self.create_qr_image(qr_code_value, landing_page_url, qr_image_path, farm_name, state, country, year, is_cacao)
+            self.create_qr_image(qr_code_value, qr_image_path, farm_name, state, country, year, is_cacao)
             
             # Verify the file was created
             if os.path.exists(qr_image_path):
@@ -804,16 +817,30 @@ def test_qr_generation(product_name=None, farm_name=None, state=None, country=No
         print(f"🔗 Landing Page: {test_landing_page_url}")
         
         # Generate QR code
-        result = handler.handle_webhook_request(
-            product_name=test_product_name,
-            landing_page_url=test_landing_page_url,
-            farm_name=test_farm_name,
-            state=test_state,
-            country=test_country,
-            year=test_year,
-            is_cacao=test_is_cacao,
-            auto_commit=True
-        )
+        if sheet_row is not None and sheet_data:
+            # Use sheet data
+            result = handler.handle_webhook_request(
+                product_name=test_product_name,
+                farm_name=test_farm_name,
+                state=test_state,
+                country=test_country,
+                year=test_year,
+                is_cacao=test_is_cacao,
+                auto_commit=True,
+                sheet_data=sheet_data
+            )
+        else:
+            # Use provided parameters
+            result = handler.handle_webhook_request(
+                product_name=test_product_name,
+                landing_page_url=test_landing_page_url,
+                farm_name=test_farm_name,
+                state=test_state,
+                country=test_country,
+                year=test_year,
+                is_cacao=test_is_cacao,
+                auto_commit=True
+            )
         
         if result['success']:
             print("\n✅ Test completed successfully!")
