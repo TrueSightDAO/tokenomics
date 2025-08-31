@@ -50,10 +50,16 @@ function letterToColumn(letter) {
   return col;
 }
 
-// Get inventory ledger configurations (simplified version)
+// Get inventory ledger configurations
 function getInventoryLedgerConfigs() {
-  // For now, return a basic configuration for the main inventory sheet
-  // This can be expanded to fetch from Wix like the inventory management system
+  // Try to fetch ledger configurations from Wix first
+  var dynamicConfigs = getLedgerConfigsFromWix();
+  if (dynamicConfigs && dynamicConfigs.length > 0) {
+    return dynamicConfigs;
+  }
+  
+  // Fallback to hardcoded configuration if Wix fetch fails
+  Logger.log('Using fallback hardcoded ledger configuration');
   return [
     {
       ledger_name: 'MAIN',
@@ -65,6 +71,125 @@ function getInventoryLedgerConfigs() {
       record_start_row: 5
     }
   ];
+}
+
+// Function to fetch ledger configurations from Wix
+function getLedgerConfigsFromWix() {
+  try {
+    var creds = getCredentials();
+    var wixAccessToken = creds.WIX_API_KEY;
+    
+    var options = {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': wixAccessToken,
+        'wix-account-id': '0e2cde5f-b353-468b-9f4e-36835fc60a0e',
+        'wix-site-id': 'd45a189f-d0cc-48de-95ee-30635a95385f'
+      },
+      payload: JSON.stringify({})
+    };
+    
+    var requestUrl = 'https://www.wixapis.com/wix-data/v2/items/query?dataCollectionId=AgroverseShipments';
+    
+    var response = UrlFetchApp.fetch(requestUrl, options);
+    var content = response.getContentText();
+    var responseObj = JSON.parse(content);
+    
+    // Create a map of contract URLs to ledger names (using title)
+    var urlToContractMap = {};
+    responseObj.dataItems.forEach(function(item) {
+      Logger.log('Item title: ' + item.data.title);
+      var contractUrl = item.data.contract_url;
+      var ledgerName = item.data.title;
+      if (contractUrl && ledgerName) {
+        urlToContractMap[contractUrl] = ledgerName;
+      }
+    });
+    
+    var ledgerUrls = responseObj.dataItems
+      .map(function(item) { return item.data.contract_url; })
+      .filter(function(url) { return url && url !== ''; })
+      .filter(function(url, index, self) { return self.indexOf(url) === index; });
+    
+    Logger.log('Raw ledger URLs from Wix: ' + JSON.stringify(ledgerUrls));
+    Logger.log('URL to contract mapping: ' + JSON.stringify(urlToContractMap));
+    
+    // Construct ledger configs dynamically
+    var ledgerConfigs = ledgerUrls.map(function(url) {
+      var resolvedUrl = resolveRedirect(url);
+      Logger.log('Resolved URL: ' + url + ' -> ' + resolvedUrl);
+      
+      // Use shipment_contract_number as the ledger name
+      var ledgerName = urlToContractMap[url] || 'UNKNOWN';
+      Logger.log('Using shipment contract number as ledger name: ' + ledgerName + ' for URL: ' + url);
+      
+      return {
+        ledger_name: ledgerName,
+        ledger_url: resolvedUrl,
+        sheet_name: 'Balance',
+        manager_names_column: 'H',
+        asset_name_column: 'J',
+        asset_quantity_column: 'I',
+        record_start_row: 6
+      };
+    });
+    
+    // Add the main inventory sheet
+    ledgerConfigs.unshift({
+      ledger_name: 'MAIN',
+      ledger_url: 'https://docs.google.com/spreadsheets/d/1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU/edit',
+      sheet_name: 'offchain asset location',
+      manager_names_column: 'B',
+      asset_name_column: 'A',
+      asset_quantity_column: 'C',
+      record_start_row: 5
+    });
+    
+    Logger.log('Ledger configs fetched from Wix: ' + JSON.stringify(ledgerConfigs));
+    return ledgerConfigs;
+    
+  } catch (e) {
+    Logger.log('Error fetching ledger URLs from Wix: ' + e.message);
+    return [];
+  }
+}
+
+// Helper function to resolve redirect URLs
+function resolveRedirect(url) {
+  try {
+    var currentUrl = url;
+    var redirectCount = 0;
+    var maxRedirects = 10;
+    
+    while (redirectCount < maxRedirects) {
+      var response = UrlFetchApp.fetch(currentUrl, {
+        followRedirects: false,
+        muteHttpExceptions: true
+      });
+      var responseCode = response.getResponseCode();
+      
+      if (responseCode < 300 || responseCode >= 400) {
+        return currentUrl;
+      }
+      
+      var headers = response.getHeaders();
+      var location = headers['Location'] || headers['location'];
+      if (!location) {
+        Logger.log('No Location header for redirect at ' + currentUrl);
+        return '';
+      }
+      
+      currentUrl = location;
+      redirectCount++;
+    }
+    
+    Logger.log('Exceeded maximum redirects (' + maxRedirects + ') for URL ' + url);
+    return '';
+  } catch (e) {
+    Logger.log('Error resolving redirect for URL ' + url + ': ' + e.message);
+    return '';
+  }
 }
 
 // ===== Main Web App Function =====
@@ -105,6 +230,43 @@ function doGet(e) {
     
   } catch (error) {
     return createErrorResponse('Error processing request: ' + error.message);
+  }
+}
+
+// Handle POST requests (for batch QR code generation)
+function doPost(e) {
+  try {
+    // Parse the POST data
+    var postData = e.postData.contents;
+    var payload = JSON.parse(postData);
+    
+    // Check if this is a batch QR generation request
+    if (payload.request_type === 'batch_qr_generation') {
+      var result = handleBatchQRRequest(payload);
+    } else {
+      var result = createErrorResponse('Invalid request type. Use "batch_qr_generation"');
+    }
+    
+    // Return the result with CORS headers
+    return ContentService
+      .createTextOutput(JSON.stringify(result))
+      .setMimeType(ContentService.MimeType.JSON)
+      .setHeaders({
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type'
+      });
+    
+  } catch (error) {
+    var errorResult = createErrorResponse('Error processing POST request: ' + error.message);
+    return ContentService
+      .createTextOutput(JSON.stringify(errorResult))
+      .setMimeType(ContentService.MimeType.JSON)
+      .setHeaders({
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type'
+      });
   }
 }
 
@@ -232,12 +394,14 @@ function listAllCurrencies() {
   var dataRange = sheet.getRange(2, 1, lastRow - 1, 10).getValues(); // A to J
   var currencyQuantities = {}; // Track total quantities for each currency
   
-  // First pass: collect all currencies from the Currencies sheet
+  // First pass: collect only serializable currencies from the Currencies sheet
   for (var i = 0; i < dataRange.length; i++) {
     var row = dataRange[i];
     var currentProductName = row[0] ? row[0].toString().trim() : '';
+    var isSerializable = row[2] === true || row[2] === 'TRUE' || row[2] === 'True'; // Column C
     
-    if (currentProductName) {
+    // Only include currencies that are marked as serializable
+    if (currentProductName && isSerializable) {
       currencyQuantities[currentProductName] = {
         product_name: currentProductName,
         product_image: row[3] || '', // Column D
@@ -255,8 +419,12 @@ function listAllCurrencies() {
   
   // Second pass: fetch quantities from inventory ledgers
   var ledgerConfigs = getInventoryLedgerConfigs();
+  Logger.log('Processing ' + ledgerConfigs.length + ' ledgers for quantities');
+  
   ledgerConfigs.forEach(function(config) {
     try {
+      Logger.log('Processing ledger: ' + config.ledger_name + ' - ' + config.ledger_url);
+      
       if (!config.ledger_url || !config.ledger_url.includes('docs.google.com/spreadsheets')) {
         Logger.log('Skipping invalid or non-spreadsheet URL: ' + config.ledger_url);
         return;
@@ -264,12 +432,20 @@ function listAllCurrencies() {
       
       var ledgerSpreadsheet = SpreadsheetApp.openByUrl(config.ledger_url);
       var ledgerSheet = ledgerSpreadsheet.getSheetByName(config.sheet_name);
-      if (!ledgerSheet) return;
+      if (!ledgerSheet) {
+        Logger.log('Sheet not found: ' + config.sheet_name + ' in ledger ' + config.ledger_name);
+        return;
+      }
       
       var startRow = config.record_start_row;
       var lastLedgerRow = ledgerSheet.getLastRow();
       var numRows = Math.max(0, lastLedgerRow - startRow + 1);
-      if (numRows < 1) return;
+      if (numRows < 1) {
+        Logger.log('No data rows found in ledger ' + config.ledger_name);
+        return;
+      }
+      
+      Logger.log('Processing ' + numRows + ' rows in ledger ' + config.ledger_name);
       
       var nameCol = letterToColumn(config.manager_names_column);
       var assetCol = letterToColumn(config.asset_name_column);
@@ -279,6 +455,7 @@ function listAllCurrencies() {
       var assets = ledgerSheet.getRange(startRow, assetCol, numRows, 1).getValues();
       var qtys = ledgerSheet.getRange(startRow, qtyCol, numRows, 1).getValues();
       
+      var matchesFound = 0;
       for (var i = 0; i < names.length; i++) {
         var assetName = assets[i][0];
         var quantity = parseFloat(qtys[i][0]) || 0;
@@ -288,8 +465,13 @@ function listAllCurrencies() {
           currencyQuantities[assetName].total_quantity += quantity;
           currencyQuantities[assetName].ledger_quantities[config.ledger_name] = 
             (currencyQuantities[assetName].ledger_quantities[config.ledger_name] || 0) + quantity;
+          matchesFound++;
+          Logger.log('Found match in ' + config.ledger_name + ': ' + assetName + ' = ' + quantity);
         }
       }
+      
+      Logger.log('Found ' + matchesFound + ' matches in ledger ' + config.ledger_name);
+      
     } catch (err) {
       Logger.log('Error processing ledger ' + config.ledger_name + ': ' + err);
     }
@@ -337,8 +519,10 @@ function searchProduct(productName) {
   for (var i = 0; i < dataRange.length; i++) {
     var row = dataRange[i];
     var currentProductName = row[0] ? row[0].toString().trim() : '';
+    var isSerializable = row[2] === true || row[2] === 'TRUE' || row[2] === 'True'; // Column C
     
-    if (currentProductName.toLowerCase().includes(productName.toLowerCase())) {
+    // Only include currencies that are marked as serializable and match the search term
+    if (currentProductName && isSerializable && currentProductName.toLowerCase().includes(productName.toLowerCase())) {
       matchingProducts.push({
         product_name: currentProductName,
         product_image: row[3] || '', // Column D
@@ -477,8 +661,10 @@ function findProductInCurrencies(sheet, productName) {
   for (var i = 0; i < dataRange.length; i++) {
     var row = dataRange[i];
     var currentProductName = row[0] ? row[0].toString().trim() : '';
+    var isSerializable = row[2] === true || row[2] === 'TRUE' || row[2] === 'True'; // Column C
     
-    if (currentProductName.toLowerCase() === productName.toLowerCase()) {
+    // Only return products that are marked as serializable
+    if (currentProductName && isSerializable && currentProductName.toLowerCase() === productName.toLowerCase()) {
       return {
         product_name: currentProductName,
         product_image: row[3] || '', // Column D
@@ -900,5 +1086,30 @@ function testGitHubToken() {
   } else {
     Logger.log('GitHub token is NOT configured');
     return 'GitHub token is NOT configured. Please set GITHUB_TOKEN in Script Properties.';
+  }
+}
+
+// Test function to debug ledger fetching
+function testLedgerFetching() {
+  Logger.log('=== Testing Ledger Fetching ===');
+  
+  try {
+    var creds = getCredentials();
+    Logger.log('Credentials loaded: ' + (creds ? 'YES' : 'NO'));
+    Logger.log('Wix API Key: ' + (creds.WIX_API_KEY ? 'PRESENT' : 'MISSING'));
+    
+    var ledgerConfigs = getInventoryLedgerConfigs();
+    Logger.log('Total ledger configs: ' + ledgerConfigs.length);
+    
+    for (var i = 0; i < ledgerConfigs.length; i++) {
+      var config = ledgerConfigs[i];
+      Logger.log('Ledger ' + (i + 1) + ': ' + config.ledger_name + ' - ' + config.ledger_url);
+    }
+    
+    return 'Ledger fetching test completed. Check logs for details.';
+    
+  } catch (error) {
+    Logger.log('Error in testLedgerFetching: ' + error.message);
+    return 'Error: ' + error.message;
   }
 }
