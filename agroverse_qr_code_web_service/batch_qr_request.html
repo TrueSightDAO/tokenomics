@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Batch QR Code Generation - TrueSight DAO</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #2c3e50;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #34495e;
+        }
+        input, select, textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+            box-sizing: border-box;
+        }
+        textarea {
+            height: 100px;
+            resize: vertical;
+        }
+        button {
+            background-color: #3498db;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            width: 100%;
+            margin-top: 10px;
+        }
+        button:hover {
+            background-color: #2980b9;
+        }
+        button:disabled {
+            background-color: #bdc3c7;
+            cursor: not-allowed;
+        }
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 5px;
+            white-space: pre-wrap;
+            font-family: monospace;
+            font-size: 14px;
+        }
+        .success {
+            background-color: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        .error {
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+        .info {
+            background-color: #d1ecf1;
+            border: 1px solid #bee5eb;
+            color: #0c5460;
+        }
+        .signature-section {
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            margin-top: 20px;
+        }
+        .product-info {
+            background-color: #e8f5e8;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        .loading {
+            text-align: center;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔄 Batch QR Code Generation</h1>
+        
+        <div class="info">
+            <strong>Instructions:</strong><br>
+            1. Enter the product name and quantity<br>
+            2. Generate your digital signature<br>
+            3. Submit the batch request<br>
+            4. Receive email notification when complete
+        </div>
+
+        <form id="batchForm">
+            <div class="form-group">
+                <label for="productName">Product Name:</label>
+                <input type="text" id="productName" required placeholder="Enter exact product name from Currencies sheet">
+            </div>
+
+            <div class="form-group">
+                <label for="quantity">Quantity (1-100):</label>
+                <input type="number" id="quantity" min="1" max="100" value="10" required>
+            </div>
+
+            <div class="form-group">
+                <label for="email">Email (optional, for notifications):</label>
+                <input type="email" id="email" placeholder="your@email.com">
+            </div>
+
+            <div class="signature-section">
+                <h3>🔐 Digital Signature</h3>
+                <div class="form-group">
+                    <label for="privateKey">Your Private Key (Base64):</label>
+                    <textarea id="privateKey" placeholder="Paste your private key here..." required></textarea>
+                </div>
+                
+                <button type="button" onclick="generateSignature()">Generate Digital Signature</button>
+                
+                <div class="form-group">
+                    <label for="digitalSignature">Digital Signature:</label>
+                    <textarea id="digitalSignature" readonly placeholder="Digital signature will appear here after generation"></textarea>
+                </div>
+            </div>
+
+            <button type="submit" id="submitBtn" disabled>Submit Batch Request</button>
+        </form>
+
+        <div id="result"></div>
+    </div>
+
+    <script>
+        // Google Apps Script URL (replace with your deployment URL)
+        const GOOGLE_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/YOUR_DEPLOYMENT_ID/exec';
+        
+        let generatedSignature = null;
+
+        async function generateSignature() {
+            const privateKeyBase64 = document.getElementById('privateKey').value.trim();
+            const productName = document.getElementById('productName').value.trim();
+            const quantity = document.getElementById('quantity').value;
+            
+            if (!privateKeyBase64 || !productName || !quantity) {
+                showResult('Please fill in all required fields before generating signature.', 'error');
+                return;
+            }
+
+            try {
+                // Create the message to sign
+                const message = `[QR CODE BATCH REQUEST]
+Product: ${productName}
+Quantity: ${quantity}
+Timestamp: ${new Date().toISOString()}`;
+
+                // Import private key
+                const privateKeyBuffer = Uint8Array.from(atob(privateKeyBase64), c => c.charCodeAt(0));
+                const privateKey = await window.crypto.subtle.importKey(
+                    'pkcs8',
+                    privateKeyBuffer,
+                    {
+                        name: 'RSASSA-PKCS1-v1_5',
+                        hash: 'SHA-256'
+                    },
+                    false,
+                    ['sign']
+                );
+
+                // Sign the message
+                const encoder = new TextEncoder();
+                const signature = await window.crypto.subtle.sign(
+                    'RSASSA-PKCS1-v1_5',
+                    privateKey,
+                    encoder.encode(message)
+                );
+
+                // Convert signature to base64
+                const signatureBase64 = btoa(String.fromCharCode(...new Uint8Array(signature)));
+
+                // Export public key for verification
+                const publicKey = await window.crypto.subtle.exportKey('spki', privateKey);
+                const publicKeyBase64 = btoa(String.fromCharCode(...new Uint8Array(publicKey)));
+
+                // Store the signature
+                generatedSignature = {
+                    message: message,
+                    signature: signatureBase64,
+                    publicKey: publicKeyBase64
+                };
+
+                // Display the signature
+                document.getElementById('digitalSignature').value = publicKeyBase64;
+                document.getElementById('submitBtn').disabled = false;
+
+                showResult('✅ Digital signature generated successfully!', 'success');
+
+            } catch (error) {
+                showResult(`❌ Error generating signature: ${error.message}`, 'error');
+            }
+        }
+
+        async function submitBatchRequest() {
+            const productName = document.getElementById('productName').value.trim();
+            const quantity = document.getElementById('quantity').value;
+            const email = document.getElementById('email').value.trim();
+            
+            if (!generatedSignature) {
+                showResult('Please generate a digital signature first.', 'error');
+                return;
+            }
+
+            const submitBtn = document.getElementById('submitBtn');
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Submitting...';
+
+            try {
+                // Prepare the request
+                const params = new URLSearchParams({
+                    product_name: productName,
+                    action: 'generate',
+                    quantity: quantity,
+                    digital_signature: generatedSignature.publicKey
+                });
+
+                if (email) {
+                    params.append('email', email);
+                }
+
+                // Make the request to Google Apps Script
+                const response = await fetch(`${GOOGLE_APPS_SCRIPT_URL}?${params.toString()}`);
+                const result = await response.json();
+
+                if (result.status === 'success') {
+                    const data = result.data;
+                    const successMessage = `✅ Batch request submitted successfully!
+
+📦 Batch ID: ${data.batch_id}
+📊 Quantity: ${data.quantity}
+📁 Zip File: ${data.zip_file_name}
+📧 Email: ${email || 'Not provided'}
+
+🔄 GitHub Actions workflow has been triggered.
+You will receive an email notification when the batch is complete.
+
+Generated QR Codes:
+${data.generated_codes.map(code => `- ${code.qr_code}`).join('\n')}`;
+
+                    showResult(successMessage, 'success');
+                } else {
+                    showResult(`❌ Error: ${result.message}`, 'error');
+                }
+
+            } catch (error) {
+                showResult(`❌ Network error: ${error.message}`, 'error');
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Submit Batch Request';
+            }
+        }
+
+        function showResult(message, type) {
+            const resultDiv = document.getElementById('result');
+            resultDiv.textContent = message;
+            resultDiv.className = `result ${type}`;
+            resultDiv.scrollIntoView({ behavior: 'smooth' });
+        }
+
+        // Form submission handler
+        document.getElementById('batchForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            submitBatchRequest();
+        });
+
+        // Real-time validation
+        document.getElementById('productName').addEventListener('input', function() {
+            const submitBtn = document.getElementById('submitBtn');
+            submitBtn.disabled = !generatedSignature || !this.value.trim();
+        });
+
+        document.getElementById('quantity').addEventListener('input', function() {
+            const value = parseInt(this.value);
+            if (value < 1) this.value = 1;
+            if (value > 100) this.value = 100;
+        });
+    </script>
+</body>
+</html>

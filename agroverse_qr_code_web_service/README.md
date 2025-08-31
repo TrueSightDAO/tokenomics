@@ -97,6 +97,8 @@ This system uses two repositories:
 
 ### **2. Google App Script Setup**
 
+**📖 Complete Setup Guide**: See [GOOGLE_APPS_SCRIPT_SETUP.md](./GOOGLE_APPS_SCRIPT_SETUP.md) for detailed instructions.
+
 1. **Create a new Google App Script project:**
    - Go to [script.google.com](https://script.google.com)
    - Create a new project
