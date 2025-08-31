@@ -4,7 +4,27 @@
  * This script provides a web service to:
  * 1. Search for products in the "Currencies" sheet
  * 2. Generate QR codes and add them to the "Agroverse QR codes" sheet
- * 3. Handle the complete workflow from product search to QR code generation
+ * 3. Trigger GitHub Actions to generate QR code images
+ * 4. Handle the complete workflow from product search to QR code generation
+ * 
+ * SETUP INSTRUCTIONS:
+ * 1. Deploy this script as a web app in Google Apps Script
+ * 2. Set up GitHub token in Script Properties:
+ *    - Go to Project Settings > Script Properties
+ *    - Add property: GITHUB_TOKEN = your_github_personal_access_token
+ *    - Token needs 'repo' scope to trigger workflows
+ * 3. Test the setup using testGitHubToken() function
+ * 
+ * USAGE:
+ * - GET request: ?product_name=ProductName&action=search|generate
+ * - POST request: JSON payload with product_name field
+ * 
+ * WORKFLOW:
+ * 1. doGet/doPost receives product name
+ * 2. Searches for product in Currencies sheet
+ * 3. Creates new row in Agroverse QR codes sheet
+ * 4. Triggers GitHub Actions webhook to generate QR code image
+ * 5. Returns success/error response
  */
 
 // ===== Configuration =====
@@ -290,35 +310,36 @@ function createErrorResponse(message) {
 // ===== GitHub Actions Webhook Trigger =====
 function triggerGitHubWebhook(sheetRow) {
   try {
-    // GitHub repository and workflow configuration
+    // GitHub repository configuration
     var githubRepo = 'TrueSightDAO/tokenomics';
-    var workflowId = 'qr-code-webhook.yml';
     var githubToken = getGitHubToken(); // You'll need to set this up
     
     if (!githubToken) {
       return {
         success: false,
-        message: 'GitHub token not configured'
+        message: 'GitHub token not configured. Please set GITHUB_TOKEN in Script Properties.'
       };
     }
     
-    // Prepare the webhook payload
+    // Prepare the repository_dispatch payload
     var payload = {
-      ref: 'main',
-      inputs: {
+      event_type: 'qr-code-generation',
+      client_payload: {
         sheet_row: sheetRow.toString(),
-        no_commit: 'false'
+        no_commit: 'false',
+        timestamp: new Date().toISOString()
       }
     };
     
-    // Make the API call to trigger the workflow
-    var url = 'https://api.github.com/repos/' + githubRepo + '/actions/workflows/' + workflowId + '/dispatches';
+    // Make the API call to trigger repository_dispatch
+    var url = 'https://api.github.com/repos/' + githubRepo + '/dispatches';
     var options = {
       method: 'POST',
       headers: {
         'Authorization': 'token ' + githubToken,
         'Accept': 'application/vnd.github.v3+json',
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
+        'User-Agent': 'GoogleAppsScript-QRCodeGenerator'
       },
       payload: JSON.stringify(payload)
     };
@@ -329,7 +350,7 @@ function triggerGitHubWebhook(sheetRow) {
     if (responseCode === 204) {
       return {
         success: true,
-        message: 'GitHub Actions webhook triggered successfully for row ' + sheetRow
+        message: 'GitHub Actions webhook triggered successfully for row ' + sheetRow + '. Workflow will generate QR code image.'
       };
     } else {
       var responseText = response.getContentText();
@@ -374,6 +395,20 @@ function getGitHubToken() {
   return null;
 }
 
+// ===== Setup GitHub Token =====
+function setupGitHubToken() {
+  var scriptProperties = PropertiesService.getScriptProperties();
+  var currentToken = scriptProperties.getProperty('GITHUB_TOKEN');
+  
+  if (currentToken) {
+    Logger.log('GitHub token is already configured');
+    return 'GitHub token is already configured';
+  } else {
+    Logger.log('GitHub token not configured. Please set it up manually.');
+    return 'GitHub token not configured. Please set GITHUB_TOKEN in Script Properties.';
+  }
+}
+
 // ===== Utility Functions for Manual Testing =====
 
 function testSearchProduct() {
@@ -410,4 +445,15 @@ function testWebhookTrigger() {
   // Test webhook trigger for row 708
   var result = triggerGitHubWebhook(708);
   Logger.log('Webhook trigger result: ' + JSON.stringify(result));
+}
+
+function testGitHubToken() {
+  var token = getGitHubToken();
+  if (token) {
+    Logger.log('GitHub token is configured');
+    return 'GitHub token is configured';
+  } else {
+    Logger.log('GitHub token is NOT configured');
+    return 'GitHub token is NOT configured. Please set GITHUB_TOKEN in Script Properties.';
+  }
 }
