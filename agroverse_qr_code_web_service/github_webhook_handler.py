@@ -292,8 +292,10 @@ class GitHubWebhookHandler:
         # Logo configuration
         LOGO_RATIO = 0.2
         
-        # Try multiple paths for logo files (GitHub Actions environment)
+        # Try multiple paths for logo files (prioritize local logos folder)
         possible_cacao_logo_paths = [
+            os.path.join(os.path.dirname(__file__), "logos", "agroverse_logo.jpeg"),  # Local logos folder
+            os.path.join(os.getcwd(), "logos", "agroverse_logo.jpeg"),  # Local logos folder (current dir)
             os.path.join(os.path.dirname(__file__), "agroverse_logo.jpeg"),
             os.path.join(os.path.dirname(__file__), "assets", "agroverse_logo.jpeg"),
             os.path.join(os.getcwd(), "agroverse_logo.jpeg"),
@@ -301,6 +303,8 @@ class GitHubWebhookHandler:
         ]
         
         possible_non_cacao_logo_paths = [
+            os.path.join(os.path.dirname(__file__), "logos", "truesight_icon.png"),  # Local logos folder
+            os.path.join(os.getcwd(), "logos", "truesight_icon.png"),  # Local logos folder (current dir)
             os.path.join(os.path.dirname(__file__), "truesight_icon.png"),
             os.path.join(os.path.dirname(__file__), "assets", "truesight_icon.png"),
             os.path.join(os.getcwd(), "truesight_icon.png"),
