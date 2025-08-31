@@ -356,17 +356,12 @@ Request Transaction ID: {signature_hash}
 
 **Format**:
 ```
-[SALES REPORT]
-Contributor: {contributor_name}
-Product: {product_name}
-Quantity: {quantity}
-Unit price: {unit_price}
-Total amount: {total_amount}
-Currency: {currency}
-Customer: {customer_info}
-Sale date: {date}
-Payment method: {payment_method}
-Additional notes: {notes}
+[SALES EVENT]
+- Item: {qr_code_or_item_id}
+- Sales price: ${amount}
+- Sold by: {contributor_name}
+- Attached Filename: {filename_or_None}
+- Submission Source: {source_url}
 --------
 
 My Digital Signature: {public_key}
@@ -374,7 +369,7 @@ My Digital Signature: {public_key}
 Request Transaction ID: {signature_hash}
 ```
 
-**Attachments**: Receipt, invoice, or proof of sale
+**Attachments**: Receipt, invoice, or proof of sale (optional)
 
 ### 4. DAO Expenses Report
 
