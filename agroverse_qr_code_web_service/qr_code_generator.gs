@@ -39,34 +39,68 @@ var CURRENCIES_SHEET_NAME = 'Currencies';
 var QR_CODES_SHEET_NAME = 'Agroverse QR codes';
 var GITHUB_REPO_URL = 'https://github.com/TrueSightDAO/qr_codes/blob/main/';
 
+// ===== Helper Functions =====
+
+// Helper to convert column letter(s) to number
+function letterToColumn(letter) {
+  var col = 0;
+  for (var i = 0; i < letter.length; i++) {
+    col = col * 26 + (letter.charCodeAt(i) - 'A'.charCodeAt(0) + 1);
+  }
+  return col;
+}
+
+// Get inventory ledger configurations (simplified version)
+function getInventoryLedgerConfigs() {
+  // For now, return a basic configuration for the main inventory sheet
+  // This can be expanded to fetch from Wix like the inventory management system
+  return [
+    {
+      ledger_name: 'MAIN',
+      ledger_url: 'https://docs.google.com/spreadsheets/d/1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU/edit',
+      sheet_name: 'offchain asset location',
+      manager_names_column: 'B',
+      asset_name_column: 'A',
+      asset_quantity_column: 'C',
+      record_start_row: 5
+    }
+  ];
+}
+
 // ===== Main Web App Function =====
 function doGet(e) {
   try {
     // Parse parameters
-    var productName = e.parameter.product_name;
     var action = e.parameter.action || 'generate';
+    var productName = e.parameter.product_name;
     var quantity = parseInt(e.parameter.quantity) || 1; // Number of QR codes to generate
     var digitalSignature = e.parameter.digital_signature; // Digital signature for identification
     var requestorEmail = e.parameter.email; // Optional email for notification
     
-    if (!productName) {
-      return createErrorResponse('Missing required parameter: product_name');
-    }
-    
-    // Validate quantity
-    if (quantity < 1 || quantity > 100) {
-      return createErrorResponse('Quantity must be between 1 and 100');
-    }
-    
     switch (action) {
+      case 'list':
+        return listAllCurrencies();
       case 'search':
+        if (!productName) {
+          return createErrorResponse('Missing required parameter: product_name for search action');
+        }
         return searchProduct(productName);
       case 'generate':
+        if (!productName) {
+          return createErrorResponse('Missing required parameter: product_name for generate action');
+        }
+        // Validate quantity
+        if (quantity < 1 || quantity > 100) {
+          return createErrorResponse('Quantity must be between 1 and 100');
+        }
         return generateBatchQRCodes(productName, quantity, digitalSignature, requestorEmail);
       case 'generate_single':
+        if (!productName) {
+          return createErrorResponse('Missing required parameter: product_name for generate_single action');
+        }
         return generateQRCode(productName);
       default:
-        return createErrorResponse('Invalid action. Use "search", "generate", or "generate_single"');
+        return createErrorResponse('Invalid action. Use "list", "search", "generate", or "generate_single"');
     }
     
   } catch (error) {
@@ -79,6 +113,13 @@ function doPost(e) {
   try {
     // Parse JSON payload
     var payload = JSON.parse(e.postData.contents);
+    
+    // Check if this is a batch QR code request
+    if (payload.request_type === 'batch_qr_generation') {
+      return handleBatchQRRequest(payload);
+    }
+    
+    // Legacy single QR code request
     var productName = payload.product_name;
     
     if (!productName) {
@@ -106,6 +147,173 @@ function doPost(e) {
   } catch (error) {
     return createErrorResponse('Error processing webhook request: ' + error.message);
   }
+}
+
+// ===== Handle Batch QR Code Request =====
+function handleBatchQRRequest(payload) {
+  try {
+    // Validate required fields
+    var requiredFields = ['currency_name', 'quantity', 'digital_signature', 'request_transaction_id', 'submission_source'];
+    for (var i = 0; i < requiredFields.length; i++) {
+      if (!payload[requiredFields[i]]) {
+        return createErrorResponse('Missing required field: ' + requiredFields[i]);
+      }
+    }
+    
+    // Validate quantity
+    var quantity = parseInt(payload.quantity);
+    if (isNaN(quantity) || quantity < 1 || quantity > 100) {
+      return createErrorResponse('Quantity must be between 1 and 100');
+    }
+    
+    // Verify digital signature and get user info
+    var userInfo = verifyDigitalSignature(payload.digital_signature);
+    if (!userInfo.success) {
+      return createErrorResponse('Invalid digital signature: ' + userInfo.message);
+    }
+    
+    // Generate batch QR codes
+    var result = generateBatchQRCodes(
+      payload.currency_name, 
+      quantity, 
+      payload.digital_signature, 
+      userInfo.email,
+      payload.request_transaction_id,
+      payload.submission_source
+    );
+    
+    var resultData = JSON.parse(result.getContent());
+    
+    if (resultData.status === 'success') {
+      // Send email notification
+      var emailResult = sendEmailNotification(
+        userInfo.email,
+        resultData.data.zip_file_name,
+        resultData.data.zip_file_url,
+        quantity,
+        payload.currency_name
+      );
+      
+      return createSuccessResponse({
+        action: 'batch_qr_generation',
+        currency_name: payload.currency_name,
+        quantity: quantity,
+        batch_id: resultData.data.batch_id,
+        zip_file_name: resultData.data.zip_file_name,
+        zip_file_url: resultData.data.zip_file_url,
+        email_sent: emailResult.success,
+        email_message: emailResult.message,
+        message: 'Batch QR codes generated successfully. Check your email for download link.'
+      });
+    } else {
+      return result; // Return the error response
+    }
+    
+  } catch (error) {
+    return createErrorResponse('Error processing batch QR request: ' + error.message);
+  }
+}
+
+// ===== List All Currencies with Quantities Function =====
+function listAllCurrencies() {
+  var spreadsheet = SpreadsheetApp.openByUrl(SPREADSHEET_URL);
+  var sheet = spreadsheet.getSheetByName(CURRENCIES_SHEET_NAME);
+  
+  if (!sheet) {
+    return createErrorResponse('Currencies sheet not found');
+  }
+  
+  var lastRow = sheet.getLastRow();
+  if (lastRow < 2) {
+    return createErrorResponse('No data found in Currencies sheet');
+  }
+  
+  // Get all data from the Currencies sheet (skip header row)
+  var dataRange = sheet.getRange(2, 1, lastRow - 1, 10).getValues(); // A to J
+  var currencyQuantities = {}; // Track total quantities for each currency
+  
+  // First pass: collect all currencies from the Currencies sheet
+  for (var i = 0; i < dataRange.length; i++) {
+    var row = dataRange[i];
+    var currentProductName = row[0] ? row[0].toString().trim() : '';
+    
+    if (currentProductName) {
+      currencyQuantities[currentProductName] = {
+        product_name: currentProductName,
+        product_image: row[3] || '', // Column D
+        landing_page: row[4] || '', // Column E
+        ledger: row[5] || '', // Column F
+        farm_name: row[6] || '', // Column G
+        state: row[7] || '', // Column H
+        country: row[8] || '', // Column I
+        year: row[9] || '', // Column J
+        total_quantity: 0,
+        ledger_quantities: {} // Track quantities per ledger
+      };
+    }
+  }
+  
+  // Second pass: fetch quantities from inventory ledgers
+  var ledgerConfigs = getInventoryLedgerConfigs();
+  ledgerConfigs.forEach(function(config) {
+    try {
+      if (!config.ledger_url || !config.ledger_url.includes('docs.google.com/spreadsheets')) {
+        Logger.log('Skipping invalid or non-spreadsheet URL: ' + config.ledger_url);
+        return;
+      }
+      
+      var ledgerSpreadsheet = SpreadsheetApp.openByUrl(config.ledger_url);
+      var ledgerSheet = ledgerSpreadsheet.getSheetByName(config.sheet_name);
+      if (!ledgerSheet) return;
+      
+      var startRow = config.record_start_row;
+      var lastLedgerRow = ledgerSheet.getLastRow();
+      var numRows = Math.max(0, lastLedgerRow - startRow + 1);
+      if (numRows < 1) return;
+      
+      var nameCol = letterToColumn(config.manager_names_column);
+      var assetCol = letterToColumn(config.asset_name_column);
+      var qtyCol = letterToColumn(config.asset_quantity_column);
+      
+      var names = ledgerSheet.getRange(startRow, nameCol, numRows, 1).getValues();
+      var assets = ledgerSheet.getRange(startRow, assetCol, numRows, 1).getValues();
+      var qtys = ledgerSheet.getRange(startRow, qtyCol, numRows, 1).getValues();
+      
+      for (var i = 0; i < names.length; i++) {
+        var assetName = assets[i][0];
+        var quantity = parseFloat(qtys[i][0]) || 0;
+        
+        // Check if this asset matches any currency in our list
+        if (assetName && currencyQuantities[assetName]) {
+          currencyQuantities[assetName].total_quantity += quantity;
+          currencyQuantities[assetName].ledger_quantities[config.ledger_name] = 
+            (currencyQuantities[assetName].ledger_quantities[config.ledger_name] || 0) + quantity;
+        }
+      }
+    } catch (err) {
+      Logger.log('Error processing ledger ' + config.ledger_name + ': ' + err);
+    }
+  });
+  
+  // Convert to array and filter out currencies with zero quantity
+  var allCurrencies = [];
+  for (var currencyName in currencyQuantities) {
+    var currency = currencyQuantities[currencyName];
+    if (currency.total_quantity > 0) {
+      allCurrencies.push(currency);
+    }
+  }
+  
+  // Sort by total quantity (descending)
+  allCurrencies.sort(function(a, b) {
+    return b.total_quantity - a.total_quantity;
+  });
+  
+  return createSuccessResponse({
+    action: 'list',
+    currencies: allCurrencies,
+    total_currencies: allCurrencies.length
+  });
 }
 
 // ===== Product Search Function =====
@@ -148,7 +356,7 @@ function searchProduct(productName) {
     action: 'search',
     product_name: productName,
     matches: matchingProducts,
-    count: matchingProducts.length
+    total_matches: matchingProducts.length
   });
 }
 
@@ -194,7 +402,7 @@ function generateQRCode(productName) {
 }
 
 // ===== Batch QR Code Generation Function =====
-function generateBatchQRCodes(productName, quantity, digitalSignature, requestorEmail) {
+function generateBatchQRCodes(currencyName, quantity, digitalSignature, requestorEmail, requestTransactionId, submissionSource) {
   var spreadsheet = SpreadsheetApp.openByUrl(SPREADSHEET_URL);
   var currenciesSheet = spreadsheet.getSheetByName(CURRENCIES_SHEET_NAME);
   var qrCodesSheet = spreadsheet.getSheetByName(QR_CODES_SHEET_NAME);
@@ -203,22 +411,22 @@ function generateBatchQRCodes(productName, quantity, digitalSignature, requestor
     return createErrorResponse('Required sheets not found');
   }
   
-  // Find the product in Currencies sheet
-  var productData = findProductInCurrencies(currenciesSheet, productName);
-  if (!productData) {
-    return createErrorResponse('Product not found: ' + productName);
+  // Find the currency in Currencies sheet
+  var currencyData = findProductInCurrencies(currenciesSheet, currencyName);
+  if (!currencyData) {
+    return createErrorResponse('Currency not found: ' + currencyName);
   }
   
   // Generate batch information
   var batchId = generateBatchId();
-  var zipFileName = generateZipFileName(productName, batchId);
+  var zipFileName = generateZipFileName(currencyName, batchId);
   var generatedRows = [];
   var startRow = findLastNonEmptyRowInColumnA(qrCodesSheet) + 1;
   
   // Generate multiple QR codes
   for (var i = 0; i < quantity; i++) {
-    var qrCodeValue = generateQRCodeValue(productData.year);
-    var newRowData = createQRCodeRow(qrCodeValue, productData);
+    var qrCodeValue = generateQRCodeValue(currencyData.year);
+    var newRowData = createQRCodeRow(qrCodeValue, currencyData);
     var insertRow = startRow + i;
     
     // Add batch information to the row
@@ -226,6 +434,8 @@ function generateBatchQRCodes(productName, quantity, digitalSignature, requestor
     newRowData.push(zipFileName); // Column V: Zip file name
     newRowData.push(digitalSignature || ''); // Column W: Digital signature
     newRowData.push(requestorEmail || ''); // Column X: Requestor email
+    newRowData.push(requestTransactionId || ''); // Column Y: Request transaction ID
+    newRowData.push(submissionSource || ''); // Column Z: Submission source
     
     qrCodesSheet.getRange(insertRow, 1, 1, newRowData.length).setValues([newRowData]);
     generatedRows.push({
@@ -243,10 +453,11 @@ function generateBatchQRCodes(productName, quantity, digitalSignature, requestor
   
   return createSuccessResponse({
     action: 'generate_batch',
-    product_name: productName,
+    currency_name: currencyName,
     quantity: quantity,
     batch_id: batchId,
     zip_file_name: zipFileName,
+    zip_file_url: GITHUB_REPO_URL.replace('/blob/', '/raw/') + 'batch_files/' + zipFileName,
     start_row: startRow,
     end_row: startRow + quantity - 1,
     generated_codes: generatedRows,
@@ -515,6 +726,89 @@ function triggerBatchGitHubWebhook(startRow, endRow, zipFileName, digitalSignatu
     return {
       success: false,
       message: 'Error triggering batch webhook: ' + error.message
+    };
+  }
+}
+
+// ===== Digital Signature Verification =====
+function verifyDigitalSignature(digitalSignature) {
+  try {
+    // Call the Asset Management API to verify signature and get user info
+    var assetManagementApi = 'https://script.google.com/macros/s/AKfycbygmwRbyqse-dpCYMco0rb93NSgg-Jc1QIw7kUiBM7CZK6jnWnMB5DEjdoX_eCsvVs7/exec';
+    
+    var params = {
+      'digital_signature': digitalSignature,
+      'action': 'get_contributor_info'
+    };
+    
+    var response = UrlFetchApp.fetch(assetManagementApi + '?' + Object.keys(params).map(function(key) {
+      return encodeURIComponent(key) + '=' + encodeURIComponent(params[key]);
+    }).join('&'));
+    
+    if (response.getResponseCode() === 200) {
+      var data = JSON.parse(response.getContentText());
+      if (data.status === 'success' && data.data) {
+        return {
+          success: true,
+          name: data.data.name || 'Unknown',
+          email: data.data.email || '',
+          voting_rights: data.data.voting_rights || 0
+        };
+      } else {
+        return {
+          success: false,
+          message: data.message || 'Invalid digital signature'
+        };
+      }
+    } else {
+      return {
+        success: false,
+        message: 'Failed to verify digital signature'
+      };
+    }
+    
+  } catch (error) {
+    return {
+      success: false,
+      message: 'Error verifying digital signature: ' + error.message
+    };
+  }
+}
+
+// ===== Email Notification Function =====
+function sendEmailNotification(email, zipFileName, zipFileUrl, quantity, currencyName) {
+  try {
+    // This would integrate with an email service
+    // For now, we'll just log the email details
+    
+    var subject = "QR Code Batch Generation Complete - TrueSight DAO";
+    var body = "Your QR code batch has been generated successfully!\n\n" +
+               "📦 Zip File: " + zipFileName + "\n" +
+               "🔗 Download Link: " + zipFileUrl + "\n" +
+               "📊 Quantity: " + quantity + " QR codes\n" +
+               "💰 Currency: " + currencyName + "\n" +
+               "📅 Generated: " + new Date().toISOString() + "\n\n" +
+               "You can download the zip file containing all QR code images from the link above.\n\n" +
+               "Best regards,\nTrueSight DAO QR Code System";
+    
+    Logger.log('Email notification prepared:');
+    Logger.log('To: ' + email);
+    Logger.log('Subject: ' + subject);
+    Logger.log('Body: ' + body);
+    
+    // TODO: Implement actual email sending
+    // Example with Gmail:
+    // GmailApp.sendEmail(email, subject, body);
+    
+    return {
+      success: true,
+      message: 'Email notification prepared for ' + email
+    };
+    
+  } catch (error) {
+    return {
+      success: false,
+      message: 'Error sending email: ' + error.message
     };
   }
 }

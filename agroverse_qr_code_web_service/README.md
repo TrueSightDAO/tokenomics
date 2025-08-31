@@ -15,16 +15,28 @@ agroverse_qr_code_web_service/
 ├── .gitignore                          # Git ignore rules (excludes sensitive files)
 
 ├── github_webhook_handler.py           # GitHub Actions webhook handler
+├── batch_webhook_handler.py            # Batch QR code generation handler
+├── digital_signature_processor.py      # Digital signature verification
 ├── webhook_client.py                   # Webhook client for external triggers
 ├── test_qr_generation.py               # Test script for local QR generation
+├── test_batch_handler.py               # Test suite for batch processing
 ├── run_test.sh                         # Shell script to run tests with virtual environment
 ├── local_config_template.py            # Template for local configuration
 ├── local_config.py                     # Local config (not in git - contains tokens)
 
 ├── to_upload/                          # Directory for generated QR code images
-├── agroverse_logo.jpeg                 # Logo for cacao products
-├── truesight_icon.png                  # Logo for non-cacao products
-└── qr_code_generator.gs                # Google App Script for Google Sheets operations
+├── generated_zip_files/                # Directory for batch zip files
+├── logos/                              # Local font and logo files
+│   ├── arial.ttf                       # Local Arial font
+│   ├── arial_bold.ttf                  # Local Arial Bold font
+│   ├── agroverse_logo.jpeg             # Logo for cacao products
+│   └── truesight_icon.png              # Logo for non-cacao products
+├── agroverse_logo.jpeg                 # Logo for cacao products (legacy)
+├── truesight_icon.png                  # Logo for non-cacao products (legacy)
+├── arial.ttf                           # Local Arial font (legacy)
+├── arial_bold.ttf                      # Local Arial Bold font (legacy)
+├── qr_code_generator.gs                # Google App Script for Google Sheets operations
+└── batch_qr_request.html               # DApp batch request interface
 
 Repository Root:
 ├── .github/workflows/
@@ -49,12 +61,16 @@ Repository Root:
 ```
 TrueSightDAO/tokenomics/ (Code Repository)
 ├── .github/workflows/
-│   └── qr-code-webhook.yml            # GitHub Actions workflow
+│   ├── qr-code-webhook.yml            # GitHub Actions workflow (single QR codes)
+│   └── qr-code-batch-webhook.yml      # GitHub Actions workflow (batch QR codes)
 └── agroverse_qr_code_web_service/
     ├── github_webhook_handler.py      # Python webhook handler
+    ├── batch_webhook_handler.py       # Python batch handler
+    ├── digital_signature_processor.py # Digital signature verification
     ├── webhook_client.py              # Python client examples
     ├── qr_code_generator.gs           # Google App Script (webhook)
-    ├── html_frontend_example.html     # Example HTML/JS frontend
+    ├── batch_qr_request.html          # DApp batch request interface
+    ├── test_batch_handler.py          # Batch testing suite
     ├── README.md
     └── requirements.txt
 
@@ -873,6 +889,281 @@ logging.basicConfig(level=logging.DEBUG)
 5. **Parallel Processing** - Generate multiple QR codes simultaneously
 6. **Caching** - Cache frequently requested QR codes
 7. **Notifications** - Slack/email notifications on completion
+
+## 🧪 **Testing the Batch Webhook Handler**
+
+### **Testing `batch_webhook_handler.py`**
+
+The batch webhook handler can be tested both locally and in GitHub Actions. Here are comprehensive testing instructions:
+
+#### **Prerequisites for Testing:**
+
+1. **Environment Variables:**
+   ```bash
+   export QR_CODE_REPOSITORY_TOKEN="your_github_token"
+   export GDRIVE_KEY='{"type": "service_account", ...}'  # Google Sheets API credentials
+   ```
+
+2. **Dependencies:**
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+3. **Required Files:**
+   - `github_webhook_handler.py` (for QR code generation)
+   - `digital_signature_processor.py` (for signature verification)
+   - Font files: `arial.ttf`, `arial_bold.ttf`
+   - Logo files: `agroverse_logo.jpeg`, `truesight_icon.png`
+
+#### **Local Testing:**
+
+**🚀 Quick Test Suite:**
+```bash
+# Run the automated test suite
+python test_batch_handler.py
+```
+
+**1. Basic Batch Test (Simulated Data):**
+```bash
+python batch_webhook_handler.py \
+  --start-row 100 \
+  --end-row 105 \
+  --zip-file-name "test_batch_20241201.zip" \
+  --output-file "test_results.json"
+```
+
+**2. Test with Digital Signature:**
+```bash
+python batch_webhook_handler.py \
+  --start-row 100 \
+  --end-row 105 \
+  --zip-file-name "test_batch_with_signature.zip" \
+  --digital-signature "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA..." \
+  --requestor-email "test@example.com" \
+  --output-file "test_results.json"
+```
+
+**3. Test with Real Google Sheets Data:**
+```bash
+# Ensure GDRIVE_KEY environment variable is set
+python batch_webhook_handler.py \
+  --start-row 100 \
+  --end-row 110 \
+  --zip-file-name "real_data_batch.zip" \
+  --digital-signature "YOUR_DIGITAL_SIGNATURE" \
+  --requestor-email "user@example.com" \
+  --output-file "real_test_results.json"
+```
+
+#### **Testing Individual Components:**
+
+**1. Test Digital Signature Processor:**
+```bash
+python digital_signature_processor.py
+```
+
+**2. Test QR Code Generation:**
+```bash
+python github_webhook_handler.py --test
+```
+
+**3. Test Google Sheets Integration:**
+```python
+# Create a test script: test_sheets_integration.py
+import os
+import json
+from batch_webhook_handler import BatchWebhookHandler
+
+handler = BatchWebhookHandler()
+data = handler.fetch_sheet_rows(100, 105)
+print(json.dumps(data, indent=2))
+```
+
+#### **GitHub Actions Testing:**
+
+**1. Manual Workflow Trigger:**
+- Go to GitHub repository → Actions → `qr-code-batch-webhook.yml`
+- Click "Run workflow"
+- Fill in the parameters:
+  - Start row: `100`
+  - End row: `105`
+  - Zip file name: `test_batch_github_actions.zip`
+  - Digital signature: `YOUR_SIGNATURE`
+  - Requestor email: `test@example.com`
+
+**2. Test via Repository Dispatch:**
+```bash
+# Using curl to trigger the workflow
+curl -X POST \
+  -H "Authorization: token YOUR_GITHUB_TOKEN" \
+  -H "Accept: application/vnd.github.v3+json" \
+  https://api.github.com/repos/TrueSightDAO/tokenomics/dispatches \
+  -d '{
+    "event_type": "qr-code-batch-generation",
+    "client_payload": {
+      "start_row": "100",
+      "end_row": "105",
+      "zip_file_name": "curl_test_batch.zip",
+      "digital_signature": "YOUR_SIGNATURE",
+      "requestor_email": "test@example.com"
+    }
+  }'
+```
+
+#### **Expected Test Results:**
+
+**Successful Test Output:**
+```json
+{
+  "success": true,
+  "batch_info": {
+    "start_row": 100,
+    "end_row": 105,
+    "total_generated": 6,
+    "zip_file_name": "test_batch_20241201.zip",
+    "zip_file_url": "https://raw.githubusercontent.com/TrueSightDAO/qr_codes/main/batch_files/test_batch_20241201.zip"
+  },
+  "generated_codes": [
+    "2024_20241201_100",
+    "2024_20241201_101",
+    "2024_20241201_102",
+    "2024_20241201_103",
+    "2024_20241201_104",
+    "2024_20241201_105"
+  ],
+  "email_sent": true,
+  "email_message": "Email notification prepared for test@example.com",
+  "timestamp": "2024-12-01T12:00:00.000000"
+}
+```
+
+#### **Troubleshooting Tests:**
+
+**1. Font/Logo Issues:**
+```bash
+# Check if font files exist
+ls -la *.ttf *.jpeg *.png
+
+# Test font loading
+python -c "
+from PIL import ImageFont
+font = ImageFont.truetype('arial.ttf', 20)
+print('Font loaded successfully')
+"
+```
+
+**2. Google Sheets API Issues:**
+```bash
+# Test Google Sheets connection
+python -c "
+import gspread
+from oauth2client.service_account import ServiceAccountCredentials
+import json
+import os
+
+scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
+credentials = ServiceAccountCredentials.from_json_keyfile_dict(
+    json.loads(os.getenv('GDRIVE_KEY')), scope
+)
+gc = gspread.authorize(credentials)
+print('Google Sheets connection successful')
+"
+```
+
+**3. GitHub API Issues:**
+```bash
+# Test GitHub token
+curl -H "Authorization: token YOUR_GITHUB_TOKEN" \
+  https://api.github.com/user
+```
+
+#### **Performance Testing:**
+
+**1. Small Batch (1-10 QR codes):**
+```bash
+time python batch_webhook_handler.py \
+  --start-row 100 \
+  --end-row 105 \
+  --zip-file-name "small_batch.zip"
+```
+
+**2. Medium Batch (10-50 QR codes):**
+```bash
+time python batch_webhook_handler.py \
+  --start-row 100 \
+  --end-row 150 \
+  --zip-file-name "medium_batch.zip"
+```
+
+**3. Large Batch (50-100 QR codes):**
+```bash
+time python batch_webhook_handler.py \
+  --start-row 100 \
+  --end-row 200 \
+  --zip-file-name "large_batch.zip"
+```
+
+#### **Integration Testing:**
+
+**1. End-to-End Test:**
+```bash
+# 1. Create test data in Google Sheets
+# 2. Run batch webhook handler
+python batch_webhook_handler.py \
+  --start-row 100 \
+  --end-row 105 \
+  --zip-file-name "integration_test.zip" \
+  --digital-signature "YOUR_SIGNATURE" \
+  --requestor-email "test@example.com"
+
+# 3. Verify results
+# - Check generated images in to_upload/
+# - Check zip file creation
+# - Check GitHub upload
+# - Check email notification
+```
+
+**2. Error Handling Test:**
+```bash
+# Test with invalid row numbers
+python batch_webhook_handler.py \
+  --start-row 999999 \
+  --end-row 999999 \
+  --zip-file-name "error_test.zip"
+
+# Test with invalid digital signature
+python batch_webhook_handler.py \
+  --start-row 100 \
+  --end-row 105 \
+  --zip-file-name "invalid_sig_test.zip" \
+  --digital-signature "INVALID_SIGNATURE"
+```
+
+#### **Test Data Management:**
+
+**1. Create Test Data:**
+```python
+# Create test data in Google Sheets
+test_data = [
+    {
+        'qr_code': 'TEST_20241201_001',
+        'product_name': 'Test Product 1',
+        'farm_name': 'Test Farm',
+        'state': 'Test State',
+        'country': 'Test Country',
+        'year': '2024'
+    },
+    # ... more test records
+]
+```
+
+**2. Clean Up Test Data:**
+```bash
+# Remove test files
+rm -rf to_upload/TEST_*
+rm -f test_results.json
+rm -f generated_zip_files/test_*.zip
+```
 
 ## 🆘 **Support**
 
