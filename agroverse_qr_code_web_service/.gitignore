@@ -5,7 +5,7 @@ local_config.py
 
 # Generated QR code images
 to_upload/
-*.png
+to_upload/*.png
 
 # Python cache files
 __pycache__/
