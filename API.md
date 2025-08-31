@@ -114,6 +114,7 @@ const data = await response.json();
 ### 4. Asset Management API
 **Endpoint**: `https://script.google.com/macros/s/AKfycbygmwRbyqse-dpCYMco0rb93NSgg-Jc1QIw7kUiBM7CZK6jnWnMB5DEjdoX_eCsvVs7/exec`
 **Description**: Retrieve voting rights and asset information based on digital signature
+**Source Code**: [tdg_asset_management/web_app.gs](./google_app_scripts/tdg_asset_management/web_app.gs)
 
 **Parameters**:
 - `signature` (required): Base64 encoded public key
@@ -165,6 +166,7 @@ if (data.error) {
 ### 5. QR Code Management API
 **Endpoint**: `https://script.google.com/macros/s/AKfycbxigq4-J0izShubqIC5k6Z7fgNRyVJLakfQ34HPuENiSpxuCG-wSq0g-wOAedZzzgaL/exec`
 **Description**: Manage Agroverse QR codes and retrieve minted codes
+**Source Code**: [agroverse_qr_codes/web_app.gs](./google_app_scripts/agroverse_qr_codes/web_app.gs)
 
 **Parameters**:
 - `list=true`: Returns array of minted QR codes
@@ -220,6 +222,7 @@ const updateData = await updateResponse.json();
 ### 6. Inventory Management API
 **Endpoint**: `https://script.google.com/macros/s/AKfycbztpV3TUIRn3ftNW1aGHAKw32OBJrp_p1Pr9mMAttoyWFZyQgBRPU2T6eGhkmJtz7xV/exec`
 **Description**: List inventory managers and fetch asset data for specific managers
+**Source Code**: [tdg_inventory_management/web_app.gs](./google_app_scripts/tdg_inventory_management/web_app.gs)
 
 **Parameters**:
 - `list=true`: Returns array of inventory managers
@@ -633,3 +636,50 @@ See the following files in the dapp repository for complete implementations:
 - `notarize.html` - Document notarization
 - `verify_request.html` - Request verification
 - `create_signature.html` - Digital signature creation
+
+## Google Apps Script Implementation Details
+
+The Google Apps Script endpoints are implemented as web apps that provide RESTful API access to Google Sheets data. Each endpoint is deployed as a separate web app with specific functionality:
+
+### Asset Management API
+- **File**: [tdg_asset_management/web_app.gs](./google_app_scripts/tdg_asset_management/web_app.gs)
+- **Purpose**: Retrieves voting rights and asset information for DAO members
+- **Data Sources**: 
+  - Contributors contact information sheet
+  - Contributors voting weight sheet
+  - Off-chain asset balance sheet
+  - Wix API for additional asset data
+  - Solana blockchain for USDT vault balance
+
+### QR Code Management API
+- **File**: [agroverse_qr_codes/web_app.gs](./google_app_scripts/agroverse_qr_codes/web_app.gs)
+- **Purpose**: Manages Agroverse QR codes for cacao bag tracking
+- **Data Sources**: Agroverse QR codes sheet
+- **Features**: List minted QR codes, update email associations
+
+### Inventory Management API
+- **File**: [tdg_inventory_management/web_app.gs](./google_app_scripts/tdg_inventory_management/web_app.gs)
+- **Purpose**: Manages inventory movements and asset locations
+- **Data Sources**: 
+  - Off-chain asset location sheet
+  - Contributors contact information sheet
+  - Wix API for ledger configurations
+- **Features**: List managers, list recipients, fetch asset data per manager
+
+### Related Google Apps Script Files
+
+Additional Google Apps Script files that support the ecosystem but are not directly exposed as API endpoints:
+
+- **tdg_asset_management/**: Asset management and tokenization scripts
+  - [tdg_recurring_tokenization_monthly.gs](./google_app_scripts/tdg_asset_management/tdg_recurring_tokenization_monthly.gs) - Monthly tokenization processes
+  - [tdg_expenses_processing.gs](./google_app_scripts/tdg_asset_management/tdg_expenses_processing.gs) - Expense processing automation
+  - [tdg_wix_dashboard.gs](./google_app_scripts/tdg_asset_management/tdg_wix_dashboard.gs) - Wix dashboard integration
+
+- **tdg_inventory_management/**: Inventory and sales processing
+  - [process_sales_telegram_logs.gs](./google_app_scripts/tdg_inventory_management/process_sales_telegram_logs.gs) - Process sales from Telegram logs
+  - [process_movement_telegram_logs.gs](./google_app_scripts/tdg_inventory_management/process_movement_telegram_logs.gs) - Process inventory movements from Telegram logs
+
+- **agroverse_qr_codes/**: QR code management
+  - [subscription_notification.gs](./google_app_scripts/agroverse_qr_codes/subscription_notification.gs) - QR code subscription notifications
+
+For detailed setup and deployment instructions for these Google Apps Scripts, see the README files in each respective directory.

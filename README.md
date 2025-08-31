@@ -2,6 +2,10 @@
 
 This repository contains scripts for automating data management and contribution scoring within the TrueSight DAO Governance (TDG) ecosystem. The project is divided into three main subfolders, each focusing on a specific aspect of the TDG ecosystem:
 
+## API Documentation
+
+For comprehensive API documentation covering all endpoints used by the TrueSight DAO DApp, including request formats, authentication, response examples, and Google Apps Script webhook endpoints, see [API.md](./API.md).
+
  - **[google_app_scripts](./google_app_scripts)**: Modern Google Apps Scripts for managing DAO assets and scoring Telegram/WhatsApp chat logs.
  - **[raydium_market_making](./raydium_market_making)**: Market making strategies for the Raydium AMM on Solana. Contains a TypeScript-based implementation (`raydium_type_script/`) (the default working implementation) and a Python-based experimental implementation (`raydium_py/`) (not maintained). See raydium_market_making/README.md for details.
  - **[la_token_market_making_python](./la_token_market_making_python)**: Python-based market making bot for LA_TOKEN tokens, including the main script and a sandbox notebook. Work on this project is currently on hold as the LA_TOKEN internal engineering team has been unresponsive to our outreach to resolve trade execution issues. See la_token_market_making_python/README.md for setup and usage instructions.
