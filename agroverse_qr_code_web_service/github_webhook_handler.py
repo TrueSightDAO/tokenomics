@@ -208,6 +208,36 @@ class GitHubWebhookHandler:
         # Ensure to_upload directory exists
         os.makedirs(self.workspace, exist_ok=True)
         
+        # Install fonts for GitHub Actions environment
+        self.install_fonts()
+        
+    def install_fonts(self):
+        """Install fonts for GitHub Actions environment"""
+        try:
+            # Check if we're in a GitHub Actions environment
+            if os.environ.get('GITHUB_ACTIONS'):
+                self.log("🔧 Installing fonts for GitHub Actions environment...")
+                
+                # Install DejaVu fonts (common in Linux environments)
+                try:
+                    import subprocess
+                    subprocess.run(['apt-get', 'update'], check=True, capture_output=True)
+                    subprocess.run(['apt-get', 'install', '-y', 'fonts-dejavu-core'], check=True, capture_output=True)
+                    self.log("✅ DejaVu fonts installed successfully")
+                except Exception as e:
+                    self.log(f"⚠️ Could not install DejaVu fonts: {e}")
+                
+                # Install Liberation fonts as alternative
+                try:
+                    subprocess.run(['apt-get', 'install', '-y', 'fonts-liberation'], check=True, capture_output=True)
+                    self.log("✅ Liberation fonts installed successfully")
+                except Exception as e:
+                    self.log(f"⚠️ Could not install Liberation fonts: {e}")
+                    
+        except Exception as e:
+            self.log(f"⚠️ Font installation failed: {e}")
+            self.log("🔄 Continuing with default fonts...")
+    
     def log(self, message):
         """Log message to GitHub Actions output"""
         print(f"[{datetime.now().isoformat()}] {message}")
@@ -261,11 +291,34 @@ class GitHubWebhookHandler:
         
         # Logo configuration
         LOGO_RATIO = 0.2
-        cacao_logo_path = os.path.join(os.path.dirname(__file__), "agroverse_logo.jpeg")
-        non_cacao_logo_path = os.path.join(os.path.dirname(__file__), "truesight_icon.png")
         
-        # Select logo based on item type
-        logo_path = cacao_logo_path if is_cacao else non_cacao_logo_path
+        # Try multiple paths for logo files (GitHub Actions environment)
+        possible_cacao_logo_paths = [
+            os.path.join(os.path.dirname(__file__), "agroverse_logo.jpeg"),
+            os.path.join(os.path.dirname(__file__), "assets", "agroverse_logo.jpeg"),
+            os.path.join(os.getcwd(), "agroverse_logo.jpeg"),
+            os.path.join(os.getcwd(), "assets", "agroverse_logo.jpeg")
+        ]
+        
+        possible_non_cacao_logo_paths = [
+            os.path.join(os.path.dirname(__file__), "truesight_icon.png"),
+            os.path.join(os.path.dirname(__file__), "assets", "truesight_icon.png"),
+            os.path.join(os.getcwd(), "truesight_icon.png"),
+            os.path.join(os.getcwd(), "assets", "truesight_icon.png")
+        ]
+        
+        # Find the first available logo file
+        logo_path = None
+        if is_cacao:
+            for path in possible_cacao_logo_paths:
+                if os.path.exists(path):
+                    logo_path = path
+                    break
+        else:
+            for path in possible_non_cacao_logo_paths:
+                if os.path.exists(path):
+                    logo_path = path
+                    break
         
         # Generate QR code with BASE_QR_CHECK_URL (from batch_compiler.py)
         BASE_QR_CHECK_URL = 'https://edgar.truesight.me/agroverse/qr-code-check?qr_code='
@@ -296,11 +349,19 @@ class GitHubWebhookHandler:
                 lw, lh = logo.size
                 pos = ((qr_w - lw) // 2, (qr_h - lh) // 2)
                 qr_img.paste(logo, pos, logo)
-                self.log(f"Embedded logo: {os.path.basename(logo_path)}")
+                self.log(f"✅ Embedded logo: {os.path.basename(logo_path)}")
             except Exception as e:
-                self.log(f"Warning: Could not embed logo: {e}")
+                self.log(f"⚠️ Warning: Could not embed logo: {e}")
+                self.log(f"📁 Logo path attempted: {logo_path}")
         else:
-            self.log(f"Logo not found: {logo_path}")
+            self.log(f"⚠️ Logo not found. Searched paths:")
+            if is_cacao:
+                for path in possible_cacao_logo_paths:
+                    self.log(f"   - {path} {'✅' if os.path.exists(path) else '❌'}")
+            else:
+                for path in possible_non_cacao_logo_paths:
+                    self.log(f"   - {path} {'✅' if os.path.exists(path) else '❌'}")
+            self.log("🔄 Continuing without logo...")
         
         # Create canvas (white background)
         scale = CANVAS_SCALE
@@ -330,16 +391,61 @@ class GitHubWebhookHandler:
         
         # Helper to load font
         def load_font(size):
-            try:
-                return ImageFont.truetype('cour.ttf', size)  # Prefer Courier New
-            except Exception:
+            # Try local font files first (bundled with the code)
+            local_fonts = [
+                'arial.ttf',  # Local Arial font
+                'arial_bold.ttf',  # Local Arial Bold font
+            ]
+            
+            # Try system fonts as fallback
+            system_fonts = [
+                '/System/Library/Fonts/ArialHB.ttc',  # macOS Arial
+                '/System/Library/Fonts/Courier.ttc',  # macOS Courier
+                '/System/Library/Fonts/Helvetica.ttc',  # macOS Helvetica
+                '/System/Library/Fonts/HelveticaNeue.ttc',  # macOS Helvetica Neue
+                '/System/Library/Fonts/Times.ttc',  # macOS Times
+                '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf',  # Linux DejaVu
+                '/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf',  # Linux Liberation
+                '/usr/share/fonts/TTF/arial.ttf',  # Linux Arial
+                '/usr/share/fonts/TTF/courier.ttf',  # Linux Courier
+            ]
+            
+            self.log(f"🔤 Attempting to load font with size {size}")
+            
+            # Try local fonts first
+            for font_path in local_fonts:
                 try:
-                    return ImageFont.truetype('arial.ttf', size)
-                except Exception:
-                    try:
-                        return ImageFont.truetype('Helvetica.ttc', size)
-                    except Exception:
-                        return ImageFont.load_default()
+                    if os.path.exists(font_path):
+                        self.log(f"✅ Found local font: {font_path}")
+                        font = ImageFont.truetype(font_path, size)
+                        self.log(f"✅ Successfully loaded local font: {font_path} with size {size}")
+                        return font
+                except Exception as e:
+                    self.log(f"❌ Failed to load local font {font_path}: {e}")
+                    continue
+            
+            # Try system fonts as fallback
+            for font_path in system_fonts:
+                try:
+                    if os.path.exists(font_path):
+                        self.log(f"✅ Found system font: {font_path}")
+                        font = ImageFont.truetype(font_path, size)
+                        self.log(f"✅ Successfully loaded system font: {font_path} with size {size}")
+                        return font
+                except Exception as e:
+                    self.log(f"❌ Failed to load system font {font_path}: {e}")
+                    continue
+            
+            # Fallback to default font (works in GitHub Actions)
+            try:
+                self.log("🔄 Falling back to default font")
+                default_font = ImageFont.load_default()
+                self.log("✅ Successfully loaded default font")
+                return default_font
+            except Exception as e:
+                self.log(f"❌ Failed to load default font: {e}")
+                # Ultimate fallback - create a basic font
+                return None
         
         # Prepare text lines (matching batch_compiler.py logic)
         if is_cacao:
@@ -374,6 +480,22 @@ class GitHubWebhookHandler:
         f_plant = load_font(f_plant_size)
         f_serial = load_font(f_serial_size)
         
+        # Ensure we have valid fonts (fallback to default if needed)
+        if f_harvest is None:
+            self.log("⚠️ Harvest font is None, using default")
+            f_harvest = ImageFont.load_default()
+        if f_info is None:
+            self.log("⚠️ Info font is None, using default")
+            f_info = ImageFont.load_default()
+        if f_plant is None:
+            self.log("⚠️ Plant font is None, using default")
+            f_plant = ImageFont.load_default()
+        if f_serial is None:
+            self.log("⚠️ Serial font is None, using default")
+            f_serial = ImageFont.load_default()
+        
+        self.log(f"📝 Fonts loaded - Harvest: {type(f_harvest)}, Info: {type(f_info)}, Plant: {type(f_plant)}, Serial: {type(f_serial)}")
+        
         # Measure text heights
         _, h1 = text_size(harvest_text, f_harvest)
         _, h2 = text_size(info_text, f_info)
@@ -403,16 +525,19 @@ class GitHubWebhookHandler:
         # Draw harvest text (centered horizontally)
         w_harvest, _ = text_size(harvest_text, f_harvest)
         x = (bg_w - w_harvest) // 2
+        self.log(f"🎨 Drawing harvest text: '{harvest_text}' at ({x}, {harvest_y}) with font {type(f_harvest)}")
         draw.text((x, harvest_y), harvest_text, fill="black", font=f_harvest)
         
         # Draw info text (centered horizontally)
         w_info, _ = text_size(info_text, f_info)
         x = (bg_w - w_info) // 2
+        self.log(f"🎨 Drawing info text: '{info_text}' at ({x}, {info_y}) with font {type(f_info)}")
         draw.text((x, info_y), info_text, fill="black", font=f_info)
         
         # Draw planting message (centered horizontally)
         w_plant, _ = text_size(plant_text, f_plant)
         x = (bg_w - w_plant) // 2
+        self.log(f"🎨 Drawing plant text: '{plant_text}' at ({x}, {plant_y}) with font {type(f_plant)}")
         draw.text((x, plant_y), plant_text, fill="black", font=f_plant)
         
         # Draw serial text (vertical, on the right)
