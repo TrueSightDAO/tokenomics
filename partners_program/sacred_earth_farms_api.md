@@ -160,17 +160,20 @@ function base64ToArrayBuffer(base64) {
 After the sale, report the inventory movement for fund transfer:
 
 ```javascript
-async function reportInventoryMovement(amount, stripeTransactionId) {
+async function reportInventoryMovement(amount, stripeTransactionId, latitude, longitude, filename) {
+  const timestamp = new Date().toISOString().replace(/[-:]/g, '').replace(/\..+/, '');
+  const destinationLocation = `https://github.com/TrueSightDAO/.github/tree/main/assets/inventory_${timestamp}_gary_teh_${filename}`;
+  
   const requestText = `[INVENTORY MOVEMENT]
-Contributor: Sacred Earth Farms
-Movement type: Transfer
-Product: USD
-Quantity: ${amount}
-From location: Sacred Earth Farms
-To location: Gary Teh
-Date: ${new Date().toISOString().split('T')[0]}
-Reason: Stripe payment transfer
-Stripe Transaction ID: ${stripeTransactionId}
+- Manager Name: Sacred Earth Farms
+- Recipient Name: Gary Teh
+- Inventory Item: [SEF1] USD
+- Quantity: ${amount}
+- Latitude: ${latitude}
+- Longitude: ${longitude}
+- Attached Filename: ${filename}
+- Destination Inventory File Location: ${destinationLocation}
+- Submission Source: https://dapp.truesight.me/report_inventory_movement.html
 --------`;
 
   // Sign the request
@@ -211,6 +214,44 @@ This submission was generated programmatically by Sacred Earth Farms`;
 }
 ```
 
+## Exact Payload Examples
+
+Here are the exact payload formats that Sacred Earth Farms will generate:
+
+### Sales Event Example
+```
+[SALES EVENT]
+- Item: 2024PF_20250505_28
+- Sales price: $25
+- Sold by: Sacred Earth Farms
+- Attached Filename: None
+- Submission Source: https://dapp.truesight.me/report_sales.html
+--------
+
+My Digital Signature: MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA54jNZdN4xkaPDI9TB/RwuicbbUMvttOWSTVRfvZxiHWeIoqTHRz2WJdoGsuW9rz9QPbpz6T9zQZu3RNzsSF216U3aCd89R2g7qhOMh9VC+7+sNJnI6H4qPPKFbndxQD8262Q+zqYQR6r0k89mud1sYbla/DCtKAcGZsALihVyl8tF2v1rUzfPU9FHpi5ow2kOEpVxnhe6xEY1HDU/zuFRt707WzkG1zit4AWEBXyBd3YLyinPNAb2aBA6dSPnPAQ4aB46Dtis3p5DgkLeO7E4gh/E0BqViDkkB1tLy1dgy9Kjv+5zxo1yTxkBKACjqqo69Q0VrUfkXgegWmXBAu04wIDAQAB
+
+Request Transaction ID: Ne4/MH+5cQu/j0DKE3vUUp4Jq5BVk6wqHmLhhLN5qvEPL6ogtRLJItaV7LAZrdfahOedpBLkmAjw3Do2KNblA0Mftaf2gWzoWZhxIudKbnFQvctHSSaZ0zT48NrNImWB+z8YLo0v/scDepf7gLsqgKrFTd5dcCHFmIxKLZ88d1aI6YhqFT4EKYOFDB4H3wfkCkPWJZ+KcAsk8oT1S+RNOl3fEBam4qFJ1DMGW1/mpY5WYO7D5NOFXDFjn1k0jOf5GSRooDNGlZholcHgHTilRz8VdaEo59fggSCQA/F8uRo1fKK5Hjski0F4869vfQM2L1P4jWd2Kl8EowINAlJK0A==
+```
+
+### Inventory Movement Example
+```
+[INVENTORY MOVEMENT]
+- Manager Name: Sacred Earth Farms
+- Recipient Name: Gary Teh
+- Inventory Item: [SEF1] USD
+- Quantity: 7
+- Latitude: NA
+- Longitude: NA
+- Attached Filename: stripe_transaction_screenshot.png
+- Destination Inventory File Location: https://github.com/TrueSightDAO/.github/tree/main/assets/inventory_20250831152619_gary_teh_stripe_transaction_screenshot.png
+- Submission Source: https://dapp.truesight.me/report_inventory_movement.html
+--------
+
+My Digital Signature: MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA54jNZdN4xkaPDI9TB/RwuicbbUMvttOWSTVRfvZxiHWeIoqTHRz2WJdoGsuW9rz9QPbpz6T9zQZu3RNzsSF216U3aCd89R2g7qhOMh9VC+7+sNJnI6H4qPPKFbndxQD8262Q+zqYQR6r0k89mud1sYbla/DCtKAcGZsALihVyl8tF2v1rUzfPU9FHpi5ow2kOEpVxnhe6xEY1HDU/zuFRt707WzkG1zit4AWEBXyBd3YLyinPNAb2aBA6dSPnPAQ4aB46Dtis3p5DgkLeO7E4gh/E0BqViDkkB1tLy1dgy9Kjv+5zxo1yTxkBKACjqqo69Q0VrUfkXgegWmXBAu04wIDAQAB
+
+Request Transaction ID: GKYxrsumD8rFKayAX9e+/Lt5bHOh23IaRnAmQu+MlxJ3J+JeP73A9IFzJQokDXTm4Ydy1+61n3g80VTMXY29GY/2WdegfyJahv76swrCOOYqRfzUGpWVlRSO0jta2QK0XesP3Y41J6ooiFB+BCjIB2+w7UaDJWrurSTz6Cdq5+e/MIf3HwOIXpRWLa6cQpaVl3cB4B74hKuthqn/3TnbaRi6hAwlR0zNt1jAWCULKg6A7ko2PY6i/h5zv8yYPQEQuo1lTxXbHhKpayF6ZSBoQHZUZ1AyECn98eIidmKA1aF6hplqp1g871bRWLaCfTaF9FtC+JxTvp4XlDEqyLOZbg==
+```
+
 ## Complete Integration Example
 
 Here's a complete example of how to integrate with Stripe webhooks:
@@ -229,8 +270,12 @@ async function handleStripePayment(event) {
       // Report the QR code sale
       await reportQrCodeSale(qrCode, amount, transactionId);
       
+      // Get location data (will be 'NA' for server-side integration)
+      const location = await getLocation();
+      const filename = `stripe_transaction_${transactionId}.png`; // Or get from Stripe receipt
+      
       // Report inventory movement for fund transfer
-      await reportInventoryMovement(amount, transactionId);
+      await reportInventoryMovement(amount, transactionId, location.latitude, location.longitude, filename);
       
       console.log('Successfully reported sale and inventory movement');
     } catch (error) {
@@ -238,6 +283,22 @@ async function handleStripePayment(event) {
       // Implement retry logic or alert system
     }
   }
+}
+
+// Helper function to get location (handles server-side scenarios)
+async function getLocation() {
+  // For server-side/programmatic integration, GPS coordinates are not available
+  // Use 'NA' as default, matching the DApp behavior when location is unavailable
+  return {
+    latitude: 'NA',
+    longitude: 'NA'
+  };
+  
+  // Alternative: Use fixed coordinates for Sacred Earth Farms if preferred
+  // return {
+  //   latitude: -14.276098,
+  //   longitude: -38.990758
+  // };
 }
 ```
 
@@ -320,6 +381,7 @@ When using this document with AI code generation systems, consider the following
 - **Line Endings**: Preserve exact line breaks in request text
 - **Character Encoding**: Use UTF-8 encoding for all text operations
 - **API Endpoints**: Verify endpoint URLs are correct and accessible
+- **Location Handling**: Use 'NA' for latitude/longitude in server-side scenarios (GPS not available)
 
 ### Testing Checklist for Generated Code
 - [ ] Digital signature generation works correctly
