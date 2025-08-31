@@ -109,6 +109,187 @@ const response = await fetch(`${API_ENDPOINT}?signature=${encodeURIComponent(pub
 const data = await response.json();
 ```
 
+## Google Apps Script Webhook Endpoints
+
+### 4. Asset Management API
+**Endpoint**: `https://script.google.com/macros/s/AKfycbygmwRbyqse-dpCYMco0rb93NSgg-Jc1QIw7kUiBM7CZK6jnWnMB5DEjdoX_eCsvVs7/exec`
+**Description**: Retrieve voting rights and asset information based on digital signature
+
+**Parameters**:
+- `signature` (required): Base64 encoded public key
+- `full` (optional): If `true`, returns full asset details; if `false` or omitted, returns only contributor name
+
+**Response Format**:
+```json
+// Success response (contributor name only)
+{
+  "contributor_name": "John Doe"
+}
+
+// Success response (full details with full=true parameter)
+{
+  "contributor_name": "John Doe",
+  "voting_rights": 1000,
+  "voting_rights_circulated": 750,
+  "total_assets": 15000.00000,
+  "asset_per_circulated_voting_right": 20.00000
+}
+
+// Error response
+{
+  "error": "No matching signature found in the database"
+}
+```
+
+**Example**:
+```javascript
+// Get contributor name only
+const response = await fetch('https://script.google.com/macros/s/AKfycbygmwRbyqse-dpCYMco0rb93NSgg-Jc1QIw7kUiBM7CZK6jnWnMB5DEjdoX_eCsvVs7/exec?signature=' + encodeURIComponent(publicKey));
+const data = await response.json();
+
+// Get full asset details
+const fullResponse = await fetch('https://script.google.com/macros/s/AKfycbygmwRbyqse-dpCYMco0rb93NSgg-Jc1QIw7kUiBM7CZK6jnWnMB5DEjdoX_eCsvVs7/exec?signature=' + encodeURIComponent(publicKey) + '&full=true');
+const fullData = await fullResponse.json();
+
+// Handle response
+if (data.error) {
+  console.error('Error:', data.error);
+} else {
+  console.log('Contributor:', data.contributor_name);
+  if (fullData.total_assets) {
+    console.log('Total assets:', fullData.total_assets);
+  }
+}
+```
+
+### 5. QR Code Management API
+**Endpoint**: `https://script.google.com/macros/s/AKfycbxigq4-J0izShubqIC5k6Z7fgNRyVJLakfQ34HPuENiSpxuCG-wSq0g-wOAedZzzgaL/exec`
+**Description**: Manage Agroverse QR codes and retrieve minted codes
+
+**Parameters**:
+- `list=true`: Returns array of minted QR codes
+- `qr_code`: QR code identifier for updating email
+- `email_address`: Email address to associate with QR code
+
+**Response Format**:
+```json
+// Success response for list=true
+{
+  "status": "success",
+  "qr_codes": [
+    "2025BF_20250521_PROPANE_1",
+    "2025BF_20250522_COFFEE_1",
+    "2025BF_20250523_CORN_1",
+    "2025BF_20250524_SOYBEAN_1"
+  ]
+}
+
+// Error response
+{
+  "status": "error",
+  "message": "Failed to retrieve QR codes"
+}
+
+// Success response for email update
+{
+  "status": "success",
+  "message": "QR code email updated successfully"
+}
+```
+
+**Example**:
+```javascript
+// Get list of minted QR codes
+const response = await fetch('https://script.google.com/macros/s/AKfycbxigq4-J0izShubqIC5k6Z7fgNRyVJLakfQ34HPuENiSpxuCG-wSq0g-wOAedZzzgaL/exec?list=true');
+const data = await response.json();
+
+if (data.status === 'error') {
+  throw new Error(data.message);
+}
+
+// Process QR codes
+data.qr_codes.forEach(qrCode => {
+  console.log('QR Code:', qrCode);
+});
+
+// Update QR code email
+const updateResponse = await fetch('https://script.google.com/macros/s/AKfycbxigq4-J0izShubqIC5k6Z7fgNRyVJLakfQ34HPuENiSpxuCG-wSq0g-wOAedZzzgaL/exec?qr_code=2025BF_20250521_PROPANE_1&email_address=user@example.com');
+const updateData = await updateResponse.json();
+```
+
+### 6. Inventory Management API
+**Endpoint**: `https://script.google.com/macros/s/AKfycbztpV3TUIRn3ftNW1aGHAKw32OBJrp_p1Pr9mMAttoyWFZyQgBRPU2T6eGhkmJtz7xV/exec`
+**Description**: List inventory managers and fetch asset data for specific managers
+
+**Parameters**:
+- `list=true`: Returns array of inventory managers
+- `recipients=true`: Returns array of recipient managers
+- `manager=<key>`: Returns asset data for specific manager (URL-encoded manager name)
+
+**Response Format**:
+```json
+// For list=true - List of inventory managers
+{
+  "managers": [
+    {"key": "john_doe_manager", "name": "John Doe"},
+    {"key": "jane_smith_manager", "name": "Jane Smith"},
+    {"key": "bob_wilson_manager", "name": "Bob Wilson"}
+  ]
+}
+
+// For recipients=true - List of recipient managers
+{
+  "recipients": [
+    {"key": "recipient_1", "name": "Recipient One"},
+    {"key": "recipient_2", "name": "Recipient Two"},
+    {"key": "recipient_3", "name": "Recipient Three"}
+  ]
+}
+
+// For manager=<key> - Assets for specific manager
+{
+  "assets": [
+    {"currency": "USD", "amount": 15000.00},
+    {"currency": "BRL", "amount": 75000.00},
+    {"currency": "EUR", "amount": 12000.00}
+  ]
+}
+
+// Error response
+{
+  "error": "Manager not found"
+}
+```
+
+**Example**:
+```javascript
+// Get list of inventory managers
+const managersResponse = await fetch('https://script.google.com/macros/s/AKfycbztpV3TUIRn3ftNW1aGHAKw32OBJrp_p1Pr9mMAttoyWFZyQgBRPU2T6eGhkmJtz7xV/exec?list=true');
+const managers = await managersResponse.json();
+
+// Get recipient managers
+const recipientsResponse = await fetch('https://script.google.com/macros/s/AKfycbztpV3TUIRn3ftNW1aGHAKw32OBJrp_p1Pr9mMAttoyWFZyQgBRPU2T6eGhkmJtz7xV/exec?recipients=true');
+const recipients = await recipientsResponse.json();
+
+// Get assets for specific manager
+const managerKey = encodeURIComponent('John Doe');
+const assetsResponse = await fetch('https://script.google.com/macros/s/AKfycbztpV3TUIRn3ftNW1aGHAKw32OBJrp_p1Pr9mMAttoyWFZyQgBRPU2T6eGhkmJtz7xV/exec?manager=' + managerKey);
+const assets = await assetsResponse.json();
+
+// Handle responses
+if (managers.managers) {
+  managers.managers.forEach(manager => {
+    console.log('Manager:', manager.name, 'Key:', manager.key);
+  });
+}
+
+if (assets.assets) {
+  assets.assets.forEach(asset => {
+    console.log('Asset:', asset.currency, 'Amount:', asset.amount);
+  });
+}
+```
+
 ## Request Types and Formats
 
 ### 1. Voting Rights Withdrawal Request
@@ -334,12 +515,87 @@ async function verifySignature(message, digitalSignature, signatureBase64) {
 
 ## Error Handling
 
+### HTTP Status Codes
+
+- **200 OK**: Request successful
+- **400 Bad Request**: Invalid parameters or malformed request
+- **404 Not Found**: Resource not found
+- **500 Internal Server Error**: Server-side error
+
 ### Common Error Responses
 
-1. **Signature Not Found**: `No matching signature found in the database`
-2. **Invalid Signature Format**: `Invalid digital signature format`
-3. **Network Error**: `Failed to fetch contributor info`
-4. **Server Error**: `The server encountered an error processing your request`
+1. **Signature Not Found**: 
+   ```json
+   {
+     "error": "No matching signature found in the database"
+   }
+   ```
+
+2. **Invalid Signature Format**: 
+   ```json
+   {
+     "error": "Invalid digital signature format"
+   }
+   ```
+
+3. **Network Error**: 
+   ```json
+   {
+     "error": "Failed to fetch contributor info"
+   }
+   ```
+
+4. **Server Error**: 
+   ```json
+   {
+     "error": "The server encountered an error processing your request"
+   }
+   ```
+
+5. **QR Code API Error**:
+   ```json
+   {
+     "status": "error",
+     "message": "Failed to retrieve QR codes"
+   }
+   ```
+
+6. **Manager Not Found**:
+   ```json
+   {
+     "error": "Manager not found"
+   }
+   ```
+
+### Error Handling Best Practices
+
+```javascript
+async function makeApiCall(url) {
+  try {
+    const response = await fetch(url);
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    
+    // Check for API-specific error responses
+    if (data.error) {
+      throw new Error(data.error);
+    }
+    
+    if (data.status === 'error') {
+      throw new Error(data.message);
+    }
+    
+    return data;
+  } catch (error) {
+    console.error('API call failed:', error);
+    throw error;
+  }
+}
+```
 
 ### Offline Mode
 
