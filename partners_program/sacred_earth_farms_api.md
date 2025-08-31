@@ -102,18 +102,12 @@ When a sale occurs, create and sign the sales report:
 
 ```javascript
 async function reportQrCodeSale(qrCode, salePrice, stripeTransactionId) {
-  const requestText = `[SALES REPORT]
-Contributor: Sacred Earth Farms
-Product: ${qrCode}
-Quantity: 1
-Unit price: ${salePrice}
-Total amount: ${salePrice}
-Currency: USD
-Customer: Stripe Customer
-Sale date: ${new Date().toISOString().split('T')[0]}
-Payment method: Stripe
-Stripe Transaction ID: ${stripeTransactionId}
-Additional notes: Automated sale report from Sacred Earth Farms
+  const requestText = `[SALES EVENT]
+- Item: ${qrCode}
+- Sales price: $${salePrice}
+- Sold by: Sacred Earth Farms
+- Attached Filename: None
+- Submission Source: https://dapp.truesight.me/report_sales.html
 --------`;
 
   // Sign the request
