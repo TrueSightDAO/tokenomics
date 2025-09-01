@@ -149,6 +149,7 @@ class BatchWebhookHandler:
                         'country': row[6] if len(row) > 6 else '',
                         'year': row[7] if len(row) > 7 else '',
                         'product_name': row[8] if len(row) > 8 else '',
+                        'github_url': row[10] if len(row) > 10 else '',  # Column K: GitHub URL
                         'product_image': row[18] if len(row) > 18 else '',  # Column S
                         'batch_id': row[20] if len(row) > 20 else '',  # Column U
                         'zip_file_name': row[21] if len(row) > 21 else '',  # Column V
@@ -185,6 +186,7 @@ class BatchWebhookHandler:
                 'country': 'Test Country',
                 'year': str(year),
                 'product_name': 'Test Product',
+                'github_url': f'https://github.com/TrueSightDAO/qr_codes/blob/main/{qr_code_value}.png',
                 'product_image': 'https://example.com/image.jpg',
                 'batch_id': f'BATCH_{date_str}_{today.strftime("%H%M%S")}_ABC123',
                 'zip_file_name': 'test_batch.zip',
@@ -196,6 +198,11 @@ class BatchWebhookHandler:
     def generate_qr_code_image(self, row_data):
         """Generate QR code image for a single row"""
         try:
+            print(f"🔍 DEBUG: Processing row {row_data['row']}")
+            print(f"🔍 DEBUG: QR code value from sheet: '{row_data.get('qr_code_value', 'NOT_FOUND')}'")
+            print(f"🔍 DEBUG: QR code from sheet: '{row_data.get('qr_code', 'NOT_FOUND')}'")
+            print(f"🔍 DEBUG: Full row_data keys: {list(row_data.keys())}")
+            
             # Use the existing GitHubWebhookHandler to generate the image
             result = self.handler.handle_webhook_request(
                 product_name=row_data['product_name'],
@@ -209,7 +216,11 @@ class BatchWebhookHandler:
                 sheet_data=row_data
             )
             
+            print(f"🔍 DEBUG: Result from handle_webhook_request: {result}")
+            
             if result.get('success') and result.get('local_image_path'):
+                print(f"🔍 DEBUG: Generated image path: {result['local_image_path']}")
+                print(f"🔍 DEBUG: Expected QR code: {result.get('qr_code', 'NOT_FOUND')}")
                 return result['local_image_path']
             else:
                 raise Exception(f"Failed to generate image: {result.get('error', 'Unknown error')}")
