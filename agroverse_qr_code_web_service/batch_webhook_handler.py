@@ -137,6 +137,10 @@ class BatchWebhookHandler:
             sheet_data = []
             for i, row in enumerate(rows):
                 if len(row) >= 9:  # Ensure we have minimum required columns
+                    print(f"🔍 DEBUG: Raw row {start_row + i}: {row}")
+                    print(f"🔍 DEBUG: Column A (QR code): '{row[0] if len(row) > 0 else 'EMPTY'}'")
+                    print(f"🔍 DEBUG: Column K (GitHub URL): '{row[10] if len(row) > 10 else 'EMPTY'}'")
+                    
                     sheet_data.append({
                         'row': start_row + i,
                         'qr_code': row[0] if len(row) > 0 else '',
@@ -156,6 +160,8 @@ class BatchWebhookHandler:
                         'digital_signature': row[22] if len(row) > 22 else '',  # Column W
                         'requestor_email': row[23] if len(row) > 23 else ''  # Column X
                     })
+                    
+                    print(f"🔍 DEBUG: Processed row data: {sheet_data[-1]}")
             
             return sheet_data
             

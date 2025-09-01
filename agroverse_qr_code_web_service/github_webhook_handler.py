@@ -57,7 +57,10 @@ def extract_sheet_id(sheet_url: str) -> str:
 
 def parse_github_url(github_url: str):
     """Parse GitHub URL from column K to extract repository and path"""
+    print(f"🔍 DEBUG: parse_github_url input: '{github_url}'")
+    
     if not github_url:
+        print("🔍 DEBUG: No GitHub URL provided")
         return None, None
     
     # Expected format: https://github.com/TrueSightDAO/qr_codes/blob/main/[filename].png
@@ -67,26 +70,39 @@ def parse_github_url(github_url: str):
         if 'github.com' in github_url and '/blob/' in github_url:
             # Format: https://github.com/owner/repo/blob/branch/path
             parts = github_url.split('/')
+            print(f"🔍 DEBUG: Parsing github.com URL, parts: {parts}")
             if len(parts) >= 6:
                 owner = parts[3]
                 repo = parts[4]
                 branch = parts[6]
                 path_parts = parts[7:]
                 path = '/'.join(path_parts)
-                return f"{owner}/{repo}", path
+                result = (f"{owner}/{repo}", path)
+                print(f"🔍 DEBUG: Parsed result: {result}")
+                return result
+            else:
+                print(f"🔍 DEBUG: Not enough parts in URL: {len(parts)} < 6")
         elif 'raw.githubusercontent.com' in github_url:
             # Format: https://raw.githubusercontent.com/owner/repo/branch/path
             parts = github_url.split('/')
+            print(f"🔍 DEBUG: Parsing raw.githubusercontent.com URL, parts: {parts}")
             if len(parts) >= 6:
                 owner = parts[3]
                 repo = parts[4]
                 branch = parts[5]
                 path_parts = parts[6:]
                 path = '/'.join(path_parts)
-                return f"{owner}/{repo}", path
+                result = (f"{owner}/{repo}", path)
+                print(f"🔍 DEBUG: Parsed result: {result}")
+                return result
+            else:
+                print(f"🔍 DEBUG: Not enough parts in URL: {len(parts)} < 6")
+        else:
+            print(f"🔍 DEBUG: URL format not recognized: {github_url}")
     except Exception as e:
         print(f"Warning: Could not parse GitHub URL '{github_url}': {e}")
     
+    print("🔍 DEBUG: Failed to parse GitHub URL")
     return None, None
 
 def fetch_sheet_row(row_number: int):
@@ -745,13 +761,17 @@ class GitHubWebhookHandler:
             # Step 3: Create QR code image
             self.log("Step 3: Creating QR code image...")
             qr_image_path = os.path.join(self.workspace, f"{qr_code_value}.png")
-            self.log(f"Creating QR code at path: {qr_image_path}")
+            self.log(f"🔍 DEBUG: Creating QR code at path: {qr_image_path}")
+            self.log(f"🔍 DEBUG: Expected filename: {qr_code_value}.png")
             self.create_qr_image(qr_code_value, qr_image_path, farm_name, state, country, year, is_cacao)
             
             # Verify the file was created
             if os.path.exists(qr_image_path):
                 self.log(f"✅ QR code image created successfully at: {qr_image_path}")
-                self.log(f"File size: {os.path.getsize(qr_image_path)} bytes")
+                self.log(f"🔍 DEBUG: File size: {os.path.getsize(qr_image_path)} bytes")
+                self.log(f"🔍 DEBUG: Filename from path: {os.path.basename(qr_image_path)}")
+                self.log(f"🔍 DEBUG: Expected filename: {qr_code_value}.png")
+                self.log(f"🔍 DEBUG: Filenames match: {os.path.basename(qr_image_path) == f'{qr_code_value}.png'}")
             else:
                 raise FileNotFoundError(f"QR code image was not created at: {qr_image_path}")
             
@@ -760,7 +780,7 @@ class GitHubWebhookHandler:
                 self.log("Step 4: Uploading to GitHub...")
                 commit_message = f"Add QR code for {product_name}: {qr_code_value} [skip ci]"
                 
-                # Parse GitHub URL from sheet data if available
+                # Use the final path from column K (GitHub URL) directly
                 target_repo = None
                 target_path = None
                 if sheet_data and sheet_data.get('github_url'):
@@ -768,12 +788,17 @@ class GitHubWebhookHandler:
                     if target_repo and target_path:
                         self.log(f"📁 Using target repository: {target_repo}")
                         self.log(f"📁 Using target path: {target_path}")
+                        self.log(f"🔍 DEBUG: Final path from column K: {target_path}")
                     else:
-                        self.log("⚠️ Could not parse GitHub URL from sheet, using defaults")
+                        self.log("⚠️ Could not parse GitHub URL from column K, using defaults")
+                        target_path = f"{qr_code_value}.png"
+                else:
+                    self.log("⚠️ No GitHub URL found in column K, using default path")
+                    target_path = f"{qr_code_value}.png"
                 
                 self.log(f"🔍 DEBUG: qr_code_value: {qr_code_value}")
                 self.log(f"🔍 DEBUG: target_path: {target_path}")
-                self.log(f"🔍 DEBUG: Final path will be: {target_path or f'{qr_code_value}.png'}")
+                self.log(f"🔍 DEBUG: Final path will be: {target_path}")
                 
                 upload_result = self.upload_to_github(qr_code_value, qr_image_path, commit_message, target_repo, target_path)
             
