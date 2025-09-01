@@ -14,7 +14,10 @@ const GITHUB_REPO = 'TrueSightDAO/tokenomics'; // GitHub repository (owner/repo 
 // These are the actual spreadsheet URLs - usually don't need to change:
 
 const SPREADSHEET_URL = 'https://docs.google.com/spreadsheets/d/1qbZZhf-_7xzmDTriaJVWj6OZshyQsFkdsAV8-pyzASQ/edit?gid=1703901725#gid=1703901725'; // Main spreadsheet URL
-const AGROVERSE_QR_SPREADSHEET_URL = 'https://docs.google.com/spreadsheets/d/1qSi_-VSj7yiJl0Ak-Q3lch-l4mrH37cEw8EmQwS_6a4/edit?gid=472328231#gid=472328231'; // Agroverse QR codes spreadsheet
+
+//const AGROVERSE_QR_SPREADSHEET_URL = 'https://docs.google.com/spreadsheets/d/1qSi_-VSj7yiJl0Ak-Q3lch-l4mrH37cEw8EmQwS_6a4/edit?gid=472328231#gid=472328231'; // Agroverse QR codes spreadsheet - SANDBOX
+const AGROVERSE_QR_SPREADSHEET_URL = 'https://docs.google.com/spreadsheets/d/1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU/edit?gid=472328231#gid=472328231'; // Agroverse QR codes spreadsheet - PRODUCTION
+
 const CONTRIBUTORS_SIGNATURES_URL = 'https://docs.google.com/spreadsheets/d/1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU/edit?gid=577022511#gid=577022511'; // Contributors Digital Signatures spreadsheet
 const GITHUB_REPO_URL = 'https://github.com/TrueSightDAO/qr_codes/blob/main/'; // GitHub repository URL
 
@@ -165,6 +168,13 @@ function processQRCodeGenerationTelegramLogs() {
       Logger.log(`Message ID already processed: ${messageId}`);
       return;
     }
+    
+    // Check if message is already in QR Code Generation tab
+    const existingRow = findExistingQRCodeGenerationRow(messageId);
+    if (existingRow) {
+      Logger.log(`Message ID ${messageId} already exists in QR Code Generation tab at row ${existingRow}`);
+      return;
+    }
 
     if (contributionMade && contributionMade.startsWith("[BATCH QR CODE REQUEST]")) {
       Logger.log(contributionMade);
@@ -201,9 +211,9 @@ function processQRCodeGenerationTelegramLogs() {
         currency, // I - Currency
         "", // J - Zip File Download URL (will be filled when completed)
         expectedZipFile, // K - Expected Zip File
-        downloadLocation, // L - Download Location
-        "PENDING", // M - Status
-        "Queued for QR code generation" // N - Processing Notes
+        "PENDING - Queued for QR code generation", // L - Status (includes processing notes)
+        "", // M - Status (empty - moved to Column L)
+        "" // N - Processing Notes (empty)
       ]);
 
       const qrCodeGenerationRowNumber = qrCodeGenerationTab.getLastRow();
@@ -299,9 +309,11 @@ function updateQRCodeGenerationStatus(messageId, status, processingNotes) {
     if (messageIds[i] === messageId) {
       const rowNumber = i + 2; // Convert to spreadsheet row number
       
-      // Update Status (Column M) and Processing Notes (Column N)
-      qrCodeGenerationTab.getRange(rowNumber, 13).setValue(status); // Status
-      qrCodeGenerationTab.getRange(rowNumber, 14).setValue(processingNotes); // Processing Notes
+      // Update Status (Column L) with status and processing notes combined
+      const combinedStatus = processingNotes ? `${status} - ${processingNotes}` : status;
+      qrCodeGenerationTab.getRange(rowNumber, 12).setValue(combinedStatus); // Status (Column L)
+      qrCodeGenerationTab.getRange(rowNumber, 13).setValue(""); // Status (Column M) - leave empty
+      qrCodeGenerationTab.getRange(rowNumber, 14).setValue(""); // Processing Notes (Column N) - leave empty
       
       Logger.log(`Updated status for message ID ${messageId} to ${status}`);
       return true;
@@ -553,11 +565,11 @@ function createQRCodeRow(qrCodeValue, currencyData, batchId, zipFileName, contri
     currencyData.product_image, // Column S: Product image from column D
     25, // Column T: Price (default value)
     contributorName, // Column U: Requester Name (from Contributors Digital Signatures)
-    batchId, // Column V: Batch ID
-    zipFileName, // Column W: Zip file name
-    '', // Column X: Requestor email (placeholder)
-    messageId, // Column Y: Request transaction ID
-    'Telegram Logs Processing' // Column Z: Submission source
+    '', // Column V: (empty - no batch ID)
+    '', // Column W: (empty - no zip file name)
+    '', // Column X: (empty - no requestor email)
+    '', // Column Y: (empty - no message ID)
+    '' // Column Z: (empty - no submission source)
   ];
 }
 
@@ -868,6 +880,8 @@ function updateAgroverseQRLines(messageId, startLine, endLine) {
 // ===== Test Functions =====
 
 // Function to test processing of a specific row from Telegram Chat Logs
+// ⚠️ IMPORTANT: This function will NOT process records that have already been processed
+// It checks the QR Code Generation tab for existing message IDs and skips duplicates
 function testProcessSpecificRow(rowNumber = 6479) {
   try {
     Logger.log(`=== Testing Processing of Row ${rowNumber} ===`);
@@ -959,8 +973,18 @@ function testProcessSpecificRow(rowNumber = 6479) {
         }
       }
       
-      // Add to QR Code Generation tab
+      // Check if this message ID has already been processed
       const messageId = rowData[3]; // Column D
+      Logger.log(`🔍 Checking if message ID ${messageId} has already been processed...`);
+      const existingRow = findExistingQRCodeGenerationRow(messageId);
+      if (existingRow) {
+        Logger.log(`⚠️ Message ID ${messageId} already exists in QR Code Generation tab at row ${existingRow}`);
+        Logger.log(`⏭️ Skipping processing - record already exists`);
+        return `⚠️ Message ID ${messageId} already processed. Record exists at row ${existingRow}. Skipping to prevent duplicate processing.`;
+      }
+      Logger.log(`✅ Message ID ${messageId} not found in existing records - proceeding with processing`);
+      
+      // Add to QR Code Generation tab
       qrCodeGenerationTab.appendRow([
         rowData[0], // A - Telegram Update ID
         rowData[1], // B - Telegram Chatroom ID
@@ -973,9 +997,9 @@ function testProcessSpecificRow(rowNumber = 6479) {
         currency, // I - Currency
         "", // J - Zip File Download URL (will be filled when completed)
         expectedZipFile, // K - Expected Zip File
-        downloadLocation, // L - Download Location
-        "PENDING", // M - Status
-        "Queued for QR code generation" // N - Processing Notes
+        "PENDING - Queued for QR code generation", // L - Status (includes processing notes)
+        "", // M - Status (empty - moved to Column L)
+        "" // N - Processing Notes (empty)
       ]);
       
       const qrCodeGenerationRowNumber = qrCodeGenerationTab.getLastRow();
@@ -1300,5 +1324,37 @@ function testRowRange(startRow = 100, endRow = 200) {
   } catch (error) {
     Logger.log(`❌ Range test error: ${error.message}`);
     return `Error: ${error.message}`;
+  }
+}
+
+// Function to find existing QR Code Generation row
+function findExistingQRCodeGenerationRow(messageId) {
+  try {
+    const sheet = SpreadsheetApp.openByUrl(SPREADSHEET_URL);
+    const qrCodeGenerationTab = sheet.getSheetByName(qrCodeGenerationTabName);
+    
+    if (!qrCodeGenerationTab) {
+      Logger.log("QR Code Generation tab not found");
+      return null;
+    }
+
+    const lastRow = qrCodeGenerationTab.getLastRow();
+    if (lastRow < 2) {
+      return null; // No data rows
+    }
+
+    const dataRange = qrCodeGenerationTab.getRange(2, 4, lastRow - 1, 1); // Column D (Message ID)
+    const messageIds = dataRange.getValues().flat();
+
+    for (let i = 0; i < messageIds.length; i++) {
+      if (messageIds[i] === messageId) {
+        return i + 2; // Return the actual row number
+      }
+    }
+
+    return null; // Message ID not found
+  } catch (error) {
+    Logger.log(`Error checking for existing QR Code Generation row: ${error.message}`);
+    return null;
   }
 }
