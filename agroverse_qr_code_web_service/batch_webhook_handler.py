@@ -167,39 +167,10 @@ class BatchWebhookHandler:
             
         except Exception as e:
             print(f"❌ Error fetching sheet data: {e}")
-            # Fallback to simulated data for testing
-            return self.get_simulated_sheet_data(start_row, end_row)
+            # Don't fallback to simulated data - let it crash with clear error
+            raise Exception(f"Failed to fetch sheet data: {e}. Make sure gspread and oauth2client are installed and GDRIVE_KEY environment variable is set.")
     
-    def get_simulated_sheet_data(self, start_row, end_row):
-        """Generate simulated sheet data for testing"""
-        data = []
-        for i in range(start_row, end_row + 1):
-            # Generate a realistic QR code value based on current date and row number
-            today = datetime.now()
-            date_str = today.strftime('%Y%m%d')
-            year = today.year
-            qr_code_value = f'{year}_{date_str}_{i:03d}'
-            
-            data.append({
-                'row': i,
-                'qr_code': qr_code_value,
-                'qr_code_value': qr_code_value,  # Add this for GitHubWebhookHandler compatibility
-                'landing_page': 'https://agroverse.com/product/test',
-                'ledger': 'Test Ledger',
-                'status': 'MINTED',
-                'farm_name': 'Test Farm',
-                'state': 'Test State',
-                'country': 'Test Country',
-                'year': str(year),
-                'product_name': 'Test Product',
-                'github_url': f'https://github.com/TrueSightDAO/qr_codes/blob/main/{qr_code_value}.png',
-                'product_image': 'https://example.com/image.jpg',
-                'batch_id': f'BATCH_{date_str}_{today.strftime("%H%M%S")}_ABC123',
-                'zip_file_name': 'test_batch.zip',
-                'digital_signature': 'test_signature',
-                'requestor_email': 'test@example.com'
-            })
-        return data
+    # Removed get_simulated_sheet_data method - no more fallback to fake data
     
     def generate_qr_code_image(self, row_data):
         """Generate QR code image for a single row"""
