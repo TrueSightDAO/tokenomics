@@ -591,6 +591,12 @@ class GitHubWebhookHandler:
         path = target_path or f"{qr_code_value}.png"
         api_url = f"https://api.github.com/repos/{repo}/contents/{path}"
         
+        self.log(f"🔍 DEBUG: Final upload details:")
+        self.log(f"🔍 DEBUG: - qr_code_value: {qr_code_value}")
+        self.log(f"🔍 DEBUG: - target_path: {target_path}")
+        self.log(f"🔍 DEBUG: - final path: {path}")
+        self.log(f"🔍 DEBUG: - api_url: {api_url}")
+        
         # Prepare payload
         payload = {
             "message": commit_message,
@@ -764,6 +770,10 @@ class GitHubWebhookHandler:
                         self.log(f"📁 Using target path: {target_path}")
                     else:
                         self.log("⚠️ Could not parse GitHub URL from sheet, using defaults")
+                
+                self.log(f"🔍 DEBUG: qr_code_value: {qr_code_value}")
+                self.log(f"🔍 DEBUG: target_path: {target_path}")
+                self.log(f"🔍 DEBUG: Final path will be: {target_path or f'{qr_code_value}.png'}")
                 
                 upload_result = self.upload_to_github(qr_code_value, qr_image_path, commit_message, target_repo, target_path)
             
