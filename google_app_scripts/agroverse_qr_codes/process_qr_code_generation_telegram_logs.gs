@@ -232,7 +232,7 @@ function processQRCodeGenerationTelegramLogs() {
           
           // Send email notification to the requester
           try {
-            const contributorEmail = getContributorEmailFromSignature(digitalSignature);
+            const contributorEmail = getContributorEmailFromSignature(publicSignature);
             if (contributorEmail) {
               const emailResult = sendEmailNotification(
                 contributorEmail,
@@ -737,18 +737,23 @@ function getContributorEmailFromSignature(digitalSignature) {
     
     // Search for digital signature in Column E
     const dataRange = sheet.getRange(2, 5, lastRow - 1, 2).getValues(); // Columns E and F
+    Logger.log(`Searching for digital signature: ${digitalSignature}`);
+    Logger.log(`Found ${dataRange.length} rows in Contributors Digital Signatures sheet`);
     
     for (let i = 0; i < dataRange.length; i++) {
       const signature = dataRange[i][0] ? dataRange[i][0].toString().trim() : '';
       const email = dataRange[i][1] ? dataRange[i][1].toString().trim() : '';
       
+      Logger.log(`Row ${i + 2}: Signature='${signature}', Email='${email}'`);
+      
       if (signature === digitalSignature && email) {
-        Logger.log(`Found email for signature: ${email}`);
+        Logger.log(`✅ Found email for signature: ${email}`);
         return email;
       }
     }
     
-    Logger.log(`No email found for digital signature: ${digitalSignature}`);
+    Logger.log(`❌ No email found for digital signature: ${digitalSignature}`);
+    Logger.log(`Available signatures: ${dataRange.map(row => row[0]).filter(s => s).join(', ')}`);
     return null;
     
   } catch (error) {
@@ -793,7 +798,11 @@ TrueSight DAO QR Code System
     
     // TODO: Implement actual email sending
     // Example with Gmail:
-    // GmailApp.sendEmail(email, subject, body);
+    GmailApp.sendEmail(email, subject, body);
+    
+    Logger.log(`📧 Email notification prepared for: ${email}`);
+    Logger.log(`📧 Subject: ${subject}`);
+    Logger.log(`📧 Body length: ${body.length} characters`);
     
     return {
       success: true,
@@ -997,6 +1006,7 @@ function testProcessSpecificRow(rowNumber = 6479) {
         // Send email notification to the requester
         try {
           const contributorEmail = getContributorEmailFromSignature(publicSignature);
+          Logger.log("Email sending to : " + contributorEmail);
           if (contributorEmail) {
             const emailResult = sendEmailNotification(
               contributorEmail,
