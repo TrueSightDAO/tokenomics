@@ -126,8 +126,12 @@ class BatchWebhookHandler:
             )
             gc = gspread.authorize(credentials)
             
-            # Open the spreadsheet
-            spreadsheet_url = 'https://docs.google.com/spreadsheets/d/1qSi_-VSj7yiJl0Ak-Q3lch-l4mrH37cEw8EmQwS_6a4/edit'
+            # SANDBOX - Open the spreadsheet
+            # spreadsheet_url = 'https://docs.google.com/spreadsheets/d/1qSi_-VSj7yiJl0Ak-Q3lch-l4mrH37cEw8EmQwS_6a4/edit'
+
+            # PRODUCTION - Open the spreadsheet
+            spreadsheet_url = 'https://docs.google.com/spreadsheets/d/1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU/edit?gid=472328231#gid=472328231'
+
             sheet = gc.open_by_url(spreadsheet_url).worksheet('Agroverse QR codes')
             
             # Fetch the rows
