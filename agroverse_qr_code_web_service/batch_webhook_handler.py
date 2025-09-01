@@ -140,6 +140,7 @@ class BatchWebhookHandler:
                     sheet_data.append({
                         'row': start_row + i,
                         'qr_code': row[0] if len(row) > 0 else '',
+                        'qr_code_value': row[0] if len(row) > 0 else '',  # Add this for GitHubWebhookHandler compatibility
                         'landing_page': row[1] if len(row) > 1 else '',
                         'ledger': row[2] if len(row) > 2 else '',
                         'status': row[3] if len(row) > 3 else '',
@@ -166,19 +167,26 @@ class BatchWebhookHandler:
         """Generate simulated sheet data for testing"""
         data = []
         for i in range(start_row, end_row + 1):
+            # Generate a realistic QR code value based on current date and row number
+            today = datetime.now()
+            date_str = today.strftime('%Y%m%d')
+            year = today.year
+            qr_code_value = f'{year}_{date_str}_{i:03d}'
+            
             data.append({
                 'row': i,
-                'qr_code': f'2024_20241201_{i:03d}',
+                'qr_code': qr_code_value,
+                'qr_code_value': qr_code_value,  # Add this for GitHubWebhookHandler compatibility
                 'landing_page': 'https://agroverse.com/product/test',
                 'ledger': 'Test Ledger',
                 'status': 'MINTED',
                 'farm_name': 'Test Farm',
                 'state': 'Test State',
                 'country': 'Test Country',
-                'year': '2024',
+                'year': str(year),
                 'product_name': 'Test Product',
                 'product_image': 'https://example.com/image.jpg',
-                'batch_id': 'BATCH_20241201_120000_ABC123',
+                'batch_id': f'BATCH_{date_str}_{today.strftime("%H%M%S")}_ABC123',
                 'zip_file_name': 'test_batch.zip',
                 'digital_signature': 'test_signature',
                 'requestor_email': 'test@example.com'
