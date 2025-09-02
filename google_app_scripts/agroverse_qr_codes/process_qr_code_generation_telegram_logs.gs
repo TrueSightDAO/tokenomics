@@ -20,6 +20,7 @@ const AGROVERSE_QR_SPREADSHEET_URL = 'https://docs.google.com/spreadsheets/d/1GE
 
 const CONTRIBUTORS_SIGNATURES_URL = 'https://docs.google.com/spreadsheets/d/1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU/edit?gid=577022511#gid=577022511'; // Contributors Digital Signatures spreadsheet
 const GITHUB_REPO_URL = 'https://github.com/TrueSightDAO/qr_codes/blob/main/'; // GitHub repository URL
+const ZIP_FILE_DOWNLOAD_BASE_URL = 'https://raw.githubusercontent.com/TrueSightDAO/qr_codes/main/batch_files/'; // Base URL for zip file downloads
 
 // Tab names
 const telegramLogTabName = "Telegram Chat Logs";
@@ -76,12 +77,12 @@ function sendQRCodeGenerationNotification(rowData, qrCodeGenerationRowNumber) {
     `Chatroom Name: ${rowData[2]}\n` +
     `Message ID: ${rowData[3]}\n` +
     `Contributor Handle: ${rowData[4]}\n` +
-    `Contributor Name: ${rowData[9]}\n` +
-    `Currency: ${rowData[10]}\n` +
-    `Quantity: ${rowData[11]}\n` +
-    `Expected Zip File: ${rowData[12]}\n` +
-    `Download Location: ${rowData[13]}\n` +
-    `Status: ${rowData[14]}\n\n` +
+    `Contributor Name: ${rowData[7]}\n` +
+    `Currency: ${rowData[8]}\n` +
+    `Quantity: ${rowData[9]}\n` +
+    `Expected Zip File: ${rowData[10]}\n` +
+    `Download Location: ${rowData[11]}\n` +
+    `Status: ${rowData[12]}\n\n` +
     `Review here: ${outputSheetLink}`;
 
   const payload = {
@@ -436,7 +437,7 @@ function createQRCodeRecordsInAgroverse(currencyName, quantity, contributorName,
       success: true,
       batch_id: batchId,
       zip_file_name: zipFileName,
-      zip_file_url: GITHUB_REPO_URL.replace('/blob/', '/tree/') + 'batch_files/' + zipFileName,
+      zip_file_url: ZIP_FILE_DOWNLOAD_BASE_URL + zipFileName,
       start_row: startRow,
       end_row: startRow + quantity - 1,
       generated_codes: generatedRows,
