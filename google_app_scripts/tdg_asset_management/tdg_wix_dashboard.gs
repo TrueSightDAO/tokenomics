@@ -69,33 +69,32 @@ function resolveRedirect(url) {
 }
 
 /**
- * Fetches unique ledger URLs from the ledger_url column in Wix AgroverseShipments.
+ * Fetches unique ledger URLs from the contract_url column in Wix AgroverseShipments.
  * @return {Array<string>} Array of unique ledger URLs.
  */
 function getLedgerUrlsFromWix() {
-  var options = getWixRequestHeader();
-  var request_url = "https://www.wixapis.com/wix-data/v2/items/query?dataCollectionId=AgroverseShipments";
-  
-  var payload = {
-    "query": {
-      "fields": ["ledger_url"]
-    }
+  var options = {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': wixAccessToken,
+      'wix-account-id': '0e2cde5f-b353-468b-9f4e-36835fc60a0e',
+      'wix-site-id': 'd45a189f-d0cc-48de-95ee-30635a95385f'
+    },
+    payload: JSON.stringify({})
   };
-  
-  options.payload = JSON.stringify(payload);
-  options.method = 'POST';
-  
+  var request_url = "https://www.wixapis.com/wix-data/v2/items/query?dataCollectionId=AgroverseShipments";
+
   try {
     var response = UrlFetchApp.fetch(request_url, options);
     var content = response.getContentText();
     var response_obj = JSON.parse(content);
-    
-    // Extract unique ledger URLs
+
     var ledgerUrls = response_obj.dataItems
-      .map(item => item.data.ledger_url)
-      .filter(url => url && url !== '') // Remove empty or null URLs
-      .filter((url, index, self) => self.indexOf(url) === index); // Ensure uniqueness
-    
+      .map(item => item.data.contract_url)
+      .filter(url => url && url !== '')
+      .filter((url, index, self) => self.indexOf(url) === index);
+
     Logger.log("Unique Ledger URLs fetched from Wix: " + ledgerUrls);
     return ledgerUrls;
   } catch (e) {
@@ -112,9 +111,16 @@ function getLedgerUrlsFromWix() {
 function getTrueSightDAOEquityHoldings(ledgerUrls) {
   var balances = [];
   
-  ledgerUrls.forEach(function(url) {
+  Logger.log("Starting getTrueSightDAOEquityHoldings with " + ledgerUrls.length + " ledger URLs");
+  Logger.log("Ledger URLs: " + JSON.stringify(ledgerUrls));
+  
+  ledgerUrls.forEach(function(url, index) {
+    Logger.log(`Processing ledger URL ${index + 1}: ${url}`);
+    
     // Resolve the redirect URL to get the actual Google Sheet URL
     var resolvedUrl = resolveRedirect(url);
+    Logger.log(`Resolved URL: ${resolvedUrl}`);
+    
     if (!resolvedUrl || !resolvedUrl.includes('docs.google.com/spreadsheets')) {
       Logger.log(`Skipping invalid or non-spreadsheet URL: ${resolvedUrl}`);
       return;
@@ -130,26 +136,43 @@ function getTrueSightDAOEquityHoldings(ledgerUrls) {
         return;
       }
       
+      Logger.log(`Successfully opened Balance sheet from: ${resolvedUrl}`);
+      
       // Get all data from the Balance sheet
       var data = balanceSheet.getDataRange().getValues();
+      Logger.log(`Balance sheet has ${data.length} rows of data`);
+      
+      // Log first few rows to see the structure
+      for (var j = 0; j < Math.min(5, data.length); j++) {
+        Logger.log(`Row ${j}: [${data[j][0]}, ${data[j][1]}, ${data[j][2]}]`);
+      }
       
       // Find rows where Column A = "TrueSight DAO" and Column C = "USD"
+      var foundTrueSightDAO = false;
       for (var i = 0; i < data.length; i++) {
         if (data[i][0] === "TrueSight DAO" && data[i][2] === "USD") {
+          foundTrueSightDAO = true;
           var balance = data[i][1]; // Column B value
+          Logger.log(`Found TrueSight DAO row at index ${i}: balance=${balance}, type=${typeof balance}`);
           if (typeof balance === 'number') {
             balances.push(balance);
             Logger.log(`TrueSight DAO USD balance from ${resolvedUrl}: ${balance}`);
           } else {
-            Logger.log(`Invalid balance value for TrueSight DAO in ${resolvedUrl}`);
+            Logger.log(`Invalid balance value for TrueSight DAO in ${resolvedUrl}: ${balance} (type: ${typeof balance})`);
           }
         }
       }
+      
+      if (!foundTrueSightDAO) {
+        Logger.log(`No TrueSight DAO row found in ${resolvedUrl}`);
+      }
+      
     } catch (e) {
       Logger.log(`Error accessing spreadsheet ${resolvedUrl}: ${e.message}`);
     }
   });
   
+  Logger.log(`getTrueSightDAOEquityHoldings returning ${balances.length} balances: ${JSON.stringify(balances)}`);
   return balances;
 }
 
@@ -158,8 +181,14 @@ function getTrueSightDAOEquityHoldings(ledgerUrls) {
  * @return {number} Total USD value of TrueSight DAO holdings across all ledgers.
  */
 function getInvestmentHoldingsInAGL() {
+  Logger.log("Starting getInvestmentHoldingsInAGL...");
+  
   var ledgerUrls = getLedgerUrlsFromWix();
+  Logger.log("Retrieved " + ledgerUrls.length + " ledger URLs");
+  
   var equityHoldings = getTrueSightDAOEquityHoldings(ledgerUrls);
+  Logger.log("Retrieved " + equityHoldings.length + " equity holdings: " + JSON.stringify(equityHoldings));
+  
   var totalHoldings = equityHoldings.reduce(function(sum, balance) {
     return sum + balance;
   }, 0);
@@ -194,6 +223,12 @@ function getTdgTokensIssued() {
   });
   Logger.log("Total TDG issued: " + assets[0]);      
   return assets[0];
+}
+
+function getVotingRightsCirculated() {
+  var votingRightsCirculated = tdgIssuedBalanceTab.getRange('E1').getValue();
+  Logger.log("Voting rights circulated: " + votingRightsCirculated);
+  return votingRightsCirculated;
 }
 
 function getUSDTBalanceInVault() {
@@ -344,11 +379,19 @@ function updateAssetPerIssuedTdg() {
 }
 
 function calculateAssetPerIssuedTdg() {
-  var total_assets = getOffChainAssetValue();
-  var total_tdg_issed = getTdgTokensIssued();
-  var net_assets_per_issued_tdg = total_assets/total_tdg_issed;
-  Logger.log("Calculated Net Assets Per TDG issued: " + net_assets_per_issued_tdg);    
-  return total_assets/total_tdg_issed;
+  // Calculate total_assets as off-chain assets + USDT vault balance + AGL investment holdings
+  Logger.log("Off chain asset: " + getOffChainAssetValue()) 
+  Logger.log("USDT in vault: " + getUSDTBalanceInVault()) 
+  Logger.log("Investment holdings in AGL: " + getInvestmentHoldingsInAGL()) 
+
+  var total_assets = getOffChainAssetValue() + getUSDTBalanceInVault() + getInvestmentHoldingsInAGL();
+  var voting_rights_circulated = getVotingRightsCirculated();
+  
+  // Calculate asset_per_circulated_voting_right with zero division check
+  var asset_per_circulated_voting_right = voting_rights_circulated !== 0 ? total_assets / voting_rights_circulated : 0;
+  
+  Logger.log("Calculated Asset Per Circulated Voting Right: " + asset_per_circulated_voting_right);    
+  return asset_per_circulated_voting_right;
 }
 
 function getAssetPerIssuedTdgBalanceOnWix() {
@@ -671,4 +714,5 @@ function getUSTreasuryYieldOnWix() {
   var response_obj = JSON.parse(content);  
   Logger.log("US Treasury Yield on Wix: " + response_obj.dataItem.data.exchangeRate);  
   return response_obj.dataItem.data.exchangeRate;
+}
 }
