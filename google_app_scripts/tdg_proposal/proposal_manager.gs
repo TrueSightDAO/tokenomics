@@ -54,19 +54,6 @@ function doGet(e) {
   }
 }
 
-/**
- * Handle OPTIONS requests for CORS preflight
- */
-function doOptions(e) {
-  return ContentService
-    .createTextOutput('')
-    .setMimeType(ContentService.MimeType.TEXT)
-    .setHeaders({
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type'
-    });
-}
 
 /**
  * Handle listing all open proposals
@@ -169,7 +156,7 @@ function handleFetchProposal(prNumber) {
 }
 
 /**
- * Create a success response with CORS headers
+ * Create a success response (simple format like working web_app.gs)
  */
 function createSuccessResponse(data) {
   return ContentService
@@ -177,16 +164,11 @@ function createSuccessResponse(data) {
       success: true,
       data: data
     }))
-    .setMimeType(ContentService.MimeType.JSON)
-    .setHeaders({
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type'
-    });
+    .setMimeType(ContentService.MimeType.JSON);
 }
 
 /**
- * Create an error response with CORS headers
+ * Create an error response (simple format like working web_app.gs)
  */
 function createErrorResponse(message) {
   return ContentService
@@ -194,12 +176,7 @@ function createErrorResponse(message) {
       success: false,
       error: message
     }))
-    .setMimeType(ContentService.MimeType.JSON)
-    .setHeaders({
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type'
-    });
+    .setMimeType(ContentService.MimeType.JSON);
 }
 
 /**
@@ -1630,4 +1607,20 @@ function testWebAppEndpoints() {
   }
   
   Logger.log('🎉 Web app endpoint testing completed');
+}
+
+/**
+ * Test CORS headers directly
+ */
+function testCORSHeaders() {
+  Logger.log('🧪 Testing CORS headers...');
+  
+  try {
+    const result = createSuccessResponse({ test: 'CORS headers test' });
+    Logger.log('✅ CORS headers function working');
+    Logger.log(`Headers: ${JSON.stringify(result.getHeaders())}`);
+    Logger.log(`Content: ${result.getContent()}`);
+  } catch (error) {
+    Logger.log(`❌ CORS headers test failed: ${error.message}`);
+  }
 }
