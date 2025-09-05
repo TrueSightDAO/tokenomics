@@ -2461,11 +2461,54 @@ function testProcessSpecificDAppSubmissionFully(lineNumber) {
       }
     } else if (submissionData.type === 'PROPOSAL_VOTE') {
       Logger.log(`🗳️ Vote submission processed: ${submissionData.vote} for "${submissionData.proposalTitle}"`);
-      return {
-        success: true,
-        message: `Vote submission processed`,
-        submissionData: submissionData
-      };
+      
+      // Submit vote to GitHub if we have the PR number
+      if (submissionData.pullRequestNumber) {
+        try {
+          Logger.log(`🎯 Submitting vote to GitHub PR #${submissionData.pullRequestNumber}`);
+          const config = getConfiguration();
+          const voteText = `[PROPOSAL VOTE]\nProposal: ${submissionData.proposalTitle}\nVote: ${submissionData.vote}\nDigital Signature: ${submissionData.digitalSignature}\nTransaction ID: ${submissionData.transactionId}\n---------`;
+          const result = submitVote(submissionData.pullRequestNumber, voteText, config);
+          
+          if (result.success) {
+            // Update the row status
+            const lastRow = proposalSubmissionsSheet.getLastRow();
+            proposalSubmissionsSheet.getRange(lastRow, 11).setValue('Voted');
+            
+            Logger.log(`🎉 Submitted vote to GitHub PR #${submissionData.pullRequestNumber}`);
+            Logger.log(`🔗 PR URL: https://github.com/TrueSightDAO/proposals/pull/${submissionData.pullRequestNumber}`);
+            
+            return {
+              success: true,
+              message: `Vote submitted to GitHub PR #${submissionData.pullRequestNumber}`,
+              prNumber: submissionData.pullRequestNumber,
+              prUrl: `https://github.com/TrueSightDAO/proposals/pull/${submissionData.pullRequestNumber}`,
+              submissionData: submissionData
+            };
+          } else {
+            Logger.log(`❌ Error submitting vote to GitHub: ${result.error}`);
+            return {
+              success: false,
+              message: `Failed to submit vote to GitHub: ${result.error}`,
+              submissionData: submissionData
+            };
+          }
+        } catch (error) {
+          Logger.log(`❌ Error submitting vote to GitHub: ${error.message}`);
+          return {
+            success: false,
+            message: `Error submitting vote to GitHub: ${error.message}`,
+            submissionData: submissionData
+          };
+        }
+      } else {
+        Logger.log(`⚠️ No PR number found for vote submission`);
+        return {
+          success: false,
+          message: `No PR number found for vote submission`,
+          submissionData: submissionData
+        };
+      }
     } else {
       Logger.log(`❌ Unknown submission type: ${submissionData.type}`);
       return {
