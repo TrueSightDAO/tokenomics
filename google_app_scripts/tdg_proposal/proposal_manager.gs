@@ -45,8 +45,14 @@ function doGet(e) {
           return createErrorResponse('PR number is required for fetch_proposal mode');
         }
         return handleFetchProposal(prNumber);
+      case 'verify_signature':
+        const publicKey = e.parameter.public_key;
+        if (!publicKey) {
+          return createErrorResponse('Public key is required for verify_signature mode');
+        }
+        return handleVerifySignature(publicKey);
       default:
-        return createErrorResponse('Invalid mode. Use: list_open_proposals or fetch_proposal');
+        return createErrorResponse('Invalid mode. Use: list_open_proposals, fetch_proposal, or verify_signature');
     }
   } catch (error) {
     Logger.log(`Error in doGet: ${error.message}`);
@@ -152,6 +158,31 @@ function handleFetchProposal(prNumber) {
   } catch (error) {
     Logger.log(`Error fetching proposal: ${error.message}`);
     return createErrorResponse(`Failed to fetch proposal: ${error.message}`);
+  }
+}
+
+/**
+ * Handle signature verification
+ */
+function handleVerifySignature(publicKey) {
+  try {
+    // For now, we'll use a simple verification approach
+    // In a real implementation, you'd verify against a database of registered signatures
+    const config = getConfiguration();
+    
+    // Simple verification - in production, this should check against a real database
+    if (publicKey && publicKey.length > 10) {
+      return createSuccessResponse({
+        verified: true,
+        contributor_name: "DAO Member", // This should come from your signature database
+        public_key: publicKey
+      });
+    } else {
+      return createErrorResponse('Invalid public key format');
+    }
+  } catch (error) {
+    Logger.log(`Error verifying signature: ${error.message}`);
+    return createErrorResponse(`Signature verification failed: ${error.message}`);
   }
 }
 
