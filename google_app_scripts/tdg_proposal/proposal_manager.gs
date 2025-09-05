@@ -1901,15 +1901,21 @@ function parseProposalSubmission(messageText) {
     
     const proposalSection = proposalMatch[1];
     
-    // Extract title
-    const titleMatch = proposalSection.match(/- Title:\s*(.+)/);
+    // Extract title (try both formats: -- Title: and - Title:)
+    let titleMatch = proposalSection.match(/-- Title:\s*(.+)/);
+    if (!titleMatch) {
+      titleMatch = proposalSection.match(/- Title:\s*(.+)/);
+    }
     if (!titleMatch) {
       return null;
     }
     const title = titleMatch[1].trim();
     
-    // Extract content (everything after - Content: until the end)
-    const contentMatch = proposalSection.match(/- Content:\s*([\s\S]+)/);
+    // Extract content (try both formats: -- Content: and - Content:)
+    let contentMatch = proposalSection.match(/-- Content:\s*([\s\S]+)/);
+    if (!contentMatch) {
+      contentMatch = proposalSection.match(/- Content:\s*([\s\S]+)/);
+    }
     if (!contentMatch) {
       return null;
     }
@@ -2202,15 +2208,21 @@ function parseDAppSubmission(messageText) {
       
       const proposalSection = proposalMatch[1];
       
-      // Extract title (new format: -- Title:)
-      const titleMatch = proposalSection.match(/-- Title:\s*(.+)/);
+      // Extract title (try both formats: -- Title: and - Title:)
+      let titleMatch = proposalSection.match(/-- Title:\s*(.+)/);
+      if (!titleMatch) {
+        titleMatch = proposalSection.match(/- Title:\s*(.+)/);
+      }
       if (!titleMatch) {
         return null;
       }
       const title = titleMatch[1].trim();
       
-      // Extract content (everything after -- Content: until the end)
-      const contentMatch = proposalSection.match(/-- Content:\s*([\s\S]+)/);
+      // Extract content (try both formats: -- Content: and - Content:)
+      let contentMatch = proposalSection.match(/-- Content:\s*([\s\S]+)/);
+      if (!contentMatch) {
+        contentMatch = proposalSection.match(/- Content:\s*([\s\S]+)/);
+      }
       if (!contentMatch) {
         return null;
       }
