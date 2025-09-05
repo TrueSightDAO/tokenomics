@@ -34,6 +34,8 @@ The main Google Apps Script that handles:
 - **Web API**: Provides REST endpoints for the DApp frontend
 - **Data Processing**: Processes submissions from Telegram logs and DApp interfaces
 
+**Source Code**: [https://github.com/TrueSightDAO/tokenomics/blob/main/google_app_scripts/tdg_proposal/proposal_manager.gs](https://github.com/TrueSightDAO/tokenomics/blob/main/google_app_scripts/tdg_proposal/proposal_manager.gs)
+
 ## 🌐 DApp Frontend
 
 The proposal management DApp is hosted at: **https://truesightdao.github.io/dapp/**
