@@ -25,6 +25,287 @@
  */
 
 // ============================================================================
+// WEB APP HANDLERS
+// ============================================================================
+
+/**
+ * Web app entry point for GET requests
+ * Handles data retrieval for the proposal DApp
+ */
+function doGet(e) {
+  try {
+    const mode = e.parameter.mode;
+    
+    switch (mode) {
+      case 'list_open_proposals':
+        return handleListOpenProposals();
+      case 'fetch_proposal':
+        const prNumber = e.parameter.pr_number;
+        if (!prNumber) {
+          return createErrorResponse('PR number is required for fetch_proposal mode');
+        }
+        return handleFetchProposal(prNumber);
+      default:
+        return createErrorResponse('Invalid mode. Use: list_open_proposals or fetch_proposal');
+    }
+  } catch (error) {
+    Logger.log(`Error in doGet: ${error.message}`);
+    return createErrorResponse(`Server error: ${error.message}`);
+  }
+}
+
+/**
+ * Handle OPTIONS requests for CORS preflight
+ */
+function doOptions(e) {
+  return ContentService
+    .createTextOutput('')
+    .setMimeType(ContentService.MimeType.TEXT)
+    .setHeaders({
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type'
+    });
+}
+
+/**
+ * Handle listing all open proposals
+ */
+function handleListOpenProposals() {
+  try {
+    const config = getConfiguration();
+    const url = `https://api.github.com/repos/${config.githubOwner}/${config.githubRepo}/pulls?state=open&sort=created&direction=desc`;
+    const response = UrlFetchApp.fetch(url, {
+      headers: { 'Authorization': `token ${config.githubToken}` },
+      muteHttpExceptions: true
+    });
+    
+    if (response.getResponseCode() !== 200) {
+      return createErrorResponse(`Failed to fetch proposals: ${response.getContentText()}`);
+    }
+    
+    const prs = JSON.parse(response.getContentText());
+    const proposals = prs.map(pr => ({
+      number: pr.number,
+      title: pr.title,
+      body: pr.body,
+      created_at: pr.created_at,
+      updated_at: pr.updated_at,
+      html_url: pr.html_url,
+      user: pr.user.login,
+      head: {
+        ref: pr.head.ref,
+        sha: pr.head.sha
+      }
+    }));
+    
+    return createSuccessResponse({ proposals });
+  } catch (error) {
+    Logger.log(`Error listing proposals: ${error.message}`);
+    return createErrorResponse(`Failed to list proposals: ${error.message}`);
+  }
+}
+
+/**
+ * Handle fetching a specific proposal with voting statistics
+ */
+function handleFetchProposal(prNumber) {
+  try {
+    const config = getConfiguration();
+    
+    // Get PR details
+    const prUrl = `https://api.github.com/repos/${config.githubOwner}/${config.githubRepo}/pulls/${prNumber}`;
+    const prResponse = UrlFetchApp.fetch(prUrl, {
+      headers: { 'Authorization': `token ${config.githubToken}` },
+      muteHttpExceptions: true
+    });
+    
+    if (prResponse.getResponseCode() !== 200) {
+      return createErrorResponse(`Failed to fetch PR: ${prResponse.getContentText()}`);
+    }
+    
+    const pr = JSON.parse(prResponse.getContentText());
+    
+    // Get voting statistics
+    const voteCount = getVoteCount(prNumber, config);
+    if (!voteCount.success) {
+      return createErrorResponse(`Failed to get vote count: ${voteCount.error}`);
+    }
+    
+    // Calculate time remaining (assuming 7 days voting period)
+    const createdAt = new Date(pr.created_at);
+    const votingEndDate = new Date(createdAt.getTime() + (7 * 24 * 60 * 60 * 1000));
+    const now = new Date();
+    const timeRemaining = Math.max(0, votingEndDate.getTime() - now.getTime());
+    const daysRemaining = Math.ceil(timeRemaining / (24 * 60 * 60 * 1000));
+    
+    const proposal = {
+      number: pr.number,
+      title: pr.title,
+      body: pr.body,
+      created_at: pr.created_at,
+      updated_at: pr.updated_at,
+      html_url: pr.html_url,
+      user: pr.user.login,
+      head: {
+        ref: pr.head.ref,
+        sha: pr.head.sha
+      },
+      voting: {
+        yes_votes: voteCount.yesVotes,
+        no_votes: voteCount.noVotes,
+        total_votes: voteCount.totalVotes,
+        majority: voteCount.yesVotes > voteCount.noVotes ? 'YES' : 'NO',
+        days_remaining: daysRemaining,
+        voting_ends_at: votingEndDate.toISOString()
+      }
+    };
+    
+    return createSuccessResponse({ proposal });
+  } catch (error) {
+    Logger.log(`Error fetching proposal: ${error.message}`);
+    return createErrorResponse(`Failed to fetch proposal: ${error.message}`);
+  }
+}
+
+/**
+ * Create a success response with CORS headers
+ */
+function createSuccessResponse(data) {
+  return ContentService
+    .createTextOutput(JSON.stringify({
+      success: true,
+      data: data
+    }))
+    .setMimeType(ContentService.MimeType.JSON)
+    .setHeaders({
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type'
+    });
+}
+
+/**
+ * Create an error response with CORS headers
+ */
+function createErrorResponse(message) {
+  return ContentService
+    .createTextOutput(JSON.stringify({
+      success: false,
+      error: message
+    }))
+    .setMimeType(ContentService.MimeType.JSON)
+    .setHeaders({
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type'
+    });
+}
+
+/**
+ * Web app entry point for POST requests
+ * Handles proposal creation and voting with signature verification
+ */
+function doPost(e) {
+  try {
+    const data = JSON.parse(e.postData.contents);
+    const action = data.action;
+    
+    // Verify digital signature for all actions
+    if (!data.digital_signature || !data.request_text) {
+      return createErrorResponse('Digital signature and request text are required');
+    }
+    
+    const isValidSignature = verifyDigitalSignature(data.request_text, data.digital_signature);
+    if (!isValidSignature) {
+      return createErrorResponse('Invalid digital signature');
+    }
+    
+    switch (action) {
+      case 'create_proposal':
+        return handleCreateProposal(data);
+      case 'submit_vote':
+        return handleSubmitVote(data);
+      default:
+        return createErrorResponse('Invalid action. Use: create_proposal or submit_vote');
+    }
+  } catch (error) {
+    Logger.log(`Error in doPost: ${error.message}`);
+    return createErrorResponse(`Server error: ${error.message}`);
+  }
+}
+
+/**
+ * Handle proposal creation from DApp
+ */
+function handleCreateProposal(data) {
+  try {
+    const header = data.header;
+    const content = data.content;
+    
+    if (!header || !content) {
+      return createErrorResponse('Header and content are required for proposal creation');
+    }
+    
+    const result = createNewProposal(header, content);
+    
+    if (result.success) {
+      return createSuccessResponse({
+        message: 'Proposal created successfully',
+        pr_number: result.prNumber,
+        pr_url: result.prUrl
+      });
+    } else {
+      return createErrorResponse(`Failed to create proposal: ${result.error}`);
+    }
+  } catch (error) {
+    Logger.log(`Error creating proposal: ${error.message}`);
+    return createErrorResponse(`Failed to create proposal: ${error.message}`);
+  }
+}
+
+/**
+ * Handle vote submission from DApp
+ */
+function handleSubmitVote(data) {
+  try {
+    const prNumber = data.pr_number;
+    const voteText = data.vote_text;
+    
+    if (!prNumber || !voteText) {
+      return createErrorResponse('PR number and vote text are required for vote submission');
+    }
+    
+    const result = submitVote(prNumber, voteText);
+    
+    if (result.success) {
+      return createSuccessResponse({
+        message: 'Vote submitted successfully',
+        vote: result.vote,
+        signature: result.signature
+      });
+    } else {
+      return createErrorResponse(`Failed to submit vote: ${result.error}`);
+    }
+  } catch (error) {
+    Logger.log(`Error submitting vote: ${error.message}`);
+    return createErrorResponse(`Failed to submit vote: ${error.message}`);
+  }
+}
+
+/**
+ * Verify digital signature (placeholder - implement your signature verification logic)
+ */
+function verifyDigitalSignature(requestText, signature) {
+  // TODO: Implement your digital signature verification logic
+  // This should match the verification used in other DApps
+  // For now, return true to allow testing
+  Logger.log(`Verifying signature for request: ${requestText.substring(0, 100)}...`);
+  Logger.log(`Signature: ${signature.substring(0, 20)}...`);
+  return true; // Replace with actual verification logic
+}
+
+// ============================================================================
 // CONFIGURATION - Set these using Script Properties
 // ============================================================================
 
@@ -969,7 +1250,7 @@ This proposal aims to allocate additional funds to support community-driven proj
 /**
  * Test submitting multiple votes with different signatures
  */
-function testSubmitMultipleVotes(prNumber = 2) {
+function testSubmitMultipleVotes(prNumber = 3) {
   const testVotes = [
     {
       signature: 'MIICIjANBgkqhkiG9w0BAQEFAAOCAg8AMIICCgKCAgEA_test_signature_1',
@@ -1039,7 +1320,7 @@ Request Transaction ID: test_tx_${Date.now()}_${index}`;
 /**
  * Test submitting multiple comments
  */
-function testSubmitComments(prNumber = 2) {
+function testSubmitComments(prNumber = 3) {
   const testComments = [
     "This is an interesting proposal. I'd like to see more details about the implementation timeline.",
     "Great idea! The community definitely needs more funding for development projects.",
@@ -1081,7 +1362,7 @@ function testSubmitComments(prNumber = 2) {
 /**
  * Test vote tabulation functionality
  */
-function testVoteTabulation(prNumber = 2) {
+function testVoteTabulation(prNumber = 3) {
   Logger.log('Testing vote tabulation...');
   
   const config = getConfiguration();
@@ -1143,7 +1424,7 @@ function getLatestPRNumber() {
  * Test closing voting (WARNING: This will actually close the PR!)
  * Uncomment the call in runAllTests() to test this functionality
  */
-function testCloseVoting(prNumber = 2) {
+function testCloseVoting(prNumber = 3) {
   if (!prNumber || prNumber === 'undefined') {
     Logger.log('❌ Error: PR number is required for testCloseVoting');
     Logger.log('Usage: testCloseVoting(prNumber) where prNumber is a valid PR number');
@@ -1182,7 +1463,7 @@ function testCreateProposalOnly() {
 /**
  * Test only vote submission
  */
-function testSubmitVoteOnly(prNumber = 2) {
+function testSubmitVoteOnly(prNumber = 3) {
   Logger.log(`🧪 Testing vote submission only for PR #${prNumber}...`);
   
   const voteText = `[PROPOSAL VOTE]
@@ -1207,7 +1488,7 @@ Request Transaction ID: test_single_vote_${Date.now()}`;
 /**
  * Test only comment submission
  */
-function testSubmitCommentOnly(prNumber = 2) {
+function testSubmitCommentOnly(prNumber = 3) {
   Logger.log(`🧪 Testing comment submission only for PR #${prNumber}...`);
   
   const commentText = `This is a test comment to verify the comment functionality. 
@@ -1228,7 +1509,7 @@ Submitted on: ${new Date().toISOString()}`;
 /**
  * Test vote update functionality (same signature, different vote)
  */
-function testVoteUpdate(prNumber = 2) {
+function testVoteUpdate(prNumber = 3) {
   Logger.log(`🧪 Testing vote update functionality for PR #${prNumber}...`);
   
   const signature = 'MIICIjANBgkqhkiG9w0BAQEFAAOCAg8AMIICCgKCAgEA_test_update_signature';
@@ -1317,4 +1598,36 @@ function testCloseVotingAuto() {
   }
   
   return testCloseVoting(prNumber);
+}
+
+/**
+ * Test the web app endpoints
+ */
+function testWebAppEndpoints() {
+  Logger.log('🧪 Testing web app endpoints...');
+  
+  // Test list open proposals
+  try {
+    const listResult = handleListOpenProposals();
+    Logger.log('✅ List open proposals endpoint working');
+    Logger.log(`Response: ${listResult.getContent()}`);
+  } catch (error) {
+    Logger.log(`❌ List open proposals failed: ${error.message}`);
+  }
+  
+  // Test fetch proposal (if any exist)
+  try {
+    const prNumber = getLatestPRNumber();
+    if (prNumber) {
+      const fetchResult = handleFetchProposal(prNumber);
+      Logger.log(`✅ Fetch proposal endpoint working for PR #${prNumber}`);
+      Logger.log(`Response: ${fetchResult.getContent()}`);
+    } else {
+      Logger.log('⚠️ No PRs available to test fetch proposal endpoint');
+    }
+  } catch (error) {
+    Logger.log(`❌ Fetch proposal failed: ${error.message}`);
+  }
+  
+  Logger.log('🎉 Web app endpoint testing completed');
 }
