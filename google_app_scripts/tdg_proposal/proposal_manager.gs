@@ -1781,16 +1781,28 @@ function processProposalSubmissionsFromTelegramLogs() {
     const telegramData = telegramLogsSheet.getDataRange().getValues();
     const headers = telegramData[0];
     
-    // Find column indices
-    const messageIdIndex = headers.indexOf('Message ID');
-    const timestampIndex = headers.indexOf('Timestamp');
-    const usernameIndex = headers.indexOf('Username');
-    const messageTextIndex = headers.indexOf('Message Text');
-    const processedIndex = headers.indexOf('Processed');
+    // Use column indices like the QR code processing script
+    // Based on the QR code script structure:
+    // Column A (0): Telegram Update ID
+    // Column B (1): Telegram Chatroom ID  
+    // Column C (2): Telegram Chatroom Name
+    // Column D (3): Telegram Message ID
+    // Column E (4): Contributor Handle
+    // Column F (5): (empty)
+    // Column G (6): Contribution Made (this is where the message text is)
+    // Column H (7): (empty)
+    // Column I (8): (empty)
+    // Column J (9): (empty)
+    // Column K (10): (empty)
+    // Column L (11): Status Date
+    // Column M (12): (empty)
+    // Column N (13): (empty)
+    // Column O (14): (empty)
     
-    if (messageIdIndex === -1 || timestampIndex === -1 || usernameIndex === -1 || messageTextIndex === -1) {
-      throw new Error('Required columns not found in Telegram Chat Logs');
-    }
+    const messageIdIndex = 3; // Column D
+    const timestampIndex = 11; // Column L (Status Date)
+    const usernameIndex = 4; // Column E (Contributor Handle)
+    const messageTextIndex = 6; // Column G (Contribution Made)
     
     // Get existing processed message IDs and transaction IDs from Proposal Submissions
     const existingData = proposalSubmissionsSheet.getDataRange().getValues();
@@ -1941,13 +1953,10 @@ function testProcessSpecificProposalSubmission(lineNumber) {
     
     // Get the specific row
     const row = telegramLogsSheet.getRange(lineNumber, 1, 1, telegramLogsSheet.getLastColumn()).getValues()[0];
-    const headers = telegramLogsSheet.getRange(1, 1, 1, telegramLogsSheet.getLastColumn()).getValues()[0];
     
-    // Find message text column
-    const messageTextIndex = headers.indexOf('Message Text');
-    if (messageTextIndex === -1) {
-      throw new Error('Message Text column not found');
-    }
+    // Use column indices like the QR code processing script
+    // Column G (6): Contribution Made (this is where the message text is)
+    const messageTextIndex = 6; // Column G (Contribution Made)
     
     const messageText = row[messageTextIndex];
     Logger.log(`📝 Message text: ${messageText}`);
@@ -2008,16 +2017,28 @@ function processDAppPayloads() {
     const telegramData = telegramLogsSheet.getDataRange().getValues();
     const headers = telegramData[0];
     
-    // Find column indices
-    const messageIdIndex = headers.indexOf('Message ID');
-    const timestampIndex = headers.indexOf('Timestamp');
-    const usernameIndex = headers.indexOf('Username');
-    const messageTextIndex = headers.indexOf('Message Text');
-    const processedIndex = headers.indexOf('Processed');
+    // Use column indices like the QR code processing script
+    // Based on the QR code script structure:
+    // Column A (0): Telegram Update ID
+    // Column B (1): Telegram Chatroom ID  
+    // Column C (2): Telegram Chatroom Name
+    // Column D (3): Telegram Message ID
+    // Column E (4): Contributor Handle
+    // Column F (5): (empty)
+    // Column G (6): Contribution Made (this is where the message text is)
+    // Column H (7): (empty)
+    // Column I (8): (empty)
+    // Column J (9): (empty)
+    // Column K (10): (empty)
+    // Column L (11): Status Date
+    // Column M (12): (empty)
+    // Column N (13): (empty)
+    // Column O (14): (empty)
     
-    if (messageIdIndex === -1 || timestampIndex === -1 || usernameIndex === -1 || messageTextIndex === -1) {
-      throw new Error('Required columns not found in Telegram Chat Logs');
-    }
+    const messageIdIndex = 3; // Column D
+    const timestampIndex = 11; // Column L (Status Date)
+    const usernameIndex = 4; // Column E (Contributor Handle)
+    const messageTextIndex = 6; // Column G (Contribution Made)
     
     // Get existing processed message IDs and transaction IDs from Proposal Submissions
     const existingData = proposalSubmissionsSheet.getDataRange().getValues();
@@ -2265,13 +2286,10 @@ function testProcessSpecificDAppSubmission(lineNumber) {
     
     // Get the specific row
     const row = telegramLogsSheet.getRange(lineNumber, 1, 1, telegramLogsSheet.getLastColumn()).getValues()[0];
-    const headers = telegramLogsSheet.getRange(1, 1, 1, telegramLogsSheet.getLastColumn()).getValues()[0];
     
-    // Find message text column
-    const messageTextIndex = headers.indexOf('Message Text');
-    if (messageTextIndex === -1) {
-      throw new Error('Message Text column not found');
-    }
+    // Use column indices like the QR code processing script
+    // Column G (6): Contribution Made (this is where the message text is)
+    const messageTextIndex = 6; // Column G (Contribution Made)
     
     const messageText = row[messageTextIndex];
     Logger.log(`📝 Message text: ${messageText}`);
