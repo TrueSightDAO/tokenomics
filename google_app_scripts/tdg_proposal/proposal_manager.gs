@@ -2255,11 +2255,11 @@ function parseDAppSubmission(messageText) {
       const voteMatch2 = voteSection.match(/Vote:\s*(.+)/);
       const vote = voteMatch2 ? voteMatch2[1].trim() : '';
       
-      // Try to extract PR number from the proposal title or content
+      // Try to extract PR number from the proposal title, content, or URL
       let pullRequestNumber = '';
-      const prMatch = messageText.match(/PR #(\d+)|pull request #(\d+)|proposal #(\d+)/i);
+      const prMatch = messageText.match(/PR #(\d+)|pull request #(\d+)|proposal #(\d+)|pr=(\d+)/i);
       if (prMatch) {
-        pullRequestNumber = prMatch[1] || prMatch[2] || prMatch[3];
+        pullRequestNumber = prMatch[1] || prMatch[2] || prMatch[3] || prMatch[4];
       }
       
       return {
