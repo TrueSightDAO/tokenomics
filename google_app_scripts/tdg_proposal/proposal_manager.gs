@@ -1239,7 +1239,28 @@ This proposal aims to allocate additional funds to support community-driven proj
 ---
 *This is a test proposal created on ${new Date().toISOString()}*`;
 
+  // Create the proposal text in the same format as the DApp
+  const requestText = `[PROPOSAL CREATION]
+- Title: ${proposalTitle}
+- Content: ${proposalContent}
+--------`;
+
+  // Generate a test signature hash
+  const testSignatureHash = `test_proposal_${Date.now()}`;
+  
+  // Create the share text following the same pattern as the DApp
+  const shareText = `${requestText}
+
+My Digital Signature: MIICIjANBgkqhkiG9w0BAQEFAAOCAg8AMIICCgKCAgEA_test_signature_proposal
+
+Request Transaction ID: ${testSignatureHash}
+
+This submission was generated using https://dapp.truesight.me/create_proposal.html
+
+Verify submission here: https://dapp.truesight.me/verify_request.html`;
+
   Logger.log(`Creating test proposal: ${proposalTitle}`);
+  Logger.log(`Test share text format: ${shareText}`);
   const result = createNewProposal(proposalTitle, proposalContent);
   
   if (result.success) {
@@ -1653,5 +1674,214 @@ function testCORSHeaders() {
     Logger.log(`Content: ${result.getContent()}`);
   } catch (error) {
     Logger.log(`❌ CORS headers test failed: ${error.message}`);
+  }
+}
+
+/**
+ * Process proposal submissions from Telegram Chat Logs
+ * Parses the Telegram Chat Logs spreadsheet and creates/updates Proposal Submissions
+ */
+function processProposalSubmissionsFromTelegramLogs() {
+  try {
+    Logger.log('🔄 Processing proposal submissions from Telegram Chat Logs...');
+    
+    // Open the Telegram Chat Logs spreadsheet
+    const spreadsheetId = '1qbZZhf-_7xzmDTriaJVWj6OZshyQsFkdsAV8-pyzASQ';
+    const spreadsheet = SpreadsheetApp.openById(spreadsheetId);
+    
+    // Get Telegram Chat Logs sheet
+    const telegramLogsSheet = spreadsheet.getSheetByName('Telegram Chat Logs');
+    if (!telegramLogsSheet) {
+      throw new Error('Telegram Chat Logs sheet not found');
+    }
+    
+    // Get or create Proposal Submissions sheet
+    let proposalSubmissionsSheet = spreadsheet.getSheetByName('Proposal Submissions');
+    if (!proposalSubmissionsSheet) {
+      proposalSubmissionsSheet = spreadsheet.insertSheet('Proposal Submissions');
+      // Set up headers
+      const headers = [
+        'Message ID', 'Timestamp', 'Username', 'Message Text', 'Processed',
+        'Proposal Title', 'Proposal Content', 'Digital Signature', 'Transaction ID',
+        'Pull Request Number', 'Status', 'Created Date', 'Updated Date'
+      ];
+      proposalSubmissionsSheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+      proposalSubmissionsSheet.getRange(1, 1, 1, headers.length).setFontWeight('bold');
+    }
+    
+    // Get all data from Telegram Chat Logs
+    const telegramData = telegramLogsSheet.getDataRange().getValues();
+    const headers = telegramData[0];
+    
+    // Find column indices
+    const messageIdIndex = headers.indexOf('Message ID');
+    const timestampIndex = headers.indexOf('Timestamp');
+    const usernameIndex = headers.indexOf('Username');
+    const messageTextIndex = headers.indexOf('Message Text');
+    const processedIndex = headers.indexOf('Processed');
+    
+    if (messageIdIndex === -1 || timestampIndex === -1 || usernameIndex === -1 || messageTextIndex === -1) {
+      throw new Error('Required columns not found in Telegram Chat Logs');
+    }
+    
+    // Get existing processed message IDs from Proposal Submissions
+    const existingData = proposalSubmissionsSheet.getDataRange().getValues();
+    const existingMessageIds = new Set();
+    for (let i = 1; i < existingData.length; i++) {
+      if (existingData[i][0]) { // Message ID column
+        existingMessageIds.add(existingData[i][0]);
+      }
+    }
+    
+    let processedCount = 0;
+    let newProposalsCount = 0;
+    
+    // Process each row
+    for (let i = 1; i < telegramData.length; i++) {
+      const row = telegramData[i];
+      const messageId = row[messageIdIndex];
+      const messageText = row[messageTextIndex];
+      
+      // Skip if already processed or no message text
+      if (!messageId || !messageText || existingMessageIds.has(messageId)) {
+        continue;
+      }
+      
+      // Check if this is a proposal submission
+      if (messageText.includes('[PROPOSAL CREATION]')) {
+        try {
+          const proposalData = parseProposalSubmission(messageText);
+          if (proposalData) {
+            // Add to Proposal Submissions sheet
+            const newRow = [
+              messageId,
+              row[timestampIndex],
+              row[usernameIndex],
+              messageText,
+              'Yes', // Processed
+              proposalData.title,
+              proposalData.content,
+              proposalData.digitalSignature,
+              proposalData.transactionId,
+              '', // Pull Request Number (to be filled later)
+              'Submitted', // Status
+              new Date(),
+              new Date()
+            ];
+            
+            proposalSubmissionsSheet.appendRow(newRow);
+            newProposalsCount++;
+            
+            Logger.log(`✅ Processed proposal: ${proposalData.title}`);
+          }
+        } catch (error) {
+          Logger.log(`❌ Error processing proposal in message ${messageId}: ${error.message}`);
+        }
+      }
+      
+      processedCount++;
+    }
+    
+    Logger.log(`🎉 Processing complete! Processed ${processedCount} messages, found ${newProposalsCount} new proposals`);
+    return {
+      processed: processedCount,
+      newProposals: newProposalsCount
+    };
+    
+  } catch (error) {
+    Logger.log(`❌ Error processing proposal submissions: ${error.message}`);
+    throw error;
+  }
+}
+
+/**
+ * Parse proposal submission from message text
+ */
+function parseProposalSubmission(messageText) {
+  try {
+    // Extract the [PROPOSAL CREATION] section
+    const proposalMatch = messageText.match(/\[PROPOSAL CREATION\]([\s\S]*?)--------/);
+    if (!proposalMatch) {
+      return null;
+    }
+    
+    const proposalSection = proposalMatch[1];
+    
+    // Extract title
+    const titleMatch = proposalSection.match(/- Title:\s*(.+)/);
+    if (!titleMatch) {
+      return null;
+    }
+    const title = titleMatch[1].trim();
+    
+    // Extract content (everything after - Content: until the end)
+    const contentMatch = proposalSection.match(/- Content:\s*([\s\S]+)/);
+    if (!contentMatch) {
+      return null;
+    }
+    const content = contentMatch[1].trim();
+    
+    // Extract digital signature
+    const signatureMatch = messageText.match(/My Digital Signature:\s*(.+)/);
+    const digitalSignature = signatureMatch ? signatureMatch[1].trim() : '';
+    
+    // Extract transaction ID
+    const transactionMatch = messageText.match(/Request Transaction ID:\s*(.+)/);
+    const transactionId = transactionMatch ? transactionMatch[1].trim() : '';
+    
+    return {
+      title,
+      content,
+      digitalSignature,
+      transactionId
+    };
+    
+  } catch (error) {
+    Logger.log(`❌ Error parsing proposal submission: ${error.message}`);
+    return null;
+  }
+}
+
+/**
+ * Test method to process a specific line from Telegram Chat Logs
+ */
+function testProcessSpecificProposalSubmission(lineNumber) {
+  try {
+    Logger.log(`🧪 Testing proposal processing for line ${lineNumber}...`);
+    
+    const spreadsheetId = '1qbZZhf-_7xzmDTriaJVWj6OZshyQsFkdsAV8-pyzASQ';
+    const spreadsheet = SpreadsheetApp.openById(spreadsheetId);
+    const telegramLogsSheet = spreadsheet.getSheetByName('Telegram Chat Logs');
+    
+    if (!telegramLogsSheet) {
+      throw new Error('Telegram Chat Logs sheet not found');
+    }
+    
+    // Get the specific row
+    const row = telegramLogsSheet.getRange(lineNumber, 1, 1, telegramLogsSheet.getLastColumn()).getValues()[0];
+    const headers = telegramLogsSheet.getRange(1, 1, 1, telegramLogsSheet.getLastColumn()).getValues()[0];
+    
+    // Find message text column
+    const messageTextIndex = headers.indexOf('Message Text');
+    if (messageTextIndex === -1) {
+      throw new Error('Message Text column not found');
+    }
+    
+    const messageText = row[messageTextIndex];
+    Logger.log(`📝 Message text: ${messageText}`);
+    
+    // Parse the proposal
+    const proposalData = parseProposalSubmission(messageText);
+    if (proposalData) {
+      Logger.log(`✅ Parsed proposal data:`, proposalData);
+      return proposalData;
+    } else {
+      Logger.log(`❌ No proposal data found in message`);
+      return null;
+    }
+    
+  } catch (error) {
+    Logger.log(`❌ Error testing specific proposal: ${error.message}`);
+    throw error;
   }
 }
