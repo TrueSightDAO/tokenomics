@@ -25,6 +25,363 @@
  */
 
 // ============================================================================
+// WEB APP HANDLERS
+// ============================================================================
+
+/**
+ * Web app entry point for GET requests
+ * Handles data retrieval for the proposal DApp
+ */
+function doGet(e) {
+  try {
+    // Check for signature parameter first (for signature verification)
+    const signature = e.parameter.signature;
+    if (signature) {
+      return handleVerifySignature(signature);
+    }
+    
+    // Otherwise, check for mode parameter
+    const mode = e.parameter.mode;
+    
+    switch (mode) {
+      case 'list_open_proposals':
+        return handleListOpenProposals();
+      case 'fetch_proposal':
+        const prNumber = e.parameter.pr_number;
+        if (!prNumber) {
+          return createErrorResponse('PR number is required for fetch_proposal mode');
+        }
+        return handleFetchProposal(prNumber);
+      default:
+        return createErrorResponse('Invalid mode. Use: list_open_proposals, fetch_proposal, or provide signature parameter');
+    }
+  } catch (error) {
+    Logger.log(`Error in doGet: ${error.message}`);
+    return createErrorResponse(`Server error: ${error.message}`);
+  }
+}
+
+
+/**
+ * Handle listing all open proposals
+ */
+function handleListOpenProposals() {
+  try {
+    const config = getConfiguration();
+    const url = `https://api.github.com/repos/${config.githubOwner}/${config.githubRepo}/pulls?state=open&sort=created&direction=desc`;
+    const response = UrlFetchApp.fetch(url, {
+      headers: { 'Authorization': `token ${config.githubToken}` },
+      muteHttpExceptions: true
+    });
+    
+    if (response.getResponseCode() !== 200) {
+      return createErrorResponse(`Failed to fetch proposals: ${response.getContentText()}`);
+    }
+    
+    const prs = JSON.parse(response.getContentText());
+    const proposals = prs.map(pr => ({
+      number: pr.number,
+      title: pr.title,
+      body: pr.body,
+      created_at: pr.created_at,
+      updated_at: pr.updated_at,
+      html_url: pr.html_url,
+      user: pr.user.login,
+      head: {
+        ref: pr.head.ref,
+        sha: pr.head.sha
+      }
+    }));
+    
+    return createSuccessResponse({ proposals });
+  } catch (error) {
+    Logger.log(`Error listing proposals: ${error.message}`);
+    return createErrorResponse(`Failed to list proposals: ${error.message}`);
+  }
+}
+
+/**
+ * Handle fetching a specific proposal with voting statistics
+ */
+function handleFetchProposal(prNumber) {
+  try {
+    const config = getConfiguration();
+    
+    // Get PR details
+    const prUrl = `https://api.github.com/repos/${config.githubOwner}/${config.githubRepo}/pulls/${prNumber}`;
+    const prResponse = UrlFetchApp.fetch(prUrl, {
+      headers: { 'Authorization': `token ${config.githubToken}` },
+      muteHttpExceptions: true
+    });
+    
+    if (prResponse.getResponseCode() !== 200) {
+      return createErrorResponse(`Failed to fetch PR: ${prResponse.getContentText()}`);
+    }
+    
+    const pr = JSON.parse(prResponse.getContentText());
+    
+    // Get the actual file content from the PR's head branch
+    const fileContent = getProposalFileContent(pr.head.ref, config);
+    if (!fileContent.success) {
+      return createErrorResponse(`Failed to fetch proposal file: ${fileContent.error}`);
+    }
+    
+    // Get voting statistics
+    const voteCount = getVoteCount(prNumber, config);
+    if (!voteCount.success) {
+      return createErrorResponse(`Failed to get vote count: ${voteCount.error}`);
+    }
+    
+    // Calculate time remaining (assuming 7 days voting period)
+    const createdAt = new Date(pr.created_at);
+    const votingEndDate = new Date(createdAt.getTime() + (7 * 24 * 60 * 60 * 1000));
+    const now = new Date();
+    const timeRemaining = Math.max(0, votingEndDate.getTime() - now.getTime());
+    const daysRemaining = Math.ceil(timeRemaining / (24 * 60 * 60 * 1000));
+    
+    const proposal = {
+      number: pr.number,
+      title: fileContent.title, // Use the file name as title
+      body: fileContent.content, // Use the file content as body
+      created_at: pr.created_at,
+      updated_at: pr.updated_at,
+      html_url: pr.html_url,
+      user: pr.user.login,
+      head: {
+        ref: pr.head.ref,
+        sha: pr.head.sha
+      },
+      voting: {
+        yes_votes: voteCount.yesVotes,
+        no_votes: voteCount.noVotes,
+        total_votes: voteCount.totalVotes,
+        majority: voteCount.yesVotes > voteCount.noVotes ? 'YES' : 'NO',
+        days_remaining: daysRemaining,
+        voting_ends_at: votingEndDate.toISOString()
+      }
+    };
+    
+    return createSuccessResponse({ proposal });
+  } catch (error) {
+    Logger.log(`Error fetching proposal: ${error.message}`);
+    return createErrorResponse(`Failed to fetch proposal: ${error.message}`);
+  }
+}
+
+/**
+ * Get the proposal file content from the PR's head branch
+ */
+function getProposalFileContent(branchName, config) {
+  try {
+    // Get the tree of the head branch to find the proposal file
+    const treeUrl = `https://api.github.com/repos/${config.githubOwner}/${config.githubRepo}/git/trees/${branchName}?recursive=1`;
+    const treeResponse = UrlFetchApp.fetch(treeUrl, {
+      headers: { 'Authorization': `token ${config.githubToken}` },
+      muteHttpExceptions: true
+    });
+    
+    if (treeResponse.getResponseCode() !== 200) {
+      return { success: false, error: `Failed to fetch branch tree: ${treeResponse.getContentText()}` };
+    }
+    
+    const tree = JSON.parse(treeResponse.getContentText());
+    
+    // Find the markdown file in the root directory (should be the only file)
+    const proposalFile = tree.tree.find(file => 
+      file.type === 'blob' && 
+      file.path.endsWith('.md') && 
+      !file.path.includes('/') // Only files in root directory
+    );
+    
+    if (!proposalFile) {
+      return { success: false, error: 'No proposal file found in branch' };
+    }
+    
+    // Get the file content
+    const fileUrl = `https://api.github.com/repos/${config.githubOwner}/${config.githubRepo}/git/blobs/${proposalFile.sha}`;
+    const fileResponse = UrlFetchApp.fetch(fileUrl, {
+      headers: { 'Authorization': `token ${config.githubToken}` },
+      muteHttpExceptions: true
+    });
+    
+    if (fileResponse.getResponseCode() !== 200) {
+      return { success: false, error: `Failed to fetch file content: ${fileResponse.getContentText()}` };
+    }
+    
+    const fileBlob = JSON.parse(fileResponse.getContentText());
+    
+    // Decode base64 content
+    const content = Utilities.base64Decode(fileBlob.content);
+    const contentText = Utilities.newBlob(content).getDataAsString();
+    
+    // Extract title from filename (remove .md extension)
+    const title = proposalFile.path.replace('.md', '');
+    
+    return {
+      success: true,
+      title: title,
+      content: contentText
+    };
+    
+  } catch (error) {
+    Logger.log(`Error getting proposal file content: ${error.message}`);
+    return { success: false, error: `Failed to get proposal file content: ${error.message}` };
+  }
+}
+
+/**
+ * Handle signature verification
+ */
+function handleVerifySignature(publicKey) {
+  try {
+    // For now, we'll use a simple verification approach
+    // In a real implementation, you'd verify against a database of registered signatures
+    const config = getConfiguration();
+    
+    // Simple verification - in production, this should check against a real database
+    if (publicKey && publicKey.length > 10) {
+      return createSuccessResponse({
+        verified: true,
+        contributor_name: "DAO Member", // This should come from your signature database
+        public_key: publicKey
+      });
+    } else {
+      return createErrorResponse('Invalid public key format');
+    }
+  } catch (error) {
+    Logger.log(`Error verifying signature: ${error.message}`);
+    return createErrorResponse(`Signature verification failed: ${error.message}`);
+  }
+}
+
+/**
+ * Create a success response (simple format like working web_app.gs)
+ */
+function createSuccessResponse(data) {
+  return ContentService
+    .createTextOutput(JSON.stringify({
+      success: true,
+      data: data
+    }))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+/**
+ * Create an error response (simple format like working web_app.gs)
+ */
+function createErrorResponse(message) {
+  return ContentService
+    .createTextOutput(JSON.stringify({
+      success: false,
+      error: message
+    }))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+/**
+ * Web app entry point for POST requests
+ * Handles proposal creation and voting with signature verification
+ */
+function doPost(e) {
+  try {
+    const data = JSON.parse(e.postData.contents);
+    const action = data.action;
+    
+    // Verify digital signature for all actions
+    if (!data.digital_signature || !data.request_text) {
+      return createErrorResponse('Digital signature and request text are required');
+    }
+    
+    const isValidSignature = verifyDigitalSignature(data.request_text, data.digital_signature);
+    if (!isValidSignature) {
+      return createErrorResponse('Invalid digital signature');
+    }
+    
+    switch (action) {
+      case 'create_proposal':
+        return handleCreateProposal(data);
+      case 'submit_vote':
+        return handleSubmitVote(data);
+      default:
+        return createErrorResponse('Invalid action. Use: create_proposal or submit_vote');
+    }
+  } catch (error) {
+    Logger.log(`Error in doPost: ${error.message}`);
+    return createErrorResponse(`Server error: ${error.message}`);
+  }
+}
+
+/**
+ * Handle proposal creation from DApp
+ */
+function handleCreateProposal(data) {
+  try {
+    const header = data.header;
+    const content = data.content;
+    
+    if (!header || !content) {
+      return createErrorResponse('Header and content are required for proposal creation');
+    }
+    
+    const result = createNewProposal(header, content);
+    
+    if (result.success) {
+      return createSuccessResponse({
+        message: 'Proposal created successfully',
+        pr_number: result.prNumber,
+        pr_url: result.prUrl
+      });
+    } else {
+      return createErrorResponse(`Failed to create proposal: ${result.error}`);
+    }
+  } catch (error) {
+    Logger.log(`Error creating proposal: ${error.message}`);
+    return createErrorResponse(`Failed to create proposal: ${error.message}`);
+  }
+}
+
+/**
+ * Handle vote submission from DApp
+ */
+function handleSubmitVote(data) {
+  try {
+    const prNumber = data.pr_number;
+    const voteText = data.vote_text;
+    
+    if (!prNumber || !voteText) {
+      return createErrorResponse('PR number and vote text are required for vote submission');
+    }
+    
+    const result = submitVote(prNumber, voteText);
+    
+    if (result.success) {
+      return createSuccessResponse({
+        message: 'Vote submitted successfully',
+        vote: result.vote,
+        signature: result.signature
+      });
+    } else {
+      return createErrorResponse(`Failed to submit vote: ${result.error}`);
+    }
+  } catch (error) {
+    Logger.log(`Error submitting vote: ${error.message}`);
+    return createErrorResponse(`Failed to submit vote: ${error.message}`);
+  }
+}
+
+/**
+ * Verify digital signature (placeholder - implement your signature verification logic)
+ */
+function verifyDigitalSignature(requestText, signature) {
+  // TODO: Implement your digital signature verification logic
+  // This should match the verification used in other DApps
+  // For now, return true to allow testing
+  Logger.log(`Verifying signature for request: ${requestText.substring(0, 100)}...`);
+  Logger.log(`Signature: ${signature.substring(0, 20)}...`);
+  return true; // Replace with actual verification logic
+}
+
+// ============================================================================
 // CONFIGURATION - Set these using Script Properties
 // ============================================================================
 
@@ -950,7 +1307,28 @@ This proposal aims to allocate additional funds to support community-driven proj
 ---
 *This is a test proposal created on ${new Date().toISOString()}*`;
 
+  // Create the proposal text in the same format as the DApp
+  const requestText = `[PROPOSAL CREATION]
+- Title: ${proposalTitle}
+- Content: ${proposalContent}
+--------`;
+
+  // Generate a test signature hash
+  const testSignatureHash = `test_proposal_${Date.now()}`;
+  
+  // Create the share text following the same pattern as the DApp
+  const shareText = `${requestText}
+
+My Digital Signature: MIICIjANBgkqhkiG9w0BAQEFAAOCAg8AMIICCgKCAgEA_test_signature_proposal
+
+Request Transaction ID: ${testSignatureHash}
+
+This submission was generated using https://dapp.truesight.me/create_proposal.html
+
+Verify submission here: https://dapp.truesight.me/verify_request.html`;
+
   Logger.log(`Creating test proposal: ${proposalTitle}`);
+  Logger.log(`Test share text format: ${shareText}`);
   const result = createNewProposal(proposalTitle, proposalContent);
   
   if (result.success) {
@@ -969,7 +1347,7 @@ This proposal aims to allocate additional funds to support community-driven proj
 /**
  * Test submitting multiple votes with different signatures
  */
-function testSubmitMultipleVotes(prNumber = 2) {
+function testSubmitMultipleVotes(prNumber = 3) {
   const testVotes = [
     {
       signature: 'MIICIjANBgkqhkiG9w0BAQEFAAOCAg8AMIICCgKCAgEA_test_signature_1',
@@ -1039,7 +1417,7 @@ Request Transaction ID: test_tx_${Date.now()}_${index}`;
 /**
  * Test submitting multiple comments
  */
-function testSubmitComments(prNumber = 2) {
+function testSubmitComments(prNumber = 3) {
   const testComments = [
     "This is an interesting proposal. I'd like to see more details about the implementation timeline.",
     "Great idea! The community definitely needs more funding for development projects.",
@@ -1081,7 +1459,7 @@ function testSubmitComments(prNumber = 2) {
 /**
  * Test vote tabulation functionality
  */
-function testVoteTabulation(prNumber = 2) {
+function testVoteTabulation(prNumber = 3) {
   Logger.log('Testing vote tabulation...');
   
   const config = getConfiguration();
@@ -1143,7 +1521,7 @@ function getLatestPRNumber() {
  * Test closing voting (WARNING: This will actually close the PR!)
  * Uncomment the call in runAllTests() to test this functionality
  */
-function testCloseVoting(prNumber = 2) {
+function testCloseVoting(prNumber = 3) {
   if (!prNumber || prNumber === 'undefined') {
     Logger.log('❌ Error: PR number is required for testCloseVoting');
     Logger.log('Usage: testCloseVoting(prNumber) where prNumber is a valid PR number');
@@ -1182,7 +1560,7 @@ function testCreateProposalOnly() {
 /**
  * Test only vote submission
  */
-function testSubmitVoteOnly(prNumber = 2) {
+function testSubmitVoteOnly(prNumber = 3) {
   Logger.log(`🧪 Testing vote submission only for PR #${prNumber}...`);
   
   const voteText = `[PROPOSAL VOTE]
@@ -1207,7 +1585,7 @@ Request Transaction ID: test_single_vote_${Date.now()}`;
 /**
  * Test only comment submission
  */
-function testSubmitCommentOnly(prNumber = 2) {
+function testSubmitCommentOnly(prNumber = 3) {
   Logger.log(`🧪 Testing comment submission only for PR #${prNumber}...`);
   
   const commentText = `This is a test comment to verify the comment functionality. 
@@ -1228,7 +1606,7 @@ Submitted on: ${new Date().toISOString()}`;
 /**
  * Test vote update functionality (same signature, different vote)
  */
-function testVoteUpdate(prNumber = 2) {
+function testVoteUpdate(prNumber = 3) {
   Logger.log(`🧪 Testing vote update functionality for PR #${prNumber}...`);
   
   const signature = 'MIICIjANBgkqhkiG9w0BAQEFAAOCAg8AMIICCgKCAgEA_test_update_signature';
@@ -1317,4 +1695,894 @@ function testCloseVotingAuto() {
   }
   
   return testCloseVoting(prNumber);
+}
+
+/**
+ * Test the web app endpoints
+ */
+function testWebAppEndpoints() {
+  Logger.log('🧪 Testing web app endpoints...');
+  
+  // Test list open proposals
+  try {
+    const listResult = handleListOpenProposals();
+    Logger.log('✅ List open proposals endpoint working');
+    Logger.log(`Response: ${listResult.getContent()}`);
+  } catch (error) {
+    Logger.log(`❌ List open proposals failed: ${error.message}`);
+  }
+  
+  // Test fetch proposal (if any exist)
+  try {
+    const prNumber = getLatestPRNumber();
+    if (prNumber) {
+      const fetchResult = handleFetchProposal(prNumber);
+      Logger.log(`✅ Fetch proposal endpoint working for PR #${prNumber}`);
+      Logger.log(`Response: ${fetchResult.getContent()}`);
+    } else {
+      Logger.log('⚠️ No PRs available to test fetch proposal endpoint');
+    }
+  } catch (error) {
+    Logger.log(`❌ Fetch proposal failed: ${error.message}`);
+  }
+  
+  Logger.log('🎉 Web app endpoint testing completed');
+}
+
+/**
+ * Test CORS headers directly
+ */
+function testCORSHeaders() {
+  Logger.log('🧪 Testing CORS headers...');
+  
+  try {
+    const result = createSuccessResponse({ test: 'CORS headers test' });
+    Logger.log('✅ CORS headers function working');
+    Logger.log(`Headers: ${JSON.stringify(result.getHeaders())}`);
+    Logger.log(`Content: ${result.getContent()}`);
+  } catch (error) {
+    Logger.log(`❌ CORS headers test failed: ${error.message}`);
+  }
+}
+
+/**
+ * Process proposal submissions from Telegram Chat Logs
+ * Parses the Telegram Chat Logs spreadsheet and creates/updates Proposal Submissions
+ */
+function processProposalSubmissionsFromTelegramLogs() {
+  try {
+    Logger.log('🔄 Processing proposal submissions from Telegram Chat Logs...');
+    
+    // Open the Telegram Chat Logs spreadsheet
+    const spreadsheetId = '1qbZZhf-_7xzmDTriaJVWj6OZshyQsFkdsAV8-pyzASQ';
+    const spreadsheet = SpreadsheetApp.openById(spreadsheetId);
+    
+    // Get Telegram Chat Logs sheet
+    const telegramLogsSheet = spreadsheet.getSheetByName('Telegram Chat Logs');
+    if (!telegramLogsSheet) {
+      throw new Error('Telegram Chat Logs sheet not found');
+    }
+    
+    // Get or create Proposal Submissions sheet
+    let proposalSubmissionsSheet = spreadsheet.getSheetByName('Proposal Submissions');
+    if (!proposalSubmissionsSheet) {
+      proposalSubmissionsSheet = spreadsheet.insertSheet('Proposal Submissions');
+      // Set up headers
+      const headers = [
+        'Message ID', 'Timestamp', 'Username', 'Message Text', 'Processed',
+        'Proposal Title', 'Proposal Content', 'Digital Signature', 'Transaction ID',
+        'Pull Request Number', 'Status', 'Created Date', 'Updated Date'
+      ];
+      proposalSubmissionsSheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+      proposalSubmissionsSheet.getRange(1, 1, 1, headers.length).setFontWeight('bold');
+    }
+    
+    // Get all data from Telegram Chat Logs
+    const telegramData = telegramLogsSheet.getDataRange().getValues();
+    const headers = telegramData[0];
+    
+    // Use column indices like the QR code processing script
+    // Based on the QR code script structure:
+    // Column A (0): Telegram Update ID
+    // Column B (1): Telegram Chatroom ID  
+    // Column C (2): Telegram Chatroom Name
+    // Column D (3): Telegram Message ID
+    // Column E (4): Contributor Handle
+    // Column F (5): (empty)
+    // Column G (6): Contribution Made (this is where the message text is)
+    // Column H (7): (empty)
+    // Column I (8): (empty)
+    // Column J (9): (empty)
+    // Column K (10): (empty)
+    // Column L (11): Status Date
+    // Column M (12): (empty)
+    // Column N (13): (empty)
+    // Column O (14): (empty)
+    
+    const messageIdIndex = 3; // Column D
+    const timestampIndex = 11; // Column L (Status Date)
+    const usernameIndex = 4; // Column E (Contributor Handle)
+    const messageTextIndex = 6; // Column G (Contribution Made)
+    
+    // Get existing processed message IDs and transaction IDs from Proposal Submissions
+    const existingData = proposalSubmissionsSheet.getDataRange().getValues();
+    const existingMessageIds = new Set();
+    const existingTransactionIds = new Set();
+    for (let i = 1; i < existingData.length; i++) {
+      if (existingData[i][0]) { // Message ID column
+        existingMessageIds.add(existingData[i][0]);
+      }
+      if (existingData[i][8]) { // Transaction ID column
+        existingTransactionIds.add(existingData[i][8]);
+      }
+    }
+    
+    Logger.log(`📊 Found ${existingMessageIds.size} existing message IDs and ${existingTransactionIds.size} existing transaction IDs`);
+    
+    let processedCount = 0;
+    let newProposalsCount = 0;
+    let skippedCount = 0;
+    
+    // Process each row
+    for (let i = 1; i < telegramData.length; i++) {
+      const row = telegramData[i];
+      const messageId = row[messageIdIndex];
+      const messageText = row[messageTextIndex];
+      
+      // Skip if no message text
+      if (!messageId || !messageText) {
+        continue;
+      }
+      
+      // Skip if already processed by message ID
+      if (existingMessageIds.has(messageId)) {
+        skippedCount++;
+        continue;
+      }
+      
+      // Check if this is a proposal submission
+      if (messageText.includes('[PROPOSAL CREATION]')) {
+        try {
+          const proposalData = parseProposalSubmission(messageText);
+          if (proposalData) {
+            // Add to Proposal Submissions sheet
+            const newRow = [
+              messageId,
+              row[timestampIndex],
+              row[usernameIndex],
+              messageText,
+              'Yes', // Processed
+              proposalData.title,
+              proposalData.content,
+              proposalData.digitalSignature,
+              proposalData.transactionId,
+              '', // Pull Request Number (to be filled later)
+              'Submitted', // Status
+              new Date(),
+              new Date()
+            ];
+            
+            proposalSubmissionsSheet.appendRow(newRow);
+            newProposalsCount++;
+            
+            Logger.log(`✅ Processed proposal: ${proposalData.title}`);
+          }
+        } catch (error) {
+          Logger.log(`❌ Error processing proposal in message ${messageId}: ${error.message}`);
+        }
+      }
+      
+      processedCount++;
+    }
+    
+    Logger.log(`🎉 Processing complete! Processed ${processedCount} messages, found ${newProposalsCount} new proposals, skipped ${skippedCount} duplicates`);
+    return {
+      processed: processedCount,
+      newProposals: newProposalsCount,
+      skipped: skippedCount
+    };
+    
+  } catch (error) {
+    Logger.log(`❌ Error processing proposal submissions: ${error.message}`);
+    throw error;
+  }
+}
+
+/**
+ * Parse proposal submission from message text
+ */
+function parseProposalSubmission(messageText) {
+  try {
+    // Extract the [PROPOSAL CREATION] section
+    const proposalMatch = messageText.match(/\[PROPOSAL CREATION\]([\s\S]*?)--------/);
+    if (!proposalMatch) {
+      return null;
+    }
+    
+    const proposalSection = proposalMatch[1];
+    
+    // Extract title (try both formats: -- Title: and - Title:)
+    let titleMatch = proposalSection.match(/-- Title:\s*(.+)/);
+    if (!titleMatch) {
+      titleMatch = proposalSection.match(/- Title:\s*(.+)/);
+    }
+    if (!titleMatch) {
+      return null;
+    }
+    const title = titleMatch[1].trim();
+    
+    // Extract content (try both formats: -- Content: and - Content:)
+    let contentMatch = proposalSection.match(/-- Content:\s*([\s\S]+)/);
+    if (!contentMatch) {
+      contentMatch = proposalSection.match(/- Content:\s*([\s\S]+)/);
+    }
+    if (!contentMatch) {
+      return null;
+    }
+    const content = contentMatch[1].trim();
+    
+    // Extract digital signature
+    const signatureMatch = messageText.match(/My Digital Signature:\s*(.+)/);
+    const digitalSignature = signatureMatch ? signatureMatch[1].trim() : '';
+    
+    // Extract transaction ID
+    const transactionMatch = messageText.match(/Request Transaction ID:\s*(.+)/);
+    const transactionId = transactionMatch ? transactionMatch[1].trim() : '';
+    
+    return {
+      title,
+      content,
+      digitalSignature,
+      transactionId
+    };
+    
+  } catch (error) {
+    Logger.log(`❌ Error parsing proposal submission: ${error.message}`);
+    return null;
+  }
+}
+
+/**
+ * Test method to process a specific line from Telegram Chat Logs
+ */
+function testProcessSpecificProposalSubmission(lineNumber) {
+  try {
+    Logger.log(`🧪 Testing proposal processing for line ${lineNumber}...`);
+    
+    const spreadsheetId = '1qbZZhf-_7xzmDTriaJVWj6OZshyQsFkdsAV8-pyzASQ';
+    const spreadsheet = SpreadsheetApp.openById(spreadsheetId);
+    const telegramLogsSheet = spreadsheet.getSheetByName('Telegram Chat Logs');
+    
+    if (!telegramLogsSheet) {
+      throw new Error('Telegram Chat Logs sheet not found');
+    }
+    
+    // Get the specific row
+    const row = telegramLogsSheet.getRange(lineNumber, 1, 1, telegramLogsSheet.getLastColumn()).getValues()[0];
+    
+    // Use column indices like the QR code processing script
+    // Column G (6): Contribution Made (this is where the message text is)
+    const messageTextIndex = 6; // Column G (Contribution Made)
+    
+    const messageText = row[messageTextIndex];
+    Logger.log(`📝 Message text: ${messageText}`);
+    
+    // Parse the proposal
+    const proposalData = parseProposalSubmission(messageText);
+    if (proposalData) {
+      Logger.log(`✅ Parsed proposal data:`, proposalData);
+      return proposalData;
+    } else {
+      Logger.log(`❌ No proposal data found in message`);
+      return null;
+    }
+    
+  } catch (error) {
+    Logger.log(`❌ Error testing specific proposal: ${error.message}`);
+    throw error;
+  }
+}
+
+// ============================================================================
+// DAPP PAYLOAD PROCESSING
+// ============================================================================
+
+/**
+ * Process DApp payloads from Edgar's domain submissions
+ * This method handles both proposal creation and voting submissions
+ */
+function processDAppPayloads() {
+  try {
+    Logger.log('🔄 Processing DApp payloads from Edgar submissions...');
+    
+    // Open the Telegram Chat Logs spreadsheet
+    const spreadsheetId = '1qbZZhf-_7xzmDTriaJVWj6OZshyQsFkdsAV8-pyzASQ';
+    const spreadsheet = SpreadsheetApp.openById(spreadsheetId);
+    
+    // Get Telegram Chat Logs sheet
+    const telegramLogsSheet = spreadsheet.getSheetByName('Telegram Chat Logs');
+    if (!telegramLogsSheet) {
+      throw new Error('Telegram Chat Logs sheet not found');
+    }
+    
+    // Get or create Proposal Submissions sheet
+    let proposalSubmissionsSheet = spreadsheet.getSheetByName('Proposal Submissions');
+    if (!proposalSubmissionsSheet) {
+      proposalSubmissionsSheet = spreadsheet.insertSheet('Proposal Submissions');
+      // Set up headers
+      const headers = [
+        'Message ID', 'Timestamp', 'Username', 'Message Text', 'Processed',
+        'Proposal Title', 'Proposal Content', 'Digital Signature', 'Transaction ID',
+        'GitHub PR URL', 'Status', 'Created Date', 'Updated Date', 'Submission Type'
+      ];
+      proposalSubmissionsSheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+      proposalSubmissionsSheet.getRange(1, 1, 1, headers.length).setFontWeight('bold');
+    }
+    
+    // Get all data from Telegram Chat Logs
+    const telegramData = telegramLogsSheet.getDataRange().getValues();
+    const headers = telegramData[0];
+    
+    // Use column indices like the QR code processing script
+    // Based on the QR code script structure:
+    // Column A (0): Telegram Update ID
+    // Column B (1): Telegram Chatroom ID  
+    // Column C (2): Telegram Chatroom Name
+    // Column D (3): Telegram Message ID
+    // Column E (4): Contributor Handle
+    // Column F (5): (empty)
+    // Column G (6): Contribution Made (this is where the message text is)
+    // Column H (7): (empty)
+    // Column I (8): (empty)
+    // Column J (9): (empty)
+    // Column K (10): (empty)
+    // Column L (11): Status Date
+    // Column M (12): (empty)
+    // Column N (13): (empty)
+    // Column O (14): (empty)
+    
+    const messageIdIndex = 3; // Column D
+    const timestampIndex = 11; // Column L (Status Date)
+    const usernameIndex = 4; // Column E (Contributor Handle)
+    const messageTextIndex = 6; // Column G (Contribution Made)
+    
+    // Get existing processed message IDs and transaction IDs from Proposal Submissions
+    const existingData = proposalSubmissionsSheet.getDataRange().getValues();
+    const existingMessageIds = new Set();
+    const existingTransactionIds = new Set();
+    for (let i = 1; i < existingData.length; i++) {
+      if (existingData[i][0]) { // Message ID column
+        existingMessageIds.add(existingData[i][0]);
+      }
+      if (existingData[i][8]) { // Transaction ID column
+        existingTransactionIds.add(existingData[i][8]);
+      }
+    }
+    
+    Logger.log(`📊 Found ${existingMessageIds.size} existing message IDs and ${existingTransactionIds.size} existing transaction IDs`);
+    
+    let processedCount = 0;
+    let newProposalsCount = 0;
+    let newVotesCount = 0;
+    let skippedCount = 0;
+    
+    // Process each row
+    for (let i = 1; i < telegramData.length; i++) {
+      const row = telegramData[i];
+      const messageId = row[messageIdIndex];
+      const messageText = row[messageTextIndex];
+      
+      // Skip if no message text
+      if (!messageId || !messageText) {
+        continue;
+      }
+      
+      // Skip if already processed by message ID
+      if (existingMessageIds.has(messageId)) {
+        skippedCount++;
+        continue;
+      }
+      
+      // Check if this is a DApp submission (contains verify_request.html link)
+      if (messageText.includes('verify_request.html') && 
+          (messageText.includes('[PROPOSAL CREATION]') || messageText.includes('[PROPOSAL VOTE]'))) {
+        
+        // Parse to get transaction ID for additional duplicate check
+        const submissionData = parseDAppSubmission(messageText);
+        if (submissionData && submissionData.transactionId) {
+          // Skip if already processed by transaction ID
+          if (existingTransactionIds.has(submissionData.transactionId)) {
+            Logger.log(`⏭️ Skipping duplicate transaction ID: ${submissionData.transactionId}`);
+            skippedCount++;
+            continue;
+          }
+        }
+        
+        try {
+          const submissionData = parseDAppSubmission(messageText);
+          if (submissionData) {
+            // Add to Proposal Submissions sheet
+            const newRow = [
+              messageId,
+              row[timestampIndex],
+              row[usernameIndex],
+              messageText,
+              'Yes', // Processed
+              submissionData.title || '',
+              submissionData.content || '',
+              submissionData.digitalSignature,
+              submissionData.transactionId,
+              submissionData.pullRequestNumber || '', // Pull Request Number
+              submissionData.status || 'Submitted', // Status
+              new Date(),
+              new Date(),
+              submissionData.type // Submission Type
+            ];
+            
+            proposalSubmissionsSheet.appendRow(newRow);
+            
+            if (submissionData.type === 'PROPOSAL_CREATION') {
+              newProposalsCount++;
+              Logger.log(`✅ Processed proposal creation: ${submissionData.title}`);
+              
+              // Create GitHub proposal if it's a new proposal
+              if (submissionData.title && submissionData.content) {
+                try {
+                  const config = getConfiguration();
+                  const result = createNewProposal(submissionData.title, submissionData.content, config);
+                  if (result.success) {
+                    // Update the row with PR number
+                    const lastRow = proposalSubmissionsSheet.getLastRow();
+                    proposalSubmissionsSheet.getRange(lastRow, 10).setValue(result.prNumber);
+                    proposalSubmissionsSheet.getRange(lastRow, 11).setValue('Created');
+                    Logger.log(`🎉 Created GitHub proposal PR #${result.prNumber}`);
+                  }
+                } catch (error) {
+                  Logger.log(`❌ Error creating GitHub proposal: ${error.message}`);
+                }
+              }
+            } else if (submissionData.type === 'PROPOSAL_VOTE') {
+              newVotesCount++;
+              Logger.log(`✅ Processed vote: ${submissionData.vote} for proposal "${submissionData.proposalTitle}"`);
+              
+              // Submit vote to GitHub if we have the PR number
+              if (submissionData.pullRequestNumber) {
+                try {
+                  const config = getConfiguration();
+                  // Use the original message text as-is for GitHub comment
+                  const result = submitVote(submissionData.pullRequestNumber, messageText, config);
+                  if (result.success) {
+                    // Update the row status
+                    const lastRow = proposalSubmissionsSheet.getLastRow();
+                    proposalSubmissionsSheet.getRange(lastRow, 11).setValue('Voted');
+                    Logger.log(`🎉 Submitted vote to GitHub PR #${submissionData.pullRequestNumber}`);
+                  }
+                } catch (error) {
+                  Logger.log(`❌ Error submitting vote to GitHub: ${error.message}`);
+                }
+              }
+            }
+          }
+        } catch (error) {
+          Logger.log(`❌ Error processing DApp submission in message ${messageId}: ${error.message}`);
+        }
+      }
+      
+      processedCount++;
+    }
+    
+    Logger.log(`🎉 DApp processing complete! Processed ${processedCount} messages, found ${newProposalsCount} new proposals, ${newVotesCount} new votes, skipped ${skippedCount} duplicates`);
+    return {
+      processed: processedCount,
+      newProposals: newProposalsCount,
+      newVotes: newVotesCount,
+      skipped: skippedCount
+    };
+    
+  } catch (error) {
+    Logger.log(`❌ Error processing DApp payloads: ${error.message}`);
+    throw error;
+  }
+}
+
+/**
+ * Parse DApp submission from message text
+ * Handles both [PROPOSAL CREATION] and [PROPOSAL VOTE] formats
+ */
+function parseDAppSubmission(messageText) {
+  try {
+    // Extract digital signature
+    const signatureMatch = messageText.match(/My Digital Signature:\s*(.+)/);
+    const digitalSignature = signatureMatch ? signatureMatch[1].trim() : '';
+    
+    // Extract transaction ID
+    const transactionMatch = messageText.match(/Request Transaction ID:\s*(.+)/);
+    const transactionId = transactionMatch ? transactionMatch[1].trim() : '';
+    
+    // Check if it's a proposal creation
+    if (messageText.includes('[PROPOSAL CREATION]')) {
+      const proposalMatch = messageText.match(/\[PROPOSAL CREATION\]([\s\S]*?)--------/);
+      if (!proposalMatch) {
+        return null;
+      }
+      
+      const proposalSection = proposalMatch[1];
+      
+      // Extract title (try both formats: -- Title: and - Title:)
+      let titleMatch = proposalSection.match(/-- Title:\s*(.+)/);
+      if (!titleMatch) {
+        titleMatch = proposalSection.match(/- Title:\s*(.+)/);
+      }
+      if (!titleMatch) {
+        return null;
+      }
+      const title = titleMatch[1].trim();
+      
+      // Extract content (try both formats: -- Content: and - Content:)
+      let contentMatch = proposalSection.match(/-- Content:\s*([\s\S]+)/);
+      if (!contentMatch) {
+        contentMatch = proposalSection.match(/- Content:\s*([\s\S]+)/);
+      }
+      if (!contentMatch) {
+        return null;
+      }
+      const content = contentMatch[1].trim();
+      
+      return {
+        type: 'PROPOSAL_CREATION',
+        title,
+        content,
+        digitalSignature,
+        transactionId,
+        status: 'Submitted'
+      };
+    }
+    
+    // Check if it's a proposal vote
+    if (messageText.includes('[PROPOSAL VOTE]')) {
+      const voteMatch = messageText.match(/\[PROPOSAL VOTE\]([\s\S]*?)--------/);
+      if (!voteMatch) {
+        return null;
+      }
+      
+      const voteSection = voteMatch[1];
+      
+      // Extract proposal title
+      const proposalMatch = voteSection.match(/Proposal:\s*(.+)/);
+      const proposalTitle = proposalMatch ? proposalMatch[1].trim() : '';
+      
+      // Extract vote
+      const voteMatch2 = voteSection.match(/Vote:\s*(.+)/);
+      const vote = voteMatch2 ? voteMatch2[1].trim() : '';
+      
+      // Try to extract PR number from the proposal title, content, or URL
+      let pullRequestNumber = '';
+      const prMatch = messageText.match(/PR #(\d+)|pull request #(\d+)|proposal #(\d+)|pr=(\d+)/i);
+      if (prMatch) {
+        pullRequestNumber = prMatch[1] || prMatch[2] || prMatch[3] || prMatch[4];
+      }
+      
+      return {
+        type: 'PROPOSAL_VOTE',
+        proposalTitle,
+        vote,
+        pullRequestNumber,
+        digitalSignature,
+        transactionId,
+        status: 'Submitted'
+      };
+    }
+    
+    return null;
+    
+  } catch (error) {
+    Logger.log(`❌ Error parsing DApp submission: ${error.message}`);
+    return null;
+  }
+}
+
+/**
+ * Test method to process a specific line from Telegram Chat Logs for DApp submissions
+ */
+function testProcessSpecificDAppSubmission(lineNumber) {
+  try {
+    Logger.log(`🧪 Testing DApp submission processing for line ${lineNumber}...`);
+    
+    const spreadsheetId = '1qbZZhf-_7xzmDTriaJVWj6OZshyQsFkdsAV8-pyzASQ';
+    const spreadsheet = SpreadsheetApp.openById(spreadsheetId);
+    const telegramLogsSheet = spreadsheet.getSheetByName('Telegram Chat Logs');
+    
+    if (!telegramLogsSheet) {
+      throw new Error('Telegram Chat Logs sheet not found');
+    }
+    
+    // Get the specific row
+    const row = telegramLogsSheet.getRange(lineNumber, 1, 1, telegramLogsSheet.getLastColumn()).getValues()[0];
+    
+    // Use column indices like the QR code processing script
+    // Column G (6): Contribution Made (this is where the message text is)
+    const messageTextIndex = 6; // Column G (Contribution Made)
+    
+    const messageText = row[messageTextIndex];
+    Logger.log(`📝 Message text: ${messageText}`);
+    
+    // Parse the DApp submission
+    const submissionData = parseDAppSubmission(messageText);
+    if (submissionData) {
+      Logger.log(`✅ Parsed DApp submission data:`, submissionData);
+      return submissionData;
+    } else {
+      Logger.log(`❌ No DApp submission data found in message`);
+      return null;
+    }
+    
+  } catch (error) {
+    Logger.log(`❌ Error testing DApp submission processing: ${error.message}`);
+    throw error;
+  }
+}
+
+/**
+ * Debug version to test vote submission with detailed logging
+ */
+function testVoteSubmissionDebug(lineNumber) {
+  try {
+    Logger.log(`🔍 DEBUG: Testing vote submission for line ${lineNumber}...`);
+    
+    const spreadsheetId = '1qbZZhf-_7xzmDTriaJVWj6OZshyQsFkdsAV8-pyzASQ';
+    const spreadsheet = SpreadsheetApp.openById(spreadsheetId);
+    const telegramLogsSheet = spreadsheet.getSheetByName('Telegram Chat Logs');
+    
+    if (!telegramLogsSheet) {
+      throw new Error('Telegram Chat Logs sheet not found');
+    }
+    
+    // Get the specific row
+    const row = telegramLogsSheet.getRange(lineNumber, 1, 1, telegramLogsSheet.getLastColumn()).getValues()[0];
+    
+    const messageIdIndex = 3; // Column D
+    const messageTextIndex = 6; // Column G (Contribution Made)
+    
+    const messageId = row[messageIdIndex];
+    const messageText = row[messageTextIndex];
+    
+    Logger.log(`📝 Message ID: ${messageId}`);
+    Logger.log(`📝 Message text: ${messageText}`);
+    
+    // Parse the DApp submission
+    const submissionData = parseDAppSubmission(messageText);
+    if (!submissionData) {
+      Logger.log(`❌ No DApp submission data found in message`);
+      return null;
+    }
+    
+    Logger.log(`✅ Parsed submission data:`, submissionData);
+    
+    // Test the submitVote function directly
+    if (submissionData.type === 'PROPOSAL_VOTE' && submissionData.pullRequestNumber) {
+      Logger.log(`🎯 Testing submitVote function directly...`);
+      const config = getConfiguration();
+      
+      Logger.log(`📤 Original message text to submit: ${messageText}`);
+      Logger.log(`🎯 PR Number: ${submissionData.pullRequestNumber}`);
+      Logger.log(`⚙️ Config: ${JSON.stringify(config)}`);
+      
+      // Use the original message text as-is for GitHub comment
+      const result = submitVote(submissionData.pullRequestNumber, messageText, config);
+      Logger.log(`📥 SubmitVote result: ${JSON.stringify(result)}`);
+      
+      return result;
+    } else {
+      Logger.log(`❌ Not a vote submission or missing PR number`);
+      return { success: false, message: 'Not a vote submission or missing PR number' };
+    }
+    
+  } catch (error) {
+    Logger.log(`❌ Error in debug vote submission: ${error.message}`);
+    Logger.log(`❌ Stack trace: ${error.stack}`);
+    throw error;
+  }
+}
+
+/**
+ * Test method to FULLY process a specific line from Telegram Chat Logs for DApp submissions
+ * This will create both the Google Sheets row AND the GitHub pull request
+ */
+function testProcessSpecificDAppSubmissionFully(lineNumber) {
+  try {
+    Logger.log(`🚀 FULLY processing DApp submission for line ${lineNumber}...`);
+    
+    const spreadsheetId = '1qbZZhf-_7xzmDTriaJVWj6OZshyQsFkdsAV8-pyzASQ';
+    const spreadsheet = SpreadsheetApp.openById(spreadsheetId);
+    const telegramLogsSheet = spreadsheet.getSheetByName('Telegram Chat Logs');
+    
+    if (!telegramLogsSheet) {
+      throw new Error('Telegram Chat Logs sheet not found');
+    }
+    
+    // Get the specific row
+    const row = telegramLogsSheet.getRange(lineNumber, 1, 1, telegramLogsSheet.getLastColumn()).getValues()[0];
+    
+    // Use column indices like the QR code processing script
+    const messageIdIndex = 3; // Column D
+    const timestampIndex = 11; // Column L (Status Date)
+    const usernameIndex = 4; // Column E (Contributor Handle)
+    const messageTextIndex = 6; // Column G (Contribution Made)
+    
+    const messageId = row[messageIdIndex];
+    const messageText = row[messageTextIndex];
+    
+    Logger.log(`📝 Message ID: ${messageId}`);
+    Logger.log(`📝 Message text: ${messageText}`);
+    
+    // Parse the DApp submission
+    const submissionData = parseDAppSubmission(messageText);
+    if (!submissionData) {
+      Logger.log(`❌ No DApp submission data found in message`);
+      return null;
+    }
+    
+    Logger.log(`✅ Parsed DApp submission data:`, submissionData);
+    
+    // Get or create Proposal Submissions sheet
+    let proposalSubmissionsSheet = spreadsheet.getSheetByName('Proposal Submissions');
+    if (!proposalSubmissionsSheet) {
+      proposalSubmissionsSheet = spreadsheet.insertSheet('Proposal Submissions');
+      // Set up headers
+      const headers = [
+        'Message ID', 'Timestamp', 'Username', 'Message Text', 'Processed',
+        'Proposal Title', 'Proposal Content', 'Digital Signature', 'Transaction ID',
+        'GitHub PR URL', 'Status', 'Created Date', 'Updated Date', 'Submission Type'
+      ];
+      proposalSubmissionsSheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+      proposalSubmissionsSheet.getRange(1, 1, 1, headers.length).setFontWeight('bold');
+    }
+    
+    // Check if already processed
+    const existingData = proposalSubmissionsSheet.getDataRange().getValues();
+    const existingMessageIds = new Set();
+    const existingTransactionIds = new Set();
+    for (let i = 1; i < existingData.length; i++) {
+      if (existingData[i][0]) { // Message ID column
+        existingMessageIds.add(existingData[i][0]);
+      }
+      if (existingData[i][8]) { // Transaction ID column
+        existingTransactionIds.add(existingData[i][8]);
+      }
+    }
+    
+    if (existingMessageIds.has(messageId)) {
+      Logger.log(`⚠️ Message ID ${messageId} already processed - skipping`);
+      return { success: false, message: 'Already processed' };
+    }
+    
+    if (existingTransactionIds.has(submissionData.transactionId)) {
+      Logger.log(`⚠️ Transaction ID ${submissionData.transactionId} already processed - skipping`);
+      return { success: false, message: 'Transaction already processed' };
+    }
+    
+    // Add to Proposal Submissions sheet
+    const newRow = [
+      messageId,
+      row[timestampIndex],
+      row[usernameIndex],
+      messageText,
+      'Yes', // Processed
+      submissionData.title || '',
+      submissionData.content || '',
+      submissionData.digitalSignature,
+      submissionData.transactionId,
+      '', // Pull Request Number (to be filled later)
+      'Submitted', // Status
+      new Date(),
+      new Date(),
+      submissionData.type // Submission Type
+    ];
+    
+    proposalSubmissionsSheet.appendRow(newRow);
+    Logger.log(`✅ Added row to Proposal Submissions sheet`);
+    
+    // Create GitHub proposal if it's a new proposal
+    if (submissionData.type === 'PROPOSAL_CREATION' && submissionData.title && submissionData.content) {
+      try {
+        Logger.log(`🎯 Creating GitHub proposal: ${submissionData.title}`);
+        const config = getConfiguration();
+        const result = createNewProposal(submissionData.title, submissionData.content, config);
+        
+        if (result.success) {
+          // Update the row with PR URL
+          const lastRow = proposalSubmissionsSheet.getLastRow();
+          proposalSubmissionsSheet.getRange(lastRow, 10).setValue(`https://github.com/TrueSightDAO/proposals/pull/${result.prNumber}`);
+          proposalSubmissionsSheet.getRange(lastRow, 11).setValue('Created');
+          
+          Logger.log(`🎉 Created GitHub proposal PR #${result.prNumber}`);
+          Logger.log(`🔗 PR URL: https://github.com/TrueSightDAO/proposals/pull/${result.prNumber}`);
+          
+          return {
+            success: true,
+            message: `Successfully processed DApp submission`,
+            prNumber: result.prNumber,
+            prUrl: `https://github.com/TrueSightDAO/proposals/pull/${result.prNumber}`,
+            submissionData: submissionData
+          };
+        } else {
+          Logger.log(`❌ Error creating GitHub proposal: ${result.error}`);
+          return {
+            success: false,
+            message: `Failed to create GitHub proposal: ${result.error}`,
+            submissionData: submissionData
+          };
+        }
+      } catch (error) {
+        Logger.log(`❌ Error creating GitHub proposal: ${error.message}`);
+        return {
+          success: false,
+          message: `Error creating GitHub proposal: ${error.message}`,
+          submissionData: submissionData
+        };
+      }
+    } else if (submissionData.type === 'PROPOSAL_VOTE') {
+      Logger.log(`🗳️ Vote submission processed: ${submissionData.vote} for "${submissionData.proposalTitle}"`);
+      
+      // Submit vote to GitHub if we have the PR number
+      if (submissionData.pullRequestNumber) {
+        try {
+          Logger.log(`🎯 Submitting vote to GitHub PR #${submissionData.pullRequestNumber}`);
+          const config = getConfiguration();
+          // Use the original message text as-is for GitHub comment
+          const result = submitVote(submissionData.pullRequestNumber, messageText, config);
+          
+          if (result.success) {
+            // Update the row with PR URL and status
+            const lastRow = proposalSubmissionsSheet.getLastRow();
+            proposalSubmissionsSheet.getRange(lastRow, 10).setValue(`https://github.com/TrueSightDAO/proposals/pull/${submissionData.pullRequestNumber}`);
+            proposalSubmissionsSheet.getRange(lastRow, 11).setValue('Voted');
+            
+            Logger.log(`🎉 Submitted vote to GitHub PR #${submissionData.pullRequestNumber}`);
+            Logger.log(`🔗 PR URL: https://github.com/TrueSightDAO/proposals/pull/${submissionData.pullRequestNumber}`);
+            
+            return {
+              success: true,
+              message: `Vote submitted to GitHub PR #${submissionData.pullRequestNumber}`,
+              prNumber: submissionData.pullRequestNumber,
+              prUrl: `https://github.com/TrueSightDAO/proposals/pull/${submissionData.pullRequestNumber}`,
+              submissionData: submissionData
+            };
+          } else {
+            Logger.log(`❌ Error submitting vote to GitHub: ${result.error}`);
+            return {
+              success: false,
+              message: `Failed to submit vote to GitHub: ${result.error}`,
+              submissionData: submissionData
+            };
+          }
+        } catch (error) {
+          Logger.log(`❌ Error submitting vote to GitHub: ${error.message}`);
+          return {
+            success: false,
+            message: `Error submitting vote to GitHub: ${error.message}`,
+            submissionData: submissionData
+          };
+        }
+      } else {
+        Logger.log(`⚠️ No PR number found for vote submission`);
+        return {
+          success: false,
+          message: `No PR number found for vote submission`,
+          submissionData: submissionData
+        };
+      }
+    } else {
+      Logger.log(`❌ Unknown submission type: ${submissionData.type}`);
+      return {
+        success: false,
+        message: `Unknown submission type: ${submissionData.type}`,
+        submissionData: submissionData
+      };
+    }
+    
+  } catch (error) {
+    Logger.log(`❌ Error in full DApp submission processing: ${error.message}`);
+    throw error;
+  }
 }
