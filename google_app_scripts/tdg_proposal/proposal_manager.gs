@@ -2323,6 +2323,68 @@ function testProcessSpecificDAppSubmission(lineNumber) {
 }
 
 /**
+ * Debug version to test vote submission with detailed logging
+ */
+function testVoteSubmissionDebug(lineNumber) {
+  try {
+    Logger.log(`🔍 DEBUG: Testing vote submission for line ${lineNumber}...`);
+    
+    const spreadsheetId = '1qbZZhf-_7xzmDTriaJVWj6OZshyQsFkdsAV8-pyzASQ';
+    const spreadsheet = SpreadsheetApp.openById(spreadsheetId);
+    const telegramLogsSheet = spreadsheet.getSheetByName('Telegram Chat Logs');
+    
+    if (!telegramLogsSheet) {
+      throw new Error('Telegram Chat Logs sheet not found');
+    }
+    
+    // Get the specific row
+    const row = telegramLogsSheet.getRange(lineNumber, 1, 1, telegramLogsSheet.getLastColumn()).getValues()[0];
+    
+    const messageIdIndex = 3; // Column D
+    const messageTextIndex = 6; // Column G (Contribution Made)
+    
+    const messageId = row[messageIdIndex];
+    const messageText = row[messageTextIndex];
+    
+    Logger.log(`📝 Message ID: ${messageId}`);
+    Logger.log(`📝 Message text: ${messageText}`);
+    
+    // Parse the DApp submission
+    const submissionData = parseDAppSubmission(messageText);
+    if (!submissionData) {
+      Logger.log(`❌ No DApp submission data found in message`);
+      return null;
+    }
+    
+    Logger.log(`✅ Parsed submission data:`, submissionData);
+    
+    // Test the submitVote function directly
+    if (submissionData.type === 'PROPOSAL_VOTE' && submissionData.pullRequestNumber) {
+      Logger.log(`🎯 Testing submitVote function directly...`);
+      const config = getConfiguration();
+      const voteText = `[PROPOSAL VOTE]\nProposal: ${submissionData.proposalTitle}\nVote: ${submissionData.vote}\nDigital Signature: ${submissionData.digitalSignature}\nTransaction ID: ${submissionData.transactionId}\n---------`;
+      
+      Logger.log(`📤 Vote text to submit: ${voteText}`);
+      Logger.log(`🎯 PR Number: ${submissionData.pullRequestNumber}`);
+      Logger.log(`⚙️ Config: ${JSON.stringify(config)}`);
+      
+      const result = submitVote(submissionData.pullRequestNumber, voteText, config);
+      Logger.log(`📥 SubmitVote result: ${JSON.stringify(result)}`);
+      
+      return result;
+    } else {
+      Logger.log(`❌ Not a vote submission or missing PR number`);
+      return { success: false, message: 'Not a vote submission or missing PR number' };
+    }
+    
+  } catch (error) {
+    Logger.log(`❌ Error in debug vote submission: ${error.message}`);
+    Logger.log(`❌ Stack trace: ${error.stack}`);
+    throw error;
+  }
+}
+
+/**
  * Test method to FULLY process a specific line from Telegram Chat Logs for DApp submissions
  * This will create both the Google Sheets row AND the GitHub pull request
  */
