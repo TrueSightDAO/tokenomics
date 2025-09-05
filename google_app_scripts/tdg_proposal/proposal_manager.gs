@@ -2149,8 +2149,8 @@ function processDAppPayloads() {
               if (submissionData.pullRequestNumber) {
                 try {
                   const config = getConfiguration();
-                  const voteText = `[PROPOSAL VOTE]\nProposal: ${submissionData.proposalTitle}\nVote: ${submissionData.vote}\nMy Digital Signature: ${submissionData.digitalSignature}\nRequest Transaction ID: ${submissionData.transactionId}\n---------`;
-                  const result = submitVote(submissionData.pullRequestNumber, voteText, config);
+                  // Use the original message text as-is for GitHub comment
+                  const result = submitVote(submissionData.pullRequestNumber, messageText, config);
                   if (result.success) {
                     // Update the row status
                     const lastRow = proposalSubmissionsSheet.getLastRow();
@@ -2362,13 +2362,13 @@ function testVoteSubmissionDebug(lineNumber) {
     if (submissionData.type === 'PROPOSAL_VOTE' && submissionData.pullRequestNumber) {
       Logger.log(`🎯 Testing submitVote function directly...`);
       const config = getConfiguration();
-      const voteText = `[PROPOSAL VOTE]\nProposal: ${submissionData.proposalTitle}\nVote: ${submissionData.vote}\nMy Digital Signature: ${submissionData.digitalSignature}\nRequest Transaction ID: ${submissionData.transactionId}\n---------`;
       
-      Logger.log(`📤 Vote text to submit: ${voteText}`);
+      Logger.log(`📤 Original message text to submit: ${messageText}`);
       Logger.log(`🎯 PR Number: ${submissionData.pullRequestNumber}`);
       Logger.log(`⚙️ Config: ${JSON.stringify(config)}`);
       
-      const result = submitVote(submissionData.pullRequestNumber, voteText, config);
+      // Use the original message text as-is for GitHub comment
+      const result = submitVote(submissionData.pullRequestNumber, messageText, config);
       Logger.log(`📥 SubmitVote result: ${JSON.stringify(result)}`);
       
       return result;
@@ -2529,8 +2529,8 @@ function testProcessSpecificDAppSubmissionFully(lineNumber) {
         try {
           Logger.log(`🎯 Submitting vote to GitHub PR #${submissionData.pullRequestNumber}`);
           const config = getConfiguration();
-          const voteText = `[PROPOSAL VOTE]\nProposal: ${submissionData.proposalTitle}\nVote: ${submissionData.vote}\nMy Digital Signature: ${submissionData.digitalSignature}\nRequest Transaction ID: ${submissionData.transactionId}\n---------`;
-          const result = submitVote(submissionData.pullRequestNumber, voteText, config);
+          // Use the original message text as-is for GitHub comment
+          const result = submitVote(submissionData.pullRequestNumber, messageText, config);
           
           if (result.success) {
             // Update the row with PR URL and status
