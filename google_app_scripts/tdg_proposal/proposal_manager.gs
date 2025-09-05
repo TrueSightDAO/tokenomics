@@ -2013,7 +2013,7 @@ function processDAppPayloads() {
       const headers = [
         'Message ID', 'Timestamp', 'Username', 'Message Text', 'Processed',
         'Proposal Title', 'Proposal Content', 'Digital Signature', 'Transaction ID',
-        'Pull Request Number', 'Status', 'Created Date', 'Updated Date', 'Submission Type'
+        'GitHub PR URL', 'Status', 'Created Date', 'Updated Date', 'Submission Type'
       ];
       proposalSubmissionsSheet.getRange(1, 1, 1, headers.length).setValues([headers]);
       proposalSubmissionsSheet.getRange(1, 1, 1, headers.length).setFontWeight('bold');
@@ -2370,7 +2370,7 @@ function testProcessSpecificDAppSubmissionFully(lineNumber) {
       const headers = [
         'Message ID', 'Timestamp', 'Username', 'Message Text', 'Processed',
         'Proposal Title', 'Proposal Content', 'Digital Signature', 'Transaction ID',
-        'Pull Request Number', 'Status', 'Created Date', 'Updated Date', 'Submission Type'
+        'GitHub PR URL', 'Status', 'Created Date', 'Updated Date', 'Submission Type'
       ];
       proposalSubmissionsSheet.getRange(1, 1, 1, headers.length).setValues([headers]);
       proposalSubmissionsSheet.getRange(1, 1, 1, headers.length).setFontWeight('bold');
@@ -2428,9 +2428,9 @@ function testProcessSpecificDAppSubmissionFully(lineNumber) {
         const result = createNewProposal(submissionData.title, submissionData.content, config);
         
         if (result.success) {
-          // Update the row with PR number
+          // Update the row with PR URL
           const lastRow = proposalSubmissionsSheet.getLastRow();
-          proposalSubmissionsSheet.getRange(lastRow, 10).setValue(result.prNumber);
+          proposalSubmissionsSheet.getRange(lastRow, 10).setValue(`https://github.com/TrueSightDAO/proposals/pull/${result.prNumber}`);
           proposalSubmissionsSheet.getRange(lastRow, 11).setValue('Created');
           
           Logger.log(`🎉 Created GitHub proposal PR #${result.prNumber}`);
@@ -2471,8 +2471,9 @@ function testProcessSpecificDAppSubmissionFully(lineNumber) {
           const result = submitVote(submissionData.pullRequestNumber, voteText, config);
           
           if (result.success) {
-            // Update the row status
+            // Update the row with PR URL and status
             const lastRow = proposalSubmissionsSheet.getLastRow();
+            proposalSubmissionsSheet.getRange(lastRow, 10).setValue(`https://github.com/TrueSightDAO/proposals/pull/${submissionData.pullRequestNumber}`);
             proposalSubmissionsSheet.getRange(lastRow, 11).setValue('Voted');
             
             Logger.log(`🎉 Submitted vote to GitHub PR #${submissionData.pullRequestNumber}`);
