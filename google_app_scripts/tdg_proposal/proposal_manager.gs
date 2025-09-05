@@ -2321,3 +2321,162 @@ function testProcessSpecificDAppSubmission(lineNumber) {
     throw error;
   }
 }
+
+/**
+ * Test method to FULLY process a specific line from Telegram Chat Logs for DApp submissions
+ * This will create both the Google Sheets row AND the GitHub pull request
+ */
+function testProcessSpecificDAppSubmissionFully(lineNumber) {
+  try {
+    Logger.log(`🚀 FULLY processing DApp submission for line ${lineNumber}...`);
+    
+    const spreadsheetId = '1qbZZhf-_7xzmDTriaJVWj6OZshyQsFkdsAV8-pyzASQ';
+    const spreadsheet = SpreadsheetApp.openById(spreadsheetId);
+    const telegramLogsSheet = spreadsheet.getSheetByName('Telegram Chat Logs');
+    
+    if (!telegramLogsSheet) {
+      throw new Error('Telegram Chat Logs sheet not found');
+    }
+    
+    // Get the specific row
+    const row = telegramLogsSheet.getRange(lineNumber, 1, 1, telegramLogsSheet.getLastColumn()).getValues()[0];
+    
+    // Use column indices like the QR code processing script
+    const messageIdIndex = 3; // Column D
+    const timestampIndex = 11; // Column L (Status Date)
+    const usernameIndex = 4; // Column E (Contributor Handle)
+    const messageTextIndex = 6; // Column G (Contribution Made)
+    
+    const messageId = row[messageIdIndex];
+    const messageText = row[messageTextIndex];
+    
+    Logger.log(`📝 Message ID: ${messageId}`);
+    Logger.log(`📝 Message text: ${messageText}`);
+    
+    // Parse the DApp submission
+    const submissionData = parseDAppSubmission(messageText);
+    if (!submissionData) {
+      Logger.log(`❌ No DApp submission data found in message`);
+      return null;
+    }
+    
+    Logger.log(`✅ Parsed DApp submission data:`, submissionData);
+    
+    // Get or create Proposal Submissions sheet
+    let proposalSubmissionsSheet = spreadsheet.getSheetByName('Proposal Submissions');
+    if (!proposalSubmissionsSheet) {
+      proposalSubmissionsSheet = spreadsheet.insertSheet('Proposal Submissions');
+      // Set up headers
+      const headers = [
+        'Message ID', 'Timestamp', 'Username', 'Message Text', 'Processed',
+        'Proposal Title', 'Proposal Content', 'Digital Signature', 'Transaction ID',
+        'Pull Request Number', 'Status', 'Created Date', 'Updated Date', 'Submission Type'
+      ];
+      proposalSubmissionsSheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+      proposalSubmissionsSheet.getRange(1, 1, 1, headers.length).setFontWeight('bold');
+    }
+    
+    // Check if already processed
+    const existingData = proposalSubmissionsSheet.getDataRange().getValues();
+    const existingMessageIds = new Set();
+    const existingTransactionIds = new Set();
+    for (let i = 1; i < existingData.length; i++) {
+      if (existingData[i][0]) { // Message ID column
+        existingMessageIds.add(existingData[i][0]);
+      }
+      if (existingData[i][8]) { // Transaction ID column
+        existingTransactionIds.add(existingData[i][8]);
+      }
+    }
+    
+    if (existingMessageIds.has(messageId)) {
+      Logger.log(`⚠️ Message ID ${messageId} already processed - skipping`);
+      return { success: false, message: 'Already processed' };
+    }
+    
+    if (existingTransactionIds.has(submissionData.transactionId)) {
+      Logger.log(`⚠️ Transaction ID ${submissionData.transactionId} already processed - skipping`);
+      return { success: false, message: 'Transaction already processed' };
+    }
+    
+    // Add to Proposal Submissions sheet
+    const newRow = [
+      messageId,
+      row[timestampIndex],
+      row[usernameIndex],
+      messageText,
+      'Yes', // Processed
+      submissionData.title || '',
+      submissionData.content || '',
+      submissionData.digitalSignature,
+      submissionData.transactionId,
+      '', // Pull Request Number (to be filled later)
+      'Submitted', // Status
+      new Date(),
+      new Date(),
+      submissionData.type // Submission Type
+    ];
+    
+    proposalSubmissionsSheet.appendRow(newRow);
+    Logger.log(`✅ Added row to Proposal Submissions sheet`);
+    
+    // Create GitHub proposal if it's a new proposal
+    if (submissionData.type === 'PROPOSAL_CREATION' && submissionData.title && submissionData.content) {
+      try {
+        Logger.log(`🎯 Creating GitHub proposal: ${submissionData.title}`);
+        const config = getConfiguration();
+        const result = createNewProposal(submissionData.title, submissionData.content, config);
+        
+        if (result.success) {
+          // Update the row with PR number
+          const lastRow = proposalSubmissionsSheet.getLastRow();
+          proposalSubmissionsSheet.getRange(lastRow, 10).setValue(result.prNumber);
+          proposalSubmissionsSheet.getRange(lastRow, 11).setValue('Created');
+          
+          Logger.log(`🎉 Created GitHub proposal PR #${result.prNumber}`);
+          Logger.log(`🔗 PR URL: https://github.com/TrueSightDAO/proposals/pull/${result.prNumber}`);
+          
+          return {
+            success: true,
+            message: `Successfully processed DApp submission`,
+            prNumber: result.prNumber,
+            prUrl: `https://github.com/TrueSightDAO/proposals/pull/${result.prNumber}`,
+            submissionData: submissionData
+          };
+        } else {
+          Logger.log(`❌ Error creating GitHub proposal: ${result.error}`);
+          return {
+            success: false,
+            message: `Failed to create GitHub proposal: ${result.error}`,
+            submissionData: submissionData
+          };
+        }
+      } catch (error) {
+        Logger.log(`❌ Error creating GitHub proposal: ${error.message}`);
+        return {
+          success: false,
+          message: `Error creating GitHub proposal: ${error.message}`,
+          submissionData: submissionData
+        };
+      }
+    } else if (submissionData.type === 'PROPOSAL_VOTE') {
+      Logger.log(`🗳️ Vote submission processed: ${submissionData.vote} for "${submissionData.proposalTitle}"`);
+      return {
+        success: true,
+        message: `Vote submission processed`,
+        submissionData: submissionData
+      };
+    } else {
+      Logger.log(`❌ Unknown submission type: ${submissionData.type}`);
+      return {
+        success: false,
+        message: `Unknown submission type: ${submissionData.type}`,
+        submissionData: submissionData
+      };
+    }
+    
+  } catch (error) {
+    Logger.log(`❌ Error in full DApp submission processing: ${error.message}`);
+    throw error;
+  }
+}
