@@ -1178,6 +1178,233 @@ function generateVotingSummary(yesVotes, noVotes, totalVotes, action) {
   return `## 🏁 Voting Closed - ${actionText} ${actionEmoji}\n\n**Final Vote Count:**\n- ✅ YES: ${yesVotes}\n- ❌ NO: ${noVotes}\n- 📊 Total: ${totalVotes}\n- 🏆 Majority: ${majority}\n\n**Result:** This proposal has been ${action.toUpperCase()} based on the majority vote.\n\n*Voting closed on ${new Date().toISOString()}*`;
 }
 
+/**
+ * Automatically closes all expired pull requests based on voting outcomes
+ * This method is designed to be run daily via Google Apps Script triggers
+ * @return {Object} Result object with summary of actions taken
+ */
+function autoCloseExpiredProposals() {
+  try {
+    Logger.log('🔄 Starting automatic closure of expired proposals...');
+    
+    // Validate configuration first
+    if (!validateConfiguration()) {
+      return { success: false, error: 'Configuration not valid. Set required properties in Script Properties.' };
+    }
+    
+    const config = getConfiguration();
+    const now = new Date();
+    const results = {
+      success: true,
+      processed: 0,
+      closed: 0,
+      merged: 0,
+      errors: 0,
+      details: []
+    };
+    
+    // Get all open pull requests
+    const url = `https://api.github.com/repos/${config.githubOwner}/${config.githubRepo}/pulls?state=open&sort=created&direction=desc`;
+    const response = UrlFetchApp.fetch(url, {
+      headers: { 'Authorization': `token ${config.githubToken}` },
+      muteHttpExceptions: true
+    });
+    
+    if (response.getResponseCode() !== 200) {
+      return { success: false, error: `Failed to fetch open PRs: ${response.getContentText()}` };
+    }
+    
+    const prs = JSON.parse(response.getContentText());
+    Logger.log(`📋 Found ${prs.length} open pull requests to check`);
+    
+    // Process each PR
+    for (const pr of prs) {
+      try {
+        results.processed++;
+        Logger.log(`🔍 Checking PR #${pr.number}: ${pr.title}`);
+        
+        // Calculate voting deadline (7 days from creation by default)
+        const createdAt = new Date(pr.created_at);
+        const votingDeadline = new Date(createdAt.getTime() + (config.votingDeadlineDays * 24 * 60 * 60 * 1000));
+        
+        // Check if voting period has expired
+        if (now < votingDeadline) {
+          Logger.log(`⏰ PR #${pr.number} voting period not yet expired (expires: ${votingDeadline.toISOString()})`);
+          results.details.push({
+            prNumber: pr.number,
+            title: pr.title,
+            status: 'Voting period not expired',
+            expiresAt: votingDeadline.toISOString()
+          });
+          continue;
+        }
+        
+        Logger.log(`⏰ PR #${pr.number} voting period has expired (expired: ${votingDeadline.toISOString()})`);
+        
+        // Get current vote count
+        const voteCount = getVoteCount(pr.number, config);
+        if (!voteCount.success) {
+          Logger.log(`❌ Failed to get vote count for PR #${pr.number}: ${voteCount.error}`);
+          results.errors++;
+          results.details.push({
+            prNumber: pr.number,
+            title: pr.title,
+            status: 'Error getting vote count',
+            error: voteCount.error
+          });
+          continue;
+        }
+        
+        const { yesVotes, noVotes, totalVotes } = voteCount;
+        Logger.log(`📊 PR #${pr.number} vote count: ${yesVotes} YES, ${noVotes} NO, ${totalVotes} total`);
+        
+        // Check if we have minimum votes required
+        if (totalVotes < config.minimumVotes) {
+          Logger.log(`⚠️ PR #${pr.number} has insufficient votes (${totalVotes} < ${config.minimumVotes} required)`);
+          results.details.push({
+            prNumber: pr.number,
+            title: pr.title,
+            status: 'Insufficient votes',
+            yesVotes: yesVotes,
+            noVotes: noVotes,
+            totalVotes: totalVotes,
+            minimumRequired: config.minimumVotes
+          });
+          continue;
+        }
+        
+        // Determine action based on majority vote
+        const majorityYes = yesVotes > noVotes;
+        let action;
+        let actionResult;
+        
+        if (majorityYes) {
+          // Merge the PR
+          Logger.log(`✅ PR #${pr.number} has majority YES votes - merging`);
+          actionResult = mergePullRequest(pr.number, config);
+          action = 'merged';
+          if (actionResult.success) {
+            results.merged++;
+          }
+        } else {
+          // Close the PR without merging
+          Logger.log(`❌ PR #${pr.number} has majority NO votes - closing without merge`);
+          actionResult = closePullRequest(pr.number, config);
+          action = 'closed';
+          if (actionResult.success) {
+            results.closed++;
+          }
+        }
+        
+        if (actionResult.success) {
+          // Add final voting summary comment
+          const summaryComment = generateVotingSummary(yesVotes, noVotes, totalVotes, action);
+          const commentResult = addComment(pr.number, summaryComment, config);
+          if (!commentResult.success) {
+            Logger.log(`⚠️ Failed to add summary comment for PR #${pr.number}: ${commentResult.error}`);
+          }
+          
+          Logger.log(`🎉 PR #${pr.number} successfully ${action}`);
+          results.details.push({
+            prNumber: pr.number,
+            title: pr.title,
+            status: `Successfully ${action}`,
+            action: action,
+            yesVotes: yesVotes,
+            noVotes: noVotes,
+            totalVotes: totalVotes,
+            majority: majorityYes ? 'YES' : 'NO',
+            expiredAt: votingDeadline.toISOString()
+          });
+        } else {
+          Logger.log(`❌ Failed to ${action} PR #${pr.number}: ${actionResult.error}`);
+          results.errors++;
+          results.details.push({
+            prNumber: pr.number,
+            title: pr.title,
+            status: `Failed to ${action}`,
+            error: actionResult.error,
+            yesVotes: yesVotes,
+            noVotes: noVotes,
+            totalVotes: totalVotes
+          });
+        }
+        
+        // Add small delay between operations to avoid rate limiting
+        Utilities.sleep(1000);
+        
+      } catch (error) {
+        Logger.log(`❌ Error processing PR #${pr.number}: ${error.message}`);
+        results.errors++;
+        results.details.push({
+          prNumber: pr.number,
+          title: pr.title,
+          status: 'Processing error',
+          error: error.message
+        });
+      }
+    }
+    
+    Logger.log(`🎉 Auto-close process completed!`);
+    Logger.log(`📊 Summary: ${results.processed} processed, ${results.merged} merged, ${results.closed} closed, ${results.errors} errors`);
+    
+    // Send email notification if enabled
+    if (config.enableEmailNotifications && (results.merged > 0 || results.closed > 0 || results.errors > 0)) {
+      sendAutoCloseNotification(results, config);
+    }
+    
+    return results;
+    
+  } catch (error) {
+    Logger.log(`❌ Error in autoCloseExpiredProposals: ${error.message}`);
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * Sends email notification about auto-close results
+ */
+function sendAutoCloseNotification(results, config) {
+  try {
+    const subject = `TDG Proposal Auto-Close Report - ${new Date().toLocaleDateString()}`;
+    
+    let body = `TDG Proposal Management System - Daily Auto-Close Report\n\n`;
+    body += `Date: ${new Date().toISOString()}\n`;
+    body += `Processed: ${results.processed} proposals\n`;
+    body += `Merged: ${results.merged} proposals\n`;
+    body += `Closed: ${results.closed} proposals\n`;
+    body += `Errors: ${results.errors} proposals\n\n`;
+    
+    if (results.details.length > 0) {
+      body += `Details:\n`;
+      body += `========\n\n`;
+      
+      results.details.forEach(detail => {
+        body += `PR #${detail.prNumber}: ${detail.title}\n`;
+        body += `Status: ${detail.status}\n`;
+        if (detail.action) {
+          body += `Action: ${detail.action}\n`;
+        }
+        if (detail.yesVotes !== undefined) {
+          body += `Votes: ${detail.yesVotes} YES, ${detail.noVotes} NO (${detail.totalVotes} total)\n`;
+        }
+        if (detail.error) {
+          body += `Error: ${detail.error}\n`;
+        }
+        body += `\n`;
+      });
+    }
+    
+    body += `\nThis is an automated report from the TDG Proposal Management System.`;
+    
+    MailApp.sendEmail(config.adminEmail, subject, body);
+    Logger.log(`📧 Email notification sent to ${config.adminEmail}`);
+    
+  } catch (error) {
+    Logger.log(`❌ Failed to send email notification: ${error.message}`);
+  }
+}
+
 // ============================================================================
 // TEST FUNCTIONS - Ready to Use
 // ============================================================================
@@ -1727,6 +1954,169 @@ function testWebAppEndpoints() {
   }
   
   Logger.log('🎉 Web app endpoint testing completed');
+}
+
+/**
+ * Test the auto-close functionality (DRY RUN - no actual changes)
+ * This will check which PRs would be closed without actually closing them
+ */
+function testAutoCloseExpiredProposals() {
+  try {
+    Logger.log('🧪 Testing auto-close functionality (DRY RUN)...');
+    
+    // Validate configuration first
+    if (!validateConfiguration()) {
+      return { success: false, error: 'Configuration not valid. Set required properties in Script Properties.' };
+    }
+    
+    const config = getConfiguration();
+    const now = new Date();
+    const results = {
+      success: true,
+      processed: 0,
+      wouldClose: 0,
+      wouldMerge: 0,
+      wouldSkip: 0,
+      details: []
+    };
+    
+    // Get all open pull requests
+    const url = `https://api.github.com/repos/${config.githubOwner}/${config.githubRepo}/pulls?state=open&sort=created&direction=desc`;
+    const response = UrlFetchApp.fetch(url, {
+      headers: { 'Authorization': `token ${config.githubToken}` },
+      muteHttpExceptions: true
+    });
+    
+    if (response.getResponseCode() !== 200) {
+      return { success: false, error: `Failed to fetch open PRs: ${response.getContentText()}` };
+    }
+    
+    const prs = JSON.parse(response.getContentText());
+    Logger.log(`📋 Found ${prs.length} open pull requests to check`);
+    
+    // Process each PR (DRY RUN)
+    for (const pr of prs) {
+      try {
+        results.processed++;
+        Logger.log(`🔍 Checking PR #${pr.number}: ${pr.title}`);
+        
+        // Calculate voting deadline (7 days from creation by default)
+        const createdAt = new Date(pr.created_at);
+        const votingDeadline = new Date(createdAt.getTime() + (config.votingDeadlineDays * 24 * 60 * 60 * 1000));
+        
+        // Check if voting period has expired
+        if (now < votingDeadline) {
+          Logger.log(`⏰ PR #${pr.number} voting period not yet expired (expires: ${votingDeadline.toISOString()})`);
+          results.wouldSkip++;
+          results.details.push({
+            prNumber: pr.number,
+            title: pr.title,
+            status: 'Voting period not expired',
+            expiresAt: votingDeadline.toISOString(),
+            action: 'SKIP'
+          });
+          continue;
+        }
+        
+        Logger.log(`⏰ PR #${pr.number} voting period has expired (expired: ${votingDeadline.toISOString()})`);
+        
+        // Get current vote count
+        const voteCount = getVoteCount(pr.number, config);
+        if (!voteCount.success) {
+          Logger.log(`❌ Failed to get vote count for PR #${pr.number}: ${voteCount.error}`);
+          results.details.push({
+            prNumber: pr.number,
+            title: pr.title,
+            status: 'Error getting vote count',
+            error: voteCount.error,
+            action: 'ERROR'
+          });
+          continue;
+        }
+        
+        const { yesVotes, noVotes, totalVotes } = voteCount;
+        Logger.log(`📊 PR #${pr.number} vote count: ${yesVotes} YES, ${noVotes} NO, ${totalVotes} total`);
+        
+        // Check if we have minimum votes required
+        if (totalVotes < config.minimumVotes) {
+          Logger.log(`⚠️ PR #${pr.number} has insufficient votes (${totalVotes} < ${config.minimumVotes} required)`);
+          results.wouldSkip++;
+          results.details.push({
+            prNumber: pr.number,
+            title: pr.title,
+            status: 'Insufficient votes',
+            yesVotes: yesVotes,
+            noVotes: noVotes,
+            totalVotes: totalVotes,
+            minimumRequired: config.minimumVotes,
+            action: 'SKIP'
+          });
+          continue;
+        }
+        
+        // Determine what action would be taken
+        const majorityYes = yesVotes > noVotes;
+        const action = majorityYes ? 'MERGE' : 'CLOSE';
+        
+        if (majorityYes) {
+          Logger.log(`✅ PR #${pr.number} would be MERGED (majority YES votes)`);
+          results.wouldMerge++;
+        } else {
+          Logger.log(`❌ PR #${pr.number} would be CLOSED (majority NO votes)`);
+          results.wouldClose++;
+        }
+        
+        results.details.push({
+          prNumber: pr.number,
+          title: pr.title,
+          status: `Would ${action.toLowerCase()}`,
+          action: action,
+          yesVotes: yesVotes,
+          noVotes: noVotes,
+          totalVotes: totalVotes,
+          majority: majorityYes ? 'YES' : 'NO',
+          expiredAt: votingDeadline.toISOString()
+        });
+        
+      } catch (error) {
+        Logger.log(`❌ Error processing PR #${pr.number}: ${error.message}`);
+        results.details.push({
+          prNumber: pr.number,
+          title: pr.title,
+          status: 'Processing error',
+          error: error.message,
+          action: 'ERROR'
+        });
+      }
+    }
+    
+    Logger.log(`🎉 Auto-close test completed!`);
+    Logger.log(`📊 Summary: ${results.processed} processed, ${results.wouldMerge} would merge, ${results.wouldClose} would close, ${results.wouldSkip} would skip`);
+    
+    // Log detailed results
+    Logger.log(`\n📋 Detailed Results:`);
+    results.details.forEach(detail => {
+      Logger.log(`PR #${detail.prNumber}: ${detail.title}`);
+      Logger.log(`  Status: ${detail.status}`);
+      Logger.log(`  Action: ${detail.action}`);
+      if (detail.yesVotes !== undefined) {
+        Logger.log(`  Votes: ${detail.yesVotes} YES, ${detail.noVotes} NO (${detail.totalVotes} total)`);
+      }
+      if (detail.expiresAt) {
+        Logger.log(`  Expires: ${detail.expiresAt}`);
+      }
+      if (detail.error) {
+        Logger.log(`  Error: ${detail.error}`);
+      }
+      Logger.log('');
+    });
+    
+    return results;
+    
+  } catch (error) {
+    Logger.log(`❌ Error in testAutoCloseExpiredProposals: ${error.message}`);
+    return { success: false, error: error.message };
+  }
 }
 
 /**
