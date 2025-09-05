@@ -2362,7 +2362,7 @@ function testVoteSubmissionDebug(lineNumber) {
     if (submissionData.type === 'PROPOSAL_VOTE' && submissionData.pullRequestNumber) {
       Logger.log(`🎯 Testing submitVote function directly...`);
       const config = getConfiguration();
-      const voteText = `[PROPOSAL VOTE]\nProposal: ${submissionData.proposalTitle}\nVote: ${submissionData.vote}\nDigital Signature: ${submissionData.digitalSignature}\nTransaction ID: ${submissionData.transactionId}\n---------`;
+      const voteText = `[PROPOSAL VOTE]\nProposal: ${submissionData.proposalTitle}\nVote: ${submissionData.vote}\nMy Digital Signature: ${submissionData.digitalSignature}\nRequest Transaction ID: ${submissionData.transactionId}\n---------`;
       
       Logger.log(`📤 Vote text to submit: ${voteText}`);
       Logger.log(`🎯 PR Number: ${submissionData.pullRequestNumber}`);
@@ -2529,7 +2529,7 @@ function testProcessSpecificDAppSubmissionFully(lineNumber) {
         try {
           Logger.log(`🎯 Submitting vote to GitHub PR #${submissionData.pullRequestNumber}`);
           const config = getConfiguration();
-          const voteText = `[PROPOSAL VOTE]\nProposal: ${submissionData.proposalTitle}\nVote: ${submissionData.vote}\nDigital Signature: ${submissionData.digitalSignature}\nTransaction ID: ${submissionData.transactionId}\n---------`;
+          const voteText = `[PROPOSAL VOTE]\nProposal: ${submissionData.proposalTitle}\nVote: ${submissionData.vote}\nMy Digital Signature: ${submissionData.digitalSignature}\nRequest Transaction ID: ${submissionData.transactionId}\n---------`;
           const result = submitVote(submissionData.pullRequestNumber, voteText, config);
           
           if (result.success) {
