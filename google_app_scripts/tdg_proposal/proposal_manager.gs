@@ -34,6 +34,13 @@
  */
 function doGet(e) {
   try {
+    // Check for signature parameter first (for signature verification)
+    const signature = e.parameter.signature;
+    if (signature) {
+      return handleVerifySignature(signature);
+    }
+    
+    // Otherwise, check for mode parameter
     const mode = e.parameter.mode;
     
     switch (mode) {
@@ -45,14 +52,8 @@ function doGet(e) {
           return createErrorResponse('PR number is required for fetch_proposal mode');
         }
         return handleFetchProposal(prNumber);
-      case 'verify_signature':
-        const publicKey = e.parameter.public_key;
-        if (!publicKey) {
-          return createErrorResponse('Public key is required for verify_signature mode');
-        }
-        return handleVerifySignature(publicKey);
       default:
-        return createErrorResponse('Invalid mode. Use: list_open_proposals, fetch_proposal, or verify_signature');
+        return createErrorResponse('Invalid mode. Use: list_open_proposals, fetch_proposal, or provide signature parameter');
     }
   } catch (error) {
     Logger.log(`Error in doGet: ${error.message}`);
@@ -119,6 +120,12 @@ function handleFetchProposal(prNumber) {
     
     const pr = JSON.parse(prResponse.getContentText());
     
+    // Get the actual file content from the PR's head branch
+    const fileContent = getProposalFileContent(pr.head.ref, config);
+    if (!fileContent.success) {
+      return createErrorResponse(`Failed to fetch proposal file: ${fileContent.error}`);
+    }
+    
     // Get voting statistics
     const voteCount = getVoteCount(prNumber, config);
     if (!voteCount.success) {
@@ -134,8 +141,8 @@ function handleFetchProposal(prNumber) {
     
     const proposal = {
       number: pr.number,
-      title: pr.title,
-      body: pr.body,
+      title: fileContent.title, // Use the file name as title
+      body: fileContent.content, // Use the file content as body
       created_at: pr.created_at,
       updated_at: pr.updated_at,
       html_url: pr.html_url,
@@ -158,6 +165,67 @@ function handleFetchProposal(prNumber) {
   } catch (error) {
     Logger.log(`Error fetching proposal: ${error.message}`);
     return createErrorResponse(`Failed to fetch proposal: ${error.message}`);
+  }
+}
+
+/**
+ * Get the proposal file content from the PR's head branch
+ */
+function getProposalFileContent(branchName, config) {
+  try {
+    // Get the tree of the head branch to find the proposal file
+    const treeUrl = `https://api.github.com/repos/${config.githubOwner}/${config.githubRepo}/git/trees/${branchName}?recursive=1`;
+    const treeResponse = UrlFetchApp.fetch(treeUrl, {
+      headers: { 'Authorization': `token ${config.githubToken}` },
+      muteHttpExceptions: true
+    });
+    
+    if (treeResponse.getResponseCode() !== 200) {
+      return { success: false, error: `Failed to fetch branch tree: ${treeResponse.getContentText()}` };
+    }
+    
+    const tree = JSON.parse(treeResponse.getContentText());
+    
+    // Find the markdown file in the root directory (should be the only file)
+    const proposalFile = tree.tree.find(file => 
+      file.type === 'blob' && 
+      file.path.endsWith('.md') && 
+      !file.path.includes('/') // Only files in root directory
+    );
+    
+    if (!proposalFile) {
+      return { success: false, error: 'No proposal file found in branch' };
+    }
+    
+    // Get the file content
+    const fileUrl = `https://api.github.com/repos/${config.githubOwner}/${config.githubRepo}/git/blobs/${proposalFile.sha}`;
+    const fileResponse = UrlFetchApp.fetch(fileUrl, {
+      headers: { 'Authorization': `token ${config.githubToken}` },
+      muteHttpExceptions: true
+    });
+    
+    if (fileResponse.getResponseCode() !== 200) {
+      return { success: false, error: `Failed to fetch file content: ${fileResponse.getContentText()}` };
+    }
+    
+    const fileBlob = JSON.parse(fileResponse.getContentText());
+    
+    // Decode base64 content
+    const content = Utilities.base64Decode(fileBlob.content);
+    const contentText = Utilities.newBlob(content).getDataAsString();
+    
+    // Extract title from filename (remove .md extension)
+    const title = proposalFile.path.replace('.md', '');
+    
+    return {
+      success: true,
+      title: title,
+      content: contentText
+    };
+    
+  } catch (error) {
+    Logger.log(`Error getting proposal file content: ${error.message}`);
+    return { success: false, error: `Failed to get proposal file content: ${error.message}` };
   }
 }
 
