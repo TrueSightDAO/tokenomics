@@ -2149,7 +2149,7 @@ function processDAppPayloads() {
               if (submissionData.pullRequestNumber) {
                 try {
                   const config = getConfiguration();
-                  const voteText = `[PROPOSAL VOTE]\nProposal: ${submissionData.proposalTitle}\nVote: ${submissionData.vote}\nDigital Signature: ${submissionData.digitalSignature}\nTransaction ID: ${submissionData.transactionId}\n---------`;
+                  const voteText = `[PROPOSAL VOTE]\nProposal: ${submissionData.proposalTitle}\nVote: ${submissionData.vote}\nMy Digital Signature: ${submissionData.digitalSignature}\nRequest Transaction ID: ${submissionData.transactionId}\n---------`;
                   const result = submitVote(submissionData.pullRequestNumber, voteText, config);
                   if (result.success) {
                     // Update the row status
