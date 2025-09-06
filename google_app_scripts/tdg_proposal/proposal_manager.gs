@@ -79,19 +79,25 @@ function handleListOpenProposals() {
     }
     
     const prs = JSON.parse(response.getContentText());
-    const proposals = prs.map(pr => ({
-      number: pr.number,
-      title: pr.title,
-      body: pr.body,
-      created_at: pr.created_at,
-      updated_at: pr.updated_at,
-      html_url: pr.html_url,
-      user: pr.user.login,
-      head: {
-        ref: pr.head.ref,
-        sha: pr.head.sha
-      }
-    }));
+    const proposals = prs.map(pr => {
+      // For the list view, we'll use GitHub username by default
+      // The contributor name lookup will happen in handleFetchProposal when viewing individual proposals
+      // This is more efficient than fetching file content for every PR in the list
+      
+      return {
+        number: pr.number,
+        title: pr.title,
+        body: pr.body,
+        created_at: pr.created_at,
+        updated_at: pr.updated_at,
+        html_url: pr.html_url,
+        user: pr.user.login, // Use GitHub username for list view
+        head: {
+          ref: pr.head.ref,
+          sha: pr.head.sha
+        }
+      };
+    });
     
     return createSuccessResponse({ proposals });
   } catch (error) {
@@ -139,6 +145,30 @@ function handleFetchProposal(prNumber) {
     const timeRemaining = Math.max(0, votingEndDate.getTime() - now.getTime());
     const daysRemaining = Math.ceil(timeRemaining / (24 * 60 * 60 * 1000));
     
+    // Try to extract digital signature and lookup contributor name
+    let contributorName = pr.user.login; // Default to GitHub username
+    
+    Logger.log(`🔍 Processing PR #${prNumber}: ${pr.title}`);
+    
+    if (fileContent.content) {
+      Logger.log(`📝 PR #${prNumber} has file content, extracting signature...`);
+      const digitalSignature = extractDigitalSignatureFromProposal(fileContent.content);
+      if (digitalSignature) {
+        Logger.log(`✅ Found signature in PR #${prNumber}, looking up contributor...`);
+        const lookupName = lookupContributorName(digitalSignature);
+        if (lookupName) {
+          Logger.log(`✅ PR #${prNumber}: Using contributor name: ${lookupName}`);
+          contributorName = lookupName;
+        } else {
+          Logger.log(`❌ PR #${prNumber}: No contributor found, using GitHub username: ${pr.user.login}`);
+        }
+      } else {
+        Logger.log(`❌ PR #${prNumber}: No signature found in file content, using GitHub username: ${pr.user.login}`);
+      }
+    } else {
+      Logger.log(`❌ PR #${prNumber}: No file content, using GitHub username: ${pr.user.login}`);
+    }
+    
     const proposal = {
       number: pr.number,
       title: fileContent.title, // Use the file name as title
@@ -146,7 +176,8 @@ function handleFetchProposal(prNumber) {
       created_at: pr.created_at,
       updated_at: pr.updated_at,
       html_url: pr.html_url,
-      user: pr.user.login,
+      user: contributorName, // Use contributor name instead of GitHub username
+      github_user: pr.user.login, // Keep original GitHub username for reference
       head: {
         ref: pr.head.ref,
         sha: pr.head.sha
@@ -186,16 +217,60 @@ function getProposalFileContent(branchName, config) {
     
     const tree = JSON.parse(treeResponse.getContentText());
     
-    // Find the markdown file in the root directory (should be the only file)
+    // Debug: Log all files found in the branch
+    Logger.log(`🔍 Files found in branch ${branchName}:`);
+    tree.tree.forEach(file => {
+      if (file.type === 'blob' && file.path.endsWith('.md')) {
+        Logger.log(`   - ${file.path}`);
+      }
+    });
+    
+    // Find the proposal file (exclude README.md and other common files)
     const proposalFile = tree.tree.find(file => 
       file.type === 'blob' && 
       file.path.endsWith('.md') && 
-      !file.path.includes('/') // Only files in root directory
+      !file.path.includes('/') && // Only files in root directory
+      file.path.toLowerCase() !== 'readme.md' && // Exclude README
+      file.path.toLowerCase() !== 'license.md' && // Exclude LICENSE
+      file.path.toLowerCase() !== 'changelog.md' // Exclude CHANGELOG
     );
     
     if (!proposalFile) {
+      Logger.log(`❌ No specific proposal file found, trying fallback...`);
+      // If no specific proposal file found, try to find any .md file that's not README
+      const fallbackFile = tree.tree.find(file => 
+        file.type === 'blob' && 
+        file.path.endsWith('.md') && 
+        !file.path.includes('/') &&
+        file.path.toLowerCase() !== 'readme.md'
+      );
+      
+      if (fallbackFile) {
+        Logger.log(`⚠️ Using fallback file: ${fallbackFile.path}`);
+        const fileUrl = `https://api.github.com/repos/${config.githubOwner}/${config.githubRepo}/git/blobs/${fallbackFile.sha}`;
+        const fileResponse = UrlFetchApp.fetch(fileUrl, {
+          headers: { 'Authorization': `token ${config.githubToken}` },
+          muteHttpExceptions: true
+        });
+        
+        if (fileResponse.getResponseCode() === 200) {
+          const fileBlob = JSON.parse(fileResponse.getContentText());
+          const content = Utilities.base64Decode(fileBlob.content);
+          const contentText = Utilities.newBlob(content).getDataAsString();
+          const title = fallbackFile.path.replace('.md', '');
+          
+          return {
+            success: true,
+            title: title,
+            content: contentText
+          };
+        }
+      }
+      
       return { success: false, error: 'No proposal file found in branch' };
     }
+    
+    Logger.log(`✅ Selected proposal file: ${proposalFile.path}`);
     
     // Get the file content
     const fileUrl = `https://api.github.com/repos/${config.githubOwner}/${config.githubRepo}/git/blobs/${proposalFile.sha}`;
@@ -318,12 +393,13 @@ function handleCreateProposal(data) {
   try {
     const header = data.header;
     const content = data.content;
+    const fullPayload = data.fullPayload || null;
     
     if (!header || !content) {
       return createErrorResponse('Header and content are required for proposal creation');
     }
     
-    const result = createNewProposal(header, content);
+    const result = createNewProposal(header, content, fullPayload);
     
     if (result.success) {
       return createSuccessResponse({
@@ -470,9 +546,10 @@ function validateConfiguration() {
  * Creates a new proposal by creating a file in a new branch and opening a PR
  * @param {string} header - The proposal title (used as filename and branch name)
  * @param {string} content - The proposal content
+ * @param {string} fullPayload - The complete payload that was submitted (optional)
  * @return {Object} Result object with success status and PR details
  */
-function createNewProposal(header, content) {
+function createNewProposal(header, content, fullPayload = null) {
   try {
     // Validate configuration first
     if (!validateConfiguration()) {
@@ -493,8 +570,8 @@ function createNewProposal(header, content) {
       return { success: false, error: `Failed to create branch: ${branchResult.error}` };
     }
     
-    // Create proposal file content
-    const fileContent = `# ${header}\n\n${content}\n\n---\n\n*This proposal was created on ${new Date().toISOString()}*`;
+    // Create proposal file content - use full payload if available, otherwise use title and content
+    const fileContent = fullPayload || `# ${header}\n\n${content}\n\n---\n\n*This proposal was created on ${new Date().toISOString()}*`;
     
     // Upload file to branch
     const fileResult = createFileInBranch(branchName, fileName, fileContent, config);
@@ -502,8 +579,9 @@ function createNewProposal(header, content) {
       return { success: false, error: `Failed to create file: ${fileResult.error}` };
     }
     
-    // Create pull request
-    const prResult = createPullRequest(header, branchName, content, config);
+    // Create pull request - use full payload if available, otherwise use content
+    const prBody = fullPayload || content;
+    const prResult = createPullRequest(header, branchName, prBody, config);
     if (!prResult.success) {
       return { success: false, error: `Failed to create PR: ${prResult.error}` };
     }
@@ -547,10 +625,19 @@ function submitVote(prNumber, voteText) {
     // Get configuration
     const config = getConfiguration();
     
-    // Parse the vote text to extract digital signature and vote
+    // Parse the vote text to extract digital signature, vote, and proposal URL
     const voteData = parseVoteSubmission(voteText);
     if (!voteData.success) {
       return { success: false, error: voteData.error };
+    }
+    
+    // Validate that the proposal URL in the vote matches the current PR
+    const expectedUrl = `https://github.com/${config.githubOwner}/${config.githubRepo}/pull/${prNumber}`;
+    if (voteData.proposalUrl !== expectedUrl) {
+      return { 
+        success: false, 
+        error: `Proposal URL mismatch. Expected: ${expectedUrl}, Found: ${voteData.proposalUrl}` 
+      };
     }
     
     // Check if this signature already voted
@@ -895,7 +982,7 @@ function updateVoteComment(commentId, newBody, config) {
 }
 
 /**
- * Parses vote submission text to extract digital signature and vote
+ * Parses vote submission text to extract digital signature, vote, and proposal URL
  */
 function parseVoteSubmission(voteText) {
   try {
@@ -915,7 +1002,15 @@ function parseVoteSubmission(voteText) {
     
     const vote = voteMatch[1].toUpperCase();
     
-    return { success: true, signature: signature, vote: vote };
+    // Look for Proposal URL pattern
+    const urlMatch = voteText.match(/Proposal URL:\s*(https:\/\/github\.com\/[^\s\n]+)/);
+    if (!urlMatch) {
+      return { success: false, error: 'Proposal URL not found in vote text' };
+    }
+    
+    const proposalUrl = urlMatch[1];
+    
+    return { success: true, signature: signature, vote: vote, proposalUrl: proposalUrl };
     
   } catch (error) {
     return { success: false, error: error.message };
@@ -1556,7 +1651,7 @@ Verify submission here: https://dapp.truesight.me/verify_request.html`;
 
   Logger.log(`Creating test proposal: ${proposalTitle}`);
   Logger.log(`Test share text format: ${shareText}`);
-  const result = createNewProposal(proposalTitle, proposalContent);
+  const result = createNewProposal(proposalTitle, proposalContent, shareText);
   
   if (result.success) {
     Logger.log(`✅ Proposal created successfully`);
@@ -2519,7 +2614,7 @@ function processDAppPayloads() {
               if (submissionData.title && submissionData.content) {
                 try {
                   const config = getConfiguration();
-                  const result = createNewProposal(submissionData.title, submissionData.content, config);
+                  const result = createNewProposal(submissionData.title, submissionData.content, submissionData.fullPayload);
                   if (result.success) {
                     // Update the row with PR number
                     const lastRow = proposalSubmissionsSheet.getLastRow();
@@ -2624,7 +2719,8 @@ function parseDAppSubmission(messageText) {
         content,
         digitalSignature,
         transactionId,
-        status: 'Submitted'
+        status: 'Submitted',
+        fullPayload: messageText
       };
     }
     
@@ -2877,7 +2973,7 @@ function testProcessSpecificDAppSubmissionFully(lineNumber) {
       try {
         Logger.log(`🎯 Creating GitHub proposal: ${submissionData.title}`);
         const config = getConfiguration();
-        const result = createNewProposal(submissionData.title, submissionData.content, config);
+        const result = createNewProposal(submissionData.title, submissionData.content, submissionData.fullPayload);
         
         if (result.success) {
           // Update the row with PR URL
@@ -2975,4 +3071,430 @@ function testProcessSpecificDAppSubmissionFully(lineNumber) {
     Logger.log(`❌ Error in full DApp submission processing: ${error.message}`);
     throw error;
   }
+}
+
+/**
+ * Test function to verify URL validation in vote submissions
+ */
+function testVoteUrlValidation() {
+  Logger.log('🧪 Testing vote URL validation...');
+  
+  // Test 1: Valid vote with correct URL
+  const validVoteText = `[PROPOSAL VOTE]
+Proposal: Test Proposal
+Proposal URL: https://github.com/TrueSightDAO/proposals/pull/12
+Vote: YES
+---------
+
+My Digital Signature: MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA54jNZdN4xkaPDI9TB/RwuicbbUMvttOWSTVRfvZxiHWeIoqTHRz2WJdoGsuW9rz9QPbpz6T9zQZu3RNzsSF216U3aCd89R2g7qhOMh9VC+7+sNJnI6H4qPPKFbndxQD8262Q+zqYQR6r0k89mud1sYbla/DCtKAcGZsALihVyl8tF2v1rUzfPU9FHpi5ow2kOEpVxnhe6xEY1HDU/zuFRt707WzkG1zit4AWEBXyBd3YLyinPNAb2aBA6dSPnPAQ4aB46Dtis3p5DgkLeO7E4gh/E0BqViDkkB1tLy1dgy9Kjv+5zxo1yTxkBKACjqqo69Q0VrUfkXgegWmXBAu04wIDAQAB
+
+Request Transaction ID: test_tx_${Date.now()}`;
+
+  // Test 2: Invalid vote with wrong URL
+  const invalidVoteText = `[PROPOSAL VOTE]
+Proposal: Test Proposal
+Proposal URL: https://github.com/TrueSightDAO/proposals/pull/999
+Vote: YES
+---------
+
+My Digital Signature: MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA54jNZdN4xkaPDI9TB/RwuicbbUMvttOWSTVRfvZxiHWeIoqTHRz2WJdoGsuW9rz9QPbpz6T9zQZu3RNzsSF216U3aCd89R2g7qhOMh9VC+7+sNJnI6H4qPPKFbndxQD8262Q+zqYQR6r0k89mud1sYbla/DCtKAcGZsALihVyl8tF2v1rUzfPU9FHpi5ow2kOEpVxnhe6xEY1HDU/zuFRt707WzkG1zit4AWEBXyBd3YLyinPNAb2aBA6dSPnPAQ4aB46Dtis3p5DgkLeO7E4gh/E0BqViDkkB1tLy1dgy9Kjv+5zxo1yTxkBKACjqqo69Q0VrUfkXgegWmXBAu04wIDAQAB
+
+Request Transaction ID: test_tx_${Date.now()}`;
+
+  // Test 3: Vote without URL
+  const noUrlVoteText = `[PROPOSAL VOTE]
+Proposal: Test Proposal
+Vote: YES
+---------
+
+My Digital Signature: MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA54jNZdN4xkaPDI9TB/RwuicbbUMvttOWSTVRfvZxiHWeIoqTHRz2WJdoGsuW9rz9QPbpz6T9zQZu3RNzsSF216U3aCd89R2g7qhOMh9VC+7+sNJnI6H4qPPKFbndxQD8262Q+zqYQR6r0k89mud1sYbla/DCtKAcGZsALihVyl8tF2v1rUzfPU9FHpi5ow2kOEpVxnhe6xEY1HDU/zuFRt707WzkG1zit4AWEBXyBd3YLyinPNAb2aBA6dSPnPAQ4aB46Dtis3p5DgkLeO7E4gh/E0BqViDkkB1tLy1dgy9Kjv+5zxo1yTxkBKACjqqo69Q0VrUfkXgegWmXBAu04wIDAQAB
+
+Request Transaction ID: test_tx_${Date.now()}`;
+
+  // Test parsing function
+  Logger.log('\n📝 Test 1: Parsing valid vote with correct URL');
+  const validParse = parseVoteSubmission(validVoteText);
+  Logger.log(`✅ Valid vote parsed: ${validParse.success}`);
+  if (validParse.success) {
+    Logger.log(`   - Vote: ${validParse.vote}`);
+    Logger.log(`   - URL: ${validParse.proposalUrl}`);
+  }
+
+  Logger.log('\n📝 Test 2: Parsing invalid vote with wrong URL');
+  const invalidParse = parseVoteSubmission(invalidVoteText);
+  Logger.log(`✅ Invalid vote parsed: ${invalidParse.success}`);
+  if (invalidParse.success) {
+    Logger.log(`   - Vote: ${invalidParse.vote}`);
+    Logger.log(`   - URL: ${invalidParse.proposalUrl}`);
+  }
+
+  Logger.log('\n📝 Test 3: Parsing vote without URL');
+  const noUrlParse = parseVoteSubmission(noUrlVoteText);
+  Logger.log(`❌ Vote without URL should fail: ${!noUrlParse.success}`);
+  if (!noUrlParse.success) {
+    Logger.log(`   - Error: ${noUrlParse.error}`);
+  }
+
+  // Test URL validation (this would require actual PR submission, so we'll just test the logic)
+  Logger.log('\n🔍 Test 4: URL validation logic');
+  const testPrNumber = 12;
+  const config = getConfiguration();
+  const expectedUrl = `https://github.com/${config.githubOwner}/${config.githubRepo}/pull/${testPrNumber}`;
+  Logger.log(`   - Expected URL for PR #${testPrNumber}: ${expectedUrl}`);
+  
+  if (validParse.success) {
+    const urlMatches = validParse.proposalUrl === expectedUrl;
+    Logger.log(`   - Valid vote URL matches expected: ${urlMatches}`);
+  }
+  
+  if (invalidParse.success) {
+    const urlMatches = invalidParse.proposalUrl === expectedUrl;
+    Logger.log(`   - Invalid vote URL matches expected: ${urlMatches}`);
+  }
+
+  Logger.log('\n✅ URL validation test completed!');
+  return {
+    validParse: validParse,
+    invalidParse: invalidParse,
+    noUrlParse: noUrlParse,
+    expectedUrl: expectedUrl
+  };
+}
+
+/**
+ * Lookup contributor name by digital signature from Google Sheets
+ * @param {string} digitalSignature - The digital signature to lookup
+ * @return {string} Contributor name or null if not found
+ */
+function lookupContributorName(digitalSignature) {
+  try {
+    Logger.log(`🔍 Looking up contributor for signature: ${digitalSignature.substring(0, 50)}...`);
+    
+    const spreadsheetId = '1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU';
+    const spreadsheet = SpreadsheetApp.openById(spreadsheetId);
+    const sheet = spreadsheet.getSheetByName('Contributors Digital Signatures');
+    
+    if (!sheet) {
+      Logger.log('❌ Contributors Digital Signatures sheet not found');
+      return null;
+    }
+    
+    Logger.log('✅ Sheet found, getting data...');
+    const data = sheet.getDataRange().getValues();
+    Logger.log(`📊 Found ${data.length} rows in sheet`);
+    
+    // Skip header row, search through data
+    for (let i = 1; i < data.length; i++) {
+      const row = data[i];
+      const contributorName = row[0]; // Column A
+      const signature = row[4]; // Column E (Contributors Digital Signatures)
+      
+      if (signature && signature.trim()) {
+        Logger.log(`🔍 Row ${i}: Checking signature for ${contributorName}...`);
+        
+        if (signature.trim() === digitalSignature.trim()) {
+          Logger.log(`✅ Found contributor: ${contributorName} for signature: ${digitalSignature.substring(0, 50)}...`);
+          return contributorName;
+        }
+      }
+    }
+    
+    Logger.log(`❌ No contributor found for signature: ${digitalSignature.substring(0, 50)}...`);
+    return null;
+    
+  } catch (error) {
+    Logger.log(`❌ Error looking up contributor: ${error.message}`);
+    return null;
+  }
+}
+
+/**
+ * Extract digital signature from proposal content
+ * @param {string} proposalContent - The proposal content to search
+ * @return {string} Digital signature or null if not found
+ */
+function extractDigitalSignatureFromProposal(proposalContent) {
+  try {
+    // Look for digital signature pattern in the proposal content
+    const signatureMatch = proposalContent.match(/My Digital Signature:\s*([A-Za-z0-9+/=]+)/);
+    if (signatureMatch) {
+      return signatureMatch[1];
+    }
+    return null;
+  } catch (error) {
+    Logger.log(`Error extracting digital signature: ${error.message}`);
+    return null;
+  }
+}
+
+/**
+ * Test function to verify that PR body includes full payload
+ */
+function testPrBodyWithFullPayload() {
+  Logger.log('🧪 Testing PR body with full payload...');
+  
+  // Create a test proposal with full payload
+  const testTitle = 'Test Proposal with Full Payload';
+  const testContent = 'This is the proposal content that would normally be in the PR body.';
+  const testFullPayload = `[PROPOSAL CREATION]
+-- Title: ${testTitle}
+-- Content: ${testContent}
+---------
+
+My Digital Signature: MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA54jNZdN4xkaPDI9TB/RwuicbbUMvttOWSTVRfvZxiHWeIoqTHRz2WJdoGsuW9rz9QPbpz6T9zQZu3RNzsSF216U3aCd89R2g7qhOMh9VC+7+sNJnI6H4qPPKFbndxQD8262Q+zqYQR6r0k89mud1sYbla/DCtKAcGZsALihVyl8tF2v1rUzfPU9FHpi5ow2kOEpVxnhe6xEY1HDU/zuFRt707WzkG1zit4AWEBXyBd3YLyinPNAb2aBA6dSPnPAQ4aB46Dtis3p5DgkLeO7E4gh/E0BqViDkkB1tLy1dgy9Kjv+5zxo1yTxkBKACjqqo69Q0VrUfkXgegWmXBAu04wIDAQAB
+
+Request Transaction ID: test_full_payload_${Date.now()}
+
+This submission was generated using https://dapp.truesight.me/create_proposal.html
+
+Verify submission here: https://dapp.truesight.me/verify_request.html`;
+
+  Logger.log('\n📝 Test 1: Creating proposal with full payload');
+  Logger.log(`   - Title: ${testTitle}`);
+  Logger.log(`   - Content: ${testContent}`);
+  Logger.log(`   - Full payload length: ${testFullPayload.length} characters`);
+  
+  // Test the createNewProposal function with full payload
+  const result = createNewProposal(testTitle, testContent, testFullPayload);
+  
+  if (result.success) {
+    Logger.log(`✅ Proposal created successfully with PR #${result.prNumber}`);
+    Logger.log(`   - PR URL: ${result.prUrl}`);
+    Logger.log(`   - Branch: ${result.branchName}`);
+    Logger.log(`   - File: ${result.fileName}`);
+    
+    // Verify that the PR body contains the full payload
+    Logger.log('\n🔍 Test 2: Verifying PR body contains full payload');
+    const config = getConfiguration();
+    const prUrl = `https://api.github.com/repos/${config.githubOwner}/${config.githubRepo}/pulls/${result.prNumber}`;
+    
+    try {
+      const response = UrlFetchApp.fetch(prUrl, {
+        headers: { 'Authorization': `token ${config.githubToken}` },
+        muteHttpExceptions: true
+      });
+      
+      if (response.getResponseCode() === 200) {
+        const prData = JSON.parse(response.getContentText());
+        const prBody = prData.body;
+        
+        Logger.log(`   - PR body length: ${prBody.length} characters`);
+        Logger.log(`   - Contains digital signature: ${prBody.includes('My Digital Signature:')}`);
+        Logger.log(`   - Contains transaction ID: ${prBody.includes('Request Transaction ID:')}`);
+        Logger.log(`   - Contains verify link: ${prBody.includes('verify_request.html')}`);
+        Logger.log(`   - Contains DApp URL: ${prBody.includes('create_proposal.html')}`);
+        
+        // Check if the full payload is in the PR body
+        const payloadInBody = prBody.includes('My Digital Signature:') && 
+                             prBody.includes('Request Transaction ID:') && 
+                             prBody.includes('verify_request.html');
+        
+        Logger.log(`   - Full payload included: ${payloadInBody}`);
+        
+        if (payloadInBody) {
+          Logger.log('✅ SUCCESS: PR body contains the full payload!');
+          Logger.log('   - Users can now copy the entire PR body and verify it');
+        } else {
+          Logger.log('❌ FAILURE: PR body does not contain the full payload');
+        }
+      } else {
+        Logger.log(`❌ Failed to fetch PR details: ${response.getContentText()}`);
+      }
+    } catch (error) {
+      Logger.log(`❌ Error fetching PR details: ${error.message}`);
+    }
+
+    // Verify that the .md file also contains the full payload
+    Logger.log('\n🔍 Test 3: Verifying .md file contains full payload');
+    const fileUrl = `https://api.github.com/repos/${config.githubOwner}/${config.githubRepo}/contents/${result.fileName}?ref=${result.branchName}`;
+    
+    try {
+      const fileResponse = UrlFetchApp.fetch(fileUrl, {
+        headers: { 'Authorization': `token ${config.githubToken}` },
+        muteHttpExceptions: true
+      });
+      
+      if (fileResponse.getResponseCode() === 200) {
+        const fileData = JSON.parse(fileResponse.getContentText());
+        const fileContent = Utilities.base64Decode(fileData.content).toString();
+        
+        Logger.log(`   - File content length: ${fileContent.length} characters`);
+        Logger.log(`   - Contains digital signature: ${fileContent.includes('My Digital Signature:')}`);
+        Logger.log(`   - Contains transaction ID: ${fileContent.includes('Request Transaction ID:')}`);
+        Logger.log(`   - Contains verify link: ${fileContent.includes('verify_request.html')}`);
+        Logger.log(`   - Contains DApp URL: ${fileContent.includes('create_proposal.html')}`);
+        
+        // Check if the full payload is in the file content
+        const payloadInFile = fileContent.includes('My Digital Signature:') && 
+                             fileContent.includes('Request Transaction ID:') && 
+                             fileContent.includes('verify_request.html');
+        
+        Logger.log(`   - Full payload included in file: ${payloadInFile}`);
+        
+        if (payloadInFile) {
+          Logger.log('✅ SUCCESS: .md file contains the full payload!');
+          Logger.log('   - Users can now copy the entire file content and verify it');
+        } else {
+          Logger.log('❌ FAILURE: .md file does not contain the full payload');
+        }
+      } else {
+        Logger.log(`❌ Failed to fetch file details: ${fileResponse.getContentText()}`);
+      }
+    } catch (error) {
+      Logger.log(`❌ Error fetching file details: ${error.message}`);
+    }
+  } else {
+    Logger.log(`❌ Proposal creation failed: ${result.error}`);
+  }
+
+  Logger.log('\n✅ PR body with full payload test completed!');
+  return result;
+}
+
+/**
+ * Test function to verify contributor name lookup functionality
+ */
+function testContributorLookup() {
+  Logger.log('🧪 Testing contributor name lookup...');
+  
+  // Test with a known digital signature from the spreadsheet
+  const testSignature = 'MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAvqRyznTL3PdBJcdY3gLiSk+ZotZd5ZB19sPEB1HYlQQFSmxl/mCSy+mJ8l0cVJD9Rr8oej0Catp8ChVlsTs7oWnd/3Kwi4Pdu54NKlcI8d3UXsnhI3kGINqnW7QPk22rGri6hhvIOyjwRxy2aYCPdqZdkiIRIvRS+nc4fSTNbtvfm8qazse8f8WJRivws85JbuhEvES0Yp5aBMpm41HFLJQd+IvT8PQznshpSL8io7dsKn1/rhsVE9Ng8aPI1BaDAMzIGzhMfJD6FvVxOkl9VtSPI8a7uJypuDj6pxC5QwXcciVAkvVfvjLrOFt88wyT7rMzhKomXBRYSfZiL9eYdQIDAQAB';
+  
+  Logger.log('\n📝 Test 1: Direct signature lookup');
+  const contributorName = lookupContributorName(testSignature);
+  Logger.log(`   - Signature: ${testSignature.substring(0, 50)}...`);
+  Logger.log(`   - Found contributor: ${contributorName}`);
+  
+  if (contributorName) {
+    Logger.log('✅ SUCCESS: Contributor lookup working!');
+  } else {
+    Logger.log('❌ FAILURE: Contributor lookup failed');
+  }
+  
+  // Test with a proposal content that contains a digital signature
+  Logger.log('\n📝 Test 2: Extract signature from proposal content');
+  const testProposalContent = `[PROPOSAL CREATION]
+- Title: Test Proposal
+- Content: This is a test proposal content
+---------
+
+My Digital Signature: ${testSignature}
+
+Request Transaction ID: test_tx_12345
+
+This submission was generated using https://dapp.truesight.me/create_proposal.html
+
+Verify submission here: https://dapp.truesight.me/verify_request.html`;
+
+  const extractedSignature = extractDigitalSignatureFromProposal(testProposalContent);
+  Logger.log(`   - Extracted signature: ${extractedSignature ? extractedSignature.substring(0, 50) + '...' : 'null'}`);
+  
+  if (extractedSignature) {
+    const extractedContributorName = lookupContributorName(extractedSignature);
+    Logger.log(`   - Found contributor from extracted signature: ${extractedContributorName}`);
+    
+    if (extractedContributorName) {
+      Logger.log('✅ SUCCESS: Signature extraction and lookup working!');
+    } else {
+      Logger.log('❌ FAILURE: Contributor lookup from extracted signature failed');
+    }
+  } else {
+    Logger.log('❌ FAILURE: Signature extraction failed');
+  }
+  
+  // Test with invalid signature
+  Logger.log('\n📝 Test 3: Invalid signature lookup');
+  const invalidSignature = 'invalid_signature_12345';
+  const invalidContributorName = lookupContributorName(invalidSignature);
+  Logger.log(`   - Invalid signature: ${invalidSignature}`);
+  Logger.log(`   - Found contributor: ${invalidContributorName}`);
+  
+  if (!invalidContributorName) {
+    Logger.log('✅ SUCCESS: Invalid signature correctly returns null');
+  } else {
+    Logger.log('❌ FAILURE: Invalid signature should return null');
+  }
+
+  Logger.log('\n✅ Contributor lookup test completed!');
+  return {
+    directLookup: contributorName,
+    extractedSignature: extractedSignature,
+    extractedLookup: extractedSignature ? lookupContributorName(extractedSignature) : null,
+    invalidLookup: invalidContributorName
+  };
+}
+
+/**
+ * Test function to verify the API endpoints are returning contributor names
+ */
+function testApiEndpointsWithContributorNames() {
+  Logger.log('🧪 Testing API endpoints with contributor names...');
+  
+  // Test list_open_proposals endpoint
+  Logger.log('\n📝 Test 1: list_open_proposals endpoint');
+  try {
+    const listResult = handleListOpenProposals();
+    const listData = JSON.parse(listResult.getContent());
+    
+    if (listData.success && listData.data.proposals.length > 0) {
+      const firstProposal = listData.data.proposals[0];
+      Logger.log(`   - First proposal author: ${firstProposal.user}`);
+      Logger.log(`   - GitHub user: ${firstProposal.github_user || 'not set'}`);
+      
+      if (firstProposal.user !== firstProposal.github_user) {
+        Logger.log('✅ SUCCESS: list_open_proposals returning contributor names!');
+      } else {
+        Logger.log('⚠️ WARNING: list_open_proposals still returning GitHub usernames');
+      }
+    } else {
+      Logger.log('❌ No proposals found to test');
+    }
+  } catch (error) {
+    Logger.log(`❌ Error testing list_open_proposals: ${error.message}`);
+  }
+  
+  // Test fetch_proposal endpoint with a specific PR
+  Logger.log('\n📝 Test 2: fetch_proposal endpoint');
+  try {
+    // Try to get the latest PR number
+    const config = getConfiguration();
+    const url = `https://api.github.com/repos/${config.githubOwner}/${config.githubRepo}/pulls?state=open&sort=created&direction=desc&per_page=1`;
+    const response = UrlFetchApp.fetch(url, {
+      headers: { 'Authorization': `token ${config.githubToken}` },
+      muteHttpExceptions: true
+    });
+    
+    if (response.getResponseCode() === 200) {
+      const prs = JSON.parse(response.getContentText());
+      if (prs.length > 0) {
+        const latestPR = prs[0];
+        Logger.log(`   - Testing with PR #${latestPR.number}`);
+        
+        const fetchResult = handleFetchProposal(latestPR.number);
+        const fetchData = JSON.parse(fetchResult.getContent());
+        
+        if (fetchData.success) {
+          const proposal = fetchData.data.proposal;
+          Logger.log(`   - Proposal author: ${proposal.user}`);
+          Logger.log(`   - GitHub user: ${proposal.github_user || 'not set'}`);
+          
+          if (proposal.user !== proposal.github_user) {
+            Logger.log('✅ SUCCESS: fetch_proposal returning contributor names!');
+          } else {
+            Logger.log('⚠️ WARNING: fetch_proposal still returning GitHub usernames');
+          }
+        } else {
+          Logger.log(`❌ fetch_proposal failed: ${fetchData.error}`);
+        }
+      } else {
+        Logger.log('❌ No open PRs found to test');
+      }
+    } else {
+      Logger.log(`❌ Failed to fetch PRs: ${response.getContentText()}`);
+    }
+  } catch (error) {
+    Logger.log(`❌ Error testing fetch_proposal: ${error.message}`);
+  }
+  
+  Logger.log('\n✅ API endpoints test completed!');
 }
