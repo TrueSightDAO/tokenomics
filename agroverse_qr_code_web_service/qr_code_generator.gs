@@ -30,10 +30,10 @@
 // ===== Configuration =====
 
 // Sandbox
-var SPREADSHEET_URL = 'https://docs.google.com/spreadsheets/d/1qSi_-VSj7yiJl0Ak-Q3lch-l4mrH37cEw8EmQwS_6a4/edit?gid=0#gid=0';
+// var SPREADSHEET_URL = 'https://docs.google.com/spreadsheets/d/1qSi_-VSj7yiJl0Ak-Q3lch-l4mrH37cEw8EmQwS_6a4/edit?gid=0#gid=0';
 
 // Production
-// var SPREADSHEET_URL = 'https://docs.google.com/spreadsheets/d/1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU/edit?gid=1552160318#gid=1552160318';
+var SPREADSHEET_URL = 'https://docs.google.com/spreadsheets/d/1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU/edit?gid=1552160318#gid=1552160318';
 
 var CURRENCIES_SHEET_NAME = 'Currencies';
 var QR_CODES_SHEET_NAME = 'Agroverse QR codes';
@@ -413,6 +413,7 @@ function listAllCurrencies() {
   for (var i = 0; i < dataRange.length; i++) {
     var row = dataRange[i];
     var currentProductName = row[0] ? row[0].toString().trim() : '';
+    Logger.log(currentProductName)
     var isSerializable = row[2] === true || row[2] === 'TRUE' || row[2] === 'True'; // Column C
     
     // Only include currencies that are marked as serializable
