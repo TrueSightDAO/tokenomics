@@ -75,7 +75,7 @@ def get_recurring_records_from_ledger():
 
         # Filter rows where Column A (index 0) contains "Edgar AWS"
         edgar_records = []
-        for row in values:
+        for row_index, row in enumerate(values):
             if row and 'Edgar AWS' in row[0].strip():
                 start_date = None
                 signature = None
@@ -94,6 +94,7 @@ def get_recurring_records_from_ledger():
                     contributor_name = row[1].strip()
                 edgar_records.append({
                     'row': row,
+                    'row_index': row_index + 1,  # +1 because Google Sheets is 1-based
                     'start_date': start_date,
                     'signature': signature,
                     'contributor_name': contributor_name
@@ -164,9 +165,9 @@ def insertTransaction(service, contributor_name, description, amount, end_date_s
             'Recurring Tokenizations',  # Column B
             description,  # Column C: Recurring Transactions Column A
             '1TDG For every 1 USD of liquidity injected',  # Column D
-            f"{amount:.2f}",  # Column E: Amount billed
+            amount,  # Column E: Amount billed (as number, not string)
             'Successfully Completed / Full Provision Awarded',  # Column F
-            f"{amount:.2f}",  # Column G: Amount billed
+            amount,  # Column G: Amount billed (as number, not string)
             end_date_str  # Column H: Billing period end date
         ]
         
@@ -187,11 +188,11 @@ def insertTransaction(service, contributor_name, description, amount, end_date_s
         return False
 
 
-def update_start_date(service, row_index):
+def update_last_ran_date(service, row_index):
     try:
         today_str = datetime.utcnow().strftime('%Y%m%d')
         body = {
-            'range': f'{RECURRING_SHEET_NAME}!F{row_index + 1}',
+            'range': f'{RECURRING_SHEET_NAME}!F{row_index}',
             'values': [[today_str]]
         }
         service.spreadsheets().values().update(
@@ -200,9 +201,9 @@ def update_start_date(service, row_index):
             valueInputOption='RAW',
             body=body
         ).execute()
-        print(f"Updated Column F of row {row_index + 1} with current date {today_str}")
+        print(f"Updated Column F (last ran date) of row {row_index} with current date {today_str}")
     except Exception as e:
-        print(f"Error updating start date: {e}")
+        print(f"Error updating last ran date: {e}")
 
 
 def get_latest_aws_charges(access_key, secret_key, account_name, start_date):
@@ -380,6 +381,7 @@ def main():
             signature = record['signature']
             start_date = record['start_date']
             contributor_name = record['contributor_name']
+            row_index = record['row_index']
             name = record['row'][0].strip() if record['row'][0] else 'Edgar AWS'
             if not signature:
                 print(f"Skipping record with missing signature: {record['row']}")
@@ -401,6 +403,9 @@ def main():
                 print(f"No valid cost data for {signature}. Skipping transaction insertion.")
                 continue
 
+            # Track if any transactions were inserted for this record
+            transactions_inserted = False
+            
             # Check and insert transactions
             for result in results:
                 start_date_str = result['period']['start']
@@ -411,10 +416,12 @@ def main():
                 if not transactionRecordExist(service, contributor_name, description, end_date_str):
                     # Insert new transaction
                     insertTransaction(service, contributor_name, description, total_cost, end_date_str)
-                    row_index = edgar_records.index(record) + 4
-                    update_start_date(service, row_index)
+                    transactions_inserted = True
                 else:
                     print(f"Transaction already exists for {signature} for period ending {end_date_str}. Skipping insertion.")
+            
+            # Update Column F (last ran date) for this record - always update when script runs
+            update_last_ran_date(service, row_index)
 
     else:
         parser.print_help()
