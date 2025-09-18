@@ -132,7 +132,8 @@ def transactionRecordExist(service, contributor_name, description, end_date_str)
                 continue
             ledger_contributor_name = row[0].strip() if row[0] else ''
             ledger_description = row[2].strip() if row[2] else ''
-            ledger_date = row[7].strip() if row[7] else ''
+            # Column H can be either a number or string, so convert both to string for comparison
+            ledger_date = str(row[7]) if row[7] else ''
             if (ledger_contributor_name == contributor_name and
                 ledger_description == description and
                 ledger_date == end_date_str):
@@ -170,7 +171,7 @@ def insertTransaction(service, contributor_name, description, amount, end_date_s
             amount,  # Column E: Amount billed (as number, not string)
             'Successfully Completed / Full Provision Awarded',  # Column F
             amount,  # Column G: Amount billed (as number, not string)
-            end_date_str  # Column H: Billing period end date
+            int(end_date_str)  # Column H: Billing period end date (as number, not string)
         ]
         
         # Insert the new row after the last non-empty row
