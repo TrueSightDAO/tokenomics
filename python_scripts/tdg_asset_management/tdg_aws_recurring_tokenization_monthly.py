@@ -127,7 +127,7 @@ def transactionRecordExist(service, contributor_name, description, end_date_str)
             return False
 
         # Check for matching record
-        for row in values:
+        for row_index, row in enumerate(values):
             if len(row) < 8:
                 continue
             ledger_contributor_name = row[0].strip() if row[0] else ''
@@ -136,7 +136,9 @@ def transactionRecordExist(service, contributor_name, description, end_date_str)
             if (ledger_contributor_name == contributor_name and
                 ledger_description == description and
                 ledger_date == end_date_str):
-                print(f"Matching transaction found in Ledger history for contributor_name: {contributor_name}, description: {ledger_description}, date: {end_date_str}")
+                # +2 because Google Sheets is 1-based and we skip header row
+                sheet_row_number = row_index + 2
+                print(f"Matching transaction found in Ledger history at row {sheet_row_number} for contributor_name: {contributor_name}, description: {ledger_description}, date: {end_date_str}")
                 return True
         return False
     except Exception as e:
