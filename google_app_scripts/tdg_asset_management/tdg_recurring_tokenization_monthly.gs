@@ -229,12 +229,20 @@ function tokenizedAlready(contributor, description, expected_date) {
     const records = data.slice(1); // Skip header row
     
     // Check if the record exists
-    return records.some(row => {
+    for (let i = 0; i < records.length; i++) {
+      const row = records[i];
       const ledgerContributor = row[CONFIG.LEDGER_COLUMNS.CONTRIBUTOR] || 'N/A'; // Column A
       const ledgerStartDate = row[CONFIG.LEDGER_COLUMNS.START_DATE] ? String(row[CONFIG.LEDGER_COLUMNS.START_DATE]).padStart(8, '0') : 'N/A'; // Column C
       const ledgerDate = row[CONFIG.LEDGER_COLUMNS.DATE] ? String(row[CONFIG.LEDGER_COLUMNS.DATE]).padStart(8, '0') : 'N/A'; // Column H
-      return ledgerContributor === contributor && ledgerStartDate === description && ledgerDate === expected_date;
-    });
+      
+      if (ledgerContributor === contributor && ledgerStartDate === description && ledgerDate === expected_date) {
+        // +2 because Google Sheets is 1-based and we skip header row
+        const sheetRowNumber = i + 2;
+        Logger.log(`Matching transaction found in Ledger history at row ${sheetRowNumber} for contributor: ${contributor}, description: ${description}, date: ${expected_date}`);
+        return true;
+      }
+    }
+    return false;
     
   } catch (e) {
     Logger.log('Error in tokenizedAlready: ' + e.message);
