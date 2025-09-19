@@ -1,7 +1,42 @@
 /**
- * Extended Google Apps Script for managing Agroverse ledger data and TrueSight DAO equity holdings.
- * Integrates with Wix APIs, Solana blockchain, and Google Sheets.
- * Includes new functions to fetch ledger URLs, retrieve equity holdings, and calculate total AGL investments.
+ * TDG Wix Dashboard - TrueSight DAO Asset Management and Tokenomics Automation
+ * 
+ * This Google Apps Script manages the complete tokenomics and asset tracking system for TrueSight DAO.
+ * It integrates multiple data sources and automates critical financial operations.
+ * 
+ * KEY FEATURES:
+ * - Asset Management: Tracks off-chain assets, USDT vault balance, and AGL investment holdings
+ * - Tokenomics Calculations: Calculates asset per TDG, voting rights, and buy-back budgets
+ * - Wix Integration: Syncs data with Wix platform for public display
+ * - Transaction Automation: Creates daily buy-back provisions and recurring tokenizations
+ * - Multi-Source Data: Integrates Wix APIs, Solana blockchain, and Google Sheets
+ * 
+ * MAIN FUNCTIONS:
+ * - updateTotalDAOAssetOnWix(): Updates total DAO asset value on Wix
+ * - updateAssetPerIssuedTdg(): Calculates and updates asset per TDG ratio
+ * - getDailyTdgBuyBackBudget(): Creates daily buy-back transaction pairs
+ * - getInvestmentHoldingsInAGL(): Calculates total AGL investment holdings
+ * - update30DaysSalesOnWix(): Updates 30-day sales data on Wix
+ * 
+ * DAILY AUTOMATION:
+ * - Daily buy-back budget calculation and transaction creation
+ * - Asset value updates and tokenomics recalculation
+ * - Treasury yield monitoring and adjustment
+ * 
+ * DATA SOURCES:
+ * - Google Sheets: Ledger history, off-chain transactions, asset balances
+ * - Wix APIs: Public data display and exchange rates
+ * - Solana Blockchain: USDT vault balance monitoring
+ * - US Treasury: Real-time yield data for calculations
+ * 
+ * SPREADSHEET STRUCTURE:
+ * - "Ledger history": TDG token issuance and voting rights tracking
+ * - "offchain transactions": All off-chain financial transactions
+ * - "off chain asset balance": Current asset valuations
+ * - "Recurring Transactions": Automated recurring tokenization rules
+ * 
+ * KEYWORDS: TDG, TrueSight DAO, tokenomics, asset management, buy-back, voting rights, 
+ *           Wix integration, Solana, USDT vault, treasury yield, AGL investments
  */
 
 // Stores the credentials object retrieved from the getCredentials() function
@@ -672,6 +707,76 @@ function getDailyTdgBuyBackBudget() {
   return response_obj.dataItem.data.exchangeRate;
 }
 
+/**
+ * Creates daily buy-back provision transaction pairs in the "offchain transactions" sheet.
+ * This function should be executed daily to provision funds for TDG buy-back operations.
+ * 
+ * Creates two transactions:
+ * 1. Negative transaction: Deducts buy-back budget from off-chain funds
+ * 2. Positive transaction: Provisions buy-back budget for voting rights cash-out
+ * 
+ * @return {boolean} True if transactions were created successfully, false otherwise
+ */
+function createDailyTdgBuyBackTransactions() {
+  try {
+    // Get the current date in YYYYMMDD format
+    var currentDate = Utilities.formatDate(new Date(), 'GMT', 'yyyyMMdd');
+    
+    // Get the daily buy-back budget from Wix
+    var buyBackBudget = getDailyTdgBuyBackBudget();
+    
+    if (!buyBackBudget || buyBackBudget <= 0) {
+      Logger.log("Invalid buy-back budget: " + buyBackBudget);
+      return false;
+    }
+    
+    Logger.log("Creating daily buy-back transactions for date: " + currentDate + " with budget: " + buyBackBudget);
+    
+    // Get the "offchain transactions" sheet
+    var offTransactionsSheet = SpreadsheetApp.openById(ledgerDocId).getSheetByName("offchain transactions");
+    if (!offTransactionsSheet) {
+      Logger.log("Error: 'offchain transactions' sheet not found");
+      return false;
+    }
+    
+    // Find the last non-empty row in Column A
+    var lastRow = offTransactionsSheet.getLastRow();
+    var nextRow = lastRow + 1;
+    
+    // Transaction #1: Negative transaction (deduct from off-chain funds)
+    var transaction1 = [
+      currentDate,  // Column A: Transaction Date
+      "[DAILY BUYBACK PROVISION]\nDaily Buyback budget: " + buyBackBudget,  // Column B: Description
+      "Gary Teh",  // Column C: Fund Handler
+      -buyBackBudget,  // Column D: Amount (negative)
+      "USD"  // Column E: Currency
+    ];
+    
+    // Transaction #2: Positive transaction (provision for voting rights cash-out)
+    var transaction2 = [
+      currentDate,  // Column A: Transaction Date
+      "[DAILY BUYBACK PROVISION]\nDaily Buyback budget: " + buyBackBudget,  // Column B: Description
+      "Gary Teh",  // Column C: Fund Handler
+      buyBackBudget,  // Column D: Amount (positive)
+      "USD - provisions for voting rights cash out"  // Column E: Currency
+    ];
+    
+    // Insert both transactions
+    offTransactionsSheet.getRange(nextRow, 1, 1, transaction1.length).setValues([transaction1]);
+    offTransactionsSheet.getRange(nextRow + 1, 1, 1, transaction2.length).setValues([transaction2]);
+    
+    Logger.log("Successfully created daily buy-back transactions:");
+    Logger.log("Transaction 1 (Row " + nextRow + "): -" + buyBackBudget + " USD");
+    Logger.log("Transaction 2 (Row " + (nextRow + 1) + "): +" + buyBackBudget + " USD");
+    
+    return true;
+    
+  } catch (e) {
+    Logger.log("Error creating daily buy-back transactions: " + e.message);
+    return false;
+  }
+}
+
 // Constant for the US Treasury Yield DataItemID
 function getWixUSTreasuryYieldDataItemId() {
   return "7e8efc84-f212-47ac-a37e-2f32f29c76e0";
@@ -714,5 +819,4 @@ function getUSTreasuryYieldOnWix() {
   var response_obj = JSON.parse(content);  
   Logger.log("US Treasury Yield on Wix: " + response_obj.dataItem.data.exchangeRate);  
   return response_obj.dataItem.data.exchangeRate;
-}
 }
