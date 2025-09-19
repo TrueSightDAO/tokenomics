@@ -761,6 +761,9 @@ function getGaryTehUSDBalance() {
  * Implements the ledger-based buy-back program as specified in:
  * https://github.com/TrueSightDAO/proposals/blob/main/migration-away-from-raydium-towards-ledger-based-buy-back-program.md
  * 
+ * Execution Source: https://script.google.com/home/projects/1ZQjgSZvAXL2PB3e3YW289xY7Ork4S5wV4uKTXJyw83xQT4R0lh_hwNWn/edit
+ * Source Code: https://github.com/TrueSightDAO/tokenomics/blob/main/google_app_scripts/tdg_asset_management/tdg_wix_dashboard.gs
+ * 
  * Creates two transactions:
  * 1. Negative transaction: Deducts buy-back budget from off-chain funds
  * 2. Positive transaction: Provisions buy-back budget for voting rights cash-out
@@ -807,12 +810,19 @@ function createDailyTdgBuyBackTransactions() {
     var lastRow = offTransactionsSheet.getLastRow();
     var nextRow = lastRow + 1;
     
+    // Get execution timestamp
+    var executionTimestamp = Utilities.formatDate(new Date(), 'GMT', 'yyyy-MM-dd HH:mm:ss') + ' UTC';
+    
     // Create description with capping information if applicable
     var description = "[DAILY BUYBACK PROVISION]\nDaily Buyback budget: " + buyBackBudget;
     if (actualBuyBackAmount < buyBackBudget) {
       description += "\nActual amount (capped): " + actualBuyBackAmount + "\nGary Teh's USD balance: " + garyTehUSDBalance;
     }
-    description += "\n\nProposal: https://github.com/TrueSightDAO/proposals/blob/main/migration-away-from-raydium-towards-ledger-based-buy-back-program.md";
+    description += "\n--------\n\nMethod: createDailyTdgBuyBackTransactions";
+    description += "\nExecuted: " + executionTimestamp;
+    description += "\nProposal: https://github.com/TrueSightDAO/proposals/blob/main/migration-away-from-raydium-towards-ledger-based-buy-back-program.md";
+    description += "\nExecution Source: https://script.google.com/home/projects/1ZQjgSZvAXL2PB3e3YW289xY7Ork4S5wV4uKTXJyw83xQT4R0lh_hwNWn/edit";
+    description += "\nSource Code: https://github.com/TrueSightDAO/tokenomics/blob/main/google_app_scripts/tdg_asset_management/tdg_wix_dashboard.gs";
     
     // Transaction #1: Negative transaction (deduct from off-chain funds)
     var transaction1 = [
