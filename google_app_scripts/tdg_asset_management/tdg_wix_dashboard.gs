@@ -708,8 +708,58 @@ function getDailyTdgBuyBackBudget() {
 }
 
 /**
+ * Gets Gary Teh's USD balance from the "offchain asset location" sheet.
+ * 
+ * Searches for rows where:
+ * - Column A = "USD"
+ * - Column B = "Gary Teh"
+ * - Returns Column C (Amount Managed)
+ * 
+ * @return {number} Gary Teh's USD balance, or 0 if not found
+ */
+function getGaryTehUSDBalance() {
+  try {
+    // Get the "offchain asset location" sheet
+    var offChainAssetLocationSheet = SpreadsheetApp.openById(ledgerDocId).getSheetByName("offchain asset location");
+    if (!offChainAssetLocationSheet) {
+      Logger.log("Error: 'offchain asset location' sheet not found");
+      return 0;
+    }
+    
+    // Get all data from the sheet
+    var data = offChainAssetLocationSheet.getDataRange().getValues();
+    
+    // Search for Gary Teh's USD balance
+    for (var i = 0; i < data.length; i++) {
+      var row = data[i];
+      if (row.length >= 3) {
+        var currency = row[0]; // Column A
+        var location = row[1]; // Column B
+        var amount = row[2];   // Column C
+        
+        if (currency === "USD" && location === "Gary Teh") {
+          var balance = parseFloat(amount) || 0;
+          Logger.log("Gary Teh's USD balance: " + balance);
+          return balance;
+        }
+      }
+    }
+    
+    Logger.log("Gary Teh's USD balance not found in offchain asset location sheet");
+    return 0;
+    
+  } catch (e) {
+    Logger.log("Error getting Gary Teh's USD balance: " + e.message);
+    return 0;
+  }
+}
+
+/**
  * Creates daily buy-back provision transaction pairs in the "offchain transactions" sheet.
  * This function should be executed daily to provision funds for TDG buy-back operations.
+ * 
+ * Implements the ledger-based buy-back program as specified in:
+ * https://github.com/TrueSightDAO/proposals/blob/main/migration-away-from-raydium-towards-ledger-based-buy-back-program.md
  * 
  * Creates two transactions:
  * 1. Negative transaction: Deducts buy-back budget from off-chain funds
@@ -730,7 +780,21 @@ function createDailyTdgBuyBackTransactions() {
       return false;
     }
     
-    Logger.log("Creating daily buy-back transactions for date: " + currentDate + " with budget: " + buyBackBudget);
+    // Get Gary Teh's USD balance and cap the buy-back budget if necessary
+    var garyTehUSDBalance = getGaryTehUSDBalance();
+    var actualBuyBackAmount = Math.min(buyBackBudget, garyTehUSDBalance);
+    
+    if (actualBuyBackAmount <= 0) {
+      Logger.log("Insufficient USD balance for buy-back. Gary Teh's balance: " + garyTehUSDBalance + ", Required: " + buyBackBudget);
+      return false;
+    }
+    
+    // Log if the amount was capped
+    if (actualBuyBackAmount < buyBackBudget) {
+      Logger.log("Buy-back amount capped due to insufficient USD balance. Original budget: " + buyBackBudget + ", Actual amount: " + actualBuyBackAmount);
+    }
+    
+    Logger.log("Creating daily buy-back transactions for date: " + currentDate + " with amount: " + actualBuyBackAmount);
     
     // Get the "offchain transactions" sheet
     var offTransactionsSheet = SpreadsheetApp.openById(ledgerDocId).getSheetByName("offchain transactions");
@@ -743,21 +807,28 @@ function createDailyTdgBuyBackTransactions() {
     var lastRow = offTransactionsSheet.getLastRow();
     var nextRow = lastRow + 1;
     
+    // Create description with capping information if applicable
+    var description = "[DAILY BUYBACK PROVISION]\nDaily Buyback budget: " + buyBackBudget;
+    if (actualBuyBackAmount < buyBackBudget) {
+      description += "\nActual amount (capped): " + actualBuyBackAmount + "\nGary Teh's USD balance: " + garyTehUSDBalance;
+    }
+    description += "\n\nProposal: https://github.com/TrueSightDAO/proposals/blob/main/migration-away-from-raydium-towards-ledger-based-buy-back-program.md";
+    
     // Transaction #1: Negative transaction (deduct from off-chain funds)
     var transaction1 = [
       currentDate,  // Column A: Transaction Date
-      "[DAILY BUYBACK PROVISION]\nDaily Buyback budget: " + buyBackBudget,  // Column B: Description
+      description,  // Column B: Description
       "Gary Teh",  // Column C: Fund Handler
-      -buyBackBudget,  // Column D: Amount (negative)
+      -actualBuyBackAmount,  // Column D: Amount (negative)
       "USD"  // Column E: Currency
     ];
     
     // Transaction #2: Positive transaction (provision for voting rights cash-out)
     var transaction2 = [
       currentDate,  // Column A: Transaction Date
-      "[DAILY BUYBACK PROVISION]\nDaily Buyback budget: " + buyBackBudget,  // Column B: Description
+      description,  // Column B: Description
       "Gary Teh",  // Column C: Fund Handler
-      buyBackBudget,  // Column D: Amount (positive)
+      actualBuyBackAmount,  // Column D: Amount (positive)
       "USD - provisions for voting rights cash out"  // Column E: Currency
     ];
     
@@ -766,8 +837,8 @@ function createDailyTdgBuyBackTransactions() {
     offTransactionsSheet.getRange(nextRow + 1, 1, 1, transaction2.length).setValues([transaction2]);
     
     Logger.log("Successfully created daily buy-back transactions:");
-    Logger.log("Transaction 1 (Row " + nextRow + "): -" + buyBackBudget + " USD");
-    Logger.log("Transaction 2 (Row " + (nextRow + 1) + "): +" + buyBackBudget + " USD");
+    Logger.log("Transaction 1 (Row " + nextRow + "): -" + actualBuyBackAmount + " USD");
+    Logger.log("Transaction 2 (Row " + (nextRow + 1) + "): +" + actualBuyBackAmount + " USD");
     
     return true;
     
