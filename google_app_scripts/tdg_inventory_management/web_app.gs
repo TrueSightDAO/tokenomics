@@ -271,10 +271,24 @@ function doGet(e) {
       .setMimeType(ContentService.MimeType.JSON);
   }
 
+  // Return list of ledger names and URLs from WIX AgroverseShipments
+  if (e.parameter.ledgers) {
+    const ledgerConfigs = getLedgerConfigsFromWix();
+    const ledgers = ledgerConfigs.map(function(config) {
+      return {
+        ledger_name: config.ledger_name,
+        ledger_url: config.ledger_url
+      };
+    });
+    return ContentService
+      .createTextOutput(JSON.stringify(ledgers))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+
   // No valid parameter provided
   return ContentService
     .createTextOutput(JSON.stringify({
-      error: 'Please specify ?list=true to list managers, ?manager=<key> to get assets, or ?recipients=true to list recipients.'
+      error: 'Please specify ?list=true to list managers, ?manager=<key> to get assets, ?recipients=true to list recipients, or ?ledgers=true to list ledgers.'
     }))
     .setMimeType(ContentService.MimeType.JSON);
 }
