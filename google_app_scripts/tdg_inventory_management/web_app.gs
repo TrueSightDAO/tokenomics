@@ -87,22 +87,14 @@ function getLedgerConfigsFromWix() {
     const content = response.getContentText();
     const response_obj = JSON.parse(content);
 
-    const ledgerUrls = response_obj.dataItems
-      .map(item => item.data.contract_url)
-      .filter(url => url && url !== '')
-      .filter((url, index, self) => self.indexOf(url) === index);
-
-    // Construct LEDGER_CONFIGS dynamically
-    const ledgerConfigs = ledgerUrls.map(url => {
-      const resolvedUrl = resolveRedirect(url);
-      // Extract ledger name from the last segment of the URL (after the last '/')
-      const urlParts = resolvedUrl.split('/');
-      const lastSegment = urlParts[urlParts.length - 1];
-      // Use the spreadsheet ID (before any query params like ?gid) and capitalize
-      const ledgerName = lastSegment.split('?')[0].toUpperCase();
-      return {
-        ledger_name: ledgerName,
-        ledger_url: resolvedUrl,
+    // Construct LEDGER_CONFIGS dynamically using title from WIX data
+    const ledgerConfigs = response_obj.dataItems
+      .filter(item => item.data.contract_url && item.data.contract_url !== '')
+      .map(item => {
+        const resolvedUrl = resolveRedirect(item.data.contract_url);
+        return {
+          ledger_name: item.data.title,
+          ledger_url: resolvedUrl,
         sheet_name: 'Balance',
         manager_names_column: 'H',
         asset_name_column: 'J',
