@@ -8,6 +8,7 @@ var QR_CODE_SHEET_NAME = 'Agroverse QR codes';
 var QR_CODE_PARAM = 'qr_code';
 var EMAIL_ADDRESS_PARAM = 'email_address';
 var LIST_PARAM = 'list';
+var LIST_WITH_MEMBERS_PARAM = 'list_with_members';
 var HEADER_ROW = 2;
 var DATA_START_ROW = 2;
 var DEPLOYMENT_URL = 'https://script.google.com/macros/s/AKfycbxigq4-J0izShubqIC5k6Z7fgNRyVJLakfQ34HPuENiSpxuCG-wSq0g-wOAedZzzgaL/exec';
@@ -64,6 +65,43 @@ function doGet(e) {
         JSON.stringify({
           status: 'success',
           qr_codes: mintedQrCodes
+        })
+      ).setMimeType(ContentService.MimeType.JSON);
+    }
+
+    // Check if the request is for listing minted QR codes with member names
+    if (e.parameter[LIST_WITH_MEMBERS_PARAM] === 'true') {
+      var lastRow = sheet.getLastRow();
+      if (lastRow < DATA_START_ROW) {
+        return ContentService.createTextOutput(
+          JSON.stringify({
+            status: 'error',
+            message: 'No data found in sheet starting from row ' + DATA_START_ROW
+          })
+        ).setMimeType(ContentService.MimeType.JSON);
+      }
+
+      // Get QR codes (column A), status (column D), and manager names (column U)
+      var dataRange = sheet.getRange(DATA_START_ROW, 1, lastRow - DATA_START_ROW + 1, 21).getValues();
+      var mintedQrCodesWithMembers = [];
+
+      // Filter rows where column D (index 3) is 'MINTED'
+      for (var i = 0; i < dataRange.length; i++) {
+        if (dataRange[i][3] === 'MINTED') {
+          var qrCode = dataRange[i][0]; // Column A
+          var managerName = dataRange[i][20]; // Column U (index 20)
+          
+          mintedQrCodesWithMembers.push({
+            qr_code: qrCode,
+            contributor_name: managerName || ''
+          });
+        }
+      }
+
+      return ContentService.createTextOutput(
+        JSON.stringify({
+          status: 'success',
+          items: mintedQrCodesWithMembers
         })
       ).setMimeType(ContentService.MimeType.JSON);
     }
