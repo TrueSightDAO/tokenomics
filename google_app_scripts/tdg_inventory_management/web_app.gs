@@ -278,10 +278,15 @@ function doGet(e) {
       .setMimeType(ContentService.MimeType.JSON);
   }
 
+  // Return all currencies across all ledgers
+  if (e.parameter.all_currencies) {
+    return listAllCurrenciesAcrossLedgers();
+  }
+
   // No valid parameter provided
   return ContentService
     .createTextOutput(JSON.stringify({
-      error: 'Please specify ?list=true to list managers, ?manager=<key> to get assets, ?recipients=true to list recipients, or ?ledgers=true to list ledgers.'
+      error: 'Please specify ?list=true to list managers, ?manager=<key> to get assets, ?recipients=true to list recipients, ?ledgers=true to list ledgers, or ?all_currencies=true to list all currencies.'
     }))
     .setMimeType(ContentService.MimeType.JSON);
 }
@@ -305,4 +310,160 @@ function testList() {
   const e = { parameter: { list: 'true' } };
   const output = doGet(e);
   Logger.log('Manager list: %s', output.getContent());
+}
+
+/**
+ * Test function: list all currencies across all ledgers.
+ * Usage (in Apps Script console): testAllCurrencies();
+ */
+function testAllCurrencies() {
+  const e = { parameter: { all_currencies: 'true' } };
+  const output = doGet(e);
+  Logger.log('All currencies: %s', output.getContent());
+}
+
+/**
+ * List all currencies across all ledgers with their quantities
+ * Returns currencies from both the main inventory sheet and all external ledgers
+ */
+function listAllCurrenciesAcrossLedgers() {
+  try {
+    const currencyQuantities = {}; // Track currencies and their quantities per ledger
+    
+    // First, get currencies from the main inventory sheet
+    const mainSpreadsheet = SpreadsheetApp.openById(SPREADSHEET_ID);
+    const mainSheet = mainSpreadsheet.getSheetByName(SHEET_NAME);
+    
+    if (mainSheet) {
+      const lastRow = mainSheet.getLastRow();
+      const numRows = Math.max(0, lastRow - 4);
+      const data = numRows > 0 ? mainSheet.getRange(5, 1, numRows, 3).getValues() : [];
+      
+      data.forEach(function(row) {
+        const currencyName = row[0];
+        const managerName = row[1];
+        const quantity = parseFloat(row[2]) || 0;
+        
+        if (currencyName && quantity > 0) {
+          if (!currencyQuantities[currencyName]) {
+            currencyQuantities[currencyName] = {
+              product_name: currencyName,
+              product_image: '',
+              landing_page: '',
+              ledger: '',
+              farm_name: '',
+              state: '',
+              country: '',
+              year: '',
+              total_quantity: 0,
+              ledger_quantities: {}
+            };
+          }
+          currencyQuantities[currencyName].total_quantity += quantity;
+          // Don't add to ledger_quantities for main inventory sheet - it's not a specific ledger
+        }
+      });
+    }
+    
+    // Then, get currencies from all external ledgers
+    const ledgerConfigs = getLedgerConfigsFromWix();
+    Logger.log('Processing ' + ledgerConfigs.length + ' external ledgers for currencies');
+    
+    ledgerConfigs.forEach(function(config) {
+      try {
+        Logger.log('Processing ledger: ' + config.ledger_name + ' - ' + config.ledger_url);
+        
+        if (!config.ledger_url || !config.ledger_url.includes('docs.google.com/spreadsheets')) {
+          Logger.log('Skipping invalid or non-spreadsheet URL: ' + config.ledger_url);
+          return;
+        }
+        
+        const ledgerSpreadsheet = SpreadsheetApp.openByUrl(config.ledger_url);
+        const ledgerSheet = ledgerSpreadsheet.getSheetByName(config.sheet_name);
+        if (!ledgerSheet) {
+          Logger.log('Sheet not found: ' + config.sheet_name + ' in ledger ' + config.ledger_name);
+          return;
+        }
+        
+        const startRow = config.record_start_row;
+        const lastLedgerRow = ledgerSheet.getLastRow();
+        const numRows = Math.max(0, lastLedgerRow - startRow + 1);
+        if (numRows < 1) {
+          Logger.log('No data rows found in ledger ' + config.ledger_name);
+          return;
+        }
+        
+        Logger.log('Processing ' + numRows + ' rows in ledger ' + config.ledger_name);
+        
+        const nameCol = letterToColumn(config.manager_names_column);
+        const assetCol = letterToColumn(config.asset_name_column);
+        const qtyCol = letterToColumn(config.asset_quantity_column);
+        
+        const names = ledgerSheet.getRange(startRow, nameCol, numRows, 1).getValues();
+        const assets = ledgerSheet.getRange(startRow, assetCol, numRows, 1).getValues();
+        const qtys = ledgerSheet.getRange(startRow, qtyCol, numRows, 1).getValues();
+        
+        let matchesFound = 0;
+        for (let i = 0; i < names.length; i++) {
+          const assetName = assets[i][0];
+          const quantity = parseFloat(qtys[i][0]) || 0;
+          
+          if (assetName && quantity > 0) {
+            if (!currencyQuantities[assetName]) {
+              currencyQuantities[assetName] = {
+                product_name: assetName,
+                product_image: '',
+                landing_page: '',
+                ledger: config.ledger_url,
+                farm_name: '',
+                state: '',
+                country: '',
+                year: '',
+                total_quantity: 0,
+                ledger_quantities: {}
+              };
+            }
+            currencyQuantities[assetName].total_quantity += quantity;
+            currencyQuantities[assetName].ledger_quantities[config.ledger_name] = 
+              (currencyQuantities[assetName].ledger_quantities[config.ledger_name] || 0) + quantity;
+            matchesFound++;
+          }
+        }
+        
+        Logger.log('Found ' + matchesFound + ' currencies in ledger ' + config.ledger_name);
+        
+      } catch (err) {
+        Logger.log('Error processing ledger ' + config.ledger_name + ': ' + err);
+      }
+    });
+    
+    // Convert to array and sort by total quantity (descending)
+    const allCurrencies = [];
+    for (const currencyName in currencyQuantities) {
+      const currency = currencyQuantities[currencyName];
+      if (currency.total_quantity > 0) {
+        allCurrencies.push(currency);
+      }
+    }
+    
+    allCurrencies.sort(function(a, b) {
+      return b.total_quantity - a.total_quantity;
+    });
+    
+    return ContentService.createTextOutput(JSON.stringify({
+      status: 'success',
+      data: {
+        action: 'all_currencies',
+        currencies: allCurrencies,
+        total_currencies: allCurrencies.length
+      }
+    })).setMimeType(ContentService.MimeType.JSON);
+    
+  } catch (error) {
+    Logger.log('Error in listAllCurrenciesAcrossLedgers: ' + error.message);
+    return ContentService.createTextOutput(JSON.stringify({
+      status: 'error',
+      message: 'Error listing currencies: ' + error.message
+    })).setMimeType(ContentService.MimeType.JSON);
+  }
 }
