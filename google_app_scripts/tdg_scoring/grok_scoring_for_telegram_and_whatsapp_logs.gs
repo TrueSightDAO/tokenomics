@@ -1,3 +1,5 @@
+// Deployment URL: https://script.google.com/macros/s/AKfycbwnCn80es4Jd1pS9oKghpIvJ9pPYSXLonsWztrfXP6YYVVHy8lymMDEk2iRYWlNmjRT/exec
+
 // Flag to ignore chatlogs before this date (YYYYMMDD format)
 // - Messages with dates earlier than this will be skipped during processing.
 // - Format: "YYYYMMDD" (e.g., "20241213" means December 13, 2024).

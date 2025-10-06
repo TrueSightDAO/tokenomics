@@ -1,3 +1,5 @@
+// Deployment URL: https://script.google.com/macros/s/AKfycbw6Pgl5a1FqX58EWyCEIi1rG_NuI4P34R6SBtdsCP-0INjcSE8HH8apvTCZlCVrM1ft/exec
+
 // Before running the script, ensure API keys are set in Script Properties.
 // Go to 'Project Settings' > 'Script Properties' in the Apps Script editor and manually add:
 // - 'TELEGRAM_API_TOKEN': Your Telegram Bot API token

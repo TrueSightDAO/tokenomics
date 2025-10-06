@@ -1,5 +1,6 @@
 /**
  * TDG Proposal Management System
+ * Deployment URL: https://script.google.com/macros/s/AKfycbzgNstwRX1dWo17Dxny0t1ipJ6yLX02bTD_cKRuHr5RPJPemNVTj25mFhKo4UmR5Z7BIg/exec
  * 
  * This Google Apps Script provides functionality for managing TrueSight DAO proposals
  * including creation, voting, commenting, and automated PR management.

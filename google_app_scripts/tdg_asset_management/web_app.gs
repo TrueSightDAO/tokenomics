@@ -4,6 +4,8 @@
  * Asset values (total_assets, asset_per_circulated_voting_right) are formatted to 5 decimal places.
  * If query parameter full=true, returns full response; otherwise, returns only contributor_name.
  *
+ * Deployment URL: https://script.google.com/macros/s/AKfycbygmwRbyqse-dpCYMco0rb93NSgg-Jc1QIw7kUiBM7CZK6jnWnMB5DEjdoX_eCsvVs7/exec
+ *
  * Instructions to call this endpoint:
  * 1. Deploy this script as a web app:
  *    - Click Deploy > New deployment > Web app.
