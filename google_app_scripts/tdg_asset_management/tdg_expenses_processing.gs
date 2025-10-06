@@ -2,6 +2,8 @@
 setApiKeys();
 const creds = getCredentials();
 
+// Deployment URL: https://script.google.com/macros/s/AKfycbwYBlFigSSPJKkI-F2T3dSsdLnvvBi2SCGF1z2y1k95YzA5HBrJVyMo6InTA9Fud2bOEw/exec
+
 // Configuration Variables
 const SOURCE_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1qbZZhf-_7xzmDTriaJVWj6OZshyQsFkdsAV8-pyzASQ/edit?gid=0#gid=0';
 const SOURCE_SHEET_NAME = 'Telegram Chat Logs';

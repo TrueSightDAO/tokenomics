@@ -1,6 +1,6 @@
 /**
  * Google Apps Script for QR Code Generation and Management
- * const API_ENDPOINT = 'https://script.google.com/macros/s/AKfycbygmwRbyqse-dpCYMco0rb93NSgg-Jc1QIw7kUiBM7CZK6jnWnMB5DEjdoX_eCsvVs7/exec';
+ * const API_ENDPOINT = 'https://script.google.com/macros/s/AKfycbySJ86OcVsk5gETTiJ-CY-zBZGHAQoZ8yVW-buxXMjOI9eEc3HP7AicHhtNICHoJo1z/exec';
  * 
  * This script provides a web service to:
  * 1. Search for products in the "Currencies" sheet

@@ -1,23 +1,21 @@
-# TDG Ecosystem Scripts
+# Google Apps Scripts for TrueSight DAO Ecosystem
 
-This repository contains Google Apps Script projects for managing and analyzing data within the TrueSight DAO Decentralized Governance ecosystem. The repository is organized into two main subfolders, each focusing on a distinct aspect of the ecosystem:
+This repository contains Google Apps Script projects that power the TrueSight DAO Decentralized Governance ecosystem. Each folder contains specialized scripts for different aspects of the DAO operations, from asset management to content scheduling.
 
-- [tdg_asset_management](./tdg_asset_management): Manages DAO asset data, including off-chain and on-chain balances, sales, and token buy-back budgets.
-- [tdg_scoring](./tdg_scoring): Processes and scores Telegram and WhatsApp chat logs to assign TDG tokens based on contributions.
+## 📁 Repository Structure
 
-## Repository Structure
+### Core DAO Management
+- **[tdg_asset_management](./tdg_asset_management/)** - Manages DAO asset data, including off-chain and on-chain balances, sales, and token buy-back budgets
+- **[tdg_inventory_management](./tdg_inventory_management/)** - Handles inventory movements, warehouse management, and asset tracking across ledgers
+- **[tdg_proposal](./tdg_proposal/)** - Manages proposal workflows and governance processes
 
-- [tdg_asset_management](./tdg_asset_management)\
-  Contains a Google Apps Script for managing Decentralized Autonomous Organization (DAO) assets. It integrates with Google Sheets, Wix APIs, Solana blockchain, LATOKEN exchange, and U.S. Treasury yield data to track and update asset balances, TDG token issuance, sales, and buy-back budgets.\
-  See detailed README for setup and usage instructions.
+### Content & Communication
+- **[tdg_scoring](./tdg_scoring/)** - Processes and scores Telegram and WhatsApp chat logs to assign TDG tokens based on contributions
+- **[agroverse_qr_codes](./agroverse_qr_codes/)** - Manages QR code generation and tracking for agricultural products
+- **[webhooks](./webhooks/)** - Handles webhook integrations for external service communications
 
-- [tdg_scoring](./tdg_scoring)`\
-  Contains Google Apps Scripts for importing and scoring chat logs from Telegram and WhatsApp. It uses AI APIs (xAI's Grok and OpenAI) to evaluate contributions and assign TDG tokens, with data stored in Google Sheets and notifications sent via Telegram.\
-  See detailed README for setup and usage instructions.
-
-- [tdg_inventory_management](./tdg_inventory_management)\\
-  Provides a Google Apps Script web app to list inventory managers, fetch asset data for a specified manager, and list possible recipients from a Google Sheet.\\
-  See detailed README for setup and usage instructions.
+### External Services
+- **[agroverse_qr_code_web_service](./agroverse_qr_code_web_service/)** - Standalone web service for QR code operations and currency management
 
 ## Getting Started
 
@@ -44,8 +42,18 @@ This repository contains Google Apps Script projects for managing and analyzing 
 
 2. **Navigate to Subfolders**:
 
-   - For asset management, refer to [tdg_asset_management/README.md](./tdg_asset_management/README.md).
-   - For chat log scoring, refer to [tdg_scoring/README.md](./tdg_scoring/README.md).
+   - **Core DAO Management**:
+     - [tdg_asset_management/README.md](./tdg_asset_management/README.md) - Asset management and financial tracking
+     - [tdg_inventory_management/README.md](./tdg_inventory_management/README.md) - Inventory and warehouse management
+     - [tdg_proposal/README.md](./tdg_proposal/README.md) - Proposal and governance workflows
+   
+   - **Content & Communication**:
+     - [tdg_scoring/README.md](./tdg_scoring/README.md) - Chat log scoring and TDG token assignment
+     - [agroverse_qr_codes/README.md](./agroverse_qr_codes/README.md) - QR code management for agricultural products
+     - [webhooks/README.md](./webhooks/README.md) - Webhook integrations
+   
+   - **External Services**:
+     - [agroverse_qr_code_web_service/README.md](./agroverse_qr_code_web_service/README.md) - QR code web service and currency management
 
 3. **Follow Subfolder-Specific Instructions**: Each subfolder contains a detailed `README.md` with setup, configuration, and usage instructions specific to its scripts.
 

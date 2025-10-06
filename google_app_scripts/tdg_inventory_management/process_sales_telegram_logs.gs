@@ -1,3 +1,5 @@
+// Deployment URL: https://script.google.com/macros/s/AKfycbzc15gptNmn8Pm726cfeXDnBxbxZ1L31MN6bkfBH7ziiz4gxl87vJXEhAAJJhZ5uAxq/exec
+
 // Load API keys and configuration settings from Credentials.gs
 // - setApiKeys(): Stores sensitive API keys in Google Apps Script’s Script Properties for security.
 // - getCredentials(): Retrieves all configuration details (API keys, URLs, IDs) as an object.

@@ -1,5 +1,6 @@
 /**
  * Web app to list inventory managers or fetch asset data for a specific manager.
+ * Deployment URL: https://script.google.com/macros/s/AKfycbztpV3TUIRn3ftNW1aGHAKw32OBJrp_p1Pr9mMAttoyWFZyQgBRPU2T6eGhkmJtz7xV/exec
  *
  * Query parameters:
  *   list=true       : returns array of objects { key, name } for each unique manager name.
