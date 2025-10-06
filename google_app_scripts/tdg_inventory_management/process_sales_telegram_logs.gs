@@ -389,7 +389,7 @@ function parseTelegramChatLogs() {
 
 // Function to process a specific row from the source sheet
 function processSpecificRow() {
-  rowIndex = 6013;
+  rowIndex = 6751;
   // Get source and destination spreadsheets
   const sourceSpreadsheet = SpreadsheetApp.openByUrl(SOURCE_SHEET_URL);
   const destinationSpreadsheet = SpreadsheetApp.openByUrl(DESTINATION_SHEET_URL);
