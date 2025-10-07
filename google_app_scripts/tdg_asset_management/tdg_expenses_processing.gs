@@ -1,3 +1,12 @@
+/**
+ * File: google_app_scripts/tdg_asset_management/tdg_expenses_processing.gs
+ * Repository: https://github.com/TrueSightDAO/tokenomics
+ * 
+ * Description: Processes expense submissions from Telegram, validates them against
+ * contributor signatures, and inserts transactions into appropriate ledgers (offchain
+ * or managed AGL ledgers based on inventory type encoding).
+ */
+
 // Load API keys and configuration settings
 setApiKeys();
 const creds = getCredentials();

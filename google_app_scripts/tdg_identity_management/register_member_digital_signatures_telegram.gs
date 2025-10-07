@@ -1,4 +1,11 @@
 /**
+ * File: google_app_scripts/tdg_identity_management/register_member_digital_signatures_telegram.gs
+ * Repository: https://github.com/TrueSightDAO/tokenomics
+ * 
+ * Description: Registers new contributor digital signatures submitted via Telegram.
+ */
+
+/**
  * TDG Identity Management System
  * Processes digital signature events from Telegram logs and maintains a registry
  */

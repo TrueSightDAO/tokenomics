@@ -1,3 +1,10 @@
+/**
+ * File: google_app_scripts/agroverse_site_statistics/agroverse_wix_site_updates.gs
+ * Repository: https://github.com/TrueSightDAO/tokenomics
+ * 
+ * Description: Updates Agroverse Wix site statistics and metrics.
+ */
+
 const creds = getCredentials();
 var wixAccessToken =  creds.WIX_API_KEY;
 

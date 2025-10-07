@@ -1,4 +1,11 @@
 /**
+ * File: google_app_scripts/tdg_identity_management/register_member_digital_signatures_email.gs
+ * Repository: https://github.com/TrueSightDAO/tokenomics
+ * 
+ * Description: Registers new contributor digital signatures submitted via email.
+ */
+
+/**
  * Gmail-based TDG Identity Management System
  * Processes digital signature events from Gmail emails received in the last 24 hours
  */

@@ -1,4 +1,11 @@
 /**
+ * File: google_app_scripts/tdg_asset_management/tdg_wix_dashboard.gs
+ * Repository: https://github.com/TrueSightDAO/tokenomics
+ * 
+ * Description: Updates Wix dashboard metrics including treasury balance, TDG issuance, and exchange rates.
+ */
+
+/**
  * TDG Wix Dashboard - TrueSight DAO Asset Management and Tokenomics Automation
  * 
  * This Google Apps Script manages the complete tokenomics and asset tracking system for TrueSight DAO.

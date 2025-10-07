@@ -1,4 +1,11 @@
 /**
+ * File: google_app_scripts/agroverse_qr_codes/web_app.gs
+ * Repository: https://github.com/TrueSightDAO/tokenomics
+ * 
+ * Description: REST API endpoints for inventory management, QR code queries, voting rights, and asset valuation. Provides data access for the TrueSight DAO DApp.
+ */
+
+/**
  * Google Apps Script Web Service for Cacao Bag QR Code lookup.
  */
 
