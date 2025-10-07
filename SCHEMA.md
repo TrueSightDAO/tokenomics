@@ -37,7 +37,8 @@
 - [Agroverse QR codes](#sheet-agroverse-qr-codes)
 
 **Managed AGL Ledgers**
-- [Transactions Sheet Structure](#3-managed-agl-ledgers-dynamic)
+- [Overview & Active Ledgers List](#-managed-agl-ledgers-dynamic)
+- [Transactions Sheet Structure](#sheet-transactions)
 - [Balance Sheet Structure](#sheet-balance)
 
 **Additional Spreadsheets**
@@ -111,10 +112,10 @@ See `python_scripts/schema_validation/README.md` for detailed setup instructions
 | R | External API call response | String | Response from external API |
 
 **Used by:**
-- `tdg_expenses_processing.gs`
-- `process_sales_telegram_logs.gs`
-- `process_movement_telegram_logs.gs`
-- `importer_telegram_chatlogs_to_google_sheet.gs`
+- [`tdg_expenses_processing.gs`](https://github.com/TrueSightDAO/tokenomics/blob/main/google_app_scripts/tdg_asset_management/tdg_expenses_processing.gs) - Processes expense submissions
+- [`process_sales_telegram_logs.gs`](https://github.com/TrueSightDAO/tokenomics/blob/main/google_app_scripts/tdg_inventory_management/process_sales_telegram_logs.gs) - Processes sales from Telegram
+- [`process_movement_telegram_logs.gs`](https://github.com/TrueSightDAO/tokenomics/blob/main/google_app_scripts/tdg_inventory_management/process_movement_telegram_logs.gs) - Processes inventory movements
+- [`importer_telegram_chatlogs_to_google_sheet.gs`](https://github.com/TrueSightDAO/tokenomics/blob/main/google_app_scripts/tdg_telegram_chatlog_importer/importer_telegram_chatlogs_to_google_sheet.gs) - Imports raw Telegram logs
 
 ---
 
@@ -141,7 +142,7 @@ See `python_scripts/schema_validation/README.md` for detailed setup instructions
 | L | Ledger Lines Number | String | Row number in destination ledger |
 
 **Used by:**
-- `tdg_expenses_processing.gs`
+- [`tdg_expenses_processing.gs`](https://github.com/TrueSightDAO/tokenomics/blob/main/google_app_scripts/tdg_asset_management/tdg_expenses_processing.gs) - Inserts scored expenses into ledgers
 
 ---
 
@@ -167,9 +168,9 @@ See `python_scripts/schema_validation/README.md` for detailed setup instructions
 | K | Ledger Lines Number | String | Comma-separated row numbers |
 
 **Used by:**
-- `process_sales_telegram_logs.gs`
-- `sales_update_managed_agl_ledgers.gs`
-- `sales_update_main_dao_offchain_ledger.gs`
+- [`process_sales_telegram_logs.gs`](https://github.com/TrueSightDAO/tokenomics/blob/main/google_app_scripts/tdg_inventory_management/process_sales_telegram_logs.gs) - Parses and validates sales from Telegram
+- [`sales_update_managed_agl_ledgers.gs`](https://github.com/TrueSightDAO/tokenomics/blob/main/google_app_scripts/tdg_inventory_management/sales_update_managed_agl_ledgers.gs) - Updates AGL ledgers with sales
+- [`sales_update_main_dao_offchain_ledger.gs`](https://github.com/TrueSightDAO/tokenomics/blob/main/google_app_scripts/tdg_inventory_management/sales_update_main_dao_offchain_ledger.gs) - Updates main DAO ledger
 
 ---
 
@@ -195,7 +196,7 @@ See `python_scripts/schema_validation/README.md` for detailed setup instructions
 | O | Row Numbers | String | Comma-separated destination row numbers |
 
 **Used by:**
-- `process_movement_telegram_logs.gs`
+- [`process_movement_telegram_logs.gs`](https://github.com/TrueSightDAO/tokenomics/blob/main/google_app_scripts/tdg_inventory_management/process_movement_telegram_logs.gs) - Processes inventory transfers between contributors
 
 ---
 
@@ -214,7 +215,7 @@ See `python_scripts/schema_validation/README.md` for detailed setup instructions
 | H | ZIP File URL | String | Google Drive link to ZIP file |
 
 **Used by:**
-- `process_qr_code_generation_telegram_logs.gs`
+- [`process_qr_code_generation_telegram_logs.gs`](https://github.com/TrueSightDAO/tokenomics/blob/main/google_app_scripts/tdg_inventory_management/process_qr_code_generation_telegram_logs.gs) - Processes QR code generation requests from Telegram
 
 ---
 
@@ -245,9 +246,9 @@ See `python_scripts/schema_validation/README.md` for detailed setup instructions
 | G | Is Revenue | String | Revenue flag (optional) |
 
 **Used by:**
-- `tdg_expenses_processing.gs`
-- `process_movement_telegram_logs.gs`
-- All ledger update scripts
+- [`tdg_expenses_processing.gs`](https://github.com/TrueSightDAO/tokenomics/blob/main/google_app_scripts/tdg_asset_management/tdg_expenses_processing.gs) - Records expense transactions
+- [`process_movement_telegram_logs.gs`](https://github.com/TrueSightDAO/tokenomics/blob/main/google_app_scripts/tdg_inventory_management/process_movement_telegram_logs.gs) - Records inventory movements
+- [`sales_update_main_dao_offchain_ledger.gs`](https://github.com/TrueSightDAO/tokenomics/blob/main/google_app_scripts/tdg_inventory_management/sales_update_main_dao_offchain_ledger.gs) - Records sales revenue
 
 ---
 
@@ -262,8 +263,8 @@ See `python_scripts/schema_validation/README.md` for detailed setup instructions
 | D+ | *(varies)* | - | Additional metadata |
 
 **Used by:**
-- `web_app.gs` (inventory management)
-- `process_movement_telegram_logs.gs`
+- [`web_app.gs`](https://github.com/TrueSightDAO/tokenomics/blob/main/google_app_scripts/tdg_inventory_management/web_app.gs) - API for inventory queries and management
+- [`process_movement_telegram_logs.gs`](https://github.com/TrueSightDAO/tokenomics/blob/main/google_app_scripts/tdg_inventory_management/process_movement_telegram_logs.gs) - Updates location after movements
 
 ---
 
@@ -296,9 +297,10 @@ See `python_scripts/schema_validation/README.md` for detailed setup instructions
 | R | Digital Signature | String | Public key (legacy location) |
 
 **Used by:**
-- All scripts for contributor validation
-- `grok_scoring_for_telegram_and_whatsapp_logs.gs`
-- `process_sales_telegram_logs.gs`
+- [`grok_scoring_for_telegram_and_whatsapp_logs.gs`](https://github.com/TrueSightDAO/tokenomics/blob/main/google_app_scripts/tdg_grok_scoring/grok_scoring_for_telegram_and_whatsapp_logs.gs) - Validates contributors when scoring
+- [`process_sales_telegram_logs.gs`](https://github.com/TrueSightDAO/tokenomics/blob/main/google_app_scripts/tdg_inventory_management/process_sales_telegram_logs.gs) - Validates sales reporters
+- [`tdg_expenses_processing.gs`](https://github.com/TrueSightDAO/tokenomics/blob/main/google_app_scripts/tdg_asset_management/tdg_expenses_processing.gs) - Validates expense reporters
+- All scripts - For contributor name validation
 
 ---
 
@@ -319,10 +321,10 @@ See `python_scripts/schema_validation/README.md` for detailed setup instructions
 | F | Contributor Email Address | String | Email address |
 
 **Used by:**
-- `tdg_expenses_processing.gs`
-- `process_qr_code_generation_telegram_logs.gs`
-- `register_member_digital_signatures_telegram.gs`
-- `register_member_digital_signatures_email.gs`
+- [`tdg_expenses_processing.gs`](https://github.com/TrueSightDAO/tokenomics/blob/main/google_app_scripts/tdg_asset_management/tdg_expenses_processing.gs) - Authenticates expense submitters via signature
+- [`process_qr_code_generation_telegram_logs.gs`](https://github.com/TrueSightDAO/tokenomics/blob/main/google_app_scripts/tdg_inventory_management/process_qr_code_generation_telegram_logs.gs) - Authenticates QR generation requests
+- [`register_member_digital_signatures_telegram.gs`](https://github.com/TrueSightDAO/tokenomics/blob/main/google_app_scripts/tdg_proposal/register_member_digital_signatures_telegram.gs) - Registers new signatures from Telegram
+- [`register_member_digital_signatures_email.gs`](https://github.com/TrueSightDAO/tokenomics/blob/main/google_app_scripts/tdg_proposal/register_member_digital_signatures_email.gs) - Registers new signatures from email
 
 ---
 
@@ -351,7 +353,7 @@ See `python_scripts/schema_validation/README.md` for detailed setup instructions
 | N | Sold | Number | TDG sold |
 
 **Used by:**
-- `web_app.gs` (voting rights API)
+- [`web_app.gs`](https://github.com/TrueSightDAO/tokenomics/blob/main/google_app_scripts/tdg_inventory_management/web_app.gs) - API endpoint for querying voting rights and governance data
 
 ---
 
@@ -383,8 +385,8 @@ See `python_scripts/schema_validation/README.md` for detailed setup instructions
 **Cell E1:** Contains `voting_rights_circulated` total
 
 **Used by:**
-- `grok_scoring_for_telegram_and_whatsapp_logs.gs`
-- `transfer_scored_contributions_to_main_ledger.gs`
+- [`grok_scoring_for_telegram_and_whatsapp_logs.gs`](https://github.com/TrueSightDAO/tokenomics/blob/main/google_app_scripts/tdg_grok_scoring/grok_scoring_for_telegram_and_whatsapp_logs.gs) - Scores contributions and prepares for ledger entry
+- [`transfer_scored_contributions_to_main_ledger.gs`](https://github.com/TrueSightDAO/tokenomics/blob/main/google_app_scripts/tdg_grok_scoring/transfer_scored_contributions_to_main_ledger.gs) - Transfers scored contributions to this historical ledger
 
 ---
 
@@ -405,7 +407,7 @@ See `python_scripts/schema_validation/README.md` for detailed setup instructions
 **Cell D1:** Total USD value of all offchain assets
 
 **Used by:**
-- `web_app.gs` (asset valuation API)
+- [`web_app.gs`](https://github.com/TrueSightDAO/tokenomics/blob/main/google_app_scripts/tdg_inventory_management/web_app.gs) - API endpoint for asset valuation queries and dashboard metrics
 
 ---
 
@@ -441,43 +443,9 @@ See `python_scripts/schema_validation/README.md` for detailed setup instructions
 | U | Manager Name | String | Manager name |
 
 **Used by:**
-- `process_sales_telegram_logs.gs`
-- `web_app.gs` (QR code management)
-- `process_qr_code_generation_telegram_logs.gs`
-
----
-
-##### Sheet: `Scored Chatlogs`
-**Purpose:** Grok AI scored contributions from chat logs
-
-| Column | Name | Type | Description |
-|--------|------|------|-------------|
-| A | Chatlog Number | Number | Sequential ID |
-| B | Date | Date | Contribution date |
-| C | Contributor | String | Person who contributed |
-| D | Contribution | String | What was contributed |
-| E | Score | Number | AI-assigned score |
-| F | Platform | String | "Telegram" or "WhatsApp" |
-
-**Used by:**
-- `grok_scoring_for_telegram_and_whatsapp_logs.gs`
-- `transfer_scored_contributions_to_main_ledger.gs`
-
----
-
-##### Sheet: `Recurring Tokenization`
-**Purpose:** Monthly recurring token distributions
-
-| Column | Name | Type | Description |
-|--------|------|------|-------------|
-| A | Contributor Name | String | Person receiving tokens |
-| B | Description | String | Reason for recurring payment |
-| C | Amount | Number | Monthly amount |
-| D | End Date | Date | When recurring payment ends |
-| E | Currency | String | Token/currency type |
-
-**Used by:**
-- `tdg_recurring_tokenization_monthly.gs`
+- [`process_sales_telegram_logs.gs`](https://github.com/TrueSightDAO/tokenomics/blob/main/google_app_scripts/tdg_inventory_management/process_sales_telegram_logs.gs) - Validates QR codes during sales processing
+- [`web_app.gs`](https://github.com/TrueSightDAO/tokenomics/blob/main/google_app_scripts/tdg_inventory_management/web_app.gs) - API for QR code queries and management
+- [`process_qr_code_generation_telegram_logs.gs`](https://github.com/TrueSightDAO/tokenomics/blob/main/google_app_scripts/tdg_inventory_management/process_qr_code_generation_telegram_logs.gs) - Creates and registers new QR codes
 
 ---
 
@@ -489,6 +457,43 @@ See `python_scripts/schema_validation/README.md` for detailed setup instructions
 **Naming Convention:** e.g., "AGL#1", "AGL#25", "Sacred Earth Farms", etc.
 
 **Purpose:** Track inventory and transactions for specific shipments/contracts
+
+---
+
+### 📋 Active Managed Ledgers
+
+> **Note:** This list is dynamically managed via Wix and may change. To get the current list, query the `AgroverseShipments` collection or run the schema validation script.
+
+**Agroverse Ledgers:**
+- **AGL1** - https://agroverse.shop/agl1
+- **AGL2** - https://agroverse.shop/agl2
+- **AGL3** - https://agroverse.shop/agl3
+- **AGL4** - https://agroverse.shop/agl4
+- **AGL5** - https://agroverse.shop/agl5
+- **AGL6** - https://agroverse.shop/agl6
+- **AGL7** - https://agroverse.shop/agl7
+- **AGL8** - https://agroverse.shop/agl8
+- **AGL10** - https://agroverse.shop/agl10
+- **AGL13** - https://agroverse.shop/agl13
+- **AGL14** - https://agroverse.shop/agl14
+
+**Partner Program Ledgers:**
+- **SEF1** (Sacred Earth Farms) - https://truesight.me/sunmint/sef1
+- **PP1** (Partner Program) - https://truesight.me/sunmint/pp1
+
+**How to Query Current Ledgers:**
+```javascript
+// In Google Apps Script
+function getLedgerConfigsFromWix() {
+  const response = UrlFetchApp.fetch(
+    'https://www.wixapis.com/wix-data/v2/items/query?dataCollectionId=AgroverseShipments',
+    { /* headers */ }
+  );
+  return JSON.parse(response.getContentText()).dataItems;
+}
+```
+
+---
 
 #### Sheet: `Transactions`
 **Purpose:** All financial transactions for the specific ledger
@@ -522,8 +527,9 @@ See `python_scripts/schema_validation/README.md` for detailed setup instructions
 **Row 6+:** Data starts at row 6
 
 **Used by:**
-- `web_app.gs` (inventory queries)
-- Ledger balance calculations
+- [`web_app.gs`](https://github.com/TrueSightDAO/tokenomics/blob/main/google_app_scripts/tdg_inventory_management/web_app.gs) - API for querying ledger balances
+- [`sales_update_managed_agl_ledgers.gs`](https://github.com/TrueSightDAO/tokenomics/blob/main/google_app_scripts/tdg_inventory_management/sales_update_managed_agl_ledgers.gs) - Updates balance after sales
+- [`process_movement_telegram_logs.gs`](https://github.com/TrueSightDAO/tokenomics/blob/main/google_app_scripts/tdg_inventory_management/process_movement_telegram_logs.gs) - Updates balance after movements
 
 ---
 
@@ -532,10 +538,54 @@ See `python_scripts/schema_validation/README.md` for detailed setup instructions
 ### 3. Grok Scored Contributions Origin
 **Spreadsheet ID:** `1Tbj7H5ur_egQLRugdXUaSIhEYIKp0vvVv2IZ7WTLCUo`
 
-**Purpose:** Origin spreadsheet for scored contributions before transfer
+**URL:** https://docs.google.com/spreadsheets/d/1Tbj7H5ur_egQLRugdXUaSIhEYIKp0vvVv2IZ7WTLCUo/edit
+
+**Purpose:** Origin spreadsheet for AI-scored contributions from Telegram and WhatsApp before transfer to main ledger
+
+#### Sheets:
+
+##### Sheet: `Scored Chatlogs`
+**Purpose:** Grok AI scored contributions from chat logs
+
+**Sheet URL:** https://docs.google.com/spreadsheets/d/1Tbj7H5ur_egQLRugdXUaSIhEYIKp0vvVv2IZ7WTLCUo/edit#gid=0
+
+**Header Row:** 3
+
+| Column | Name | Type | Description |
+|--------|------|------|-------------|
+| A | Contributor Name | String | Person who contributed |
+| B | Project Name | String | Associated project (e.g., "telegram_chatlog") |
+| C | Contribution Made | String | Full description of contribution |
+| D | Rubric classification | String | Scoring category or "Unknown" |
+| E | TDGs Provisioned | Number | Amount of TDG tokens provisioned |
+| F | Status | String | Processing status |
+| G | TDGs Issued | Number | Amount of TDG tokens issued |
+| H | Status date | Date | Date processed (YYYYMMDD) |
+| I | Existing Contributor | Boolean | TRUE/FALSE if contributor exists |
+| J | Reporter Name | String | Person who reported this contribution |
+| K | Scoring Hash Key | String | Unique hash for deduplication |
+| L | Main Ledger Row Number | Number | Reference to main ledger |
+| M | Reviewer Email | String | Email of reviewer (if any) |
+
+**Cell A1:** Contains total TDG contributions to be tokenized  
+**Cell E1:** Contains submissions left to score count
 
 **Used by:**
-- `transfer_scored_contributions_to_main_ledger.gs`
+- [`grok_scoring_for_telegram_and_whatsapp_logs.gs`](https://github.com/TrueSightDAO/tokenomics/blob/main/google_app_scripts/tdg_grok_scoring/grok_scoring_for_telegram_and_whatsapp_logs.gs) - AI scoring of chat contributions from Telegram/WhatsApp
+- [`transfer_scored_contributions_to_main_ledger.gs`](https://github.com/TrueSightDAO/tokenomics/blob/main/google_app_scripts/tdg_grok_scoring/transfer_scored_contributions_to_main_ledger.gs) - Transfers approved scores to main ledger history
+
+---
+
+##### Other Sheets Available
+
+**Additional Sheets in This Spreadsheet:**
+- **Dashboard** - Overview and summary metrics
+- **WhatsApp Chatlog status** - Status tracking for WhatsApp logs
+- **To Be Airdropped** - Pending token distributions
+- **Unregistered Contributors** - Contributors not yet registered
+- **Registered Contributors** - Registered contributor list
+- **States** - State/status tracking
+- **Initiatives Scoring Rubric** - Scoring guidelines and rubric
 
 ---
 
