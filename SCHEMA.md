@@ -80,7 +80,7 @@ See `python_scripts/schema_validation/README.md` for detailed setup instructions
 ##### Sheet: `Scored Expense Submissions`
 **Purpose:** Processed and validated expense submissions
 
-**Sheet URL:** https://docs.google.com/spreadsheets/d/1qbZZhf-_7xzmDTriaJVWj6OZshyQsFkdsAV8-pyzASQ/edit
+**Sheet URL:** https://docs.google.com/spreadsheets/d/1qbZZhf-_7xzmDTriaJVWj6OZshyQsFkdsAV8-pyzASQ/edit#gid=452226667
 
 **Header Row:** 1
 
@@ -106,6 +106,8 @@ See `python_scripts/schema_validation/README.md` for detailed setup instructions
 
 ##### Sheet: `QR Code Sales`
 **Purpose:** Sales transactions from QR code scans
+
+**Sheet URL:** https://docs.google.com/spreadsheets/d/1qbZZhf-_7xzmDTriaJVWj6OZshyQsFkdsAV8-pyzASQ/edit#gid=1003674539
 
 **Header Row:** 1
 
@@ -187,6 +189,8 @@ See `python_scripts/schema_validation/README.md` for detailed setup instructions
 ##### Sheet: `offchain transactions`
 **Purpose:** Default ledger for all offchain financial transactions
 
+**Sheet URL:** https://docs.google.com/spreadsheets/d/1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU/edit#gid=995916231
+
 **Header Row:** 4
 
 | Column | Name | Type | Description |
@@ -225,6 +229,8 @@ See `python_scripts/schema_validation/README.md` for detailed setup instructions
 ##### Sheet: `Contributors contact information`
 **Purpose:** Master list of DAO contributors
 
+**Sheet URL:** https://docs.google.com/spreadsheets/d/1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU/edit#gid=1460794618
+
 **Header Row:** 4
 
 | Column | Name | Type | Description |
@@ -258,6 +264,8 @@ See `python_scripts/schema_validation/README.md` for detailed setup instructions
 ##### Sheet: `Contributors Digital Signatures`
 **Purpose:** Active digital signatures for authentication
 
+**Sheet URL:** https://docs.google.com/spreadsheets/d/1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU/edit#gid=577022511
+
 **Header Row:** 1
 
 | Column | Name | Type | Description |
@@ -279,6 +287,8 @@ See `python_scripts/schema_validation/README.md` for detailed setup instructions
 
 ##### Sheet: `Contributors voting weight`
 **Purpose:** Tracks voting rights for DAO governance
+
+**Sheet URL:** https://docs.google.com/spreadsheets/d/1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU/edit#gid=950541536
 
 **Header Row:** 4
 
@@ -306,6 +316,8 @@ See `python_scripts/schema_validation/README.md` for detailed setup instructions
 
 ##### Sheet: `Ledger history`
 **Purpose:** Historical ledger transactions
+
+**Sheet URL:** https://docs.google.com/spreadsheets/d/1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU/edit#gid=0
 
 **Header Row:** 4
 
@@ -338,6 +350,8 @@ See `python_scripts/schema_validation/README.md` for detailed setup instructions
 ##### Sheet: `off chain asset balance`
 **Purpose:** Summary of offchain asset valuations
 
+**Sheet URL:** https://docs.google.com/spreadsheets/d/1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU/edit#gid=2083442561
+
 **Header Row:** 4
 
 | Column | Name | Type | Description |
@@ -356,6 +370,8 @@ See `python_scripts/schema_validation/README.md` for detailed setup instructions
 
 ##### Sheet: `Agroverse QR codes`
 **Purpose:** Master list of all generated QR codes
+
+**Sheet URL:** https://docs.google.com/spreadsheets/d/1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU/edit#gid=472328231
 
 **Header Row:** 1
 
