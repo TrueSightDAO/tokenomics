@@ -8,7 +8,17 @@ python_scripts/jupyter.log
 # Ignore Python bytecode caches in our LATOKEN client
 la_token_market_making_python/__pycache__/
 # Ignore local environment file for python_scripts
-python_scripts/.env
+python_scripts/**/.env
 
 # macOS system files
 .DS_Store
+
+# Google API credentials and tokens
+*credentials*.json
+token.json
+**/credentials.json
+**/token.json
+
+# Schema validation output
+python_scripts/schema_validation/discovered_headers.json
+schema_output.txt

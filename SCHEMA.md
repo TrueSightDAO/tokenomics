@@ -4,6 +4,30 @@
 > 
 > This document provides a consolidated reference for all Google Sheets used across TrueSight DAO's Google Apps Scripts. Use this as a central schema reference when making code changes.
 
+## 🧪 Schema Validation
+
+**Test Script:** `python_scripts/schema_validation/test_schema_validation.py`
+
+To verify this documentation is accurate, run:
+```bash
+python python_scripts/schema_validation/test_schema_validation.py
+```
+
+This validates:
+- ✅ All spreadsheet IDs and sheet names
+- ✅ Column structures and extracts actual headers
+- ✅ Wix collection accessibility (optional)
+- ✅ ExchangeRate data item IDs
+- 📊 Generates comprehensive test report
+- 💾 Saves discovered headers to JSON
+
+**Setup Requirements:**
+- Install dependencies: `pip install -r python_scripts/requirements.txt`
+- Set up Google Sheets API credentials (save as `python_scripts/schema_validation/credentials.json`)
+- Set `WIX_ACCESS_TOKEN` environment variable (optional)
+
+See `python_scripts/schema_validation/README.md` for detailed setup instructions.
+
 ---
 
 ## 📊 Main Spreadsheets
@@ -20,20 +44,30 @@
 ##### Sheet: `Telegram Chat Logs`
 **Purpose:** Raw Telegram chat messages and events
 
+**Sheet URL:** https://docs.google.com/spreadsheets/d/1qbZZhf-_7xzmDTriaJVWj6OZshyQsFkdsAV8-pyzASQ/edit#gid=0
+
+**Header Row:** 2
+
 | Column | Name | Type | Description |
 |--------|------|------|-------------|
 | A | Telegram Update ID | Number | Unique Telegram update identifier |
-| B | Chat ID | Number | Telegram chat/group ID |
-| C | Chat Name | String | Telegram chatroom name |
+| B | Telegram Chatroom ID | Number | Telegram chat/group ID |
+| C | Telegram Chatroom Name | String | Telegram chatroom name |
 | D | Telegram Message ID | Number | Unique message identifier |
 | E | Contributor Name | String | Telegram username/handle |
-| F | *(varies)* | - | Additional data |
-| G | Message/Contribution | String | Full message content or contribution description |
-| H-K | *(varies)* | - | Additional fields |
-| L | Status Date | Date | Date of message/status |
-| M | *(varies)* | - | - |
+| F | Project Name | String | Associated project |
+| G | Contribution Made | String | Full message content or contribution description |
+| H | Rubric classification | String | Classification category |
+| I | TDGs Provisioned | Number | TDG tokens provisioned |
+| J | Status | String | Status of the contribution |
+| K | TDGs Issued (reviewed by Governor) | String | Issued TDG tokens |
+| L | Status date | Date | Date of message/status (YYYYMMDD) |
+| M | Main Ledger Line Number | Number | Reference to main ledger |
 | N | Scoring Hash Key | String | SHA-256 hash for deduplication |
-| O | Telegram File ID | String | Comma-separated file IDs from Telegram |
+| O | Telegram File IDs | String | Comma-separated file IDs from Telegram |
+| P | Edgar Signature Verification | String | Signature verification status |
+| Q | External API call status | String | Status of external API calls |
+| R | External API call response | String | Response from external API |
 
 **Used by:**
 - `tdg_expenses_processing.gs`
@@ -46,20 +80,24 @@
 ##### Sheet: `Scored Expense Submissions`
 **Purpose:** Processed and validated expense submissions
 
+**Sheet URL:** https://docs.google.com/spreadsheets/d/1qbZZhf-_7xzmDTriaJVWj6OZshyQsFkdsAV8-pyzASQ/edit#gid=452226667
+
+**Header Row:** 1
+
 | Column | Name | Type | Description |
 |--------|------|------|-------------|
 | A | Telegram Update ID | Number | Source Telegram update ID |
-| B | Chat ID | Number | Source chat ID |
-| C | Chat Name | String | Source chatroom name |
-| D | Message ID | Number | Source message ID |
+| B | Telegram Chatroom ID | Number | Source chat ID |
+| C | Telegram Chatroom Name | String | Source chatroom name |
+| D | Telegram Message ID | Number | Source message ID |
 | E | Reporter Name | String | Actual contributor name (from digital signature) |
 | F | Expense Reported | String | Full expense message |
-| G | Status Date | Date | Date of expense |
+| G | Status date | Date | Date of expense (YYYYMMDD) |
 | H | Contributor Name | String | DAO member who incurred expense |
-| I | Currency/Inventory Type | String | Type of inventory |
+| I | Currency  | String | Type of inventory (note trailing space) |
 | J | Amount | Number | Quantity (negative for expenses) |
-| K | Hash Key | String | Unique identifier for deduplication |
-| L | Transaction Line | Number | Row number in destination ledger |
+| K | Scoring Hash Key | String | Unique identifier for deduplication |
+| L | Ledger Lines Number | String | Row number in destination ledger |
 
 **Used by:**
 - `tdg_expenses_processing.gs`
@@ -69,19 +107,23 @@
 ##### Sheet: `QR Code Sales`
 **Purpose:** Sales transactions from QR code scans
 
+**Sheet URL:** https://docs.google.com/spreadsheets/d/1qbZZhf-_7xzmDTriaJVWj6OZshyQsFkdsAV8-pyzASQ/edit#gid=1003674539
+
+**Header Row:** 1
+
 | Column | Name | Type | Description |
 |--------|------|------|-------------|
 | A | Telegram Update ID | Number | Source Telegram update ID |
 | B | Telegram Message ID | Number | Source message ID |
-| C | Message | String | Full sale message |
-| D | Contributor Name | String | Person who made the sale |
-| E | QR Code | String | Scanned QR code |
+| C | Sales Report Log Message | String | Full sale message |
+| D | Reporter Name | String | Person who made the sale |
+| E | QR Code value | String | Scanned QR code |
 | F | Sale Price | Number | Amount of sale |
-| G | Agroverse Value | String | URL to ledger |
-| H | Sales Date | Date | Date of sale |
-| I | Inventory Type | String | Product sold |
-| J | Tokenized Status | String | "PROCESSING", "ACCOUNTED", empty |
-| K | Offchain Row Numbers | String | Comma-separated row numbers |
+| G | AGL Ledger URL | String | URL to ledger |
+| H | Sales Date | Date | Date of sale (YYYYMMDD) |
+| I | Currency | String | Product sold |
+| J | Status | String | "PROCESSING", "ACCOUNTED", "TOKENIZED", empty |
+| K | Ledger Lines Number | String | Comma-separated row numbers |
 
 **Used by:**
 - `process_sales_telegram_logs.gs`
@@ -147,13 +189,19 @@
 ##### Sheet: `offchain transactions`
 **Purpose:** Default ledger for all offchain financial transactions
 
+**Sheet URL:** https://docs.google.com/spreadsheets/d/1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU/edit#gid=995916231
+
+**Header Row:** 4
+
 | Column | Name | Type | Description |
 |--------|------|------|-------------|
-| A | Date | Date | Transaction date |
+| A | Transaction Date | Date | Transaction date (YYYYMMDD) |
 | B | Description | String | Transaction description |
 | C | Fund Handler | String | Person handling funds |
 | D | Amount | Number | Transaction amount (negative for debits) |
-| E | Inventory Type | String | Asset/currency type |
+| E | Currency | String | Asset/currency type |
+| F | Ledger Line | Number | Row number (auto-populated) |
+| G | Is Revenue | String | Revenue flag (optional) |
 
 **Used by:**
 - `tdg_expenses_processing.gs`
@@ -181,13 +229,29 @@
 ##### Sheet: `Contributors contact information`
 **Purpose:** Master list of DAO contributors
 
+**Sheet URL:** https://docs.google.com/spreadsheets/d/1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU/edit#gid=1460794618
+
+**Header Row:** 4
+
 | Column | Name | Type | Description |
 |--------|------|------|-------------|
-| A | Full Name | String | Contributor's full name |
-| B-F | *(contact info)* | - | Email, phone, address, etc. |
-| G | *(varies)* | - | - |
-| H | Telegram Handle | String | Telegram username (with or without @) |
-| I-Q | *(varies)* | - | Additional info |
+| A | Name | String | Contributor's full name |
+| B | TRUESIGHT Wallet Address (Solana) | String | Solana wallet address |
+| C | Ethereum Wallet Address | String | Ethereum wallet address |
+| D | Email | String | Email address |
+| E | Address | String | Physical address |
+| F | Phone / WhatsApp | String | Phone number |
+| G | Discord ID | String | Discord username |
+| H | Telegram ID | String | Telegram username |
+| I | Twitter | String | Twitter handle |
+| J | Projects  | String | Associated projects (note trailing space) |
+| K | LinkedIn | String | LinkedIn profile |
+| L | Facebook | String | Facebook profile |
+| M | Github | String | GitHub username |
+| N | Instagram | String | Instagram handle |
+| O | Website | String | Personal website |
+| P | Taxation ID | String | Tax ID |
+| Q | WhatsApp Chat Log ID | String | WhatsApp log ID |
 | R | Digital Signature | String | Public key (legacy location) |
 
 **Used by:**
@@ -200,14 +264,18 @@
 ##### Sheet: `Contributors Digital Signatures`
 **Purpose:** Active digital signatures for authentication
 
+**Sheet URL:** https://docs.google.com/spreadsheets/d/1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU/edit#gid=577022511
+
+**Header Row:** 1
+
 | Column | Name | Type | Description |
 |--------|------|------|-------------|
 | A | Contributor Name | String | Full name of contributor |
-| B | Email Address | String | Email (optional) |
-| C | Last Used Timestamp | String | Format: "YYYYMMDD HH:MM:SS" |
+| B | Created Time Stamp | String | Format: "YYYY-MM-DD HH:MM:SS" |
+| C | Last Active Time Stamp | String | Format: "YYYYMMDD HH:MM:SS" |
 | D | Status | String | "ACTIVE", "INACTIVE", etc. |
 | E | Digital Signature | String | Public key for authentication |
-| F | *(varies)* | - | Additional metadata |
+| F | Contributor Email Address | String | Email address |
 
 **Used by:**
 - `tdg_expenses_processing.gs`
@@ -220,12 +288,26 @@
 ##### Sheet: `Contributors voting weight`
 **Purpose:** Tracks voting rights for DAO governance
 
+**Sheet URL:** https://docs.google.com/spreadsheets/d/1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU/edit#gid=950541536
+
+**Header Row:** 4
+
 | Column | Name | Type | Description |
 |--------|------|------|-------------|
-| A-B | *(varies)* | - | - |
-| C | Contributor Name | String | Full name |
-| D-G | *(varies)* | - | - |
-| H | Voting Rights | Number | Total voting weight |
+| A | Ownership Rank - Controlled | Number | Ownership ranking |
+| B | Voting Weightage Rank | Number | Voting ranking |
+| C | Contributors | String | Full name |
+| D | Solana Wallet Address | String | Wallet address |
+| E | Quadratic Voting Power | String | Quadratic voting percentage |
+| F | Total TDG in registered wallet | String | TDG in wallet |
+| G | Total TDG unissued | Number | Unissued TDG |
+| H | Total TDG controlled (legacy) | Number | Legacy controlled TDG |
+| I | Total TDG controlled | Number | Total controlled TDG |
+| J | Total Percentage Controlled | String | Percentage controlled |
+| K | Total Voting Power | String | Total voting percentage |
+| L | Ranking | Number | Overall ranking |
+| M | Quadratic Votes | Number | Quadratic vote count |
+| N | Sold | Number | TDG sold |
 
 **Used by:**
 - `web_app.gs` (voting rights API)
@@ -235,13 +317,27 @@
 ##### Sheet: `Ledger history`
 **Purpose:** Historical ledger transactions
 
+**Sheet URL:** https://docs.google.com/spreadsheets/d/1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU/edit#gid=0
+
+**Header Row:** 4
+
 | Column | Name | Type | Description |
 |--------|------|------|-------------|
-| A | Date | Date | Transaction date |
-| B | Description | String | Transaction description |
-| C | Contributor | String | Person involved |
-| D | Amount | Number | Transaction amount |
-| E | Asset Type | String | Currency/asset |
+| A | Contributor Name | String | Person involved |
+| B | Project Name | String | Associated project |
+| C | Contribution Made | String | Description of contribution |
+| D | Rubric classification | String | Classification category |
+| E | TDGs Provisioned | Number | Provisioned TDG amount |
+| F | Status | String | Status of contribution |
+| G | TDGs Issued | Number | Issued TDG amount |
+| H | Status date | Date | Date (YYYYMMDD) |
+| I | Solana Transfer Hash | String | Blockchain transaction hash |
+| J | TDGs yet Air Dropped | Number | Pending airdrops |
+| K | Discord ID | String | Discord identifier |
+| L | Within past 90 days | String | 90-day activity |
+| M | Within past 90 days vesting | String | 90-day vesting |
+| N | Within past 180 days | String | 180-day activity |
+| O | Within past 180 days vesting | Number | 180-day vesting |
 
 **Cell E1:** Contains `voting_rights_circulated` total
 
@@ -254,6 +350,17 @@
 ##### Sheet: `off chain asset balance`
 **Purpose:** Summary of offchain asset valuations
 
+**Sheet URL:** https://docs.google.com/spreadsheets/d/1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU/edit#gid=2083442561
+
+**Header Row:** 4
+
+| Column | Name | Type | Description |
+|--------|------|------|-------------|
+| A | Asset Type | String | Type of physical asset |
+| B | Balance | Number | Quantity of asset |
+| C | Unit Value | Number | Value per unit |
+| D | Value (USD) | Number | Total USD value |
+
 **Cell D1:** Total USD value of all offchain assets
 
 **Used by:**
@@ -264,14 +371,33 @@
 ##### Sheet: `Agroverse QR codes`
 **Purpose:** Master list of all generated QR codes
 
+**Sheet URL:** https://docs.google.com/spreadsheets/d/1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU/edit#gid=472328231
+
+**Header Row:** 1
+
 | Column | Name | Type | Description |
 |--------|------|------|-------------|
-| A | QR Code | String | QR code identifier |
-| B | *(varies)* | - | - |
-| C | Value | String | Associated value/URL |
-| D | Status | String | "ACTIVE", "USED", etc. |
-| E-H | *(varies)* | - | - |
-| I | Inventory Type | String | Product type for QR |
+| A | qr_code | String | QR code identifier |
+| B | landing_page | String | Landing page URL |
+| C | ledger | String | Associated ledger URL |
+| D | status | String | "ACTIVE", "SOLD", etc. |
+| E | farm name | String | Name of farm |
+| F | state | String | State/region |
+| G | country | String | Country |
+| H | Year | String | Year |
+| I | Currency | String | Product type/currency |
+| J | QR code creation date (YYYYMMDD) | String | Creation date |
+| K | QR code location | String | Storage location URL |
+| L | Owner Email | String | Owner email |
+| M | Onboarding Email Sent Date | String | Onboarding date |
+| N | Tree Planting Date (YYYYMMDD) | String | Planting date |
+| O | Latitude | String | GPS latitude |
+| P | Longitude | String | GPS longitude |
+| Q | Planting Video URL | String | Video URL |
+| R | Tree Seedling Photo URL | String | Photo URL |
+| S | Product Image | String | Product image URL |
+| T | Price | Number | Price |
+| U | Manager Name | String | Manager name |
 
 **Used by:**
 - `process_sales_telegram_logs.gs`
@@ -446,18 +572,99 @@ TELEGRAM_FILE_ID_COL = 14     // Column O
 
 ---
 
-## 🔄 Related Wix Collections
+## 🔄 Wix Data Collections
 
-### AgroverseShipments
+### Wix Account & Site Information
+**Account ID:** `0e2cde5f-b353-468b-9f4e-36835fc60a0e`  
+**Site IDs:**
+- TrueSight DAO: `d45a189f-d0cc-48de-95ee-30635a95385f`
+- Agroverse: *(varies by site)*
+
+**API Base URL:** `https://www.wixapis.com/wix-data/v2`
+
+---
+
+### Collection: `AgroverseShipments`
 **Purpose:** Tracks shipment contracts and their ledger URLs
 
+**API Endpoint:** `https://www.wixapis.com/wix-data/v2/items/query?dataCollectionId=AgroverseShipments`
+
 **Fields:**
-- `title` - Ledger name (e.g., "AGL#25")
+- `title` - Ledger name (e.g., "AGL#25", "Sacred Earth Farms")
 - `contract_url` - URL to ledger spreadsheet (may redirect)
 
 **Used by:**
-- `getLedgerConfigsFromWix()` in multiple scripts
-- Dynamically builds ledger configurations
+- `tdg_expenses_processing.gs` - `getLedgerConfigsFromWix()`
+- `process_movement_telegram_logs.gs` - `getLedgerConfigsFromWix()`
+- `web_app.gs` - Multiple inventory functions
+- `tdg_wix_dashboard.gs` - Dashboard updates
+
+---
+
+### Collection: `ExchangeRate`
+**Purpose:** Stores financial metrics and exchange rates for TrueSight DAO dashboard
+
+**API Endpoint:** `https://www.wixapis.com/wix-data/v2/items/{dataItemId}?dataCollectionId=ExchangeRate`
+
+**Data Structure:**
+```javascript
+{
+  "dataCollectionId": "ExchangeRate",
+  "dataItem": {
+    "data": {
+      "_id": "{dataItemId}",
+      "description": "{METRIC_NAME}",
+      "exchangeRate": {value},
+      "currency": "{CURRENCY_CODE}"
+    }
+  }
+}
+```
+
+**Data Items:**
+
+| Description | Data Item ID | Currency | Purpose |
+|-------------|--------------|----------|---------|
+| `USD_TREASURY_BALANCE` | `a0e7364c-716d-49f3-a795-647d2686a22b` | USD | Total DAO asset balance |
+| `TDG_ISSUED` | `4088e994-2c06-42a8-a1cf-8cd77ee73203` | TDG | Total TDG tokens issued |
+| `ASSET_PER_TDG_ISSUED` | `9b04879b-f06a-419a-9ad3-520ad60ea972` | USD | USD value per TDG token |
+| `30_DAYS_SALES` | `956fdb46-bc8d-4c71-8e67-79813effbab3` | USD | Rolling 30-day sales total |
+| `TDG_USDC_PRICE` | `8edde502-ac79-4e66-ab2d-8ebb99108665` | USDC | TDG to USDC exchange rate |
+
+**Used by:**
+- `tdg_wix_dashboard.gs` - Updates all metrics
+- `buyback_sol_to_tdg.ts` - Reads buyback budget
+- Market making scripts
+
+---
+
+### Collection: `Statistics`
+**Purpose:** Tracks website statistics for Agroverse and TrueSight sites
+
+**API Endpoint:** `https://www.wixapis.com/wix-data/v2/items/{dataItemId}?dataCollectionId=Statistics`
+
+**Used by:**
+- `agroverse_wix_site_updates.gs` - Updates site statistics
+
+---
+
+## 🔑 Wix Authentication
+
+All Wix API requests require these headers:
+
+```javascript
+{
+  'Content-Type': 'application/json',
+  'Authorization': WIX_ACCESS_TOKEN,  // From credentials
+  'wix-account-id': '0e2cde5f-b353-468b-9f4e-36835fc60a0e',
+  'wix-site-id': 'd45a189f-d0cc-48de-95ee-30635a95385f'
+}
+```
+
+**Common Operations:**
+- GET: Read item - `https://www.wixapis.com/wix-data/v2/items/{dataItemId}?dataCollectionId={collectionId}`
+- POST: Query collection - `https://www.wixapis.com/wix-data/v2/items/query?dataCollectionId={collectionId}`
+- PUT: Update item - `https://www.wixapis.com/wix-data/v2/items/{dataItemId}`
 
 ---
 
