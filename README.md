@@ -84,20 +84,20 @@ See [python_scripts/schema_validation/README.md](./python_scripts/schema_validat
 - **Never commit credentials** - All credential files are in `.gitignore`
 
 ### Required Credentials
-- **Google Sheets API** - For schema validation and data access
-- **Wix API** - For managed AGL ledger configurations and dashboard updates
-- **Telegram Bot API** - For chat log imports and bot interactions
-- **OpenAI/xAI API** - For AI-powered contribution scoring
-- **Solana RPC** - For Raydium market making
-- **LATOKEN API** - For LATOKEN market making (if resuming)
+- **[Google Sheets API](https://console.cloud.google.com/)** - For schema validation and data access
+- **[Wix API](https://dev.wix.com/)** - For managed AGL ledger configurations and dashboard updates
+- **[Telegram Bot API](https://core.telegram.org/bots/api)** - For chat log imports and bot interactions
+- **[OpenAI API](https://platform.openai.com/)** / **[xAI API](https://x.ai/)** - For AI-powered contribution scoring
+- **[Solana RPC](https://solana.com/docs/rpc)** - For Raydium market making
+- **[LATOKEN API](https://api.latoken.com/)** - For LATOKEN market making (if resuming)
 
 ### API Rate Limits
 Be mindful of rate limits for:
-- OpenAI API (Grok scoring)
-- Wix Data API (ledger configs)
-- Telegram Bot API (message imports)
-- Solana RPC (market making)
-- Google Sheets API (all read/write operations)
+- [OpenAI API](https://platform.openai.com/docs/guides/rate-limits) (Grok scoring)
+- [Wix Data API](https://dev.wix.com/docs/rest/articles/getting-started/rate-limits) (ledger configs)
+- [Telegram Bot API](https://core.telegram.org/bots/faq#my-bot-is-hitting-limits-how-do-i-avoid-this) (message imports)
+- [Solana RPC](https://docs.solana.com/cluster/rpc-endpoints) (market making)
+- [Google Sheets API](https://developers.google.com/sheets/api/limits) (all read/write operations)
 
 ---
 
@@ -217,8 +217,11 @@ This project is unlicensed. Use and modify at your own risk.
 ## 🔗 Related Projects
 
 - **[TrueSight DAO DApp](https://github.com/TrueSightDAO/dapp)** - Web interface for DAO operations
-- **[Agroverse](https://agroverse.shop)** - Sustainable agriculture marketplace
+- **[Agroverse](https://agroverse.shop)** - Sustainable agriculture marketplace  
 - **[SunMint](https://truesight.me/sunmint)** - Partner program platform
+- **[TrueSight DAO Website](https://truesight.me)** - Main DAO website
+- **[Raydium AMM](https://raydium.io/)** - Solana-based automated market maker
+- **[LATOKEN Exchange](https://latoken.com/)** - Cryptocurrency exchange platform
 
 ---
 

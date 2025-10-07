@@ -65,10 +65,10 @@ This validates:
 
 **Setup Requirements:**
 - Install dependencies: `pip install -r python_scripts/requirements.txt`
-- Set up Google Sheets API credentials (save as `python_scripts/schema_validation/credentials.json`)
+- Set up [Google Sheets API credentials](https://console.cloud.google.com/) (save as `python_scripts/schema_validation/credentials.json`)
 - Set `WIX_ACCESS_TOKEN` environment variable (optional)
 
-See `python_scripts/schema_validation/README.md` for detailed setup instructions.
+See [`python_scripts/schema_validation/README.md`](./python_scripts/schema_validation/README.md) for detailed setup instructions.
 
 ---
 
@@ -465,21 +465,21 @@ See `python_scripts/schema_validation/README.md` for detailed setup instructions
 > **Note:** This list is dynamically managed via Wix and may change. To get the current list, query the `AgroverseShipments` collection or run the schema validation script.
 
 **Agroverse Ledgers:**
-- **AGL1** - https://agroverse.shop/agl1
-- **AGL2** - https://agroverse.shop/agl2
-- **AGL3** - https://agroverse.shop/agl3
-- **AGL4** - https://agroverse.shop/agl4
-- **AGL5** - https://agroverse.shop/agl5
-- **AGL6** - https://agroverse.shop/agl6
-- **AGL7** - https://agroverse.shop/agl7
-- **AGL8** - https://agroverse.shop/agl8
-- **AGL10** - https://agroverse.shop/agl10
-- **AGL13** - https://agroverse.shop/agl13
-- **AGL14** - https://agroverse.shop/agl14
+- **[AGL1](https://agroverse.shop/agl1)** - Agroverse Ledger #1
+- **[AGL2](https://agroverse.shop/agl2)** - Agroverse Ledger #2
+- **[AGL3](https://agroverse.shop/agl3)** - Agroverse Ledger #3
+- **[AGL4](https://agroverse.shop/agl4)** - Agroverse Ledger #4
+- **[AGL5](https://agroverse.shop/agl5)** - Agroverse Ledger #5
+- **[AGL6](https://agroverse.shop/agl6)** - Agroverse Ledger #6
+- **[AGL7](https://agroverse.shop/agl7)** - Agroverse Ledger #7
+- **[AGL8](https://agroverse.shop/agl8)** - Agroverse Ledger #8
+- **[AGL10](https://agroverse.shop/agl10)** - Agroverse Ledger #10
+- **[AGL13](https://agroverse.shop/agl13)** - Agroverse Ledger #13
+- **[AGL14](https://agroverse.shop/agl14)** - Agroverse Ledger #14
 
 **Partner Program Ledgers:**
-- **SEF1** (Sacred Earth Farms) - https://truesight.me/sunmint/sef1
-- **PP1** (Partner Program) - https://truesight.me/sunmint/pp1
+- **[SEF1](https://truesight.me/sunmint/sef1)** - Sacred Earth Farms
+- **[PP1](https://truesight.me/sunmint/pp1)** - Partner Program
 
 **How to Query Current Ledgers:**
 ```javascript
@@ -668,17 +668,18 @@ TELEGRAM_FILE_ID_COL = 14     // Column O
 ### Wix Account & Site Information
 **Account ID:** `0e2cde5f-b353-468b-9f4e-36835fc60a0e`  
 **Site IDs:**
-- TrueSight DAO: `d45a189f-d0cc-48de-95ee-30635a95385f`
-- Agroverse: *(varies by site)*
+- [TrueSight DAO](https://truesight.me): `d45a189f-d0cc-48de-95ee-30635a95385f`
+- [Agroverse](https://agroverse.shop): *(varies by site)*
 
-**API Base URL:** `https://www.wixapis.com/wix-data/v2`
+**API Base URL:** `https://www.wixapis.com/wix-data/v2`  
+**API Documentation:** [Wix Data API Docs](https://dev.wix.com/docs/rest/api-reference/wix-data/wix-data)
 
 ---
 
 ### Collection: `AgroverseShipments`
 **Purpose:** Tracks shipment contracts and their ledger URLs
 
-**API Endpoint:** `https://www.wixapis.com/wix-data/v2/items/query?dataCollectionId=AgroverseShipments`
+**API Endpoint:** [`https://www.wixapis.com/wix-data/v2/items/query?dataCollectionId=AgroverseShipments`](https://www.wixapis.com/wix-data/v2/items/query?dataCollectionId=AgroverseShipments)
 
 **Fields:**
 - `title` - Ledger name (e.g., "AGL#25", "Sacred Earth Farms")
