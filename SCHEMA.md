@@ -4,6 +4,28 @@
 > 
 > This document provides a consolidated reference for all Google Sheets used across TrueSight DAO's Google Apps Scripts. Use this as a central schema reference when making code changes.
 
+## 🧪 Schema Validation
+
+**Test Script:** `google_app_scripts/test_schema_validation.gs`
+
+To verify this documentation is accurate, run:
+```javascript
+runSchemaValidationTests()
+```
+
+This validates:
+- ✅ All spreadsheet IDs and sheet names
+- ✅ Column structures where possible
+- ✅ Wix collection accessibility
+- ✅ ExchangeRate data item IDs
+- 📊 Generates comprehensive test report
+
+**Quick Tests:**
+```javascript
+testSpreadsheetId('1qbZZhf-_7xzmDTriaJVWj6OZshyQsFkdsAV8-pyzASQ', 'Telegram Logs')
+testWixCollection('AgroverseShipments')
+```
+
 ---
 
 ## 📊 Main Spreadsheets
@@ -446,18 +468,99 @@ TELEGRAM_FILE_ID_COL = 14     // Column O
 
 ---
 
-## 🔄 Related Wix Collections
+## 🔄 Wix Data Collections
 
-### AgroverseShipments
+### Wix Account & Site Information
+**Account ID:** `0e2cde5f-b353-468b-9f4e-36835fc60a0e`  
+**Site IDs:**
+- TrueSight DAO: `d45a189f-d0cc-48de-95ee-30635a95385f`
+- Agroverse: *(varies by site)*
+
+**API Base URL:** `https://www.wixapis.com/wix-data/v2`
+
+---
+
+### Collection: `AgroverseShipments`
 **Purpose:** Tracks shipment contracts and their ledger URLs
 
+**API Endpoint:** `https://www.wixapis.com/wix-data/v2/items/query?dataCollectionId=AgroverseShipments`
+
 **Fields:**
-- `title` - Ledger name (e.g., "AGL#25")
+- `title` - Ledger name (e.g., "AGL#25", "Sacred Earth Farms")
 - `contract_url` - URL to ledger spreadsheet (may redirect)
 
 **Used by:**
-- `getLedgerConfigsFromWix()` in multiple scripts
-- Dynamically builds ledger configurations
+- `tdg_expenses_processing.gs` - `getLedgerConfigsFromWix()`
+- `process_movement_telegram_logs.gs` - `getLedgerConfigsFromWix()`
+- `web_app.gs` - Multiple inventory functions
+- `tdg_wix_dashboard.gs` - Dashboard updates
+
+---
+
+### Collection: `ExchangeRate`
+**Purpose:** Stores financial metrics and exchange rates for TrueSight DAO dashboard
+
+**API Endpoint:** `https://www.wixapis.com/wix-data/v2/items/{dataItemId}?dataCollectionId=ExchangeRate`
+
+**Data Structure:**
+```javascript
+{
+  "dataCollectionId": "ExchangeRate",
+  "dataItem": {
+    "data": {
+      "_id": "{dataItemId}",
+      "description": "{METRIC_NAME}",
+      "exchangeRate": {value},
+      "currency": "{CURRENCY_CODE}"
+    }
+  }
+}
+```
+
+**Data Items:**
+
+| Description | Data Item ID | Currency | Purpose |
+|-------------|--------------|----------|---------|
+| `USD_TREASURY_BALANCE` | `a0e7364c-716d-49f3-a795-647d2686a22b` | USD | Total DAO asset balance |
+| `TDG_ISSUED` | `4088e994-2c06-42a8-a1cf-8cd77ee73203` | TDG | Total TDG tokens issued |
+| `ASSET_PER_TDG_ISSUED` | `9b04879b-f06a-419a-9ad3-520ad60ea972` | USD | USD value per TDG token |
+| `30_DAYS_SALES` | `956fdb46-bc8d-4c71-8e67-79813effbab3` | USD | Rolling 30-day sales total |
+| `TDG_USDC_PRICE` | `8edde502-ac79-4e66-ab2d-8ebb99108665` | USDC | TDG to USDC exchange rate |
+
+**Used by:**
+- `tdg_wix_dashboard.gs` - Updates all metrics
+- `buyback_sol_to_tdg.ts` - Reads buyback budget
+- Market making scripts
+
+---
+
+### Collection: `Statistics`
+**Purpose:** Tracks website statistics for Agroverse and TrueSight sites
+
+**API Endpoint:** `https://www.wixapis.com/wix-data/v2/items/{dataItemId}?dataCollectionId=Statistics`
+
+**Used by:**
+- `agroverse_wix_site_updates.gs` - Updates site statistics
+
+---
+
+## 🔑 Wix Authentication
+
+All Wix API requests require these headers:
+
+```javascript
+{
+  'Content-Type': 'application/json',
+  'Authorization': WIX_ACCESS_TOKEN,  // From credentials
+  'wix-account-id': '0e2cde5f-b353-468b-9f4e-36835fc60a0e',
+  'wix-site-id': 'd45a189f-d0cc-48de-95ee-30635a95385f'
+}
+```
+
+**Common Operations:**
+- GET: Read item - `https://www.wixapis.com/wix-data/v2/items/{dataItemId}?dataCollectionId={collectionId}`
+- POST: Query collection - `https://www.wixapis.com/wix-data/v2/items/query?dataCollectionId={collectionId}`
+- PUT: Update item - `https://www.wixapis.com/wix-data/v2/items/{dataItemId}`
 
 ---
 
