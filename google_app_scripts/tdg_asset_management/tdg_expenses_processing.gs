@@ -20,6 +20,8 @@ const OFFCHAIN_TRANSACTIONS_SHEET_NAME = 'offchain transactions';
 const CONTRIBUTORS_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU/edit?gid=1460794618#gid=1460794618';
 const CONTRIBUTORS_SHEET_NAME = 'Contributors contact information';
 const TELEGRAM_CHAT_ID = '-1002190388985'; // Fixed chat ID from reference code
+const MAX_REDIRECTS = 10; // Maximum number of redirects to follow
+const WIX_ACCESS_TOKEN = creds.WIX_API_KEY; // Wix API key for fetching ledger configurations
 
 // Column indices for source sheet (Telegram Chat Logs)
 const TELEGRAM_UPDATE_ID_COL = 0; // Column A
@@ -73,6 +75,144 @@ function generateHashKey(messageId, daoMemberName, salesDate) {
   }
 }
 
+/**
+ * Resolves redirect URLs to get the final URL.
+ * @param {string} url - The URL to resolve.
+ * @return {string} The resolved URL or empty string on error.
+ */
+function resolveRedirect(url) {
+  try {
+    let currentUrl = url;
+    let redirectCount = 0;
+
+    while (redirectCount < MAX_REDIRECTS) {
+      const response = UrlFetchApp.fetch(currentUrl, {
+        followRedirects: false,
+        muteHttpExceptions: true
+      });
+      const responseCode = response.getResponseCode();
+
+      // If not a redirect (2xx or other), return the current URL
+      if (responseCode < 300 || responseCode >= 400) {
+        return currentUrl;
+      }
+
+      // Get the Location header for the redirect
+      const headers = response.getHeaders();
+      const location = headers['Location'] || headers['location'];
+      if (!location) {
+        Logger.log(`No Location header for redirect at ${currentUrl}`);
+        return '';
+      }
+
+      // Update the current URL and increment redirect count
+      currentUrl = location;
+      redirectCount++;
+    }
+
+    Logger.log(`Exceeded maximum redirects (${MAX_REDIRECTS}) for URL ${url}`);
+    return '';
+  } catch (e) {
+    Logger.log(`Error resolving redirect for URL ${url}: ${e.message}`);
+    return '';
+  }
+}
+
+/**
+ * Fetches ledger configurations from WIX AgroverseShipments data collection.
+ * @return {Array} Array of ledger configuration objects with ledger_name, ledger_url, and sheet_name.
+ */
+function getLedgerConfigsFromWix() {
+  const options = {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': WIX_ACCESS_TOKEN,
+      'wix-account-id': '0e2cde5f-b353-468b-9f4e-36835fc60a0e',
+      'wix-site-id': 'd45a189f-d0cc-48de-95ee-30635a95385f'
+    },
+    payload: JSON.stringify({})
+  };
+  const request_url = 'https://www.wixapis.com/wix-data/v2/items/query?dataCollectionId=AgroverseShipments';
+
+  try {
+    const response = UrlFetchApp.fetch(request_url, options);
+    const content = response.getContentText();
+    const response_obj = JSON.parse(content);
+
+    // Construct LEDGER_CONFIGS dynamically using title from WIX data
+    const ledgerConfigs = response_obj.dataItems
+      .filter(item => item.data.contract_url && item.data.contract_url !== '')
+      .map(item => {
+        const resolvedUrl = resolveRedirect(item.data.contract_url);
+        return {
+          ledger_name: item.data.title,
+          ledger_url: resolvedUrl,
+          sheet_name: 'Transactions', // Managed AGL ledgers use "Transactions" sheet
+          is_managed_ledger: true
+        };
+      });
+
+    Logger.log('Ledger configs fetched from Wix: ' + JSON.stringify(ledgerConfigs));
+    return ledgerConfigs;
+  } catch (e) {
+    Logger.log('Error fetching ledger URLs from Wix: ' + e.message);
+    return [];
+  }
+}
+
+/**
+ * Finds contributor name by digital signature from Contributors Digital Signatures sheet
+ * @param {string} digitalSignature - The digital signature to lookup
+ * @return {Object} { contributorName: string | null, error: string | null }
+ */
+function findContributorByDigitalSignature(digitalSignature) {
+  try {
+    if (!digitalSignature) {
+      return { contributorName: null, error: 'No digital signature provided' };
+    }
+    
+    Logger.log(`Looking up contributor for signature: ${digitalSignature.substring(0, 50)}...`);
+    
+    const contributorsSpreadsheet = SpreadsheetApp.openByUrl(CONTRIBUTORS_SHEET_URL);
+    const digitalSignaturesSheet = contributorsSpreadsheet.getSheetByName('Contributors Digital Signatures');
+    
+    if (!digitalSignaturesSheet) {
+      return { contributorName: null, error: 'Contributors Digital Signatures sheet not found' };
+    }
+    
+    const signatureData = digitalSignaturesSheet.getDataRange().getValues();
+    
+    // Skip header row, search through data
+    for (let i = 1; i < signatureData.length; i++) {
+      const contributorName = signatureData[i][0]; // Column A
+      const signature = signatureData[i][4]; // Column E (Contributors Digital Signatures)
+      const status = signatureData[i][3]; // Column D (Status)
+      
+      if (signature && signature.trim() === digitalSignature.trim()) {
+        Logger.log(`Found contributor: ${contributorName} for signature`);
+        
+        // Check if status is ACTIVE
+        if (status === 'ACTIVE') {
+          return { contributorName: contributorName, error: null };
+        } else {
+          return { 
+            contributorName: null, 
+            error: `Signature found for ${contributorName} but status is ${status}, not ACTIVE` 
+          };
+        }
+      }
+    }
+    
+    Logger.log(`No active contributor found for signature: ${digitalSignature.substring(0, 50)}...`);
+    return { contributorName: null, error: 'No matching active digital signature found' };
+    
+  } catch (e) {
+    Logger.log(`Error looking up contributor by digital signature: ${e.message}`);
+    return { contributorName: null, error: e.message };
+  }
+}
+
 // Function to check if reporterName exists in Contributors sheet Column H
 function ReporterExist(reporterName) {
   try {
@@ -116,6 +256,14 @@ function extractExpenseDetails(message) {
     return null;
   }
   
+  // Extract digital signature if present
+  let digitalSignature = null;
+  const sigPattern = /My Digital Signature:\s*([\s\S]*?)(?:\n\s*Request Transaction ID:|This submission was generated using|$)/i;
+  const sigMatch = message.match(sigPattern);
+  if (sigMatch) {
+    digitalSignature = sigMatch[1].trim();
+  }
+  
   return {
     daoMemberName: match[1].trim(),
     latitude: match[2] ? match[2].trim() : null,
@@ -125,7 +273,8 @@ function extractExpenseDetails(message) {
     description: match[6].trim(),
     attachedFilename: match[7] ? match[7].trim() : null,
     destinationFileLocation: match[8] ? match[8].trim() : null,
-    submissionSource: match[9] ? match[9].trim() : null
+    submissionSource: match[9] ? match[9].trim() : null,
+    digitalSignature: digitalSignature
   };
 }
 
@@ -243,32 +392,86 @@ function uploadFileToGitHub(fileId, destinationUrl, commitMessage) {
   }
 }
 
-// Function to insert records into offchain transactions sheet
+// Function to insert records into offchain transactions sheet or resolved ledger
 function InsertExpenseRecords(scoredRow, rowIndex) {
   try {
-    const offchainSpreadsheet = SpreadsheetApp.openByUrl(OFFCHAIN_TRANSACTIONS_SHEET_URL);
-    const offchainSheet = offchainSpreadsheet.getSheetByName(OFFCHAIN_TRANSACTIONS_SHEET_NAME);
-    
     const expenseDetails = extractExpenseDetails(scoredRow[DEST_EXPENSE_REPORTED_COL]);
     if (!expenseDetails) {
       Logger.log(`Failed to extract expense details for row ${rowIndex + 1}`);
       return null;
     }
 
-    const rowToAppend = [
-      scoredRow[DEST_STATUS_DATE_COL],
-      `${scoredRow[DEST_EXPENSE_REPORTED_COL]} reported by ${scoredRow[DEST_CHAT_NAME_COL]} \n\n\nAutomated processing by Edgar via script: https://github.com/TrueSightDAO/tokenomics/blob/main/google_app_scripts/tdg_asset_management/tdg_expenses_processing.gs\n\nEdgar Scoring Hash Key: ${scoredRow[DEST_HASH_KEY_COL]}`,
-      expenseDetails.daoMemberName,
-      expenseDetails.quantity * -1,
-      expenseDetails.inventoryType
-    ];
+    // Check if inventoryType has ledger name encoded in format [ledger name] inventoryType
+    let targetSpreadsheetUrl = OFFCHAIN_TRANSACTIONS_SHEET_URL;
+    let targetSheetName = OFFCHAIN_TRANSACTIONS_SHEET_NAME;
+    let cleanInventoryType = expenseDetails.inventoryType;
+    let isManagedLedger = false;
+    
+    const ledgerMatch = expenseDetails.inventoryType.match(/^\[([^\]]+)\]\s*(.+)$/);
+    if (ledgerMatch) {
+      const ledgerName = ledgerMatch[1];
+      cleanInventoryType = ledgerMatch[2]; // Extract the actual inventory type without the ledger prefix
+      
+      Logger.log(`Ledger name detected in inventory type: ${ledgerName}`);
+      
+      // Get ledger configs from Wix
+      const ledgerConfigs = getLedgerConfigsFromWix();
+      const ledgerConfig = ledgerConfigs.find(config => 
+        config.ledger_name === ledgerName || 
+        config.ledger_name.toLowerCase() === ledgerName.toLowerCase()
+      );
+      
+      if (ledgerConfig && ledgerConfig.ledger_url) {
+        targetSpreadsheetUrl = ledgerConfig.ledger_url;
+        targetSheetName = ledgerConfig.sheet_name;
+        isManagedLedger = ledgerConfig.is_managed_ledger || false;
+        Logger.log(`Resolved ledger URL for ${ledgerName}: ${targetSpreadsheetUrl}, Sheet: ${targetSheetName}, Managed: ${isManagedLedger}`);
+      } else {
+        Logger.log(`Warning: Ledger ${ledgerName} not found in WIX data, using default offchain transactions sheet`);
+      }
+    }
+    
+    // Open the target spreadsheet and sheet
+    const targetSpreadsheet = SpreadsheetApp.openByUrl(targetSpreadsheetUrl);
+    const targetSheet = targetSpreadsheet.getSheetByName(targetSheetName);
+    
+    if (!targetSheet) {
+      Logger.log(`Error: Sheet ${targetSheetName} not found in spreadsheet ${targetSpreadsheetUrl}`);
+      return null;
+    }
 
-    const lastRow = offchainSheet.getLastRow();
-    offchainSheet.getRange(lastRow + 1, 1, 1, rowToAppend.length).setValues([rowToAppend]);
-    Logger.log(`Inserted transaction record at row ${lastRow + 1} for hash key ${scoredRow[DEST_HASH_KEY_COL]}`);
+    // Prepare row data based on ledger type
+    let rowToAppend;
+    
+    if (isManagedLedger) {
+      // Managed AGL ledger structure (6 columns):
+      // A: Date, B: Description, C: Entity, D: Amount, E: Type, F: Category
+      rowToAppend = [
+        scoredRow[DEST_STATUS_DATE_COL], // Column A: Date
+        `${scoredRow[DEST_EXPENSE_REPORTED_COL]} reported by ${scoredRow[DEST_CHAT_NAME_COL]} \n\n\nAutomated processing by Edgar via script: https://github.com/TrueSightDAO/tokenomics/blob/main/google_app_scripts/tdg_asset_management/tdg_expenses_processing.gs\n\nEdgar Scoring Hash Key: ${scoredRow[DEST_HASH_KEY_COL]}`, // Column B: Description
+        expenseDetails.daoMemberName, // Column C: Entity (DAO Member)
+        expenseDetails.quantity * -1, // Column D: Amount (negative for expense)
+        cleanInventoryType, // Column E: Type (clean inventory type without ledger prefix)
+        'Assets' // Column F: Category (Assets since we're reducing assets)
+      ];
+    } else {
+      // Default offchain transactions structure (5 columns):
+      // A: Date, B: Description, C: Fund Handler, D: Amount, E: Inventory Type
+      rowToAppend = [
+        scoredRow[DEST_STATUS_DATE_COL], // Column A: Date
+        `${scoredRow[DEST_EXPENSE_REPORTED_COL]} reported by ${scoredRow[DEST_CHAT_NAME_COL]} \n\n\nAutomated processing by Edgar via script: https://github.com/TrueSightDAO/tokenomics/blob/main/google_app_scripts/tdg_asset_management/tdg_expenses_processing.gs\n\nEdgar Scoring Hash Key: ${scoredRow[DEST_HASH_KEY_COL]}`, // Column B: Description
+        expenseDetails.daoMemberName, // Column C: Fund Handler
+        expenseDetails.quantity * -1, // Column D: Amount (negative for expense)
+        cleanInventoryType // Column E: Inventory Type (clean inventory type without ledger prefix)
+      ];
+    }
+
+    const lastRow = targetSheet.getLastRow();
+    targetSheet.getRange(lastRow + 1, 1, 1, rowToAppend.length).setValues([rowToAppend]);
+    Logger.log(`Inserted ${isManagedLedger ? 'managed ledger' : 'offchain'} expense record at row ${lastRow + 1} in ${targetSheetName} (${targetSpreadsheetUrl}) for hash key ${scoredRow[DEST_HASH_KEY_COL]}`);
     return lastRow + 1;
   } catch (e) {
-    Logger.log(`Error inserting into offchain transactions sheet: ${e.message}`);
+    Logger.log(`Error inserting into transactions sheet: ${e.message}`);
     return null;
   }
 }
@@ -365,10 +568,28 @@ function parseAndProcessTelegramLogs() {
       
       if (expensePattern.test(message) && !existingHashKeys.includes(hashKey)) {
         Logger.log("Line 148: new line detected");
-        const reporterName = sourceData[i][CONTRIBUTOR_NAME_COL];
-        if (!ReporterExist(reporterName)) {
-          Logger.log(`Skipping row ${i + 1} due to invalid reporter: ${reporterName}`);
-          continue;
+        
+        // Get reporter name from digital signature
+        let reporterName = null;
+        if (expenseDetails.digitalSignature) {
+          const result = findContributorByDigitalSignature(expenseDetails.digitalSignature);
+          if (result.contributorName) {
+            reporterName = result.contributorName;
+            Logger.log(`Reporter identified from digital signature: ${reporterName}`);
+          } else {
+            Logger.log(`Skipping row ${i + 1}: ${result.error}`);
+            continue;
+          }
+        } else {
+          // Fallback: try to use Telegram contributor name from column
+          const telegramName = sourceData[i][CONTRIBUTOR_NAME_COL];
+          if (ReporterExist(telegramName)) {
+            reporterName = telegramName;
+            Logger.log(`Reporter identified from Telegram handle: ${reporterName}`);
+          } else {
+            Logger.log(`Skipping row ${i + 1}: No valid digital signature and Telegram name ${telegramName} not found in contributors`);
+            continue;
+          }
         }
         
         // Check for Telegram file IDs and upload if needed
@@ -471,7 +692,7 @@ function doGet(e) {
 
 // Test function to process a specific row from the source sheet
 function testParseAndProcessRow() {
-  rowNumber = 5948
+  rowNumber = 6772
   try {
     // Validate row number
     if (!Number.isInteger(rowNumber) || rowNumber < 2) {
@@ -546,11 +767,27 @@ function testParseAndProcessRow() {
     }
     Logger.log(`Pattern match: ${expensePattern.test(message)}, Not processed: ${!existingHashKeys.includes(hashKey)}`);
 
-    // Step 4: Validate reporter
-    const reporterName = sourceData[i][CONTRIBUTOR_NAME_COL];
-    if (!ReporterExist(reporterName)) {
-      Logger.log(`Test Failed: Skipping row ${rowNumber} due to invalid reporter: ${reporterName}`);
-      return;
+    // Step 4: Determine and validate reporter
+    let reporterName = null;
+    if (expenseDetails.digitalSignature) {
+      const result = findContributorByDigitalSignature(expenseDetails.digitalSignature);
+      if (result.contributorName) {
+        reporterName = result.contributorName;
+        Logger.log(`Reporter identified from digital signature: ${reporterName}`);
+      } else {
+        Logger.log(`Test Failed: ${result.error}`);
+        return;
+      }
+    } else {
+      // Fallback: try to use Telegram contributor name from column
+      const telegramName = sourceData[i][CONTRIBUTOR_NAME_COL];
+      if (ReporterExist(telegramName)) {
+        reporterName = telegramName;
+        Logger.log(`Reporter identified from Telegram handle: ${reporterName}`);
+      } else {
+        Logger.log(`Test Failed: No valid digital signature and Telegram name ${telegramName} not found in contributors`);
+        return;
+      }
     }
     Logger.log(`Reporter ${reporterName} validated successfully`);
 
@@ -618,7 +855,7 @@ function testParseAndProcessRow() {
       Logger.log(`No attached filename or destination for row ${rowNumber}`);
     }
 
-    // Step 6: Simulate appending to scored expense sheet
+    // Step 6: Append to scored expense sheet
     const rowToAppend = [
       sourceData[i][TELEGRAM_UPDATE_ID_COL],
       sourceData[i][CHAT_ID_COL],
@@ -633,20 +870,31 @@ function testParseAndProcessRow() {
       hashKey,
       ''
     ];
-    Logger.log(`Simulated Scored Row: ${JSON.stringify(rowToAppend)}`);
+    
+    const lastRow = scoredExpenseSheet.getLastRow();
+    const scoredRowNumber = lastRow + 1;
+    scoredExpenseSheet.getRange(scoredRowNumber, 1, 1, rowToAppend.length).setValues([rowToAppend]);
+    Logger.log(`✅ Inserted into Scored Expense Submissions at row ${scoredRowNumber}`);
+    Logger.log(`   Data: ${JSON.stringify(rowToAppend)}`);
 
-    // Step 7: Simulate inserting into offchain transactions sheet
+    // Step 7: Insert into offchain transactions sheet or resolved ledger
     const transactionRowNumber = InsertExpenseRecords(rowToAppend, i);
     Logger.log(`Transaction Row Number: ${transactionRowNumber || 'Not recorded'}`);
 
-    // Step 8: Simulate sending notification
+    // Update Column L with transaction row number
     if (transactionRowNumber) {
-      sendExpenseNotification(rowToAppend, `SimulatedRow_${rowNumber}`, transactionRowNumber);
+      scoredExpenseSheet.getRange(scoredRowNumber, DEST_TRANSACTION_LINE_COL + 1).setValue(transactionRowNumber);
+      Logger.log(`✅ Updated Scored Expense Submissions Column L with transaction row: ${transactionRowNumber}`);
     }
 
+    // Step 8: Send notification
+    sendExpenseNotification(rowToAppend, scoredRowNumber, transactionRowNumber);
+
     // Log test success
-    Logger.log(`Test Passed: Successfully processed row ${rowNumber} with hash key: ${hashKey}`);
-    Logger.log(`Summary: File Uploads: ${JSON.stringify(fileUploadStatus)}, Transaction Row: ${transactionRowNumber || 'Not recorded'}`);
+    Logger.log(`✅ Test Passed: Successfully processed row ${rowNumber} with hash key: ${hashKey}`);
+    Logger.log(`   Scored Row: ${scoredRowNumber}`);
+    Logger.log(`   Transaction Row: ${transactionRowNumber || 'Not recorded'}`);
+    Logger.log(`   File Uploads: ${JSON.stringify(fileUploadStatus)}`);
   } catch (e) {
     Logger.log(`Test Failed: Error processing row ${rowNumber}: ${e.message}`);
   }
@@ -664,5 +912,78 @@ function checkFileExistsInGitHub(fileUrl) {
   } catch (e) {
     Logger.log(`Error checking file existence in GitHub: ${e.message}`);
     return false;
+  }
+}
+
+/**
+ * Test function to verify ledger resolution from inventory type with encoded ledger name
+ * This tests the pattern: [ledger name] inventoryType and shows the different structures
+ */
+function testLedgerResolution() {
+  try {
+    Logger.log('=== Testing Ledger Resolution ===');
+    
+    // Test 1: Fetch ledger configs from Wix
+    Logger.log('\n1. Fetching ledger configurations from Wix...');
+    const ledgerConfigs = getLedgerConfigsFromWix();
+    Logger.log(`Found ${ledgerConfigs.length} ledger configurations`);
+    ledgerConfigs.forEach(config => {
+      Logger.log(`  - Ledger: ${config.ledger_name}`);
+      Logger.log(`    URL: ${config.ledger_url}`);
+      Logger.log(`    Sheet: ${config.sheet_name}`);
+      Logger.log(`    Managed: ${config.is_managed_ledger}`);
+    });
+    
+    // Test 2: Test ledger name extraction from inventory type
+    Logger.log('\n2. Testing ledger name extraction from inventory type...');
+    const testInventoryTypes = [
+      '[AGL#25] Avocado',
+      '[Test Ledger] Coffee Beans',
+      'Regular Inventory Item',
+      '[AGL#1] Bananas'
+    ];
+    
+    testInventoryTypes.forEach(inventoryType => {
+      const ledgerMatch = inventoryType.match(/^\[([^\]]+)\]\s*(.+)$/);
+      if (ledgerMatch) {
+        const ledgerName = ledgerMatch[1];
+        const cleanInventoryType = ledgerMatch[2];
+        Logger.log(`  Inventory Type: "${inventoryType}"`);
+        Logger.log(`    - Ledger Name: ${ledgerName}`);
+        Logger.log(`    - Clean Inventory Type: ${cleanInventoryType}`);
+        
+        // Try to find matching ledger config
+        const ledgerConfig = ledgerConfigs.find(config => 
+          config.ledger_name === ledgerName || 
+          config.ledger_name.toLowerCase() === ledgerName.toLowerCase()
+        );
+        
+        if (ledgerConfig) {
+          Logger.log(`    - ✅ Matched Ledger: ${ledgerConfig.ledger_name}`);
+          Logger.log(`    - Target URL: ${ledgerConfig.ledger_url}`);
+          Logger.log(`    - Target Sheet: ${ledgerConfig.sheet_name}`);
+          Logger.log(`    - Is Managed: ${ledgerConfig.is_managed_ledger}`);
+          Logger.log(`    - Would insert ${ledgerConfig.is_managed_ledger ? '6' : '5'} columns`);
+          if (ledgerConfig.is_managed_ledger) {
+            Logger.log(`    - Structure: [Date, Description, Entity, Amount, Type, "Assets"]`);
+          } else {
+            Logger.log(`    - Structure: [Date, Description, Fund Handler, Amount, Type]`);
+          }
+        } else {
+          Logger.log(`    - ❌ No matching ledger found, would use default offchain transactions sheet`);
+          Logger.log(`    - Would insert 5 columns`);
+          Logger.log(`    - Structure: [Date, Description, Fund Handler, Amount, Type]`);
+        }
+      } else {
+        Logger.log(`  Inventory Type: "${inventoryType}"`);
+        Logger.log(`    - No ledger name detected, would use default offchain transactions sheet`);
+        Logger.log(`    - Would insert 5 columns`);
+        Logger.log(`    - Structure: [Date, Description, Fund Handler, Amount, Type]`);
+      }
+    });
+    
+    Logger.log('\n=== Test Complete ===');
+  } catch (e) {
+    Logger.log(`Error in testLedgerResolution: ${e.message}`);
   }
 }
