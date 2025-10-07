@@ -1,4 +1,11 @@
 /**
+ * File: google_app_scripts/tdg_asset_management/web_app.gs
+ * Repository: https://github.com/TrueSightDAO/tokenomics
+ * 
+ * Description: REST API endpoints for inventory management, QR code queries, voting rights, and asset valuation. Provides data access for the TrueSight DAO DApp.
+ */
+
+/**
  * Google Apps Script to handle HTTP GET request for retrieving voting rights and asset information based on a digital signature.
  * The total_assets value is calculated as the sum of off-chain assets, USDT vault balance, and AGL investment holdings.
  * Asset values (total_assets, asset_per_circulated_voting_right) are formatted to 5 decimal places.

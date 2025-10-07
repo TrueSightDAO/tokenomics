@@ -1,3 +1,10 @@
+/**
+ * File: google_app_scripts/tdg_scoring/grok_scoring_for_telegram_and_whatsapp_logs.gs
+ * Repository: https://github.com/TrueSightDAO/tokenomics
+ * 
+ * Description: AI-powered scoring of chat contributions from Telegram and WhatsApp using OpenAI/xAI APIs.
+ */
+
 // Deployment URL: https://script.google.com/macros/s/AKfycbwnCn80es4Jd1pS9oKghpIvJ9pPYSXLonsWztrfXP6YYVVHy8lymMDEk2iRYWlNmjRT/exec
 
 // Flag to ignore chatlogs before this date (YYYYMMDD format)

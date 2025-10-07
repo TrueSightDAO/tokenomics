@@ -1,3 +1,10 @@
+/**
+ * File: google_app_scripts/tdg_asset_management/tdg_recurring_tokenization_monthly.gs
+ * Repository: https://github.com/TrueSightDAO/tokenomics
+ * 
+ * Description: Processes monthly recurring token distributions for ongoing contributor payments.
+ */
+
 // Configuration variables
 const CONFIG = {
   // PRODUCTION

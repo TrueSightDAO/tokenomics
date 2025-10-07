@@ -1,4 +1,11 @@
 /**
+ * File: google_app_scripts/tdg_scoring/transfer_scored_contributions_to_main_ledger.gs
+ * Repository: https://github.com/TrueSightDAO/tokenomics
+ * 
+ * Description: Transfers approved scored contributions from the Grok spreadsheet to the main ledger history.
+ */
+
+/**
  * Google Apps Script to transfer records from "Scored Chatlogs" sheet to "Ledger history" sheet
  * based on hash_key matching and specific conditions.
  */

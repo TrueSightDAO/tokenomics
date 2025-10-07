@@ -1,3 +1,10 @@
+/**
+ * File: google_app_scripts/tdg_inventory_management/sales_update_main_dao_offchain_ledger.gs
+ * Repository: https://github.com/TrueSightDAO/tokenomics
+ * 
+ * Description: Updates the main DAO offchain ledger with sales revenue transactions.
+ */
+
 // Load API keys and configuration settings from Credentials.gs
 // - setApiKeys(): Stores sensitive API keys in Google Apps Script’s Script Properties for security.
 // - getCredentials(): Retrieves all configuration details (API keys, URLs, IDs) as an object.

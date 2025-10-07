@@ -1,3 +1,10 @@
+/**
+ * File: google_app_scripts/agroverse_notarizations/process_notarization_telegram_logs.gs
+ * Repository: https://github.com/TrueSightDAO/tokenomics
+ * 
+ * Description: Google Apps Script for TrueSight DAO automation.
+ */
+
 // Load API keys and configuration settings from Credentials.gs
 // - setApiKeys(): Stores sensitive API keys in Google Apps Script’s Script Properties for security.
 // - getCredentials(): Retrieves all configuration details (API keys, Sheet ID) as an object.

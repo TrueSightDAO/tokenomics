@@ -1,3 +1,10 @@
+/**
+ * File: google_app_scripts/agroverse_qr_codes/subscription_notification.gs
+ * Repository: https://github.com/TrueSightDAO/tokenomics
+ * 
+ * Description: Google Apps Script for TrueSight DAO automation.
+ */
+
 /* Configurable Variables */
 const SPREADSHEET_URL = "https://docs.google.com/spreadsheets/d/1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU/edit"; // Google Sheet URL
 const SHEET_NAME = "Agroverse QR codes"; // Sheet name

@@ -1,3 +1,10 @@
+/**
+ * File: google_app_scripts/sunmint_tree_planting/process_tree_planting_telegram_logs.gs
+ * Repository: https://github.com/TrueSightDAO/tokenomics
+ * 
+ * Description: Google Apps Script for TrueSight DAO automation.
+ */
+
 // Load API keys and configuration settings from Credentials.gs
 setApiKeys();
 const creds = getCredentials();
