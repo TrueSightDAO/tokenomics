@@ -317,7 +317,8 @@ def run_schema_validation_tests():
     # Test main spreadsheets
     main_spreadsheets = [
         ('1qbZZhf-_7xzmDTriaJVWj6OZshyQsFkdsAV8-pyzASQ', 'Telegram & Submissions'),
-        ('1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU', 'Main Ledger & Contributors')
+        ('1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU', 'Main Ledger & Contributors'),
+        ('1Tbj7H5ur_egQLRugdXUaSIhEYIKp0vvVv2IZ7WTLCUo', 'Grok Scored Contributions')
     ]
     
     for spreadsheet_id, description in main_spreadsheets:
@@ -325,16 +326,24 @@ def run_schema_validation_tests():
     
     # Test specific sheets
     sheets_to_test = [
+        # Telegram & Submissions Spreadsheet
         ('1qbZZhf-_7xzmDTriaJVWj6OZshyQsFkdsAV8-pyzASQ', 'Telegram Chat Logs', 'Telegram Logs'),
         ('1qbZZhf-_7xzmDTriaJVWj6OZshyQsFkdsAV8-pyzASQ', 'Scored Expense Submissions', 'Scored Expenses'),
         ('1qbZZhf-_7xzmDTriaJVWj6OZshyQsFkdsAV8-pyzASQ', 'QR Code Sales', 'QR Code Sales'),
+        ('1qbZZhf-_7xzmDTriaJVWj6OZshyQsFkdsAV8-pyzASQ', 'Inventory Movement', 'Inventory Movement'),
+        ('1qbZZhf-_7xzmDTriaJVWj6OZshyQsFkdsAV8-pyzASQ', 'QR Code Generation Requests', 'QR Generation Requests'),
+        # Main Ledger & Contributors Spreadsheet
         ('1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU', 'offchain transactions', 'Offchain Transactions'),
+        ('1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU', 'offchain asset location', 'Offchain Asset Location'),
         ('1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU', 'Contributors contact information', 'Contributors Contact'),
         ('1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU', 'Contributors Digital Signatures', 'Digital Signatures'),
-        ('1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU', 'Agroverse QR codes', 'QR Codes'),
+        ('1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU', 'Contributors voting weight', 'Voting Weight'),
         ('1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU', 'Ledger history', 'Ledger History'),
         ('1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU', 'off chain asset balance', 'Asset Balance'),
-        ('1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU', 'Contributors voting weight', 'Voting Weight')
+        ('1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU', 'Agroverse QR codes', 'QR Codes'),
+        # Additional Spreadsheets
+        ('1Tbj7H5ur_egQLRugdXUaSIhEYIKp0vvVv2IZ7WTLCUo', 'Scored Chatlogs', 'Scored Chatlogs'),
+        ('1Tbj7H5ur_egQLRugdXUaSIhEYIKp0vvVv2IZ7WTLCUo', 'Recurring Tokenization', 'Recurring Tokenization')
     ]
     
     for spreadsheet_id, sheet_name, description in sheets_to_test:
