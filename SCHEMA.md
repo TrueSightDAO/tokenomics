@@ -696,7 +696,7 @@ TELEGRAM_FILE_ID_COL = 14     // Column O
 ### Collection: `ExchangeRate`
 **Purpose:** Stores financial metrics and exchange rates for TrueSight DAO dashboard
 
-**API Endpoint:** `https://www.wixapis.com/wix-data/v2/items/{dataItemId}?dataCollectionId=ExchangeRate`
+**API Endpoint:** [`https://www.wixapis.com/wix-data/v2/items/{dataItemId}?dataCollectionId=ExchangeRate`](https://www.wixapis.com/wix-data/v2/items/)
 
 **Data Structure:**
 ```javascript
@@ -733,7 +733,7 @@ TELEGRAM_FILE_ID_COL = 14     // Column O
 ### Collection: `Statistics`
 **Purpose:** Tracks website statistics for Agroverse and TrueSight sites
 
-**API Endpoint:** `https://www.wixapis.com/wix-data/v2/items/{dataItemId}?dataCollectionId=Statistics`
+**API Endpoint:** [`https://www.wixapis.com/wix-data/v2/items/{dataItemId}?dataCollectionId=Statistics`](https://www.wixapis.com/wix-data/v2/items/)
 
 **Used by:**
 - `agroverse_wix_site_updates.gs` - Updates site statistics
@@ -754,9 +754,10 @@ All Wix API requests require these headers:
 ```
 
 **Common Operations:**
-- GET: Read item - `https://www.wixapis.com/wix-data/v2/items/{dataItemId}?dataCollectionId={collectionId}`
-- POST: Query collection - `https://www.wixapis.com/wix-data/v2/items/query?dataCollectionId={collectionId}`
-- PUT: Update item - `https://www.wixapis.com/wix-data/v2/items/{dataItemId}`
+- GET: Read item - [`/wix-data/v2/items/{dataItemId}`](https://dev.wix.com/docs/rest/api-reference/wix-data/wix-data/items/get-data-item)
+- POST: Query collection - [`/wix-data/v2/items/query`](https://dev.wix.com/docs/rest/api-reference/wix-data/wix-data/items/query-data-items)
+- PUT: Update item - [`/wix-data/v2/items/{dataItemId}`](https://dev.wix.com/docs/rest/api-reference/wix-data/wix-data/items/update-data-item)
+- POST: Trigger event - [`/events/v1/events`](https://dev.wix.com/docs/rest/api-reference/wix-events/wix-events/events/create-event)
 
 ---
 
