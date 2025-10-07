@@ -448,52 +448,6 @@ See `python_scripts/schema_validation/README.md` for detailed setup instructions
 
 ---
 
-##### Sheet: `Scored Chatlogs`
-**Purpose:** Grok AI scored contributions from chat logs
-
-**Sheet URL:** https://docs.google.com/spreadsheets/d/1Tbj7H5ur_egQLRugdXUaSIhEYIKp0vvVv2IZ7WTLCUo/edit#gid=0
-
-**Header Row:** 3
-
-| Column | Name | Type | Description |
-|--------|------|------|-------------|
-| A | Contributor Name | String | Person who contributed |
-| B | Project Name | String | Associated project (e.g., "telegram_chatlog") |
-| C | Contribution Made | String | Full description of contribution |
-| D | Rubric classification | String | Scoring category or "Unknown" |
-| E | TDGs Provisioned | Number | Amount of TDG tokens provisioned |
-| F | Status | String | Processing status |
-| G | TDGs Issued | Number | Amount of TDG tokens issued |
-| H | Status date | Date | Date processed (YYYYMMDD) |
-| I | Existing Contributor | Boolean | TRUE/FALSE if contributor exists |
-| J | Reporter Name | String | Person who reported this contribution |
-| K | Scoring Hash Key | String | Unique hash for deduplication |
-| L | Main Ledger Row Number | Number | Reference to main ledger |
-| M | Reviewer Email | String | Email of reviewer (if any) |
-
-**Cell A1:** Contains total TDG contributions to be tokenized  
-**Cell E1:** Contains submissions left to score count
-
-**Used by:**
-- `grok_scoring_for_telegram_and_whatsapp_logs.gs`
-- `transfer_scored_contributions_to_main_ledger.gs`
-
----
-
-### Additional Sheets in This Spreadsheet
-
-**Available Sheets:**
-- **Dashboard** - Overview and summary metrics
-- **WhatsApp Chatlog status** - Status tracking for WhatsApp logs
-- **Scored Chatlogs** - Main scoring sheet (documented above)
-- **To Be Airdropped** - Pending token distributions
-- **Unregistered Contributors** - Contributors not yet registered
-- **Registered Contributors** - Registered contributor list
-- **States** - State/status tracking
-- **Initiatives Scoring Rubric** - Scoring guidelines and rubric
-
----
-
 ## 🔗 Managed AGL Ledgers (Dynamic)
 
 ### Structure: Individual Shipment/Contract Ledgers
@@ -582,10 +536,54 @@ function getLedgerConfigsFromWix() {
 ### 3. Grok Scored Contributions Origin
 **Spreadsheet ID:** `1Tbj7H5ur_egQLRugdXUaSIhEYIKp0vvVv2IZ7WTLCUo`
 
-**Purpose:** Origin spreadsheet for scored contributions before transfer
+**URL:** https://docs.google.com/spreadsheets/d/1Tbj7H5ur_egQLRugdXUaSIhEYIKp0vvVv2IZ7WTLCUo/edit
+
+**Purpose:** Origin spreadsheet for AI-scored contributions from Telegram and WhatsApp before transfer to main ledger
+
+#### Sheets:
+
+##### Sheet: `Scored Chatlogs`
+**Purpose:** Grok AI scored contributions from chat logs
+
+**Sheet URL:** https://docs.google.com/spreadsheets/d/1Tbj7H5ur_egQLRugdXUaSIhEYIKp0vvVv2IZ7WTLCUo/edit#gid=0
+
+**Header Row:** 3
+
+| Column | Name | Type | Description |
+|--------|------|------|-------------|
+| A | Contributor Name | String | Person who contributed |
+| B | Project Name | String | Associated project (e.g., "telegram_chatlog") |
+| C | Contribution Made | String | Full description of contribution |
+| D | Rubric classification | String | Scoring category or "Unknown" |
+| E | TDGs Provisioned | Number | Amount of TDG tokens provisioned |
+| F | Status | String | Processing status |
+| G | TDGs Issued | Number | Amount of TDG tokens issued |
+| H | Status date | Date | Date processed (YYYYMMDD) |
+| I | Existing Contributor | Boolean | TRUE/FALSE if contributor exists |
+| J | Reporter Name | String | Person who reported this contribution |
+| K | Scoring Hash Key | String | Unique hash for deduplication |
+| L | Main Ledger Row Number | Number | Reference to main ledger |
+| M | Reviewer Email | String | Email of reviewer (if any) |
+
+**Cell A1:** Contains total TDG contributions to be tokenized  
+**Cell E1:** Contains submissions left to score count
 
 **Used by:**
+- `grok_scoring_for_telegram_and_whatsapp_logs.gs`
 - `transfer_scored_contributions_to_main_ledger.gs`
+
+---
+
+##### Other Sheets Available
+
+**Additional Sheets in This Spreadsheet:**
+- **Dashboard** - Overview and summary metrics
+- **WhatsApp Chatlog status** - Status tracking for WhatsApp logs
+- **To Be Airdropped** - Pending token distributions
+- **Unregistered Contributors** - Contributors not yet registered
+- **Registered Contributors** - Registered contributor list
+- **States** - State/status tracking
+- **Initiatives Scoring Rubric** - Scoring guidelines and rubric
 
 ---
 
