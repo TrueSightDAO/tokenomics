@@ -4,6 +4,47 @@
 > 
 > This document provides a consolidated reference for all Google Sheets used across TrueSight DAO's Google Apps Scripts. Use this as a central schema reference when making code changes.
 
+## 📑 Table of Contents
+
+### Quick Navigation
+- [🧪 Schema Validation](#-schema-validation)
+- [📊 Main Spreadsheets](#-main-spreadsheets)
+  - [Telegram & Submissions Spreadsheet](#1-truesight-dao-telegram--submissions-spreadsheet)
+  - [Main Ledger & Contributors Spreadsheet](#2-main-truesight-dao-ledger--operations-spreadsheet)
+- [📋 Additional Reference Spreadsheets](#-additional-reference-spreadsheets)
+- [🔍 Common Patterns & Constants](#-common-patterns--constants)
+- [🔐 Access & Authentication](#-access--authentication)
+- [🔄 Wix Data Collections](#-wix-data-collections)
+- [📝 Usage Notes](#-usage-notes)
+
+### Sheet-by-Sheet Index
+
+**Telegram & Submissions (1qbZZ...)**
+- [Telegram Chat Logs](#sheet-telegram-chat-logs)
+- [Scored Expense Submissions](#sheet-scored-expense-submissions)
+- [QR Code Sales](#sheet-qr-code-sales)
+- [Inventory Movement](#sheet-inventory-movement)
+- [QR Code Generation Requests](#sheet-qr-code-generation-requests)
+
+**Main Ledger & Contributors (1GE7P...)**
+- [offchain transactions](#sheet-offchain-transactions)
+- [offchain asset location](#sheet-offchain-asset-location)
+- [Contributors contact information](#sheet-contributors-contact-information)
+- [Contributors Digital Signatures](#sheet-contributors-digital-signatures)
+- [Contributors voting weight](#sheet-contributors-voting-weight)
+- [Ledger history](#sheet-ledger-history)
+- [off chain asset balance](#sheet-off-chain-asset-balance)
+- [Agroverse QR codes](#sheet-agroverse-qr-codes)
+
+**Managed AGL Ledgers**
+- [Transactions Sheet Structure](#3-managed-agl-ledgers-dynamic)
+- [Balance Sheet Structure](#sheet-balance)
+
+**Additional Spreadsheets**
+- [Grok Scored Contributions](#3-grok-scored-contributions-origin)
+
+---
+
 ## 🧪 Schema Validation
 
 **Test Script:** `python_scripts/schema_validation/test_schema_validation.py`
