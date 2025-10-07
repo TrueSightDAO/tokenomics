@@ -37,7 +37,8 @@
 - [Agroverse QR codes](#sheet-agroverse-qr-codes)
 
 **Managed AGL Ledgers**
-- [Transactions Sheet Structure](#3-managed-agl-ledgers-dynamic)
+- [Overview & Active Ledgers List](#-managed-agl-ledgers-dynamic)
+- [Transactions Sheet Structure](#sheet-transactions)
 - [Balance Sheet Structure](#sheet-balance)
 
 **Additional Spreadsheets**
@@ -450,14 +451,28 @@ See `python_scripts/schema_validation/README.md` for detailed setup instructions
 ##### Sheet: `Scored Chatlogs`
 **Purpose:** Grok AI scored contributions from chat logs
 
+**Sheet URL:** https://docs.google.com/spreadsheets/d/1Tbj7H5ur_egQLRugdXUaSIhEYIKp0vvVv2IZ7WTLCUo/edit#gid=0
+
+**Header Row:** 3
+
 | Column | Name | Type | Description |
 |--------|------|------|-------------|
-| A | Chatlog Number | Number | Sequential ID |
-| B | Date | Date | Contribution date |
-| C | Contributor | String | Person who contributed |
-| D | Contribution | String | What was contributed |
-| E | Score | Number | AI-assigned score |
-| F | Platform | String | "Telegram" or "WhatsApp" |
+| A | Contributor Name | String | Person who contributed |
+| B | Project Name | String | Associated project (e.g., "telegram_chatlog") |
+| C | Contribution Made | String | Full description of contribution |
+| D | Rubric classification | String | Scoring category or "Unknown" |
+| E | TDGs Provisioned | Number | Amount of TDG tokens provisioned |
+| F | Status | String | Processing status |
+| G | TDGs Issued | Number | Amount of TDG tokens issued |
+| H | Status date | Date | Date processed (YYYYMMDD) |
+| I | Existing Contributor | Boolean | TRUE/FALSE if contributor exists |
+| J | Reporter Name | String | Person who reported this contribution |
+| K | Scoring Hash Key | String | Unique hash for deduplication |
+| L | Main Ledger Row Number | Number | Reference to main ledger |
+| M | Reviewer Email | String | Email of reviewer (if any) |
+
+**Cell A1:** Contains total TDG contributions to be tokenized  
+**Cell E1:** Contains submissions left to score count
 
 **Used by:**
 - `grok_scoring_for_telegram_and_whatsapp_logs.gs`
@@ -465,19 +480,17 @@ See `python_scripts/schema_validation/README.md` for detailed setup instructions
 
 ---
 
-##### Sheet: `Recurring Tokenization`
-**Purpose:** Monthly recurring token distributions
+### Additional Sheets in This Spreadsheet
 
-| Column | Name | Type | Description |
-|--------|------|------|-------------|
-| A | Contributor Name | String | Person receiving tokens |
-| B | Description | String | Reason for recurring payment |
-| C | Amount | Number | Monthly amount |
-| D | End Date | Date | When recurring payment ends |
-| E | Currency | String | Token/currency type |
-
-**Used by:**
-- `tdg_recurring_tokenization_monthly.gs`
+**Available Sheets:**
+- **Dashboard** - Overview and summary metrics
+- **WhatsApp Chatlog status** - Status tracking for WhatsApp logs
+- **Scored Chatlogs** - Main scoring sheet (documented above)
+- **To Be Airdropped** - Pending token distributions
+- **Unregistered Contributors** - Contributors not yet registered
+- **Registered Contributors** - Registered contributor list
+- **States** - State/status tracking
+- **Initiatives Scoring Rubric** - Scoring guidelines and rubric
 
 ---
 
@@ -489,6 +502,43 @@ See `python_scripts/schema_validation/README.md` for detailed setup instructions
 **Naming Convention:** e.g., "AGL#1", "AGL#25", "Sacred Earth Farms", etc.
 
 **Purpose:** Track inventory and transactions for specific shipments/contracts
+
+---
+
+### 📋 Active Managed Ledgers
+
+> **Note:** This list is dynamically managed via Wix and may change. To get the current list, query the `AgroverseShipments` collection or run the schema validation script.
+
+**Agroverse Ledgers:**
+- **AGL1** - https://agroverse.shop/agl1
+- **AGL2** - https://agroverse.shop/agl2
+- **AGL3** - https://agroverse.shop/agl3
+- **AGL4** - https://agroverse.shop/agl4
+- **AGL5** - https://agroverse.shop/agl5
+- **AGL6** - https://agroverse.shop/agl6
+- **AGL7** - https://agroverse.shop/agl7
+- **AGL8** - https://agroverse.shop/agl8
+- **AGL10** - https://agroverse.shop/agl10
+- **AGL13** - https://agroverse.shop/agl13
+- **AGL14** - https://agroverse.shop/agl14
+
+**Partner Program Ledgers:**
+- **SEF1** (Sacred Earth Farms) - https://truesight.me/sunmint/sef1
+- **PP1** (Partner Program) - https://truesight.me/sunmint/pp1
+
+**How to Query Current Ledgers:**
+```javascript
+// In Google Apps Script
+function getLedgerConfigsFromWix() {
+  const response = UrlFetchApp.fetch(
+    'https://www.wixapis.com/wix-data/v2/items/query?dataCollectionId=AgroverseShipments',
+    { /* headers */ }
+  );
+  return JSON.parse(response.getContentText()).dataItems;
+}
+```
+
+---
 
 #### Sheet: `Transactions`
 **Purpose:** All financial transactions for the specific ledger
