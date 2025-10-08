@@ -1,8 +1,8 @@
-# Professional Reference for Emelin Libsoa
+# Professional Reference for Emelin Frances Lisboa
 
 **Date:** October 8, 2025  
 **Prepared by:** Gary Teh, Technical Lead, TrueSight DAO  
-**LinkedIn:** [Emelin Libsoa](https://www.linkedin.com/in/emelinlibsoa/)  
+**LinkedIn:** [Emelin Frances Lisboa](https://www.linkedin.com/in/emelinlibsoa/)  
 **Contribution Period:** September 2023 - September 2025 (2+ years)  
 **Total Contributions:** 354 documented contributions  
 **Total Value Recognition:** 26,606+ TDG tokens awarded
@@ -11,7 +11,7 @@
 
 ## Executive Summary
 
-I am pleased to provide my strongest recommendation for Emelin Libsoa, who has been an exceptional content creator and digital operations coordinator for TrueSight DAO and our Agroverse initiative over the past two years. Emelin's unique combination of creative content production, strategic social media management, and operational coordination makes her an outstanding candidate for content creator, social media manager, or digital marketing roles.
+I am pleased to provide my strongest recommendation for Emelin Frances Lisboa, who has been an exceptional content creator and digital operations coordinator for TrueSight DAO and our Agroverse initiative over the past two years. Emelin's unique combination of creative content production, strategic social media management, and operational coordination makes her an outstanding candidate for content creator, social media manager, or digital marketing roles.
 
 ## Context of Our Collaboration
 
@@ -239,7 +239,7 @@ Beyond professional skills, Emelin demonstrates:
 
 ## Closing Endorsement
 
-Emelin Libsoa is a rare combination of creative talent and operational excellence. Her ability to produce professional content while coordinating complex logistics makes her an invaluable asset to any organization.
+Emelin Frances Lisboa is a rare combination of creative talent and operational excellence. Her ability to produce professional content while coordinating complex logistics makes her an invaluable asset to any organization.
 
 Over two years of collaboration, Emelin has consistently exceeded expectations, delivered high-quality work, and demonstrated the kind of dedication and skill that drives organizational success. Any company that hires Emelin will gain a creative professional who can build and execute comprehensive content strategies while managing the operational details that ensure success.
 
@@ -289,4 +289,4 @@ Agroverse: https://agroverse.shop
 *This reference was generated using TrueSight DAO's contribution tracking system. All metrics are verifiable through our transparent, blockchain-backed ledger system.*
 
 **Generated:** October 8, 2025  
-**Reference ID:** EMELIN_LIBSOA_2025_10_08
+**Reference ID:** EMELIN_FRANCES_LISBOA_2025_10_08
