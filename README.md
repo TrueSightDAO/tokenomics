@@ -26,6 +26,7 @@ See [google_app_scripts/README.md](./google_app_scripts/README.md) for details.
 #### 2. **[python_scripts](./python_scripts/)** - Python Utilities & Tools
 Python-based tools and utilities:
 - **Schema Validation** (`schema_validation/`) - Validates SCHEMA.md accuracy against live data
+- **Reference & Testimonials** (`reference_and_testimonials/`) - Generates professional references for DAO members
 - **QR Code Generation** (`agroverse_qr_code_generator/`) - Batch QR code generator with branding
 - **Asset Management** (`tdg_asset_management/`) - AWS cost tokenization scripts
 - **Analysis Tools** (`analysis/`) - Contribution analysis and metrics
