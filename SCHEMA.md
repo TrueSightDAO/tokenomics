@@ -22,6 +22,7 @@
 **Telegram & Submissions (1qbZZ...)**
 - [Telegram Chat Logs](#sheet-telegram-chat-logs)
 - [Scored Expense Submissions](#sheet-scored-expense-submissions)
+- [Capital Injection](#sheet-capital-injection)
 - [QR Code Sales](#sheet-qr-code-sales)
 - [Inventory Movement](#sheet-inventory-movement)
 - [QR Code Generation Requests](#sheet-qr-code-generation-requests)
@@ -143,6 +144,41 @@ See [`python_scripts/schema_validation/README.md`](./python_scripts/schema_valid
 
 **Used by:**
 - [`tdg_expenses_processing.gs`](https://github.com/TrueSightDAO/tokenomics/blob/main/google_app_scripts/tdg_asset_management/tdg_expenses_processing.gs) - Inserts scored expenses into ledgers
+
+---
+
+##### Sheet: `Capital Injection`
+**Purpose:** Capital injection submissions for managed AGL ledgers. Records equity investments that increase both assets (cash) and equity through double-entry accounting.
+
+**Sheet URL:** https://docs.google.com/spreadsheets/d/1qbZZhf-_7xzmDTriaJVWj6OZshyQsFkdsAV8-pyzASQ/edit#gid=1159222428
+
+**Header Row:** 1
+
+| Column | Name | Type | Description |
+|--------|------|------|-------------|
+| A | Telegram Update ID | Number | Source Telegram update ID |
+| B | Telegram Message ID | Number | Source message ID |
+| C | Capital Injection Log Message | String | Full submission message including all details |
+| D | Reporter Name | String | Person who reported (validated via digital signature) |
+| E | Ledger Name | String | Target managed ledger (e.g., "AGL1", "SEF1") |
+| F | Amount | Number | Capital injection amount (positive, always USD) |
+| G | Ledger URL | String | Resolved URL to target managed ledger |
+| H | Injection Date | Date | Date of capital injection (YYYYMMDD) |
+| I | Description | String | Description of capital injection |
+| J | Status | String | Processing status: "NEW", "PROCESSED", "FAILED" |
+| K | Ledger Lines Number | String | Comma-separated row numbers (e.g., "245,246" for Assets & Equity) |
+
+**Key Features:**
+- **Double-Entry Accounting:** Each capital injection creates TWO transactions in the target ledger:
+  1. **Assets transaction** (Category: "Assets") - increases cash
+  2. **Equity transaction** (Category: "Equity") - increases owner's equity
+- **Managed Ledgers Only:** Only processes capital injections for managed AGL ledgers (not offchain)
+- **Digital Signature Required:** No fallback - reporter must have valid ACTIVE digital signature
+- **Currency:** Always USD (no currency column needed)
+- **Supporting Documentation:** File attachments stored in GitHub, referenced in log message
+
+**Used by:**
+- [`capital_injection_processing.gs`](https://github.com/TrueSightDAO/tokenomics/blob/main/google_app_scripts/tdg_asset_management/capital_injection_processing.gs) - Parses submissions and inserts double-entry transactions into managed ledgers
 
 ---
 
