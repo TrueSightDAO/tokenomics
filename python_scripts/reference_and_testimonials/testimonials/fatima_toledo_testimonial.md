@@ -1,7 +1,7 @@
 # Professional Reference for Fatima Toledo
 
 **Date:** October 8, 2025  
-**Prepared by:** Gary Teh, Founder & Technical Lead, TrueSight DAO  
+**Prepared by:** Gary Teh, Technical Lead, TrueSight DAO  
 **LinkedIn:** [Fatima Toledo](https://www.linkedin.com/in/fatima-toledo/)  
 **Contribution Period:** June 2021 - August 2025 (4+ years)  
 **Total Contributions:** 236 documented contributions  
@@ -15,7 +15,7 @@ I am writing to provide my strongest recommendation for Fatima Toledo, who has b
 
 ## Context of Our Collaboration
 
-As the founder of TrueSight DAO, I've had the privilege of working closely with Fatima since June 2021. Our organization operates as a decentralized autonomous organization focused on sustainable agriculture supply chain innovation, specifically through our Agroverse marketplace connecting Brazilian cacao and açaí producers with North American markets. This work requires constant navigation between:
+As Technical Lead of TrueSight DAO, I've had the privilege of working closely with Fatima since June 2021. Our organization operates as a decentralized autonomous organization focused on sustainable agriculture supply chain innovation, specifically through our Agroverse marketplace connecting Brazilian cacao and açaí producers with North American markets. This work requires constant navigation between:
 
 - **Traditional business stakeholders** (Brazilian cooperative presidents, farm owners, regulatory bodies)
 - **Modern lean startup methodologies** (rapid iteration, MVP testing, data-driven decisions)
@@ -193,7 +193,7 @@ I am happy to discuss Fatima's contributions in greater detail. Please feel free
 ---
 
 **Gary Teh**  
-Founder & Technical Lead  
+Technical Lead  
 TrueSight DAO  
 Email: [Contact via TrueSight DAO]  
 LinkedIn: [Gary Teh LinkedIn]  
