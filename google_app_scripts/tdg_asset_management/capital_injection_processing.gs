@@ -271,6 +271,38 @@ function validateManagedLedger(ledgerUrl, ledgerConfigs) {
 }
 
 /**
+ * Checks if a capital injection record already exists
+ */
+function capitalInjectionRecordExists(telegramUpdateId, telegramMessageId) {
+  try {
+    const spreadsheet = SpreadsheetApp.openByUrl(TELEGRAM_LOGS_URL);
+    const capitalInjectionSheet = spreadsheet.getSheetByName(CAPITAL_INJECTION_SHEET);
+    
+    if (!capitalInjectionSheet) {
+      return false;
+    }
+    
+    const data = capitalInjectionSheet.getDataRange().getValues();
+    const headerRow = 1;
+    
+    for (let i = headerRow; i < data.length; i++) {
+      const row = data[i];
+      const existingUpdateId = row[CI_TELEGRAM_UPDATE_ID_COL];
+      const existingMessageId = row[CI_TELEGRAM_MESSAGE_ID_COL];
+      
+      if (existingUpdateId == telegramUpdateId && existingMessageId == telegramMessageId) {
+        return true;
+      }
+    }
+    
+    return false;
+  } catch (e) {
+    Logger.log(`Error checking for duplicate: ${e.message}`);
+    return false;
+  }
+}
+
+/**
  * Inserts capital injection record into Capital Injection sheet
  */
 function insertCapitalInjectionRecord(telegramUpdateId, telegramMessageId, logMessage, reporterName, 
@@ -281,6 +313,12 @@ function insertCapitalInjectionRecord(telegramUpdateId, telegramMessageId, logMe
     
     if (!capitalInjectionSheet) {
       Logger.log(`ERROR: ${CAPITAL_INJECTION_SHEET} sheet not found`);
+      return false;
+    }
+    
+    // Check for duplicate
+    if (capitalInjectionRecordExists(telegramUpdateId, telegramMessageId)) {
+      Logger.log(`⚠️ Capital injection record already exists for Update ID ${telegramUpdateId}, Message ID ${telegramMessageId}`);
       return false;
     }
     
@@ -478,6 +516,13 @@ function parseAndProcessCapitalInjectionLogs() {
       }
       
       const reporterName = result.contributorName;
+      
+      // Check if already processed
+      if (capitalInjectionRecordExists(row[TELEGRAM_UPDATE_ID_COL], row[TELEGRAM_MESSAGE_ID_COL])) {
+        Logger.log(`⏭️ Skipping row ${i + 1}: Already processed (exists in Capital Injection sheet)`);
+        skippedCount++;
+        continue;
+      }
       
       // Get injection date (use status date from Telegram log, or current date)
       const statusDate = row[TELEGRAM_STATUS_COL] || new Date();
