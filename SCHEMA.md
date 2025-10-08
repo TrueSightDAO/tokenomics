@@ -358,7 +358,7 @@ See [`python_scripts/schema_validation/README.md`](./python_scripts/schema_valid
 ---
 
 ##### Sheet: `Ledger history`
-**Purpose:** Historical ledger transactions
+**Purpose:** Complete historical record of all DAO member contributions and TDG token awards. This sheet serves as the authoritative source for contribution tracking, governance token distribution, and member reference/testimonial generation.
 
 **Sheet URL:** https://docs.google.com/spreadsheets/d/1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU/edit#gid=0
 
@@ -366,27 +366,38 @@ See [`python_scripts/schema_validation/README.md`](./python_scripts/schema_valid
 
 | Column | Name | Type | Description |
 |--------|------|------|-------------|
-| A | Contributor Name | String | Person involved |
-| B | Project Name | String | Associated project |
-| C | Contribution Made | String | Description of contribution |
-| D | Rubric classification | String | Classification category |
-| E | TDGs Provisioned | Number | Provisioned TDG amount |
-| F | Status | String | Status of contribution |
-| G | TDGs Issued | Number | Issued TDG amount |
-| H | Status date | Date | Date (YYYYMMDD) |
-| I | Solana Transfer Hash | String | Blockchain transaction hash |
-| J | TDGs yet Air Dropped | Number | Pending airdrops |
-| K | Discord ID | String | Discord identifier |
-| L | Within past 90 days | String | 90-day activity |
-| M | Within past 90 days vesting | String | 90-day vesting |
-| N | Within past 180 days | String | 180-day activity |
-| O | Within past 180 days vesting | Number | 180-day vesting |
+| A | Contributor Name | String | DAO member name (matches Contributors contact information) |
+| B | Project Name | String | Associated project or initiative |
+| C | Contribution Made | String | Detailed description of contribution |
+| D | Rubric classification | String | Classification category with TDG award formula |
+| E | TDGs Provisioned | Number | Provisioned TDG amount (proposed award) |
+| F | Status | String | Contribution status (e.g., "Successfully Completed / Full Provision Awarded") |
+| G | TDGs Issued | Number | Actual TDG tokens issued to member |
+| H | Status date | Date | Completion/status date (YYYYMMDD format) |
+| I | Solana Transfer Hash | String | Blockchain transaction hash (if airdropped) |
+| J | TDGs yet Air Dropped | Number | TDG tokens pending airdrop |
+| K | Discord ID | String | Discord identifier for member |
+| L | Within past 90 days | String | Recent 90-day activity indicator |
+| M | Within past 90 days vesting | String | 90-day vesting status |
+| N | Within past 180 days | String | Recent 180-day activity indicator |
+| O | Within past 180 days vesting | Number | 180-day vesting amount |
 
-**Cell E1:** Contains `voting_rights_circulated` total
+**Special Cells:**
+- **Cell E1:** Contains `voting_rights_circulated` total (sum of all TDG tokens issued)
+- **Cell B1:** "Total TDG tokens Issued" label
+- **Row 2:** Description of the ledger's purpose and submission methods
+
+**Key Features:**
+- **Comprehensive History:** Records contributions from 2017 to present (10,000+ entries)
+- **Merit-Based Recognition:** TDG awards based on contribution rubric classifications
+- **Verifiable Record:** All contributions timestamped and categorized
+- **Multi-Project Tracking:** Covers TrueSight DAO, Agroverse, MoonShot, FORK, and other initiatives
+- **Reference Source:** Primary data source for generating member references and testimonials
 
 **Used by:**
 - [`grok_scoring_for_telegram_and_whatsapp_logs.gs`](https://github.com/TrueSightDAO/tokenomics/blob/main/google_app_scripts/tdg_grok_scoring/grok_scoring_for_telegram_and_whatsapp_logs.gs) - Scores contributions and prepares for ledger entry
 - [`transfer_scored_contributions_to_main_ledger.gs`](https://github.com/TrueSightDAO/tokenomics/blob/main/google_app_scripts/tdg_grok_scoring/transfer_scored_contributions_to_main_ledger.gs) - Transfers scored contributions to this historical ledger
+- [`fetch_contributions.py`](https://github.com/TrueSightDAO/tokenomics/blob/main/python_scripts/reference_and_testimonials/fetch_contributions.py) - Retrieves member contribution history for references and testimonials
 
 ---
 
