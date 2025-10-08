@@ -231,5 +231,4 @@ Agroverse: https://agroverse.shop
 *This reference was generated using TrueSight DAO's contribution tracking system. All metrics are verifiable through our transparent, blockchain-backed ledger system.*
 
 **Generated:** October 8, 2025  
-**Reference ID:** FATIMA_TOLEDO_2025_10_08  
-**Verification:** https://truesight.me/verify
+**Reference ID:** FATIMA_TOLEDO_2025_10_08
