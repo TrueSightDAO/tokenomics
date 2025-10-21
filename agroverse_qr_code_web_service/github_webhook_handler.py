@@ -299,11 +299,11 @@ class GitHubWebhookHandler:
         RIGHT_MARGIN_SERIAL_RATIO = 0.05
         
         # Fixed positions (from batch_compiler.py)
-        FIXED_QR_Y = -30
-        FIXED_HARVEST_Y = 260
-        FIXED_INFO_Y = 280
-        FIXED_PLANT_Y = 310
-        FIXED_SERIAL_Y = 325
+        FIXED_QR_Y = -31              # Shifted up by 1 pixel
+        FIXED_HARVEST_Y = 259
+        FIXED_INFO_Y = 279
+        FIXED_PLANT_Y = 309
+        FIXED_SERIAL_Y = 324
         
         # Logo configuration
         LOGO_RATIO = 0.2
