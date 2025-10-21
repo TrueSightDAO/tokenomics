@@ -48,11 +48,11 @@ BOTTOM_MARGIN_RATIO = 0.05     # bottom margin as fraction of canvas height
 RIGHT_MARGIN_SERIAL_RATIO = 0.05
 
 # Manual fixed positions (in pixels) to override dynamic layout. Set to None to use auto-layout
-FIXED_QR_Y = -30              # override QR Y position (px); e.g., -30
-FIXED_HARVEST_Y = 260         # override harvest/pledge text Y position (px)
-FIXED_INFO_Y = 280            # override info text Y position (px)
-FIXED_PLANT_Y = 310           # override plant text Y position (px)
-FIXED_SERIAL_Y = 325          # override serial text Y position (px)
+FIXED_QR_Y = -32              # override QR Y position (px); e.g., -30 (shifted up by 2px)
+FIXED_HARVEST_Y = 259         # override harvest/pledge text Y position (px)
+FIXED_INFO_Y = 279            # override info text Y position (px)
+FIXED_PLANT_Y = 309           # override plant text Y position (px)
+FIXED_SERIAL_Y = 324          # override serial text Y position (px)
 
 # Default font family for text
 DEFAULT_FONT_FAMILY = "Helvetica.ttc"
