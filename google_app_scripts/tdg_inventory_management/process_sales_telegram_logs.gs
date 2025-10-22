@@ -219,86 +219,13 @@ function updateAgroverseQrStatus(qrCode) {
   }
 }
 
-// Function to parse [SALES EVENT] structured format
-function parseSalesEvent(message) {
-  try {
-    Logger.log('Attempting to parse [SALES EVENT] format');
-    
-    // Extract Item (QR code) - pattern: "- Item: XXXX"
-    const itemMatch = message.match(/- Item:\s*([^\n]+)/i);
-    const qrCode = itemMatch ? itemMatch[1].trim() : '';
-    
-    // Extract Sales price - pattern: "- Sales price: $XX" or "- Sales price: XX"
-    const priceMatch = message.match(/- Sales price:\s*\$?([0-9]+\.?[0-9]*)/i);
-    const salePrice = priceMatch ? parseFloat(priceMatch[1]) : '';
-    
-    if (qrCode && salePrice) {
-      Logger.log(`[SALES EVENT] parsed successfully: QR=${qrCode}, Price=${salePrice}`);
-      return { qrCode, salePrice, parseMethod: 'SALES_EVENT' };
-    }
-    
-    Logger.log('[SALES EVENT] parsing failed: missing QR code or price');
-    return { qrCode: '', salePrice: '', parseMethod: 'FAILED' };
-  } catch (e) {
-    Logger.log(`[SALES EVENT] parsing error: ${e.message}`);
-    return { qrCode: '', salePrice: '', parseMethod: 'ERROR' };
-  }
-}
-
-// Function to parse [QR CODE EVENT] structured format
-function parseQrCodeEvent(message) {
-  try {
-    Logger.log('Attempting to parse [QR CODE EVENT] format');
-    
-    // Pattern: [QR CODE EVENT] QR_CODE - ... sold ... for $XX
-    // Example: "[QR CODE EVENT] 2024OSCAR_20250702_5 - this bag of cacao just sold by me for $25."
-    
-    // Extract QR code - immediately after [QR CODE EVENT]
-    const qrMatch = message.match(/\[QR CODE EVENT\]\s*([A-Za-z0-9_]+)/i);
-    const qrCode = qrMatch ? qrMatch[1].trim() : '';
-    
-    // Extract price - pattern: "for $XX" or "for XX"
-    const priceMatch = message.match(/for\s+\$?([0-9]+\.?[0-9]*)/i);
-    const salePrice = priceMatch ? parseFloat(priceMatch[1]) : '';
-    
-    if (qrCode && salePrice) {
-      Logger.log(`[QR CODE EVENT] parsed successfully: QR=${qrCode}, Price=${salePrice}`);
-      return { qrCode, salePrice, parseMethod: 'QR_CODE_EVENT' };
-    }
-    
-    Logger.log('[QR CODE EVENT] parsing failed: missing QR code or price');
-    return { qrCode: '', salePrice: '', parseMethod: 'FAILED' };
-  } catch (e) {
-    Logger.log(`[QR CODE EVENT] parsing error: ${e.message}`);
-    return { qrCode: '', salePrice: '', parseMethod: 'ERROR' };
-  }
-}
-
-// Function to parse structured messages (dispatcher)
-function parseStructuredMessage(message) {
-  // Check for [SALES EVENT] format
-  if (message.match(/\[SALES EVENT\]/i)) {
-    return parseSalesEvent(message);
-  }
-  
-  // Check for [QR CODE EVENT] format
-  if (message.match(/\[QR CODE EVENT\]/i)) {
-    return parseQrCodeEvent(message);
-  }
-  
-  // Not a recognized structured format
-  Logger.log('Message does not match any structured format');
-  return { qrCode: '', salePrice: '', parseMethod: 'NONE' };
-}
-
-// Function to call Grok API to extract QR code and sale price (fallback for unstructured messages)
+// Function to call Grok API to extract QR code and sale price
 function callGrokApi(message) {
   try {
-    Logger.log('Calling Grok API for unstructured message parsing');
     const apiKey = PropertiesService.getScriptProperties().getProperty('XAI_API_KEY');
     if (!apiKey) {
       Logger.log('Error: XAI_API_KEY not set in Script Properties');
-      return { qrCode: '', salePrice: '', parseMethod: 'GROK_ERROR' };
+      return { qrCode: '', salePrice: '' };
     }
 
     const prompt = `Extract the QR code and sale price from the following message. Return a JSON object with "qr_code" and "sale_price" fields. If not found, return empty strings. 
@@ -328,34 +255,14 @@ Message: "${message}"`;
     const data = JSON.parse(response.getContentText());
     const extractedData = JSON.parse(data.choices[0].message.content);
     
-    Logger.log('Grok API parsed successfully');
     return {
       qrCode: extractedData.qr_code || '',
-      salePrice: extractedData.sale_price ? parseFloat(extractedData.sale_price.replace('$', '')) : '',
-      parseMethod: 'GROK_API'
+      salePrice: extractedData.sale_price ? parseFloat(extractedData.sale_price.replace('$', '')) : ''
     };
   } catch (e) {
     Logger.log(`Grok API error: ${e.message}`);
-    return { qrCode: '', salePrice: '', parseMethod: 'GROK_ERROR' };
+    return { qrCode: '', salePrice: '' };
   }
-}
-
-// Function to extract QR code and sale price (tries structured parsing first, then Grok API)
-function extractQrCodeAndPrice(message) {
-  // Try structured parsing first
-  let result = parseStructuredMessage(message);
-  
-  // If structured parsing succeeded, return result
-  if (result.qrCode && result.salePrice) {
-    Logger.log(`Message parsed using ${result.parseMethod} method`);
-    return result;
-  }
-  
-  // Fallback to Grok API for unstructured messages
-  Logger.log('Structured parsing failed, falling back to Grok API');
-  result = callGrokApi(message);
-  
-  return result;
 }
 
 // Function to parse and process Telegram chat logs
@@ -419,9 +326,8 @@ function parseTelegramChatLogs() {
         continue;
       }
       
-      // Extract QR code and sale price (structured parsing first, then Grok API fallback)
-      const { qrCode, salePrice, parseMethod } = extractQrCodeAndPrice(message);
-      Logger.log(`Row ${i + 1}: Parsed using method: ${parseMethod}`);
+      // Call Grok API to extract QR code and sale price
+      const { qrCode, salePrice } = callGrokApi(message);
       
       // If valid data returned, prepare row
       if (qrCode && salePrice) {
@@ -557,9 +463,8 @@ function processSpecificRow() {
       return;
     }
     
-    // Extract QR code and sale price (structured parsing first, then Grok API fallback)
-    const { qrCode, salePrice, parseMethod } = extractQrCodeAndPrice(message);
-    Logger.log(`Row ${rowIndex}: Parsed using method: ${parseMethod}`);
+    // Call Grok API to extract QR code and sale price
+    const { qrCode, salePrice } = callGrokApi(message);
     
     // If valid data returned, prepare row
     if (qrCode && salePrice) {
@@ -622,116 +527,6 @@ function processSpecificRow() {
     Logger.log(`Row ${rowIndex} skipped: Message does not match patterns or already processed`);
   }
 }
-
-// ============================================
-// TEST METHODS FOR PARSING FUNCTIONS
-// ============================================
-
-/**
- * Test method for parseSalesEvent function
- * Call this function from Google Apps Script editor to test [SALES EVENT] parsing
- */
-function testParseSalesEvent() {
-  const testMessage = `[SALES EVENT]
-- Item: 2025ANA_20251021_MOLASSES
-- Sales price: $14
-- Sold by: Gary Teh
-- Attached Filename: None
-- Submission Source: https://dapp.truesight.me/report_sales.html
---------
-
-My Digital Signature: MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA54jNZdN4xkaPDI9TB/RwuicbbUMvttOWSTVRfvZxiHWeIoqTHRz2WJdoGsuW9rz9QPbpz6T9zQZu3RNzsSF216U3aCd89R2g7qhOMh9VC+7+sNJnI6H4qPPKFbndxQD8262Q+zqYQR6r0k89mud1sYbla/DCtKAcGZsALihVyl8tF2v1rUzfPU9FHpi5ow2kOEpVxnhe6xEY1HDU/zuFRt707WzkG1zit4AWEBXyBd3YLyinPNAb2aBA6dSPnPAQ4aB46Dtis3p5DgkLeO7E4gh/E0BqViDkkB1tLy1dgy9Kjv+5zxo1yTxkBKACjqqo69Q0VrUfkXgegWmXBAu04wIDAQAB
-
-Request Transaction ID: wXvcGm2r6wk2Owr/To8rGL+u5uXi896/fRpXt5WxThLpHVVO1YaeF63+qG7SzRFaj5lZLky1F1uOi0aRx0oEDgD3mv1oSKAGmRFRU4h0ioDDG1iQGSm0dutpll7hkgBmgMTQuz+HtyCH1daHiWxhi0txHmlC0Qy74YVGtlP9eEplZBMg5OPng4cEm01gyhaqUAVb4ClEr9v5Fu+4FZGtOt6PBEqlQaQsk3mgp+x0flXPvpvDsr/hjdsRWEWcdp+OqucAhg77tqws3DJaMi0d0LKx7JWd/aFfj4qJQL42I2h2N2wh7f3pVy4GYtwXtXI5pl2XShOtcLQ2TmnGkNhf0Q==
-
-This submission was generated using https://dapp.truesight.me/report_sales.html
-
-Verify submission here: https://dapp.truesight.me/verify_request.html`;
-
-  Logger.log('===== Testing parseSalesEvent =====');
-  const result = parseSalesEvent(testMessage);
-  Logger.log(`Result: ${JSON.stringify(result)}`);
-  Logger.log(`Expected QR Code: 2025ANA_20251021_MOLASSES`);
-  Logger.log(`Expected Price: 14`);
-  
-  if (result.qrCode === '2025ANA_20251021_MOLASSES' && result.salePrice === 14) {
-    Logger.log('✅ TEST PASSED');
-  } else {
-    Logger.log('❌ TEST FAILED');
-  }
-}
-
-/**
- * Test method for parseQrCodeEvent function
- * Call this function from Google Apps Script editor to test [QR CODE EVENT] parsing
- */
-function testParseQrCodeEvent() {
-  const testMessage = `[QR CODE EVENT] 2024OSCAR_20250702_5 - this bag of cacao just sold by me for $25.`;
-
-  Logger.log('===== Testing parseQrCodeEvent =====');
-  const result = parseQrCodeEvent(testMessage);
-  Logger.log(`Result: ${JSON.stringify(result)}`);
-  Logger.log(`Expected QR Code: 2024OSCAR_20250702_5`);
-  Logger.log(`Expected Price: 25`);
-  
-  if (result.qrCode === '2024OSCAR_20250702_5' && result.salePrice === 25) {
-    Logger.log('✅ TEST PASSED');
-  } else {
-    Logger.log('❌ TEST FAILED');
-  }
-}
-
-/**
- * Test method for extractQrCodeAndPrice function with structured messages
- * Call this function from Google Apps Script editor to test the full extraction flow
- */
-function testExtractQrCodeAndPrice() {
-  const testMessages = [
-    {
-      name: 'SALES EVENT',
-      message: `[SALES EVENT]
-- Item: 2025ANA_20251021_MOLASSES
-- Sales price: $14
-- Sold by: Gary Teh`,
-      expectedQr: '2025ANA_20251021_MOLASSES',
-      expectedPrice: 14,
-      expectedMethod: 'SALES_EVENT'
-    },
-    {
-      name: 'QR CODE EVENT',
-      message: `[QR CODE EVENT] 2024OSCAR_20250702_5 - this bag of cacao just sold by me for $25.`,
-      expectedQr: '2024OSCAR_20250702_5',
-      expectedPrice: 25,
-      expectedMethod: 'QR_CODE_EVENT'
-    }
-  ];
-
-  Logger.log('===== Testing extractQrCodeAndPrice =====');
-  let passedTests = 0;
-  let totalTests = testMessages.length;
-  
-  testMessages.forEach((test, index) => {
-    Logger.log(`\n--- Test ${index + 1}: ${test.name} ---`);
-    const result = extractQrCodeAndPrice(test.message);
-    Logger.log(`Result: ${JSON.stringify(result)}`);
-    Logger.log(`Expected: QR=${test.expectedQr}, Price=${test.expectedPrice}, Method=${test.expectedMethod}`);
-    
-    if (result.qrCode === test.expectedQr && 
-        result.salePrice === test.expectedPrice && 
-        result.parseMethod === test.expectedMethod) {
-      Logger.log('✅ TEST PASSED');
-      passedTests++;
-    } else {
-      Logger.log('❌ TEST FAILED');
-    }
-  });
-  
-  Logger.log(`\n===== SUMMARY: ${passedTests}/${totalTests} tests passed =====`);
-}
-
-// ============================================
-// END OF TEST METHODS
-// ============================================
 
 function sendQrCodeNotification(qrCode, contributorName, chatId) {
   const token = creds.TELEGRAM_API_TOKEN;
