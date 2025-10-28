@@ -10,6 +10,7 @@ Save compiled images to an output directory and a to_print subdirectory for new 
 import argparse
 import os
 import re
+import sys
 try:
     import gdrive
     from googleapiclient.discovery import build
@@ -22,6 +23,10 @@ from qrcode.constants import ERROR_CORRECT_M
 from qrcode.constants import ERROR_CORRECT_H
 
 from PIL import Image, ImageDraw, ImageFont
+
+# QR Code length warning threshold
+MAX_RECOMMENDED_QR_LENGTH = 28  # Maximum recommended QR code length for low-resolution label printers
+                                 # Based on tested value: "2024OSCAR_2025051022_N_24" (28 chars)
 
 # Layout and scaling constants
 CANVAS_BASE_WIDTH = 450        # base width for blank canvas (px)
@@ -306,6 +311,52 @@ def sanitize_filename(s: str) -> str:
     return re.sub(r'[^A-Za-z0-9._-]+', '_', s)
 
 
+def check_qr_code_length(qr_code: str, farm_name: str, auto_continue: bool = False) -> bool:
+    """
+    Check if QR code exceeds recommended length and prompt user.
+    
+    :param qr_code: The QR code value/serial number
+    :param farm_name: Farm name for context in warning message
+    :param auto_continue: If True, skip prompt and continue automatically
+    :return: True to continue processing, False to skip
+    """
+    qr_length = len(qr_code)
+    
+    if qr_length <= MAX_RECOMMENDED_QR_LENGTH:
+        return True
+    
+    # Display warning
+    print("\n" + "="*80)
+    print("⚠️  WARNING: LONG QR CODE DETECTED")
+    print("="*80)
+    print(f"QR Code: {qr_code}")
+    print(f"Farm: {farm_name}")
+    print(f"Length: {qr_length} characters (recommended maximum: {MAX_RECOMMENDED_QR_LENGTH})")
+    print()
+    print("Long QR codes may have scanning issues on low-resolution label printers.")
+    print("The QR code will be more dense and may not scan reliably.")
+    print()
+    print(f"Tested working example: '2024OSCAR_2025051022_N_24' ({MAX_RECOMMENDED_QR_LENGTH} chars)")
+    print("="*80)
+    
+    if auto_continue:
+        print("Auto-continue enabled. Proceeding with generation...")
+        print()
+        return True
+    
+    # Prompt user
+    while True:
+        response = input("Do you want to continue generating this QR code? [y/N]: ").strip().lower()
+        if response in ['y', 'yes']:
+            print("Continuing with QR code generation...\n")
+            return True
+        elif response in ['n', 'no', '']:
+            print("Skipping this QR code.\n")
+            return False
+        else:
+            print("Invalid response. Please enter 'y' or 'n'.")
+
+
 def main():
     parser = argparse.ArgumentParser(description="Batch compile QR codes with labels")
     parser.add_argument(
@@ -376,6 +427,10 @@ def main():
         "--ignore-max-width", dest="ignore_max_width", action="store_true",
         help="Ignore auto-resizing text to fit width; use specified font sizes"
     )
+    parser.add_argument(
+        "--auto-continue", dest="auto_continue", action="store_true",
+        help="Automatically continue when encountering long QR codes without prompting"
+    )
     args = parser.parse_args()
     # If requested, disable logo embedding
     if getattr(args, 'no_logo', False):
@@ -397,6 +452,11 @@ def main():
         # Check if file already exists
         if os.path.exists(out_path):
             print(f"Image already exists, skipping: {out_path}")
+            continue
+        
+        # Check QR code length and prompt user if necessary (only for new images)
+        if not check_qr_code_length(qr_code, farm_name, auto_continue=args.auto_continue):
+            print(f"⏭️  Skipped: {qr_code} ({farm_name})\n")
             continue        
 
         # Select logo based on item type
