@@ -443,7 +443,8 @@ function getAssetPerIssuedTdgBalanceOnWix() {
   var content = response.getContentText();
   var response_obj = JSON.parse(content);  
   // Logger.log(response_obj);  
-  Logger.log("Asset per issued TDG on Wix: " + response_obj.dataItem.data.exchangeRate);  
+  Logger.log("Asset per issued TDG on Wix: " + response_obj.dataItem.data.exchangeRate);
+  return response_obj.dataItem.data.exchangeRate;
 }
 
 
@@ -663,13 +664,15 @@ function getWixDailyTdgBuyBackBudgetDataItemId() {
 function setDailyTdgBuyBackBudget() {
   // Calculate the budget using the provided formula
   var last30DaysSales = get30DaysSales();
-  var tdgPrice = getTdgUsdcPriceOnWix();
+  var assetPerIssuedTdg = getAssetPerIssuedTdgBalanceOnWix();
   var treasuryYield = getUSTreasuryYield();
   
-  // Formula: (Last 30 days sales / 30) * min(TDG price, 1 - Treasury yield)
+  // Formula: (Last 30 days sales / 30) * min(Asset Per Issued TDG, 1 - Treasury yield)
+  // Using asset per issued TDG instead of market price ensures buy-back budget reflects
+  // the intrinsic value backed by DAO assets rather than speculative market pricing
   var dailySalesAverage = last30DaysSales / 30;
   Logger.log("Daily sales average: " + dailySalesAverage);
-  var adjustedPrice = Math.min(tdgPrice, 1 - treasuryYield / 100);
+  var adjustedPrice = Math.min(assetPerIssuedTdg, 1 - treasuryYield / 100);
   var dailyBudget = dailySalesAverage * adjustedPrice;
 
   Logger.log("Adjusted Price: " + adjustedPrice);
