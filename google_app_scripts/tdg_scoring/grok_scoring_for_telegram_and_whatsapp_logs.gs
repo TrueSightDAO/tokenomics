@@ -21,7 +21,7 @@ const SKIP_MESSAGE_STRINGS = [
   '[VOTING RIGHTS WITHDRAWAL REQUEST]',
   '[QR CODE EVENT]',
   '[SALES EVENT]',
-  '[DAO Inventory Expense Event]',
+  '[DAO INVENTORY EXPENSE EVENT]',
   '[INVENTORY MOVEMENT]',
   '[FARM REGISTRATION]',
   '[TREE PLANTING EVENT]',
@@ -1429,10 +1429,18 @@ function testUploadFileToGitHub(fileId, destinationUrl, message) {
  */
 function shouldSkipMessage(message) {
   const messageUpper = message.toUpperCase();
-  const shouldSkip = SKIP_MESSAGE_STRINGS.some(skipString => messageUpper.includes(skipString));
+  // Also convert skip strings to uppercase for case-insensitive matching
+  const shouldSkip = SKIP_MESSAGE_STRINGS.some(skipString => messageUpper.includes(skipString.toUpperCase()));
   
   if (shouldSkip) {
-    Logger.log(`shouldSkipMessage: Skipping message due to DAO-specific event: ${message}`);
+    Logger.log(`shouldSkipMessage: Skipping message due to DAO-specific event: ${message.substring(0, 100)}`);
+  } else {
+    Logger.log(`shouldSkipMessage: Message does not match skip patterns. Checking contents...`);
+    SKIP_MESSAGE_STRINGS.forEach(skipString => {
+      if (messageUpper.includes(skipString.toUpperCase())) {
+        Logger.log(`shouldSkipMessage: WARNING - Found skip pattern "${skipString}" but filter failed!`);
+      }
+    });
   }
   
   return shouldSkip;
