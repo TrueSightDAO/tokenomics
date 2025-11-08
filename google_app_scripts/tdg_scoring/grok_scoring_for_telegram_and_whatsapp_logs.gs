@@ -1213,7 +1213,7 @@ function extractContributionDetails(message) {
     }
     
     if (descriptionLines.length > 0) {
-      contributionDetails.description = descriptionLines.join(' ');
+      contributionDetails.description = descriptionLines.join('\n');
     }
     
     // Check if all required fields were found
