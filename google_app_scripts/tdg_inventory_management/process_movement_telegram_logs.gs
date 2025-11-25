@@ -21,9 +21,23 @@ const AGL_SHEET_NAME = 'Transactions';
 const OFFCHAIN_ASSET_SHEET_NAME = 'offchain asset location';
 const DEFAULT_AGL_SHEET_NAME = 'Balance'; // Default sheet name for AGL ledgers
 const MAX_REDIRECTS = 10; // Maximum number of redirects to follow in resolveRedirect
+const AGROVERSE_QR_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU/edit';
+const AGROVERSE_QR_SHEET_NAME = 'Agroverse QR codes';
+const CONTRIBUTORS_SHEET_NAME = 'Contributors contact information';
+const SHIPMENT_LEDGER_SHEET_NAME = 'Shipment Ledger Listing';
+const QR_CODE_COL = 0; // Column A (0-indexed)
+const LEDGER_COL = 2; // Column C (0-indexed) - ledger shortcut
+const CURRENCY_COL = 8; // Column I (0-indexed) - Currency/Inventory Type
+const MANAGER_NAME_COL = 20; // Column U (0-indexed) - Manager Name
+const CONTRIBUTOR_NAME_COL = 0; // Column A (0-indexed) - Contributor Name
+const CONTRIBUTORS_DATA_START_ROW = 5; // Data starts at row 5 (row 4 is header)
+// Shipment Ledger Listing columns (0-indexed)
+const SHIPMENT_ID_COL = 0; // Column A - Shipment ID (ledger name)
+const LEDGER_URL_COL = 11; // Column L - Ledger URL
 
 /**
  * Resolves redirect URLs to get the final URL.
+ * Handles both HTTP header redirects and JavaScript-enabled redirects.
  * @param {string} url - The URL to resolve.
  * @return {string} The resolved URL or empty string on error.
  */
@@ -41,17 +55,75 @@ function resolveRedirect(url) {
       const responseCode = response.getResponseCode();
       Logger.log(responseCode);
 
-      // If not a redirect (2xx or other), return the current URL
+      // If not a redirect (2xx or other), check for JavaScript redirects
       if (responseCode < 300 || responseCode >= 400) {
+        // Check if the response contains JavaScript redirects
+        const content = response.getContentText();
+        const jsRedirectMatch = content.match(/window\.location\.(replace|href)\s*=\s*['"]([^'"]+)['"]/i) ||
+                                content.match(/window\.location\.replace\(['"]([^'"]+)['"]\)/i) ||
+                                content.match(/<meta\s+http-equiv=['"]refresh['"]\s+content=['"]\d+;url=([^'"]+)['"]/i);
+        
+        if (jsRedirectMatch) {
+          const redirectUrl = jsRedirectMatch[1] || jsRedirectMatch[2];
+          if (redirectUrl) {
+            // Resolve relative URLs to absolute
+            if (redirectUrl.startsWith('http://') || redirectUrl.startsWith('https://')) {
+              currentUrl = redirectUrl;
+              redirectCount++;
+              Logger.log(`Found JavaScript redirect to: ${currentUrl}`);
+              continue;
+            } else {
+              // Relative URL - construct absolute URL
+              try {
+                const baseUrl = new URL(currentUrl);
+                const resolvedUrl = new URL(redirectUrl, baseUrl).toString();
+                currentUrl = resolvedUrl;
+                redirectCount++;
+                Logger.log(`Resolved relative JavaScript redirect to: ${currentUrl}`);
+                continue;
+              } catch (e) {
+                Logger.log(`Error resolving relative JavaScript redirect: ${e.message}`);
+                return currentUrl;
+              }
+            }
+          }
+        }
+        
+        // No JavaScript redirect found, return current URL
         return currentUrl;
       }
 
-      // Get the Location header for the redirect
+      // Get the Location header for HTTP redirect
       const headers = response.getHeaders();
       const location = headers['Location'] || headers['location'];
       console.log(location);
       if (!location) {
         Logger.log(`No Location header for redirect at ${currentUrl}`);
+        // Try to check for JavaScript redirect in response body
+        const content = response.getContentText();
+        const jsRedirectMatch = content.match(/window\.location\.(replace|href)\s*=\s*['"]([^'"]+)['"]/i) ||
+                                content.match(/window\.location\.replace\(['"]([^'"]+)['"]\)/i) ||
+                                content.match(/<meta\s+http-equiv=['"]refresh['"]\s+content=['"]\d+;url=([^'"]+)['"]/i);
+        
+        if (jsRedirectMatch) {
+          const redirectUrl = jsRedirectMatch[1] || jsRedirectMatch[2];
+          if (redirectUrl) {
+            if (redirectUrl.startsWith('http://') || redirectUrl.startsWith('https://')) {
+              currentUrl = redirectUrl;
+            } else {
+              try {
+                const baseUrl = new URL(currentUrl);
+                currentUrl = new URL(redirectUrl, baseUrl).toString();
+              } catch (e) {
+                Logger.log(`Error resolving relative JavaScript redirect: ${e.message}`);
+                return '';
+              }
+            }
+            redirectCount++;
+            Logger.log(`Found JavaScript redirect to: ${currentUrl}`);
+            continue;
+          }
+        }
         return '';
       }
 
@@ -70,48 +142,268 @@ function resolveRedirect(url) {
 }
 
 /**
- * Fetches ledger configurations from WIX AgroverseShipments data collection.
+ * Fetches ledger configurations from Google Sheets "Shipment Ledger Listing".
+ * Migrated from Wix API to Google Sheets for cost savings.
  * @return {Array} Array of ledger configuration objects.
  */
 function getLedgerConfigsFromWix() {
-  const options = {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': WIX_ACCESS_TOKEN,
-      'wix-account-id': '0e2cde5f-b353-468b-9f4e-36835fc60a0e',
-      'wix-site-id': 'd45a189f-d0cc-48de-95ee-30635a95385f'
-    },
-    payload: JSON.stringify({})
-  };
-  const request_url = 'https://www.wixapis.com/wix-data/v2/items/query?dataCollectionId=AgroverseShipments';
-
+  // Note: Function name kept for backward compatibility, but now reads from Google Sheets
   try {
-    const response = UrlFetchApp.fetch(request_url, options);
-    const content = response.getContentText();
-    const response_obj = JSON.parse(content);
+    const spreadsheet = SpreadsheetApp.openByUrl(AGROVERSE_QR_SHEET_URL);
+    const shipmentSheet = spreadsheet.getSheetByName(SHIPMENT_LEDGER_SHEET_NAME);
+    
+    if (!shipmentSheet) {
+      Logger.log(`Error: ${SHIPMENT_LEDGER_SHEET_NAME} sheet not found`);
+      return [];
+    }
 
-    // Construct LEDGER_CONFIGS dynamically using title from WIX data
-    const ledgerConfigs = response_obj.dataItems
-      .filter(item => item.data.contract_url && item.data.contract_url !== '')
-      .map(item => {
-        const resolvedUrl = resolveRedirect(item.data.contract_url);
-        return {
-          ledger_name: item.data.title,
-          ledger_url: resolvedUrl,
-          sheet_name: 'Balance',
-          manager_names_column: 'H',
-          asset_name_column: 'J',
-          asset_quantity_column: 'I',
-          record_start_row: 6
-        };
-      });
+    // Get all data from the sheet (skip header row)
+    const lastRow = shipmentSheet.getLastRow();
+    if (lastRow < 2) {
+      Logger.log(`No data in ${SHIPMENT_LEDGER_SHEET_NAME} sheet`);
+      return [];
+    }
 
-    Logger.log('Ledger configs fetched from Wix: ' + JSON.stringify(ledgerConfigs));
+    // Read data starting from row 2 (row 1 is header)
+    const dataRange = shipmentSheet.getRange(2, 1, lastRow - 1, 13); // Columns A to M
+    const data = dataRange.getValues();
+
+    // Construct LEDGER_CONFIGS from sheet data
+    const ledgerConfigs = [];
+    const seenUrls = new Set(); // Track unique URLs to avoid duplicates
+
+    for (let i = 0; i < data.length; i++) {
+      const row = data[i];
+      const shipmentId = row[SHIPMENT_ID_COL] ? row[SHIPMENT_ID_COL].toString().trim() : '';
+      const ledgerUrl = row[LEDGER_URL_COL] ? row[LEDGER_URL_COL].toString().trim() : '';
+      
+      // Skip if no URL or no shipment ID
+      if (!ledgerUrl || !shipmentId) {
+        continue;
+      }
+      
+      // Skip if we've already processed this URL (avoid duplicates)
+      if (seenUrls.has(ledgerUrl)) {
+        continue;
+      }
+      seenUrls.add(ledgerUrl);
+
+      try {
+        const resolvedUrl = resolveRedirect(ledgerUrl);
+        if (resolvedUrl) {
+          ledgerConfigs.push({
+            ledger_name: shipmentId,
+            ledger_url: resolvedUrl,
+            sheet_name: 'Balance',
+            manager_names_column: 'H',
+            asset_name_column: 'J',
+            asset_quantity_column: 'I',
+            record_start_row: 6
+          });
+        } else {
+          Logger.log(`Warning: Could not resolve URL for ${shipmentId}: ${ledgerUrl}`);
+        }
+      } catch (e) {
+        Logger.log(`Error resolving URL for ${shipmentId}: ${e.message}`);
+      }
+    }
+
+    Logger.log(`Ledger configs fetched from ${SHIPMENT_LEDGER_SHEET_NAME}: ${ledgerConfigs.length} configs`);
+    Logger.log('Ledger configs: ' + JSON.stringify(ledgerConfigs));
     return ledgerConfigs;
   } catch (e) {
-    Logger.log('Error fetching ledger URLs from Wix: ' + e.message);
+    Logger.log(`Error fetching ledger configs from ${SHIPMENT_LEDGER_SHEET_NAME}: ${e.message}`);
     return [];
+  }
+}
+
+/**
+ * Looks up QR code information from Agroverse QR codes sheet.
+ * @param {string} qrCode - The QR code to look up.
+ * @return {Object} Object with currency (inventory type) and ledger_url, or null if not found.
+ */
+function lookupQRCode(qrCode) {
+  try {
+    const agroverseSpreadsheet = SpreadsheetApp.openByUrl(AGROVERSE_QR_SHEET_URL);
+    const agroverseSheet = agroverseSpreadsheet.getSheetByName(AGROVERSE_QR_SHEET_NAME);
+    if (!agroverseSheet) {
+      Logger.log(`Error: Agroverse QR codes sheet not found`);
+      return null;
+    }
+    
+    const agroverseData = agroverseSheet.getDataRange().getValues();
+    
+    // Skip header row (row 0)
+    for (let i = 1; i < agroverseData.length; i++) {
+      const row = agroverseData[i];
+      if (row[QR_CODE_COL] && row[QR_CODE_COL].toString().trim() === qrCode.trim()) {
+        const currency = row[CURRENCY_COL] ? row[CURRENCY_COL].toString().trim() : '';
+        const ledgerShortcut = row[LEDGER_COL] ? row[LEDGER_COL].toString().trim() : '';
+        
+        Logger.log(`Found QR code ${qrCode}: currency=${currency}, ledger=${ledgerShortcut}`);
+        
+        return {
+          currency: currency,
+          ledger_shortcut: ledgerShortcut,
+          qr_code: qrCode,
+          row_index: i + 1 // Return 1-based row index for updating
+        };
+      }
+    }
+    
+    Logger.log(`QR code ${qrCode} not found in Agroverse QR codes sheet`);
+    return null;
+  } catch (e) {
+    Logger.log(`Error looking up QR code ${qrCode}: ${e.message}`);
+    return null;
+  }
+}
+
+/**
+ * Updates the Manager Name (Column U) in Agroverse QR codes sheet for a given QR code.
+ * @param {string} qrCode - The QR code to update.
+ * @param {string} managerName - The manager name to set.
+ * @return {boolean} True if update was successful, false otherwise.
+ */
+function updateAgroverseQrManagerName(qrCode, managerName) {
+  try {
+    const agroverseSpreadsheet = SpreadsheetApp.openByUrl(AGROVERSE_QR_SHEET_URL);
+    const agroverseSheet = agroverseSpreadsheet.getSheetByName(AGROVERSE_QR_SHEET_NAME);
+    if (!agroverseSheet) {
+      Logger.log(`Error: Agroverse QR codes sheet not found`);
+      return false;
+    }
+    
+    const agroverseData = agroverseSheet.getDataRange().getValues();
+    
+    // Skip header row (row 0)
+    for (let i = 1; i < agroverseData.length; i++) {
+      const row = agroverseData[i];
+      if (row[QR_CODE_COL] && row[QR_CODE_COL].toString().trim() === qrCode.trim()) {
+        // Update Column U (index 20, 1-based column 21)
+        agroverseSheet.getRange(i + 1, MANAGER_NAME_COL + 1).setValue(managerName);
+        Logger.log(`Updated QR code ${qrCode} Manager Name to "${managerName}" in Agroverse QR codes sheet (row ${i + 1}, column U)`);
+        return true;
+      }
+    }
+    
+    Logger.log(`QR code ${qrCode} not found in Agroverse QR codes sheet for manager name update`);
+    return false;
+  } catch (e) {
+    Logger.log(`Error updating Manager Name for QR code ${qrCode}: ${e.message}`);
+    return false;
+  }
+}
+
+/**
+ * Checks if a recipient name exists in the Contributors contact information sheet.
+ * Performs case-insensitive comparison to avoid duplicates.
+ * @param {string} recipientName - The recipient name to check.
+ * @return {boolean} True if recipient exists, false otherwise.
+ */
+function recipientExists(recipientName) {
+  try {
+    if (!recipientName || recipientName.trim() === '') {
+      return false; // Empty names don't exist
+    }
+    
+    const contributorsSpreadsheet = SpreadsheetApp.openByUrl(AGROVERSE_QR_SHEET_URL);
+    const contributorsSheet = contributorsSpreadsheet.getSheetByName(CONTRIBUTORS_SHEET_NAME);
+    if (!contributorsSheet) {
+      Logger.log(`Error: ${CONTRIBUTORS_SHEET_NAME} sheet not found`);
+      return false;
+    }
+    
+    const lastRow = contributorsSheet.getLastRow();
+    if (lastRow < CONTRIBUTORS_DATA_START_ROW) {
+      return false; // No data rows
+    }
+    
+    // Read Column A starting from data start row
+    const dataRange = contributorsSheet.getRange(CONTRIBUTORS_DATA_START_ROW, 1, lastRow - CONTRIBUTORS_DATA_START_ROW + 1, 1);
+    const data = dataRange.getValues();
+    
+    // Normalize the recipient name for comparison (trim and lowercase)
+    const normalizedRecipientName = recipientName.trim().toLowerCase();
+    
+    for (let i = 0; i < data.length; i++) {
+      const name = data[i][0];
+      if (name && typeof name === 'string') {
+        const normalizedName = name.trim().toLowerCase();
+        if (normalizedName === normalizedRecipientName) {
+          Logger.log(`Recipient "${recipientName}" already exists in Contributors sheet (row ${CONTRIBUTORS_DATA_START_ROW + i})`);
+          return true;
+        }
+      }
+    }
+    
+    return false;
+  } catch (e) {
+    Logger.log(`Error checking if recipient exists: ${e.message}`);
+    return false;
+  }
+}
+
+/**
+ * Adds a new recipient to the Contributors contact information sheet.
+ * Finds the first empty row (where Column A is empty) and adds the name there.
+ * Will NOT add the recipient if it already exists in Column A (case-insensitive check).
+ * @param {string} recipientName - The recipient name to add.
+ * @return {boolean} True if addition was successful or recipient already exists, false otherwise.
+ */
+function addNewRecipient(recipientName) {
+  try {
+    if (!recipientName || recipientName.trim() === '') {
+      Logger.log('Error: Empty recipient name provided');
+      return false;
+    }
+    
+    // Check if recipient already exists - this prevents duplicates
+    if (recipientExists(recipientName)) {
+      Logger.log(`Recipient "${recipientName}" already exists in Contributors sheet (Column A), skipping addition to prevent duplicate`);
+      return true; // Return true since it already exists (no error)
+    }
+    
+    const contributorsSpreadsheet = SpreadsheetApp.openByUrl(AGROVERSE_QR_SHEET_URL);
+    const contributorsSheet = contributorsSpreadsheet.getSheetByName(CONTRIBUTORS_SHEET_NAME);
+    if (!contributorsSheet) {
+      Logger.log(`Error: ${CONTRIBUTORS_SHEET_NAME} sheet not found`);
+      return false;
+    }
+    
+    const lastRow = contributorsSheet.getLastRow();
+    let targetRow = CONTRIBUTORS_DATA_START_ROW;
+    
+    // Check if there are existing rows
+    if (lastRow >= CONTRIBUTORS_DATA_START_ROW) {
+      // Read Column A to find first empty row
+      const dataRange = contributorsSheet.getRange(CONTRIBUTORS_DATA_START_ROW, 1, lastRow - CONTRIBUTORS_DATA_START_ROW + 1, 1);
+      const data = dataRange.getValues();
+      
+      // Find first empty row
+      let foundEmpty = false;
+      for (let i = 0; i < data.length; i++) {
+        const name = data[i][0];
+        if (!name || name.toString().trim() === '') {
+          targetRow = CONTRIBUTORS_DATA_START_ROW + i;
+          foundEmpty = true;
+          break;
+        }
+      }
+      
+      // If no empty row found, add to the end
+      if (!foundEmpty) {
+        targetRow = lastRow + 1;
+      }
+    }
+    
+    // Add the new recipient name in Column A
+    contributorsSheet.getRange(targetRow, CONTRIBUTOR_NAME_COL + 1).setValue(recipientName.trim());
+    Logger.log(`Added new recipient "${recipientName}" to Contributors sheet at row ${targetRow}`);
+    return true;
+  } catch (e) {
+    Logger.log(`Error adding new recipient "${recipientName}": ${e.message}`);
+    return false;
   }
 }
 
@@ -120,6 +412,8 @@ function getLedgerConfigsFromWix() {
  * with extracted sender name, recipient name, currency, amount, and source details.
  * The input string is expected to match the format generated by the Report Inventory Movement button:
  * "[INVENTORY MOVEMENT] manager name: <managerName>\nrecipient name: <recipientName>\ninventory item: <itemName>\nquantity: <quantity>"
+ * 
+ * If a QR code is provided, it will be looked up to determine the inventory type and ledger automatically.
  *
  * @param {string} reportText - The text copied to the clipboard from the Report Inventory Movement button.
  * @return {Object} JSON object containing extracted fields, source details, or an error message.
@@ -145,17 +439,36 @@ function processInventoryReport(reportText) {
     const managerMatch = lines.find(line => line.startsWith('- Manager Name:'));
     const recipientMatch = lines.find(line => line.startsWith('- Recipient Name:'));
     const itemMatch = lines.find(line => line.startsWith('- Inventory Item:'));
+    const qrCodeMatch = lines.find(line => line.startsWith('- QR Code:'));
     const quantityMatch = lines.find(line => line.startsWith('- Quantity:'));
 
-    if (!managerMatch || !recipientMatch || !itemMatch || !quantityMatch) {
+    if (!managerMatch || !recipientMatch || !quantityMatch) {
       return { error: 'Invalid report format: Missing required fields' };
     }
 
     // Extract values
     const managerName = managerMatch.replace('- Manager Name:', '').trim();
     const recipientName = recipientMatch.replace('- Recipient Name:', '').trim();
-    const currency = itemMatch.replace('- Inventory Item:', '').trim();
+    let currency = itemMatch ? itemMatch.replace('- Inventory Item:', '').trim() : '';
+    const qrCode = qrCodeMatch ? qrCodeMatch.replace('- QR Code:', '').trim() : null;
     const quantity = parseFloat(quantityMatch.replace('- Quantity:', '').trim());
+    
+    // If QR code is provided, look it up to determine inventory type and ledger
+    let qrCodeInfo = null;
+    if (qrCode) {
+      qrCodeInfo = lookupQRCode(qrCode);
+      if (qrCodeInfo && qrCodeInfo.currency) {
+        // Use the currency from QR code lookup
+        currency = qrCodeInfo.currency;
+        Logger.log(`Using currency from QR code lookup: ${currency}`);
+      } else {
+        Logger.log(`Warning: QR code ${qrCode} not found, using provided inventory item: ${currency}`);
+      }
+    }
+    
+    if (!currency) {
+      return { error: 'Invalid report format: Missing inventory item or QR code' };
+    }
 
     // Validate quantity
     if (isNaN(quantity) || quantity <= 0) {
@@ -170,42 +483,76 @@ function processInventoryReport(reportText) {
       ledger_url: ''
     };
 
-    // Check if currency is from any ledger (format: [LEDGER_NAME] currency_name)
-    const ledgerMatch = currency.match(/^\[([^\]]+)\]\s*(.+)$/);
-    if (ledgerMatch) {
-      const ledgerName = ledgerMatch[1];
+    // If QR code lookup provided ledger shortcut, use it to find the ledger
+    if (qrCodeInfo && qrCodeInfo.ledger_shortcut) {
+      const ledgerShortcut = qrCodeInfo.ledger_shortcut;
+      Logger.log(`Using ledger shortcut from QR code: ${ledgerShortcut}`);
+      
       // Get the actual ledger URL from WIX data
       const ledgerConfigs = getLedgerConfigsFromWix();
-      const ledgerConfig = ledgerConfigs.find(config => 
-        config.ledger_name === ledgerName || 
-        config.ledger_name.toLowerCase() === ledgerName.toLowerCase()
-      );
+      const ledgerConfig = ledgerConfigs.find(config => {
+        // Match by ledger name or by URL containing the shortcut
+        const configName = config.ledger_name.toLowerCase();
+        const shortcutLower = ledgerShortcut.toLowerCase();
+        return configName === shortcutLower || 
+               config.ledger_url.toLowerCase().includes(shortcutLower);
+      });
       
       if (ledgerConfig && ledgerConfig.ledger_url) {
         currencySource = {
-          spreadsheet_id: ledgerConfig.ledger_url.match(/\/d\/([^\/]+)/)?.[1] || '', // Extract spreadsheet ID from resolved URL
+          spreadsheet_id: ledgerConfig.ledger_url.match(/\/d\/([^\/]+)/)?.[1] || '',
           sheet_name: DEFAULT_AGL_SHEET_NAME,
           ledger_name: ledgerConfig.ledger_name,
           ledger_url: ledgerConfig.ledger_url
         };
+        Logger.log(`Found ledger from QR code shortcut: ${ledgerConfig.ledger_name}`);
       } else {
-        Logger.log(`Warning: Ledger ${ledgerName} not found in WIX data, treating as offchain`);
-        // Fall back to offchain if ledger not found in WIX
+        Logger.log(`Warning: Ledger shortcut ${ledgerShortcut} from QR code not found in WIX data, treating as offchain`);
         currencySource = {
           spreadsheet_id: OFFCHAIN_SPREADSHEET_ID,
           sheet_name: OFFCHAIN_ASSET_SHEET_NAME,
-          ledger_name: '',
-          ledger_url: ''
+          ledger_name: 'offchain',
+          ledger_url: `https://docs.google.com/spreadsheets/d/${OFFCHAIN_SPREADSHEET_ID}/edit`
         };
       }
     } else {
-      // Assume currency is from offchain asset location
-      currencySource = {
-        spreadsheet_id: OFFCHAIN_SPREADSHEET_ID,
-        sheet_name: OFFCHAIN_ASSET_SHEET_NAME,
-        ledger_name: 'offchain',
-        ledger_url: `https://docs.google.com/spreadsheets/d/${OFFCHAIN_SPREADSHEET_ID}/edit`
-      };
+      // Check if currency is from any ledger (format: [LEDGER_NAME] currency_name)
+      const ledgerMatch = currency.match(/^\[([^\]]+)\]\s*(.+)$/);
+      if (ledgerMatch) {
+        const ledgerName = ledgerMatch[1];
+        // Get the actual ledger URL from WIX data
+        const ledgerConfigs = getLedgerConfigsFromWix();
+        const ledgerConfig = ledgerConfigs.find(config => 
+          config.ledger_name === ledgerName || 
+          config.ledger_name.toLowerCase() === ledgerName.toLowerCase()
+        );
+        
+        if (ledgerConfig && ledgerConfig.ledger_url) {
+          currencySource = {
+            spreadsheet_id: ledgerConfig.ledger_url.match(/\/d\/([^\/]+)/)?.[1] || '', // Extract spreadsheet ID from resolved URL
+            sheet_name: DEFAULT_AGL_SHEET_NAME,
+            ledger_name: ledgerConfig.ledger_name,
+            ledger_url: ledgerConfig.ledger_url
+          };
+        } else {
+          Logger.log(`Warning: Ledger ${ledgerName} not found in WIX data, treating as offchain`);
+          // Fall back to offchain if ledger not found in WIX
+          currencySource = {
+            spreadsheet_id: OFFCHAIN_SPREADSHEET_ID,
+            sheet_name: OFFCHAIN_ASSET_SHEET_NAME,
+            ledger_name: 'offchain',
+            ledger_url: `https://docs.google.com/spreadsheets/d/${OFFCHAIN_SPREADSHEET_ID}/edit`
+          };
+        }
+      } else {
+        // Assume currency is from offchain asset location
+        currencySource = {
+          spreadsheet_id: OFFCHAIN_SPREADSHEET_ID,
+          sheet_name: OFFCHAIN_ASSET_SHEET_NAME,
+          ledger_name: 'offchain',
+          ledger_url: `https://docs.google.com/spreadsheets/d/${OFFCHAIN_SPREADSHEET_ID}/edit`
+        };
+      }
     }
 
     // Return JSON object with extracted fields and source details
@@ -332,6 +679,34 @@ function processTelegramChatLogsToInventoryMovement() {
 
         // Map currency to original value by removing [LEDGER_NAME] prefix
         const originalCurrency = reportResult.currency.replace(/^\[[^\]]+\]\s*/, '');
+
+        // Extract QR code from contribution if present
+        const qrCodeMatch = lines.find(line => line.startsWith('- QR Code:'));
+        const qrCode = qrCodeMatch ? qrCodeMatch.replace('- QR Code:', '').trim() : null;
+        
+        // Check if recipient exists, if not add them to Contributors sheet
+        if (reportResult.recipient_name && reportResult.recipient_name.trim() !== '') {
+          const exists = recipientExists(reportResult.recipient_name);
+          if (!exists) {
+            const added = addNewRecipient(reportResult.recipient_name);
+            if (added) {
+              Logger.log(`Successfully added new recipient "${reportResult.recipient_name}" to Contributors sheet`);
+            } else {
+              Logger.log(`Warning: Failed to add new recipient "${reportResult.recipient_name}" to Contributors sheet`);
+            }
+          }
+        }
+        
+        // If QR code is provided, update the Manager Name in Agroverse QR codes sheet
+        // The Manager Name should be set to the recipient name, as the recipient is now the holder of the QR code
+        if (qrCode && reportResult.recipient_name) {
+          const updated = updateAgroverseQrManagerName(qrCode, reportResult.recipient_name);
+          if (updated) {
+            Logger.log(`Successfully updated Manager Name for QR code ${qrCode} to ${reportResult.recipient_name} (recipient is now the holder)`);
+          } else {
+            Logger.log(`Warning: Failed to update Manager Name for QR code ${qrCode}`);
+          }
+        }
 
         // Create new row for Inventory Movement
         const newRow = [
@@ -470,6 +845,14 @@ function processInventoryMovementToLedgers() {
       const recipientName = row[8]; // Column I: recipient_name
       const currency = row[9]; // Column J: currency (without [AGL#])
       const amount = row[10]; // Column K: amount
+      
+      // Extract QR code from contribution if present
+      let qrCode = null;
+      if (typeof contributionMade === 'string') {
+        const lines = contributionMade.split('\n').map(line => line.trim());
+        const qrCodeMatch = lines.find(line => line.startsWith('- QR Code:'));
+        qrCode = qrCodeMatch ? qrCodeMatch.replace('- QR Code:', '').trim() : null;
+      }
 
       // Validate required fields
       if (!statusDate || !contributionMade || !senderName || !recipientName || !currency || !amount) {
@@ -531,13 +914,39 @@ function processInventoryMovementToLedgers() {
         ]
       ];
 
-      // Insert double-entry records
+        // Insert double-entry records
       try {
         targetSheet.getRange(targetLastRow + 1, 1, 2, 6).setValues(doubleEntryRows);
         // Record the row numbers (1-based) of the inserted records
         const insertedRowNumbers = `${targetLastRow + 1},${targetLastRow + 2}`;
         updates.push({ rowNumber, insertedRowNumbers });
         Logger.log(`Inserted double-entry records for row ${rowNumber} in ${targetSheetName} (rows ${insertedRowNumbers})`);
+
+        // Check if recipient exists, if not add them to Contributors sheet
+        // This ensures new recipients are added even when processing from Inventory Movement sheet
+        if (recipientName && recipientName.trim() !== '') {
+          const exists = recipientExists(recipientName);
+          if (!exists) {
+            const added = addNewRecipient(recipientName);
+            if (added) {
+              Logger.log(`Successfully added new recipient "${recipientName}" to Contributors sheet during ledger processing`);
+            } else {
+              Logger.log(`Warning: Failed to add new recipient "${recipientName}" to Contributors sheet during ledger processing`);
+            }
+          }
+        }
+
+        // If QR code is provided, update the Manager Name in Agroverse QR codes sheet
+        // The Manager Name should be set to the recipient name, as the recipient is now the holder of the QR code
+        // This happens after successful ledger update to ensure transaction is committed
+        if (qrCode && recipientName) {
+          const updated = updateAgroverseQrManagerName(qrCode, recipientName);
+          if (updated) {
+            Logger.log(`Successfully updated Manager Name for QR code ${qrCode} to ${recipientName} (recipient is now the holder) after ledger update`);
+          } else {
+            Logger.log(`Warning: Failed to update Manager Name for QR code ${qrCode} (may not exist in sheet)`);
+          }
+        }
 
         // Send Telegram notification
         sendInventoryTransactionNotification(contributionMade, ledgerName, ledgerUrl);

@@ -19,9 +19,10 @@ const OFFCHAIN_TRANSACTIONS_SHEET_URL = 'https://docs.google.com/spreadsheets/d/
 const OFFCHAIN_TRANSACTIONS_SHEET_NAME = 'offchain transactions';
 const CONTRIBUTORS_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU/edit?gid=1460794618#gid=1460794618';
 const CONTRIBUTORS_SHEET_NAME = 'Contributors contact information';
+const SHIPMENT_LEDGER_SHEET_NAME = 'Shipment Ledger Listing';
 const TELEGRAM_CHAT_ID = '-1002190388985'; // Fixed chat ID from reference code
 const MAX_REDIRECTS = 10; // Maximum number of redirects to follow
-const WIX_ACCESS_TOKEN = creds.WIX_API_KEY; // Wix API key for fetching ledger configurations
+const WIX_ACCESS_TOKEN = creds.WIX_API_KEY; // Wix API key for fetching ledger configurations (deprecated, kept for backward compatibility)
 
 // Column indices for source sheet (Telegram Chat Logs)
 const TELEGRAM_UPDATE_ID_COL = 0; // Column A
