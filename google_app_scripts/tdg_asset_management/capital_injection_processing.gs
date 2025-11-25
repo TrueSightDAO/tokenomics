@@ -23,6 +23,7 @@ const CONTRIBUTORS_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1GE7PUq-U
 // Sheet names
 const TELEGRAM_LOGS_SHEET = 'Telegram Chat Logs';
 const CAPITAL_INJECTION_SHEET = 'Capital Injection';
+const SHIPMENT_LEDGER_SHEET_NAME = 'Shipment Ledger Listing';
 const CONTRIBUTORS_SIGNATURES_SHEET = 'Contributors Digital Signatures';
 
 // Column indices for Telegram Chat Logs (0-based)
@@ -92,43 +93,72 @@ function resolveRedirect(url) {
 }
 
 /**
- * Fetches managed AGL ledger configurations from Wix
+ * Fetches ledger configurations from Google Sheets "Shipment Ledger Listing".
+ * Migrated from Wix API to Google Sheets for cost savings.
+ * @return {Array} Array of ledger configuration objects.
  */
 function getLedgerConfigsFromWix() {
-  const options = {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': WIX_ACCESS_TOKEN,
-      'wix-account-id': '0e2cde5f-b353-468b-9f4e-36835fc60a0e',
-      'wix-site-id': 'd45a189f-d0cc-48de-95ee-30635a95385f'
-    },
-    payload: JSON.stringify({})
-  };
-  
-  const request_url = 'https://www.wixapis.com/wix-data/v2/items/query?dataCollectionId=AgroverseShipments';
-  
   try {
-    const response = UrlFetchApp.fetch(request_url, options);
-    const content = response.getContentText();
-    const response_obj = JSON.parse(content);
+    const spreadsheet = SpreadsheetApp.openByUrl(CONTRIBUTORS_SHEET_URL);
+    const shipmentSheet = spreadsheet.getSheetByName(SHIPMENT_LEDGER_SHEET_NAME);
     
-    const ledgerConfigs = response_obj.dataItems
-      .filter(item => item.data.contract_url && item.data.contract_url !== '')
-      .map(item => {
-        const resolvedUrl = resolveRedirect(item.data.contract_url);
-        return {
-          ledger_name: item.data.title,
-          ledger_url: resolvedUrl,
-          sheet_name: 'Transactions',
-          is_managed_ledger: true
-        };
-      });
-    
-    Logger.log(`Fetched ${ledgerConfigs.length} ledger configs from Wix`);
+    if (!shipmentSheet) {
+      Logger.log(`Error: ${SHIPMENT_LEDGER_SHEET_NAME} sheet not found`);
+      return [];
+    }
+
+    // Get all data from the sheet (skip header row)
+    const lastRow = shipmentSheet.getLastRow();
+    if (lastRow < 2) {
+      Logger.log(`No data in ${SHIPMENT_LEDGER_SHEET_NAME} sheet`);
+      return [];
+    }
+
+    // Read data starting from row 2 (row 1 is header), columns A to L
+    const dataRange = shipmentSheet.getRange(2, 1, lastRow - 1, 12);
+    const data = dataRange.getValues();
+
+    // Construct LEDGER_CONFIGS from sheet data
+    const ledgerConfigs = [];
+    const seenUrls = new Set(); // Track unique URLs to avoid duplicates
+
+    for (let i = 0; i < data.length; i++) {
+      const row = data[i];
+      const shipmentId = row[0] ? row[0].toString().trim() : ''; // Column A - Shipment ID
+      const ledgerUrl = row[11] ? row[11].toString().trim() : ''; // Column L - Ledger URL
+      
+      // Skip if no URL or no shipment ID
+      if (!ledgerUrl || !shipmentId) {
+        continue;
+      }
+      
+      // Skip if we've already processed this URL (avoid duplicates)
+      if (seenUrls.has(ledgerUrl)) {
+        continue;
+      }
+      seenUrls.add(ledgerUrl);
+
+      try {
+        const resolvedUrl = resolveRedirect(ledgerUrl);
+        if (resolvedUrl) {
+          ledgerConfigs.push({
+            ledger_name: shipmentId,
+            ledger_url: resolvedUrl,
+            sheet_name: 'Transactions',
+            is_managed_ledger: true
+          });
+        } else {
+          Logger.log(`Warning: Could not resolve URL for ${shipmentId}: ${ledgerUrl}`);
+        }
+      } catch (e) {
+        Logger.log(`Error resolving URL for ${shipmentId}: ${e.message}`);
+      }
+    }
+
+    Logger.log(`Fetched ${ledgerConfigs.length} ledger configs from ${SHIPMENT_LEDGER_SHEET_NAME}`);
     return ledgerConfigs;
   } catch (e) {
-    Logger.log(`Error fetching ledger URLs from Wix: ${e.message}`);
+    Logger.log(`Error fetching ledger configs from ${SHIPMENT_LEDGER_SHEET_NAME}: ${e.message}`);
     return [];
   }
 }

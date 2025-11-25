@@ -7,6 +7,7 @@
 
 /**
  * Google Apps Script Web Service for Cacao Bag QR Code lookup.
+ * Deployment URL: https://script.google.com/macros/s/AKfycbxigq4-J0izShubqIC5k6Z7fgNRyVJLakfQ34HPuENiSpxuCG-wSq0g-wOAedZzzgaL/exec
  */
 
 // ===== Configuration =====
@@ -16,10 +17,33 @@ var QR_CODE_PARAM = 'qr_code';
 var EMAIL_ADDRESS_PARAM = 'email_address';
 var LIST_PARAM = 'list';
 var LIST_WITH_MEMBERS_PARAM = 'list_with_members';
+var LOOKUP_PARAM = 'lookup';
 var HEADER_ROW = 2;
 var DATA_START_ROW = 2;
 var DEPLOYMENT_URL = 'https://script.google.com/macros/s/AKfycbxigq4-J0izShubqIC5k6Z7fgNRyVJLakfQ34HPuENiSpxuCG-wSq0g-wOAedZzzgaL/exec';
 var DEPLOYMENT_EXAMPLE = 'https://script.google.com/macros/s/AKfycbxigq4-J0izShubqIC5k6Z7fgNRyVJLakfQ34HPuENiSpxuCG-wSq0g-wOAedZzzgaL/exec?qr_code=2025BF_20250521_PROPANE_1&email_address=something@garyteh.com';
+
+/**
+ * Helper function to create a JSON response.
+ * Note: CORS headers are automatically handled by Google Apps Script when deployed as a web app.
+ * @param {Object} data - The data object to return as JSON.
+ * @return {ContentService.TextOutput} JSON response.
+ */
+function createCORSResponse(data) {
+  return ContentService.createTextOutput(JSON.stringify(data))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+/**
+ * Handles OPTIONS requests (CORS preflight).
+ * Note: CORS headers are automatically handled by Google Apps Script when deployed as a web app.
+ * @param {Object} e Event object.
+ * @return {ContentService.TextOutput} Empty response.
+ */
+function doOptions(e) {
+  return ContentService.createTextOutput('')
+    .setMimeType(ContentService.MimeType.TEXT);
+}
 
 /**
  * Handles GET requests to this web app.
@@ -37,24 +61,20 @@ function doGet(e) {
     var spreadsheet = SpreadsheetApp.openByUrl(SHEET_URL);
     var sheet = spreadsheet.getSheetByName(QR_CODE_SHEET_NAME);
     if (!sheet) {
-      return ContentService.createTextOutput(
-        JSON.stringify({
-          status: 'error',
-          message: 'Sheet not found: ' + QR_CODE_SHEET_NAME
-        })
-      ).setMimeType(ContentService.MimeType.JSON);
+      return createCORSResponse({
+        status: 'error',
+        message: 'Sheet not found: ' + QR_CODE_SHEET_NAME
+      });
     }
 
     // Check if the request is for listing minted QR codes
     if (e.parameter[LIST_PARAM] === 'true') {
       var lastRow = sheet.getLastRow();
       if (lastRow < DATA_START_ROW) {
-        return ContentService.createTextOutput(
-          JSON.stringify({
-            status: 'error',
-            message: 'No data found in sheet starting from row ' + DATA_START_ROW
-          })
-        ).setMimeType(ContentService.MimeType.JSON);
+        return createCORSResponse({
+          status: 'error',
+          message: 'No data found in sheet starting from row ' + DATA_START_ROW
+        });
       }
 
       // Get QR codes (column A) and status (column D)
@@ -68,27 +88,23 @@ function doGet(e) {
         }
       }
 
-      return ContentService.createTextOutput(
-        JSON.stringify({
-          status: 'success',
-          qr_codes: mintedQrCodes
-        })
-      ).setMimeType(ContentService.MimeType.JSON);
+      return createCORSResponse({
+        status: 'success',
+        qr_codes: mintedQrCodes
+      });
     }
 
     // Check if the request is for listing minted QR codes with member names
     if (e.parameter[LIST_WITH_MEMBERS_PARAM] === 'true') {
       var lastRow = sheet.getLastRow();
       if (lastRow < DATA_START_ROW) {
-        return ContentService.createTextOutput(
-          JSON.stringify({
-            status: 'error',
-            message: 'No data found in sheet starting from row ' + DATA_START_ROW
-          })
-        ).setMimeType(ContentService.MimeType.JSON);
+        return createCORSResponse({
+          status: 'error',
+          message: 'No data found in sheet starting from row ' + DATA_START_ROW
+        });
       }
 
-      // Get QR codes (column A), status (column D), and manager names (column U)
+      // Get QR codes (column A), status (column D), ledger (column C, index 2), currency (column I, index 8), and manager names (column U, index 20)
       var dataRange = sheet.getRange(DATA_START_ROW, 1, lastRow - DATA_START_ROW + 1, 21).getValues();
       var mintedQrCodesWithMembers = [];
 
@@ -96,21 +112,67 @@ function doGet(e) {
       for (var i = 0; i < dataRange.length; i++) {
         if (dataRange[i][3] === 'MINTED') {
           var qrCode = dataRange[i][0]; // Column A
-          var managerName = dataRange[i][20]; // Column U (index 20)
+          var ledgerShortcut = dataRange[i][2] || ''; // Column C (index 2)
+          var currency = dataRange[i][8] || ''; // Column I (index 8)
+          var managerName = dataRange[i][20] || ''; // Column U (index 20)
           
           mintedQrCodesWithMembers.push({
             qr_code: qrCode,
-            contributor_name: managerName || ''
+            currency: currency,
+            ledger_shortcut: ledgerShortcut,
+            contributor_name: managerName
           });
         }
       }
 
-      return ContentService.createTextOutput(
-        JSON.stringify({
-          status: 'success',
-          items: mintedQrCodesWithMembers
-        })
-      ).setMimeType(ContentService.MimeType.JSON);
+      return createCORSResponse({
+        status: 'success',
+        items: mintedQrCodesWithMembers
+      });
+    }
+
+    // Check if the request is for looking up QR code details (currency, ledger, manager)
+    if (e.parameter[LOOKUP_PARAM] === 'true') {
+      var qrCode = e.parameter[QR_CODE_PARAM];
+      if (!qrCode) {
+        return createCORSResponse({
+          status: 'error',
+          message: 'Missing required parameter: qr_code'
+        });
+      }
+
+      var lastRow = sheet.getLastRow();
+      if (lastRow < DATA_START_ROW) {
+        return createCORSResponse({
+          status: 'error',
+          message: 'No data found in sheet starting from row ' + DATA_START_ROW
+        });
+      }
+
+      // Get QR codes (column A), ledger (column C, index 2), currency (column I, index 8), and manager (column U, index 20)
+      var dataRange = sheet.getRange(DATA_START_ROW, 1, lastRow - DATA_START_ROW + 1, 21).getValues();
+      
+      // Search for the QR code
+      for (var i = 0; i < dataRange.length; i++) {
+        if (dataRange[i][0] === qrCode) {
+          var currency = dataRange[i][8] || ''; // Column I (index 8)
+          var ledgerShortcut = dataRange[i][2] || ''; // Column C (index 2)
+          var managerName = dataRange[i][20] || ''; // Column U (index 20)
+          
+          return createCORSResponse({
+            status: 'success',
+            qr_code: qrCode,
+            currency: currency,
+            ledger_shortcut: ledgerShortcut,
+            manager_name: managerName
+          });
+        }
+      }
+
+      return createCORSResponse({
+        status: 'error',
+        message: 'QR code not found: ' + qrCode
+      });
     }
 
     // Existing logic for QR code and email update
@@ -118,23 +180,19 @@ function doGet(e) {
     var emailAddress = e.parameter[EMAIL_ADDRESS_PARAM];
 
     if (!qrCode || !emailAddress) {
-      return ContentService.createTextOutput(
-        JSON.stringify({
-          status: 'error',
-          message: 'Missing required parameters: qr_code and email_address',
-          example: DEPLOYMENT_EXAMPLE
-        })
-      ).setMimeType(ContentService.MimeType.JSON);
+      return createCORSResponse({
+        status: 'error',
+        message: 'Missing required parameters: qr_code and email_address',
+        example: DEPLOYMENT_EXAMPLE
+      });
     }
 
     var lastRow = sheet.getLastRow();
     if (lastRow < DATA_START_ROW) {
-      return ContentService.createTextOutput(
-        JSON.stringify({
-          status: 'error',
-          message: 'No data found in sheet starting from row ' + DATA_START_ROW
-        })
-      ).setMimeType(ContentService.MimeType.JSON);
+      return createCORSResponse({
+        status: 'error',
+        message: 'No data found in sheet starting from row ' + DATA_START_ROW
+      });
     }
 
     var qrCodeColumn = sheet.getRange(DATA_START_ROW, 1, lastRow - DATA_START_ROW + 1, 1).getValues();
@@ -149,12 +207,10 @@ function doGet(e) {
     }
 
     if (rowIndex === -1) {
-      return ContentService.createTextOutput(
-        JSON.stringify({
-          status: 'error',
-          message: 'QR code not found: ' + qrCode
-        })
-      ).setMimeType(ContentService.MimeType.JSON);
+      return createCORSResponse({
+        status: 'error',
+        message: 'QR code not found: ' + qrCode
+      });
     }
 
     // Update email address in Column L (12th column) of the matching row
@@ -162,21 +218,17 @@ function doGet(e) {
     SpreadsheetApp.flush(); // Ensure the write is committed
 
     // Return success response
-    return ContentService.createTextOutput(
-      JSON.stringify({
-        status: 'success',
-        message: 'Email address updated for QR code: ' + qrCode,
-        email: emailAddress,
-        row: rowIndex
-      })
-    ).setMimeType(ContentService.MimeType.JSON);
+    return createCORSResponse({
+      status: 'success',
+      message: 'Email address updated for QR code: ' + qrCode,
+      email: emailAddress,
+      row: rowIndex
+    });
 
   } catch (error) {
-    return ContentService.createTextOutput(
-      JSON.stringify({
-        status: 'error',
-        message: 'Error processing request: ' + error.message
-      })
-    ).setMimeType(ContentService.MimeType.JSON);
+    return createCORSResponse({
+      status: 'error',
+      message: 'Error processing request: ' + error.message
+    });
   }
 }

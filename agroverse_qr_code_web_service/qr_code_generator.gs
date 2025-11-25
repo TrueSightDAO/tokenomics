@@ -38,6 +38,7 @@ var SPREADSHEET_URL = 'https://docs.google.com/spreadsheets/d/1GE7PUq-UT6x2rBN-Q
 
 var CURRENCIES_SHEET_NAME = 'Currencies';
 var QR_CODES_SHEET_NAME = 'Agroverse QR codes';
+var SHIPMENT_LEDGER_SHEET_NAME = 'Shipment Ledger Listing';
 var GITHUB_REPO_URL = 'https://github.com/TrueSightDAO/qr_codes/blob/main/';
 
 // ===== Helper Functions =====
@@ -74,67 +75,70 @@ function getInventoryLedgerConfigs() {
   ];
 }
 
-// Function to fetch ledger configurations from Wix
+// Function to fetch ledger configurations from Google Sheets "Shipment Ledger Listing"
+// Migrated from Wix API to Google Sheets for cost savings
 function getLedgerConfigsFromWix() {
   try {
-    var creds = getCredentials();
-    var wixAccessToken = creds.WIX_API_KEY;
+    var spreadsheet = SpreadsheetApp.openByUrl(SPREADSHEET_URL);
+    var shipmentSheet = spreadsheet.getSheetByName(SHIPMENT_LEDGER_SHEET_NAME);
     
-    var options = {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': wixAccessToken,
-        'wix-account-id': '0e2cde5f-b353-468b-9f4e-36835fc60a0e',
-        'wix-site-id': 'd45a189f-d0cc-48de-95ee-30635a95385f'
-      },
-      payload: JSON.stringify({})
-    };
-    
-    var requestUrl = 'https://www.wixapis.com/wix-data/v2/items/query?dataCollectionId=AgroverseShipments';
-    
-    var response = UrlFetchApp.fetch(requestUrl, options);
-    var content = response.getContentText();
-    var responseObj = JSON.parse(content);
-    
-    // Create a map of contract URLs to ledger names (using title)
-    var urlToContractMap = {};
-    responseObj.dataItems.forEach(function(item) {
-      Logger.log('Item title: ' + item.data.title);
-      var contractUrl = item.data.contract_url;
-      var ledgerName = item.data.title;
-      if (contractUrl && ledgerName) {
-        urlToContractMap[contractUrl] = ledgerName;
+    if (!shipmentSheet) {
+      Logger.log('Error: ' + SHIPMENT_LEDGER_SHEET_NAME + ' sheet not found');
+      return [];
+    }
+
+    // Get all data from the sheet (skip header row)
+    var lastRow = shipmentSheet.getLastRow();
+    if (lastRow < 2) {
+      Logger.log('No data in ' + SHIPMENT_LEDGER_SHEET_NAME + ' sheet');
+      return [];
+    }
+
+    // Read data starting from row 2 (row 1 is header), columns A to L
+    var dataRange = shipmentSheet.getRange(2, 1, lastRow - 1, 12);
+    var data = dataRange.getValues();
+
+    // Construct LEDGER_CONFIGS from sheet data
+    var ledgerConfigs = [];
+    var seenUrls = {}; // Track unique URLs to avoid duplicates
+
+    for (var i = 0; i < data.length; i++) {
+      var row = data[i];
+      var shipmentId = row[0] ? row[0].toString().trim() : ''; // Column A - Shipment ID
+      var ledgerUrl = row[11] ? row[11].toString().trim() : ''; // Column L - Ledger URL
+      
+      // Skip if no URL or no shipment ID
+      if (!ledgerUrl || !shipmentId) {
+        continue;
       }
-    });
-    
-    var ledgerUrls = responseObj.dataItems
-      .map(function(item) { return item.data.contract_url; })
-      .filter(function(url) { return url && url !== ''; })
-      .filter(function(url, index, self) { return self.indexOf(url) === index; });
-    
-    Logger.log('Raw ledger URLs from Wix: ' + JSON.stringify(ledgerUrls));
-    Logger.log('URL to contract mapping: ' + JSON.stringify(urlToContractMap));
-    
-    // Construct ledger configs dynamically
-    var ledgerConfigs = ledgerUrls.map(function(url) {
-      var resolvedUrl = resolveRedirect(url);
-      Logger.log('Resolved URL: ' + url + ' -> ' + resolvedUrl);
       
-      // Use shipment_contract_number as the ledger name
-      var ledgerName = urlToContractMap[url] || 'UNKNOWN';
-      Logger.log('Using shipment contract number as ledger name: ' + ledgerName + ' for URL: ' + url);
-      
-      return {
-        ledger_name: ledgerName,
-        ledger_url: resolvedUrl,
-        sheet_name: 'Balance',
-        manager_names_column: 'H',
-        asset_name_column: 'J',
-        asset_quantity_column: 'I',
-        record_start_row: 6
-      };
-    });
+      // Skip if we've already processed this URL (avoid duplicates)
+      if (seenUrls[ledgerUrl]) {
+        continue;
+      }
+      seenUrls[ledgerUrl] = true;
+
+      try {
+        var resolvedUrl = resolveRedirect(ledgerUrl);
+        if (resolvedUrl) {
+          ledgerConfigs.push({
+            ledger_name: shipmentId,
+            ledger_url: resolvedUrl,
+            sheet_name: 'Balance',
+            manager_names_column: 'H',
+            asset_name_column: 'J',
+            asset_quantity_column: 'I',
+            record_start_row: 6
+          });
+          Logger.log('Resolved URL: ' + ledgerUrl + ' -> ' + resolvedUrl);
+          Logger.log('Using shipment ID as ledger name: ' + shipmentId + ' for URL: ' + ledgerUrl);
+        } else {
+          Logger.log('Warning: Could not resolve URL for ' + shipmentId + ': ' + ledgerUrl);
+        }
+      } catch (e) {
+        Logger.log('Error resolving URL for ' + shipmentId + ': ' + e.message);
+      }
+    }
     
     // Add the main inventory sheet
     ledgerConfigs.unshift({
@@ -147,11 +151,11 @@ function getLedgerConfigsFromWix() {
       record_start_row: 5
     });
     
-    Logger.log('Ledger configs fetched from Wix: ' + JSON.stringify(ledgerConfigs));
+    Logger.log('Ledger configs fetched from ' + SHIPMENT_LEDGER_SHEET_NAME + ': ' + JSON.stringify(ledgerConfigs));
     return ledgerConfigs;
     
   } catch (e) {
-    Logger.log('Error fetching ledger URLs from Wix: ' + e.message);
+    Logger.log('Error fetching ledger configs from ' + SHIPMENT_LEDGER_SHEET_NAME + ': ' + e.message);
     return [];
   }
 }
