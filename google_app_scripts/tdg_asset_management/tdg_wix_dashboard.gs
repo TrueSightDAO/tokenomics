@@ -15,6 +15,8 @@
  * - Asset Management: Tracks off-chain assets, USDT vault balance, and AGL investment holdings
  * - Tokenomics Calculations: Calculates asset per TDG, voting rights, and buy-back budgets
  * - Wix Integration: Syncs data with Wix platform for public display
+ * - Performance Statistics Sync: Automatically syncs Wix updates to Google Sheet "Performance Statistics" tab
+ * - Web Service: Exposes doGet endpoint to return Performance Statistics as JSON for index.html
  * - Transaction Automation: Creates daily buy-back provisions and recurring tokenizations
  * - Multi-Source Data: Integrates Wix APIs, Solana blockchain, and Google Sheets
  * 
@@ -24,14 +26,23 @@
  * - getDailyTdgBuyBackBudget(): Creates daily buy-back transaction pairs
  * - getInvestmentHoldingsInAGL(): Calculates total AGL investment holdings
  * - update30DaysSalesOnWix(): Updates 30-day sales data on Wix
+ * - doGet(): Web service endpoint returning Performance Statistics as JSON
+ * - updatePerformanceStatistic(): Syncs Wix updates to Performance Statistics sheet
  * 
  * DAILY AUTOMATION:
  * - Daily buy-back budget calculation and transaction creation
  * - Asset value updates and tokenomics recalculation
  * - Treasury yield monitoring and adjustment
+ * - Automatic sync of Wix updates to Performance Statistics sheet
+ * 
+ * WEB SERVICE DEPLOYMENT:
+ * - Deploy as web app: Publish > Deploy as web app
+ * - Set "Execute as: Me" and "Who has access: Anyone, even anonymous"
+ * - Web service URL: https://script.google.com/macros/s/AKfycbzlfOBo9UqKOh7jIqGcmbPAMM1RxCbsJHb-UV_vM6VbvK_HSdT44KyGbbXIeo-_Ovfy/exec
+ * - Use this URL in index.html to fetch Performance Statistics
  * 
  * DATA SOURCES:
- * - Google Sheets: Ledger history, off-chain transactions, asset balances
+ * - Google Sheets: Ledger history, off-chain transactions, asset balances, Performance Statistics
  * - Wix APIs: Public data display and exchange rates
  * - Solana Blockchain: USDT vault balance monitoring
  * - US Treasury: Real-time yield data for calculations
@@ -40,10 +51,12 @@
  * - "Ledger history": TDG token issuance and voting rights tracking
  * - "offchain transactions": All off-chain financial transactions
  * - "off chain asset balance": Current asset valuations
+ * - "Performance Statistics": Synced copy of Wix ExchangeRate collection values
  * - "Recurring Transactions": Automated recurring tokenization rules
  * 
  * KEYWORDS: TDG, TrueSight DAO, tokenomics, asset management, buy-back, voting rights, 
- *           Wix integration, Solana, USDT vault, treasury yield, AGL investments
+ *           Wix integration, Solana, USDT vault, treasury yield, AGL investments,
+ *           Performance Statistics, web service, JSON API
  */
 
 // Stores the credentials object retrieved from the getCredentials() function
@@ -66,6 +79,9 @@ var offTransactionsTab = SpreadsheetApp.openById(ledgerDocId).getSheetByName("of
 
 // Reference to the "Ledger history" sheet in the ledger Google Spreadsheet
 var tdgIssuedBalanceTab = SpreadsheetApp.openById(ledgerDocId).getSheetByName("Ledger history");
+
+// Sheet name for Performance Statistics (used for web service and sync)
+var PERFORMANCE_STATISTICS_SHEET_NAME = "Performance Statistics";
 
 // Solana wallet address for the USDT vault
 var solanaUsdtVaultWalletAddress = "BkcbCEnD14C7cYiN6VwpYuGmpVrjfoRwobhQQScBugqQ";
@@ -341,6 +357,8 @@ function setAssetBalanceOnWix( latest_asset_balance) {
   var response_obj = JSON.parse(content);  
   // Logger.log(response_obj);  
 
+  // Sync to Performance Statistics sheet
+  updatePerformanceStatistic("USD_TREASURY_BALANCE", latest_asset_balance, "USD");
 }
 
 function getTDGIssuedOnWix() {
@@ -382,6 +400,8 @@ function setTDGIssuedOnWix() {
   var response_obj = JSON.parse(content);  
   // Logger.log(response_obj);  
 
+  // Sync to Performance Statistics sheet
+  updatePerformanceStatistic("TDG_ISSUED", tdg_issed, "TDG");
 }
 
 function getWixTDGIssuedTdgDataItemId() {
@@ -475,6 +495,8 @@ function setAssetPerIssuedTdgBalanceOnWix( calculated_asset_per_issued_tdg) {
   var response_obj = JSON.parse(content);  
   // Logger.log(response_obj);  
 
+  // Sync to Performance Statistics sheet
+  updatePerformanceStatistic("ASSET_PER_TDG_ISSUED", calculated_asset_per_issued_tdg, "USD");
 }
 
 function getWixAssetPerIssuedTdgDataItemId() {
@@ -525,6 +547,9 @@ function set30DaysSalesOnWix(latest_30days_sales) {
   var content = response.getContentText();
   var response_obj = JSON.parse(content);  
   Logger.log("Updated 30 Days Sales on Wix: " + latest_30days_sales);
+  
+  // Sync to Performance Statistics sheet
+  updatePerformanceStatistic("PAST_30_DAYS_SALES", latest_30days_sales, "USD");
 }
 
 // Method to get 30 days sales from Google Sheet (simple version using F1)
@@ -702,6 +727,9 @@ Logger.log("Treasury Yield : " + treasuryYield);
   var content = response.getContentText();
   var response_obj = JSON.parse(content);  
   Logger.log("Updated Daily TDG Buy Back Budget on Wix: " + dailyBudget);
+  
+  // Sync to Performance Statistics sheet
+  updatePerformanceStatistic("TDG_DAILY_BUY_BACK_BUDGET", dailyBudget, "USD");
 }
 
 // Method to get the daily TDG buy-back budget
@@ -899,6 +927,9 @@ function setUSTreasuryYieldOnWix() {
   var content = response.getContentText();
   var response_obj = JSON.parse(content);  
   Logger.log("Updated US Treasury Yield on Wix: " + treasuryYield);
+  
+  // Sync to Performance Statistics sheet
+  updatePerformanceStatistic("USD_TREASURY_YIELD_1_MONTH", treasuryYield, "%");
 }
 
 // Method to get the US Treasury yield from Wix
@@ -910,4 +941,260 @@ function getUSTreasuryYieldOnWix() {
   var response_obj = JSON.parse(content);  
   Logger.log("US Treasury Yield on Wix: " + response_obj.dataItem.data.exchangeRate);  
   return response_obj.dataItem.data.exchangeRate;
+}
+
+/**
+ * Helper function to update Performance Statistics sheet when updating Wix
+ * Call this after updating Wix ExchangeRate collection
+ * 
+ * @param {string} key - The exchange rate key (e.g., "USD_TREASURY_BALANCE")
+ * @param {number} value - The new exchange rate / value
+ * @param {string} currency - Optional currency code
+ */
+function updatePerformanceStatistic(key, value, currency) {
+  try {
+    var spreadsheet = SpreadsheetApp.openById(ledgerDocId);
+    var sheet = spreadsheet.getSheetByName(PERFORMANCE_STATISTICS_SHEET_NAME);
+    
+    if (!sheet) {
+      Logger.log("⚠️  Performance Statistics sheet not found - skipping update");
+      return;
+    }
+    
+    // Find the row with this key
+    var lastRow = sheet.getLastRow();
+    if (lastRow < 2) {
+      Logger.log("⚠️  Performance Statistics sheet has no data rows - skipping update");
+      return;
+    }
+    
+    var dataRange = sheet.getRange(2, 1, lastRow - 1, 1); // Column 1 (Key column)
+    var keys = dataRange.getValues();
+    
+    var rowIndex = -1;
+    for (var i = 0; i < keys.length; i++) {
+      if (keys[i][0] === key) {
+        rowIndex = i + 2; // +2 because data starts at row 2 (row 1 is header)
+        break;
+      }
+    }
+    
+    if (rowIndex === -1) {
+      // Key not found - add new row
+      sheet.appendRow([
+        key,
+        key, // description
+        value !== null && value !== undefined ? value : "",
+        currency || "",
+        new Date(),
+        new Date() // last synced
+      ]);
+      Logger.log("✅ Added new row to Performance Statistics for key: " + key);
+    } else {
+      // Update existing row
+      sheet.getRange(rowIndex, 3).setValue(value !== null && value !== undefined ? value : ""); // Exchange Rate column
+      if (currency) {
+        sheet.getRange(rowIndex, 4).setValue(currency); // Currency column
+      }
+      sheet.getRange(rowIndex, 5).setValue(new Date()); // Updated Date
+      sheet.getRange(rowIndex, 6).setValue(new Date()); // Last Synced
+      Logger.log("✅ Updated Performance Statistics row " + rowIndex + " for key: " + key);
+    }
+    
+  } catch (error) {
+    Logger.log("⚠️  Error updating Performance Statistics: " + error.message);
+    // Don't throw - allow Wix update to succeed even if sheet update fails
+  }
+}
+
+/**
+ * Web service endpoint (doGet) - returns all Performance Statistics as JSON
+ * 
+ * This function exposes a web service that returns all Performance Statistics
+ * from the Google Sheet. Deploy this script as a web app to expose the endpoint.
+ * 
+ * Deployment:
+ * 1. Deploy as web app: Publish > Deploy as web app
+ * 2. Set "Execute as: Me" and "Who has access: Anyone, even anonymous"
+ * 3. Copy the web app URL and use it in index.html
+ * 
+ * URL: https://script.google.com/macros/s/AKfycbzlfOBo9UqKOh7jIqGcmbPAMM1RxCbsJHb-UV_vM6VbvK_HSdT44KyGbbXIeo-_Ovfy/exec
+ * 
+ * Returns JSON:
+ * {
+ *   "timestamp": "2025-01-27T12:00:00.000Z",
+ *   "data": {
+ *     "USDC_EXCHANGE_RATE_RAYDIUM": {
+ *       "key": "USDC_EXCHANGE_RATE_RAYDIUM",
+ *       "description": "USDC_EXCHANGE_RATE_RAYDIUM",
+ *       "exchangeRate": 1.001,
+ *       "currency": "USDC",
+ *       "updatedDate": "2025-01-27T10:00:00.000Z"
+ *     },
+ *     ...
+ *   }
+ * }
+ */
+function doGet(e) {
+  try {
+    // Check if shipment ID parameter is provided
+    var shipmentId = e.parameter.shipmentId || e.parameter.shipment_id;
+    
+    if (shipmentId) {
+      // Return sold QR codes count for this shipment
+      var count = getSoldQRCodesCount(shipmentId);
+      
+      var response = {
+        timestamp: new Date().toISOString(),
+        shipmentId: shipmentId,
+        treesSold: count
+      };
+      
+      return ContentService
+        .createTextOutput(JSON.stringify(response))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+    
+    // Default: return all performance statistics
+    var data = readPerformanceStatistics();
+    
+    var response = {
+      timestamp: new Date().toISOString(),
+      data: data
+    };
+    
+    // Return as JSON with proper CORS headers
+    return ContentService
+      .createTextOutput(JSON.stringify(response))
+      .setMimeType(ContentService.MimeType.JSON);
+      
+  } catch (error) {
+    // Return error as JSON
+    var errorResponse = {
+      timestamp: new Date().toISOString(),
+      error: true,
+      message: error.message || "Unknown error occurred"
+    };
+    
+    return ContentService
+      .createTextOutput(JSON.stringify(errorResponse))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+/**
+ * Read all performance statistics from Google Sheet
+ * Returns object keyed by exchange rate key
+ * 
+ * @return {Object} Object with performance statistics keyed by exchange rate key
+ */
+function readPerformanceStatistics() {
+  try {
+    var spreadsheet = SpreadsheetApp.openById(ledgerDocId);
+    var sheet = spreadsheet.getSheetByName(PERFORMANCE_STATISTICS_SHEET_NAME);
+    
+    if (!sheet) {
+      throw new Error("Sheet '" + PERFORMANCE_STATISTICS_SHEET_NAME + "' not found. Please run populatePerformanceStatistics() first.");
+    }
+    
+    // Get all data (assuming header is in row 1)
+    var lastRow = sheet.getLastRow();
+    if (lastRow < 2) {
+      throw new Error("No data found in Performance Statistics sheet");
+    }
+    
+    var dataRange = sheet.getRange(2, 1, lastRow - 1, 6); // Start from row 2, get 6 columns
+    var values = dataRange.getValues();
+    
+    // Build object keyed by the Key column (column 1)
+    var performanceStats = {};
+    
+    for (var i = 0; i < values.length; i++) {
+      var row = values[i];
+      var key = row[0]; // Key column
+      var description = row[1]; // Description column
+      var exchangeRate = row[2]; // Exchange Rate / Value column
+      var currency = row[3]; // Currency column
+      var updatedDate = row[4]; // Updated Date column
+      
+      if (key) {
+        performanceStats[key] = {
+          key: key,
+          description: description || key,
+          exchangeRate: exchangeRate !== "" ? exchangeRate : null,
+          currency: currency || null,
+          updatedDate: updatedDate instanceof Date ? updatedDate.toISOString() : (updatedDate || null)
+        };
+      }
+    }
+    
+    return performanceStats;
+    
+  } catch (error) {
+    Logger.log("❌ Error reading Performance Statistics: " + error.message);
+    throw error;
+  }
+}
+
+/**
+ * Gets the count of sold QR codes for a given shipment ID
+ * 
+ * Queries "Agroverse QR codes" sheet where:
+ * - Column D = "sold" (or marked as sold)
+ * - Column C (URL) ends with the shipment ID (lowercase)
+ * 
+ * @param {string} shipmentId - The shipment ID (e.g., "AGL8", "agl8", "SEF1")
+ * @return {number} Count of sold QR codes for this shipment
+ */
+function getSoldQRCodesCount(shipmentId) {
+  try {
+    // Normalize shipment ID to lowercase
+    var normalizedId = shipmentId.toLowerCase();
+    
+    // Get the "Agroverse QR codes" sheet
+    // NOTE: Update this spreadsheet ID if QR codes are in a different spreadsheet
+    var qrCodesSpreadsheetId = ledgerDocId; // Using same spreadsheet as ledger
+    var spreadsheet = SpreadsheetApp.openById(qrCodesSpreadsheetId);
+    var qrCodesSheet = spreadsheet.getSheetByName("Agroverse QR codes");
+    
+    if (!qrCodesSheet) {
+      Logger.log("⚠️  'Agroverse QR codes' sheet not found");
+      return 0;
+    }
+    
+    // Get all data from the sheet
+    var lastRow = qrCodesSheet.getLastRow();
+    if (lastRow < 2) {
+      Logger.log("⚠️  No data in 'Agroverse QR codes' sheet");
+      return 0;
+    }
+    
+    var dataRange = qrCodesSheet.getRange(2, 1, lastRow - 1, 4); // Start from row 2, get columns A-D
+    var values = dataRange.getValues();
+    
+    var count = 0;
+    
+    // Iterate through rows
+    for (var i = 0; i < values.length; i++) {
+      var row = values[i];
+      var url = row[2]; // Column C (0-indexed, so C = index 2)
+      var status = row[3]; // Column D (0-indexed, so D = index 3)
+      
+      // Check if status is "sold" (case-insensitive)
+      if (status && status.toString().toLowerCase() === "sold") {
+        // Check if URL ends with the shipment ID
+        var urlString = url ? url.toString().toLowerCase() : "";
+        if (urlString.endsWith("/" + normalizedId) || urlString.endsWith(normalizedId)) {
+          count++;
+        }
+      }
+    }
+    
+    Logger.log("Found " + count + " sold QR codes for shipment: " + shipmentId);
+    return count;
+    
+  } catch (error) {
+    Logger.log("❌ Error getting sold QR codes count: " + error.message);
+    return 0;
+  }
 }

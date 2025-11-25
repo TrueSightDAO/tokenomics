@@ -3,10 +3,18 @@
  * Repository: https://github.com/TrueSightDAO/tokenomics
  * 
  * Description: Updates Agroverse Wix site statistics and metrics.
+ * 
+ * Web Service URL:
+ * https://script.google.com/macros/s/AKfycbzHDqxI4lWlDcl6AnAhZxw7kbOp4exPPk5GFgdwqJuAfMva_00q8eIMFOAzAYIlxVRH/exec
+ * 
+ * Returns: JSON with soldBagsCount (1 bag = 1 tree planted = hectares restored)
  */
 
 const creds = getCredentials();
 var wixAccessToken =  creds.WIX_API_KEY;
+
+// Web service URL for sold bags count API
+const SOLD_BAGS_WEB_SERVICE_URL = "https://script.google.com/macros/s/AKfycbzHDqxI4lWlDcl6AnAhZxw7kbOp4exPPk5GFgdwqJuAfMva_00q8eIMFOAzAYIlxVRH/exec";
 
 // Site IDs
 function getAgroverseSiteId() { // Agroverse
@@ -186,11 +194,13 @@ function updateStatistics() {
     // Get count of SOLD rows from Agroverse QR codes Google Sheet
     var soldRowsCount = getSoldRowsCount();
     
-    // Update TREES_FINANCED on Agroverse (replace with actual dataItemId)
+    // Update TREES_FINANCED on Agroverse
+    // Note: 1 bag = 1 tree planted
     updateStatisticsCollection(soldRowsCount, "2d031e89-3418-469f-b47d-97c2a4b6425b", "TREES_FINANCED");
     
-    // Update hectares (cacao_kg / 1000, rounded to 3 decimal places) on Agroverse
-    var hectares = (soldRowsCount / 1000).toFixed(3) * 1;
+    // Update hectares restored
+    // Note: hectares restored = total trees planted (1 bag = 1 tree = hectares restored)
+    var hectares = soldRowsCount;
     updateStatisticsCollection(hectares, "8350b66e-0fdd-4b91-ba14-7eaf1893f824", "HECTARES");
 
     // Verify all updates on Agroverse
@@ -201,5 +211,51 @@ function updateStatistics() {
 
   } catch (error) {
     Logger.log("Error: " + error.message);
+  }
+}
+
+/**
+ * Web service endpoint to expose the count of bags marked as SOLD
+ * 
+ * GET /exec
+ * Returns JSON with the count of bags where Column D status = "SOLD" or "ASSIGNED_TO_TREE"
+ * 
+ * Response format:
+ * {
+ *   "timestamp": "2025-01-27T12:00:00.000Z",
+ *   "soldBagsCount": 42,
+ *   "status": "success"
+ * }
+ */
+function doGet(e) {
+  try {
+    // Get the count of sold bags
+    var soldBagsCount = getSoldRowsCount();
+    
+    // Create response object
+    var response = {
+      timestamp: new Date().toISOString(),
+      soldBagsCount: soldBagsCount,
+      status: "success"
+    };
+    
+    // Return JSON response with CORS headers
+    return ContentService
+      .createTextOutput(JSON.stringify(response))
+      .setMimeType(ContentService.MimeType.JSON);
+      
+  } catch (error) {
+    // Return error response
+    var errorResponse = {
+      timestamp: new Date().toISOString(),
+      soldBagsCount: 0,
+      status: "error",
+      error: error.message
+    };
+    
+    Logger.log("Error in doGet: " + error.message);
+    return ContentService
+      .createTextOutput(JSON.stringify(errorResponse))
+      .setMimeType(ContentService.MimeType.JSON);
   }
 }
