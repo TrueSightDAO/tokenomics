@@ -86,7 +86,7 @@ var PERFORMANCE_STATISTICS_SHEET_NAME = "Performance Statistics";
 // Solana wallet address for the USDT vault
 var solanaUsdtVaultWalletAddress = "BkcbCEnD14C7cYiN6VwpYuGmpVrjfoRwobhQQScBugqQ";
 
-// Function to resolve redirect URL (copied from provided script)
+// Function to resolve redirect URL - handles both HTTP redirects and JavaScript redirects
 function resolveRedirect(url) {
   try {
     let currentUrl = url;
@@ -100,16 +100,39 @@ function resolveRedirect(url) {
       });
       const responseCode = response.getResponseCode();
 
-      // If not a redirect (2xx or other), return the current URL
+      // If not a redirect (2xx or other), check if it's a Google Sheets URL
       if (responseCode < 300 || responseCode >= 400) {
+        // Check if it's already a Google Sheets URL
+        if (currentUrl.includes('docs.google.com/spreadsheets')) {
+          return currentUrl;
+        }
+        
+        // If not, try to parse HTML for JavaScript redirects
+        const content = response.getContentText();
+        const resolvedFromHtml = extractUrlFromHtml(content, currentUrl);
+        if (resolvedFromHtml && resolvedFromHtml.includes('docs.google.com/spreadsheets')) {
+          Logger.log(`Resolved JavaScript redirect: ${url} -> ${resolvedFromHtml}`);
+          return resolvedFromHtml;
+        }
+        
+        // If we got a 200 response but it's not a spreadsheet URL, return it anyway
         return currentUrl;
       }
 
-      // Get the Location header for the redirect
+      // Get the Location header for HTTP redirect
       const headers = response.getHeaders();
       const location = headers['Location'] || headers['location'];
       if (!location) {
-        Logger.log(`No Location header for redirect at ${currentUrl}`);
+        // No Location header - try parsing HTML for JavaScript redirect
+        const content = response.getContentText();
+        const resolvedFromHtml = extractUrlFromHtml(content, currentUrl);
+        if (resolvedFromHtml) {
+          currentUrl = resolvedFromHtml;
+          redirectCount++;
+          continue;
+        }
+        
+        Logger.log(`No Location header or JavaScript redirect found at ${currentUrl}`);
         return '';
       }
 
@@ -127,36 +150,148 @@ function resolveRedirect(url) {
 }
 
 /**
- * Fetches unique ledger URLs from the contract_url column in Wix AgroverseShipments.
- * @return {Array<string>} Array of unique ledger URLs.
+ * Extracts the actual Google Sheets URL from HTML content that may contain JavaScript redirects
+ * Handles:
+ * - window.location.href = "url"
+ * - window.location.replace("url")
+ * - meta refresh tags
+ * - direct links to Google Sheets
+ * 
+ * @param {string} htmlContent - The HTML content to parse
+ * @param {string} baseUrl - The base URL for resolving relative URLs
+ * @return {string} The extracted Google Sheets URL, or empty string if not found
+ */
+function extractUrlFromHtml(htmlContent, baseUrl) {
+  try {
+    // Look for Google Sheets URLs directly in the content
+    var sheetsUrlPattern = /https:\/\/docs\.google\.com\/spreadsheets\/d\/[a-zA-Z0-9_-]+[^\s"']*/g;
+    var match = htmlContent.match(sheetsUrlPattern);
+    if (match && match.length > 0) {
+      // Return the first Google Sheets URL found
+      var url = match[0].replace(/[^a-zA-Z0-9\/:._-]/g, ''); // Clean up trailing characters
+      Logger.log(`Found Google Sheets URL in HTML: ${url}`);
+      return url;
+    }
+    
+    // Look for window.location redirects
+    var locationPatterns = [
+      /window\.location\.href\s*=\s*["']([^"']+)["']/gi,
+      /window\.location\.replace\s*\(\s*["']([^"']+)["']/gi,
+      /window\.location\s*=\s*["']([^"']+)["']/gi
+    ];
+    
+    for (var i = 0; i < locationPatterns.length; i++) {
+      var pattern = locationPatterns[i];
+      var matches = htmlContent.match(pattern);
+      if (matches && matches.length > 0) {
+        for (var j = 0; j < matches.length; j++) {
+          var urlMatch = matches[j].match(/["']([^"']+)["']/);
+          if (urlMatch && urlMatch[1]) {
+            var extractedUrl = urlMatch[1];
+            // If it's a Google Sheets URL, return it
+            if (extractedUrl.includes('docs.google.com/spreadsheets')) {
+              Logger.log(`Found Google Sheets URL in JavaScript redirect: ${extractedUrl}`);
+              return extractedUrl;
+            }
+            // If it's a relative URL, try to resolve it
+            if (extractedUrl.startsWith('/')) {
+              var base = baseUrl.match(/https?:\/\/[^\/]+/);
+              if (base) {
+                extractedUrl = base[0] + extractedUrl;
+              }
+            }
+            // Recursively try to resolve this URL
+            if (extractedUrl.startsWith('http')) {
+              return resolveRedirect(extractedUrl);
+            }
+          }
+        }
+      }
+    }
+    
+    // Look for meta refresh tags
+    var metaRefreshPattern = /<meta[^>]*http-equiv=["']refresh["'][^>]*content=["']\d+;\s*url=([^"']+)["']/gi;
+    var metaMatch = htmlContent.match(metaRefreshPattern);
+    if (metaMatch) {
+      var urlMatch = metaMatch[0].match(/url=([^"']+)/i);
+      if (urlMatch && urlMatch[1]) {
+        var extractedUrl = urlMatch[1];
+        if (extractedUrl.includes('docs.google.com/spreadsheets')) {
+          Logger.log(`Found Google Sheets URL in meta refresh: ${extractedUrl}`);
+          return extractedUrl;
+        }
+      }
+    }
+    
+    return '';
+  } catch (e) {
+    Logger.log(`Error extracting URL from HTML: ${e.message}`);
+    return '';
+  }
+}
+
+/**
+ * Fetches unique resolved ledger URLs from "Shipment Ledger Listing" sheet, column AB.
+ * This reads the pre-resolved URLs that were populated from legacy-redirects.js,
+ * avoiding the need to resolve JavaScript redirects.
+ * 
+ * @return {Array<string>} Array of unique resolved ledger URLs (Google Sheets URLs).
  */
 function getLedgerUrlsFromWix() {
-  var options = {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': wixAccessToken,
-      'wix-account-id': '0e2cde5f-b353-468b-9f4e-36835fc60a0e',
-      'wix-site-id': 'd45a189f-d0cc-48de-95ee-30635a95385f'
-    },
-    payload: JSON.stringify({})
-  };
-  var request_url = "https://www.wixapis.com/wix-data/v2/items/query?dataCollectionId=AgroverseShipments";
-
   try {
-    var response = UrlFetchApp.fetch(request_url, options);
-    var content = response.getContentText();
-    var response_obj = JSON.parse(content);
-
-    var ledgerUrls = response_obj.dataItems
-      .map(item => item.data.contract_url)
-      .filter(url => url && url !== '')
-      .filter((url, index, self) => self.indexOf(url) === index);
-
-    Logger.log("Unique Ledger URLs fetched from Wix: " + ledgerUrls);
+    var spreadsheet = SpreadsheetApp.openById(ledgerDocId);
+    var shipmentSheet = spreadsheet.getSheetByName("Shipment Ledger Listing");
+    
+    if (!shipmentSheet) {
+      Logger.log("Error: 'Shipment Ledger Listing' sheet not found");
+      return [];
+    }
+    
+    // Get all data from the sheet (skip header row)
+    var lastRow = shipmentSheet.getLastRow();
+    if (lastRow < 2) {
+      Logger.log("No data in 'Shipment Ledger Listing' sheet");
+      return [];
+    }
+    
+    // Read data starting from row 2 (row 1 is header)
+    // Column A (1) = Shipment ID
+    // Column AB (28) = Resolved Ledger URL
+    var dataRange = shipmentSheet.getRange(2, 1, lastRow - 1, 28); // Columns A to AB
+    var data = dataRange.getValues();
+    
+    var ledgerUrls = [];
+    var seenUrls = {}; // Track unique URLs to avoid duplicates
+    
+    for (var i = 0; i < data.length; i++) {
+      var row = data[i];
+      var shipmentId = row[0] ? row[0].toString().trim() : ''; // Column A - Shipment ID
+      var resolvedUrl = row[27] ? row[27].toString().trim() : ''; // Column AB (index 27) - Resolved Ledger URL
+      
+      // Skip if no URL or no shipment ID
+      if (!resolvedUrl || !shipmentId || shipmentId === '0') {
+        continue;
+      }
+      
+      // Skip if we've already processed this URL (avoid duplicates)
+      if (seenUrls[resolvedUrl]) {
+        continue;
+      }
+      seenUrls[resolvedUrl] = true;
+      
+      // Only include Google Sheets URLs
+      if (resolvedUrl.includes('docs.google.com/spreadsheets')) {
+        ledgerUrls.push(resolvedUrl);
+        Logger.log("Found resolved URL for " + shipmentId + ": " + resolvedUrl);
+      }
+    }
+    
+    Logger.log("Unique Resolved Ledger URLs fetched from Shipment Ledger Listing: " + ledgerUrls.length);
     return ledgerUrls;
+    
   } catch (e) {
-    Logger.log("Error fetching ledger URLs from Wix: " + e.message);
+    Logger.log("Error fetching ledger URLs from Shipment Ledger Listing: " + e.message);
+    // Fallback: return empty array
     return [];
   }
 }
@@ -175,9 +310,17 @@ function getTrueSightDAOEquityHoldings(ledgerUrls) {
   ledgerUrls.forEach(function(url, index) {
     Logger.log(`Processing ledger URL ${index + 1}: ${url}`);
     
-    // Resolve the redirect URL to get the actual Google Sheet URL
-    var resolvedUrl = resolveRedirect(url);
-    Logger.log(`Resolved URL: ${resolvedUrl}`);
+    // Check if URL is already a resolved Google Sheets URL (from column AB)
+    var resolvedUrl = url;
+    
+    // If it's not already a Google Sheets URL, try to resolve it (fallback for legacy URLs)
+    if (!url.includes('docs.google.com/spreadsheets')) {
+      Logger.log(`URL is not a Google Sheets URL, attempting to resolve: ${url}`);
+      resolvedUrl = resolveRedirect(url);
+      Logger.log(`Resolved URL: ${resolvedUrl}`);
+    } else {
+      Logger.log(`Using pre-resolved URL from column AB: ${resolvedUrl}`);
+    }
     
     if (!resolvedUrl || !resolvedUrl.includes('docs.google.com/spreadsheets')) {
       Logger.log(`Skipping invalid or non-spreadsheet URL: ${resolvedUrl}`);
@@ -257,6 +400,7 @@ function getInvestmentHoldingsInAGL() {
 
 /**
  * Updates the total DAO asset value on Wix, including off-chain assets, USDT vault balance, and AGL investment holdings.
+ * NOTE: This function also updates Performance Statistics directly (even if Wix is not used).
  */
 function updateTotalDAOAssetOnWix() {
   var full_asset_value = getOffChainAssetValue() + getUSDTBalanceInVault() + getInvestmentHoldingsInAGL();
@@ -264,6 +408,31 @@ function updateTotalDAOAssetOnWix() {
 
   setAssetBalanceOnWix(full_asset_value);
   getAssetBalanceOnWix();
+}
+
+/**
+ * Updates USD_TREASURY_BALANCE in Performance Statistics directly from Google Sheets
+ * (without going through Wix). Use this when you're updating the sheet directly.
+ * 
+ * This function calculates: off-chain assets + USDT vault balance + AGL investment holdings
+ * 
+ * CALL THIS FUNCTION to update USD_TREASURY_BALANCE in Performance Statistics
+ */
+function updateUSD_TREASURY_BALANCE() {
+  try {
+    var treasuryBalance = getOffChainAssetValue() + getUSDTBalanceInVault() + getInvestmentHoldingsInAGL();
+    Logger.log("Calculating USD_TREASURY_BALANCE: " + treasuryBalance);
+    Logger.log("  - Off-chain assets: " + getOffChainAssetValue());
+    Logger.log("  - USDT vault balance: " + getUSDTBalanceInVault());
+    Logger.log("  - AGL investment holdings: " + getInvestmentHoldingsInAGL());
+    
+    updatePerformanceStatistic("USD_TREASURY_BALANCE", treasuryBalance, "USD");
+    Logger.log("✅ Successfully updated USD_TREASURY_BALANCE: " + treasuryBalance);
+    return treasuryBalance;
+  } catch (error) {
+    Logger.log("❌ Error updating USD_TREASURY_BALANCE: " + error.message);
+    throw error;
+  }
 }
 
 
@@ -290,6 +459,7 @@ function getVotingRightsCirculated() {
 }
 
 function getUSDTBalanceInVault() {
+  try {
     var options = {
      "method" : "POST",
      "headers" : {
@@ -317,6 +487,11 @@ function getUSDTBalanceInVault() {
     Logger.log("Amount of USDT in vault: " + response_obj.result.value.uiAmount);      
 
     return response_obj.result.value.uiAmount;
+  } catch (error) {
+    Logger.log("⚠️  Error fetching USDT balance from Solana vault (endpoint unavailable): " + error.message);
+    Logger.log("⚠️  Returning 0 for USDT vault balance. Treasury balance will exclude USDT vault.");
+    return 0;
+  }
 }  
 
 function getAssetBalanceOnWix() {
@@ -331,33 +506,38 @@ function getAssetBalanceOnWix() {
 
 
 function setAssetBalanceOnWix( latest_asset_balance) {
-  var options = getWixRequestHeader();  
-  var payload = {
-    "dataCollectionId": "ExchangeRate",
-    "dataItem": {
-      "data": {
-        "description": "USD_TREASURY_BALANCE",
-        "_id": getWixAssetBalanceDataItemId(),
-        "_owner": "0e2cde5f-b353-468b-9f4e-36835fc60a0e",
-        "exchangeRate": latest_asset_balance,
-        "currency": "USD"
+  // NOTE: If you're not using Wix, you can skip the Wix update and just update Performance Statistics
+  // by calling updatePerformanceStatistic() directly, or use updateUSD_TREASURY_BALANCE() instead
+  
+  // Update Wix (only if using Wix)
+  try {
+    var options = getWixRequestHeader();  
+    var payload = {
+      "dataCollectionId": "ExchangeRate",
+      "dataItem": {
+        "data": {
+          "description": "USD_TREASURY_BALANCE",
+          "_id": getWixAssetBalanceDataItemId(),
+          "_owner": "0e2cde5f-b353-468b-9f4e-36835fc60a0e",
+          "exchangeRate": latest_asset_balance,
+          "currency": "USD"
+        }
       }
     }
+
+    options.payload = JSON.stringify(payload);
+    options.method = 'PUT';
+
+    var request_url = "https://www.wixapis.com/wix-data/v2/items/" + getWixAssetBalanceDataItemId();  
+    var response = UrlFetchApp.fetch(request_url, options);
+    var content = response.getContentText();
+    var response_obj = JSON.parse(content);  
+    Logger.log("Updated Wix (if using Wix): " + latest_asset_balance);
+  } catch (e) {
+    Logger.log("⚠️  Wix update failed (this is OK if not using Wix): " + e.message);
   }
 
-  options.payload = JSON.stringify(payload);
-  options.method = 'PUT';
-
-  // Logger.log("The Final Payload");
-  // Logger.log(options);
-
-  var request_url = "https://www.wixapis.com/wix-data/v2/items/" + getWixAssetBalanceDataItemId();  
-  var response = UrlFetchApp.fetch(request_url, options);
-  var content = response.getContentText();
-  var response_obj = JSON.parse(content);  
-  // Logger.log(response_obj);  
-
-  // Sync to Performance Statistics sheet
+  // ALWAYS sync to Performance Statistics sheet (regardless of Wix)
   updatePerformanceStatistic("USD_TREASURY_BALANCE", latest_asset_balance, "USD");
 }
 
@@ -986,8 +1166,7 @@ function updatePerformanceStatistic(key, value, currency) {
         key, // description
         value !== null && value !== undefined ? value : "",
         currency || "",
-        new Date(),
-        new Date() // last synced
+        new Date() // Updated Date (Column E)
       ]);
       Logger.log("✅ Added new row to Performance Statistics for key: " + key);
     } else {
@@ -996,8 +1175,8 @@ function updatePerformanceStatistic(key, value, currency) {
       if (currency) {
         sheet.getRange(rowIndex, 4).setValue(currency); // Currency column
       }
-      sheet.getRange(rowIndex, 5).setValue(new Date()); // Updated Date
-      sheet.getRange(rowIndex, 6).setValue(new Date()); // Last Synced
+      sheet.getRange(rowIndex, 5).setValue(new Date()); // Updated Date (Column E)
+      // Note: Column F (Last Synced) is no longer used - dropped in favor of Updated Date
       Logger.log("✅ Updated Performance Statistics row " + rowIndex + " for key: " + key);
     }
     
@@ -1196,5 +1375,297 @@ function getSoldQRCodesCount(shipmentId) {
   } catch (error) {
     Logger.log("❌ Error getting sold QR codes count: " + error.message);
     return 0;
+  }
+}
+
+/**
+ * DIAGNOSTIC FUNCTION: Check why Performance Statistics is not updating
+ * 
+ * This function checks:
+ * 1. If the Performance Statistics sheet exists
+ * 2. What keys are currently in the sheet
+ * 3. What values should be there based on current calculations
+ * 4. Which values are missing or outdated
+ * 
+ * CALL THIS FUNCTION FIRST to diagnose the issue
+ * 
+ * @return {Object} Diagnostic report
+ */
+function diagnosePerformanceStatistics() {
+  Logger.log("🔍 Starting Performance Statistics diagnostic...");
+  
+  var report = {
+    sheetExists: false,
+    sheetHasData: false,
+    currentKeys: [],
+    expectedKeys: [],
+    missingKeys: [],
+    outdatedValues: [],
+    updated: [],
+    errors: []
+  };
+  
+  try {
+    // Check if sheet exists
+    var spreadsheet = SpreadsheetApp.openById(ledgerDocId);
+    var sheet = spreadsheet.getSheetByName(PERFORMANCE_STATISTICS_SHEET_NAME);
+    
+    if (!sheet) {
+      report.errors.push("❌ Performance Statistics sheet does not exist!");
+      Logger.log("❌ Sheet '" + PERFORMANCE_STATISTICS_SHEET_NAME + "' not found");
+      return report;
+    }
+    
+    report.sheetExists = true;
+    Logger.log("✅ Sheet exists");
+    
+    // Get current keys from sheet
+    var lastRow = sheet.getLastRow();
+    if (lastRow < 2) {
+      report.errors.push("⚠️  Sheet exists but has no data rows");
+      Logger.log("⚠️  Sheet has no data rows");
+      return report;
+    }
+    
+    report.sheetHasData = true;
+    
+    var dataRange = sheet.getRange(2, 1, lastRow - 1, 6);
+    var values = dataRange.getValues();
+    
+    var currentStats = {};
+    for (var i = 0; i < values.length; i++) {
+      var key = values[i][0];
+      if (key) {
+        report.currentKeys.push(key);
+        currentStats[key] = {
+          value: values[i][2],
+          currency: values[i][3],
+          updatedDate: values[i][4],
+          row: i + 2
+        };
+      }
+    }
+    
+    Logger.log("📊 Current keys in sheet: " + report.currentKeys.join(", "));
+    
+    // Calculate expected values
+    var expectedStats = {};
+    
+    try {
+      var treasuryBalance = getOffChainAssetValue() + getUSDTBalanceInVault() + getInvestmentHoldingsInAGL();
+      expectedStats["USD_TREASURY_BALANCE"] = { value: treasuryBalance, currency: "USD" };
+      Logger.log("✅ Calculated USD_TREASURY_BALANCE: " + treasuryBalance);
+      
+      // Update USD_TREASURY_BALANCE in Performance Statistics sheet
+      try {
+        updatePerformanceStatistic("USD_TREASURY_BALANCE", treasuryBalance, "USD");
+        Logger.log("✅ Updated USD_TREASURY_BALANCE in Performance Statistics: " + treasuryBalance);
+        report.updated = report.updated || [];
+        report.updated.push({ key: "USD_TREASURY_BALANCE", value: treasuryBalance });
+      } catch (updateError) {
+        Logger.log("⚠️  Calculated value but failed to update sheet: " + updateError.message);
+        report.errors.push("Error updating USD_TREASURY_BALANCE in sheet: " + updateError.message);
+      }
+    } catch (e) {
+      report.errors.push("Error calculating USD_TREASURY_BALANCE: " + e.message);
+    }
+    
+    try {
+      var tdgIssued = getTdgTokensIssued();
+      expectedStats["TDG_ISSUED"] = { value: tdgIssued, currency: "TDG" };
+      Logger.log("✅ Calculated TDG_ISSUED: " + tdgIssued);
+    } catch (e) {
+      report.errors.push("Error calculating TDG_ISSUED: " + e.message);
+    }
+    
+    try {
+      var assetPerTdg = calculateAssetPerIssuedTdg();
+      expectedStats["ASSET_PER_TDG_ISSUED"] = { value: assetPerTdg, currency: "USD" };
+      Logger.log("✅ Calculated ASSET_PER_TDG_ISSUED: " + assetPerTdg);
+    } catch (e) {
+      report.errors.push("Error calculating ASSET_PER_TDG_ISSUED: " + e.message);
+    }
+    
+    try {
+      var sales30Days = get30DaysSales();
+      expectedStats["PAST_30_DAYS_SALES"] = { value: sales30Days, currency: "USD" };
+      Logger.log("✅ Calculated PAST_30_DAYS_SALES: " + sales30Days);
+    } catch (e) {
+      report.errors.push("Error calculating PAST_30_DAYS_SALES: " + e.message);
+    }
+    
+    try {
+      var assetPerTdg = getAssetPerIssuedTdgBalanceOnWix ? getAssetPerIssuedTdgBalanceOnWix() : calculateAssetPerIssuedTdg();
+      var treasuryYield = getUSTreasuryYield();
+      var dailySalesAverage = sales30Days / 30;
+      var adjustedPrice = Math.min(assetPerTdg, 1 - treasuryYield / 100);
+      var dailyBudget = dailySalesAverage * adjustedPrice;
+      expectedStats["TDG_DAILY_BUY_BACK_BUDGET"] = { value: dailyBudget, currency: "USD" };
+      Logger.log("✅ Calculated TDG_DAILY_BUY_BACK_BUDGET: " + dailyBudget);
+    } catch (e) {
+      report.errors.push("Error calculating TDG_DAILY_BUY_BACK_BUDGET: " + e.message);
+    }
+    
+    try {
+      var treasuryYield = getUSTreasuryYield();
+      expectedStats["USD_TREASURY_YIELD_1_MONTH"] = { value: treasuryYield, currency: "%" };
+      Logger.log("✅ Calculated USD_TREASURY_YIELD_1_MONTH: " + treasuryYield);
+    } catch (e) {
+      report.errors.push("Error calculating USD_TREASURY_YIELD_1_MONTH: " + e.message);
+    }
+    
+    report.expectedKeys = Object.keys(expectedStats);
+    Logger.log("📋 Expected keys: " + report.expectedKeys.join(", "));
+    
+    // Find missing keys
+    for (var key in expectedStats) {
+      if (!currentStats[key]) {
+        report.missingKeys.push(key);
+        Logger.log("⚠️  Missing key: " + key);
+      } else {
+        // Check if value is outdated (more than 1 day old or different)
+        var currentValue = currentStats[key].value;
+        var expectedValue = expectedStats[key].value;
+        var isOutdated = false;
+        
+        if (currentValue != expectedValue) {
+          isOutdated = true;
+          Logger.log("⚠️  Outdated value for " + key + ": current=" + currentValue + ", expected=" + expectedValue);
+        }
+        
+        if (isOutdated) {
+          report.outdatedValues.push({
+            key: key,
+            current: currentValue,
+            expected: expectedValue,
+            row: currentStats[key].row
+          });
+        }
+      }
+    }
+    
+    Logger.log("✅ Diagnostic complete!");
+    Logger.log("Summary:");
+    Logger.log("  - Sheet exists: " + report.sheetExists);
+    Logger.log("  - Sheet has data: " + report.sheetHasData);
+    Logger.log("  - Current keys: " + report.currentKeys.length);
+    Logger.log("  - Expected keys: " + report.expectedKeys.length);
+    Logger.log("  - Missing keys: " + report.missingKeys.length);
+    Logger.log("  - Outdated values: " + report.outdatedValues.length);
+    Logger.log("  - Updated during diagnostic: " + (report.updated ? report.updated.length : 0));
+    Logger.log("  - Errors: " + report.errors.length);
+    
+    return report;
+    
+  } catch (error) {
+    report.errors.push("Fatal error: " + error.message);
+    Logger.log("❌ Fatal error in diagnostic: " + error.message);
+    return report;
+  }
+}
+
+/**
+ * SYNC FUNCTION: Update all Performance Statistics directly from Google Sheets calculations
+ * 
+ * This function calculates all values from Google Sheets and updates Performance Statistics
+ * WITHOUT going through Wix. Use this to sync all values at once.
+ * 
+ * CALL THIS FUNCTION to update all Performance Statistics values
+ * 
+ * @return {Object} Sync report with updated keys and values
+ */
+function syncAllPerformanceStatistics() {
+  Logger.log("🔄 Starting sync of all Performance Statistics...");
+  
+  var report = {
+    updated: [],
+    errors: [],
+    skipped: []
+  };
+  
+  try {
+    // 1. USD_TREASURY_BALANCE
+    try {
+      var treasuryBalance = getOffChainAssetValue() + getUSDTBalanceInVault() + getInvestmentHoldingsInAGL();
+      updatePerformanceStatistic("USD_TREASURY_BALANCE", treasuryBalance, "USD");
+      report.updated.push({ key: "USD_TREASURY_BALANCE", value: treasuryBalance });
+      Logger.log("✅ Updated USD_TREASURY_BALANCE: " + treasuryBalance);
+    } catch (e) {
+      report.errors.push({ key: "USD_TREASURY_BALANCE", error: e.message });
+      Logger.log("❌ Error updating USD_TREASURY_BALANCE: " + e.message);
+    }
+    
+    // 2. TDG_ISSUED
+    try {
+      var tdgIssued = getTdgTokensIssued();
+      updatePerformanceStatistic("TDG_ISSUED", tdgIssued, "TDG");
+      report.updated.push({ key: "TDG_ISSUED", value: tdgIssued });
+      Logger.log("✅ Updated TDG_ISSUED: " + tdgIssued);
+    } catch (e) {
+      report.errors.push({ key: "TDG_ISSUED", error: e.message });
+      Logger.log("❌ Error updating TDG_ISSUED: " + e.message);
+    }
+    
+    // 3. ASSET_PER_TDG_ISSUED
+    try {
+      var assetPerTdg = calculateAssetPerIssuedTdg();
+      updatePerformanceStatistic("ASSET_PER_TDG_ISSUED", assetPerTdg, "USD");
+      report.updated.push({ key: "ASSET_PER_TDG_ISSUED", value: assetPerTdg });
+      Logger.log("✅ Updated ASSET_PER_TDG_ISSUED: " + assetPerTdg);
+    } catch (e) {
+      report.errors.push({ key: "ASSET_PER_TDG_ISSUED", error: e.message });
+      Logger.log("❌ Error updating ASSET_PER_TDG_ISSUED: " + e.message);
+    }
+    
+    // 4. PAST_30_DAYS_SALES
+    try {
+      var sales30Days = get30DaysSales();
+      updatePerformanceStatistic("PAST_30_DAYS_SALES", sales30Days, "USD");
+      report.updated.push({ key: "PAST_30_DAYS_SALES", value: sales30Days });
+      Logger.log("✅ Updated PAST_30_DAYS_SALES: " + sales30Days);
+    } catch (e) {
+      report.errors.push({ key: "PAST_30_DAYS_SALES", error: e.message });
+      Logger.log("❌ Error updating PAST_30_DAYS_SALES: " + e.message);
+    }
+    
+    // 5. TDG_DAILY_BUY_BACK_BUDGET
+    try {
+      var sales30Days = get30DaysSales();
+      var assetPerTdg = calculateAssetPerIssuedTdg();
+      var treasuryYield = getUSTreasuryYield();
+      var dailySalesAverage = sales30Days / 30;
+      var adjustedPrice = Math.min(assetPerTdg, 1 - treasuryYield / 100);
+      var dailyBudget = dailySalesAverage * adjustedPrice;
+      updatePerformanceStatistic("TDG_DAILY_BUY_BACK_BUDGET", dailyBudget, "USD");
+      report.updated.push({ key: "TDG_DAILY_BUY_BACK_BUDGET", value: dailyBudget });
+      Logger.log("✅ Updated TDG_DAILY_BUY_BACK_BUDGET: " + dailyBudget);
+    } catch (e) {
+      report.errors.push({ key: "TDG_DAILY_BUY_BACK_BUDGET", error: e.message });
+      Logger.log("❌ Error updating TDG_DAILY_BUY_BACK_BUDGET: " + e.message);
+    }
+    
+    // 6. USD_TREASURY_YIELD_1_MONTH
+    try {
+      var treasuryYield = getUSTreasuryYield();
+      updatePerformanceStatistic("USD_TREASURY_YIELD_1_MONTH", treasuryYield, "%");
+      report.updated.push({ key: "USD_TREASURY_YIELD_1_MONTH", value: treasuryYield });
+      Logger.log("✅ Updated USD_TREASURY_YIELD_1_MONTH: " + treasuryYield);
+    } catch (e) {
+      report.errors.push({ key: "USD_TREASURY_YIELD_1_MONTH", error: e.message });
+      Logger.log("❌ Error updating USD_TREASURY_YIELD_1_MONTH: " + e.message);
+    }
+    
+    Logger.log("✅ Sync complete!");
+    Logger.log("Summary:");
+    Logger.log("  - Updated: " + report.updated.length + " keys");
+    Logger.log("  - Errors: " + report.errors.length);
+    Logger.log("  - Skipped: " + report.skipped.length);
+    
+    return report;
+    
+  } catch (error) {
+    report.errors.push({ key: "SYNC", error: error.message });
+    Logger.log("❌ Fatal error in sync: " + error.message);
+    return report;
   }
 }
