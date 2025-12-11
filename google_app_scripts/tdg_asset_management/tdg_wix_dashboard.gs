@@ -83,6 +83,15 @@ var tdgIssuedBalanceTab = SpreadsheetApp.openById(ledgerDocId).getSheetByName("L
 // Sheet name for Performance Statistics (used for web service and sync)
 var PERFORMANCE_STATISTICS_SHEET_NAME = "Performance Statistics";
 
+// Sheet name for Monthly Statistics
+var MONTHLY_STATISTICS_SHEET_NAME = "Monthly Statistics";
+
+// Sheet name for Shipment Ledger Listing
+var SHIPMENT_LEDGER_SHEET_NAME = "Shipment Ledger Listing";
+
+// Sales identification keywords (case-insensitive)
+var SALES_KEYWORDS = ['sale', 'sales', 'sold', 'purchase', 'payment'];
+
 // Solana wallet address for the USDT vault
 var solanaUsdtVaultWalletAddress = "BkcbCEnD14C7cYiN6VwpYuGmpVrjfoRwobhQQScBugqQ";
 
@@ -1216,6 +1225,23 @@ function updatePerformanceStatistic(key, value, currency) {
  */
 function doGet(e) {
   try {
+    // Check if type parameter is provided for monthly statistics
+    var type = e.parameter.type || e.parameter.endpoint;
+    
+    if (type === 'monthly' || type === 'monthly-statistics') {
+      // Return monthly statistics for charting
+      var monthlyData = readMonthlyStatistics();
+      
+      var response = {
+        timestamp: new Date().toISOString(),
+        data: monthlyData
+      };
+      
+      return ContentService
+        .createTextOutput(JSON.stringify(response))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+    
     // Check if shipment ID parameter is provided
     var shipmentId = e.parameter.shipmentId || e.parameter.shipment_id;
     
@@ -1258,6 +1284,70 @@ function doGet(e) {
     return ContentService
       .createTextOutput(JSON.stringify(errorResponse))
       .setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+/**
+ * Read all monthly statistics from Google Sheet
+ * Returns array of monthly data points suitable for charting
+ * 
+ * @return {Array<Object>} Array of monthly statistics objects
+ *   Format: [
+ *     { month: "2024-09", monthlySales: 100.00, cumulativeSales: 100.00, lastUpdated: "2024-09-15T..." },
+ *     ...
+ *   ]
+ */
+function readMonthlyStatistics() {
+  try {
+    var spreadsheet = SpreadsheetApp.openById(ledgerDocId);
+    var sheet = spreadsheet.getSheetByName(MONTHLY_STATISTICS_SHEET_NAME);
+    
+    if (!sheet) {
+      throw new Error("Sheet '" + MONTHLY_STATISTICS_SHEET_NAME + "' not found.");
+    }
+    
+    var lastRow = sheet.getLastRow();
+    if (lastRow < 2) {
+      return [];
+    }
+    
+    // Get all data (assuming header is in row 1)
+    // Column A: Year-Month (YYYY-MM)
+    // Column B: Monthly Sales Volume (USD)
+    // Column C: Cumulative Sales Volume (USD)
+    // Column D: Last Updated (timestamp)
+    var dataRange = sheet.getRange(2, 1, lastRow - 1, 4);
+    var values = dataRange.getValues();
+    
+    var monthlyStats = [];
+    
+    for (var i = 0; i < values.length; i++) {
+      var row = values[i];
+      var month = row[0]; // Column A: Year-Month
+      var monthlySales = row[1]; // Column B: Monthly Sales Volume
+      var cumulativeSales = row[2]; // Column C: Cumulative Sales Volume
+      var lastUpdated = row[3]; // Column D: Last Updated
+      
+      if (month) {
+        monthlyStats.push({
+          month: String(month).trim(),
+          monthlySales: monthlySales !== "" ? parseFloat(monthlySales) : 0,
+          cumulativeSales: cumulativeSales !== "" ? parseFloat(cumulativeSales) : 0,
+          lastUpdated: lastUpdated instanceof Date ? lastUpdated.toISOString() : (lastUpdated || null)
+        });
+      }
+    }
+    
+    // Sort by month (ascending)
+    monthlyStats.sort(function(a, b) {
+      return a.month.localeCompare(b.month);
+    });
+    
+    return monthlyStats;
+    
+  } catch (error) {
+    Logger.log("❌ Error reading Monthly Statistics: " + error.message);
+    throw error;
   }
 }
 
@@ -1311,6 +1401,416 @@ function readPerformanceStatistics() {
     
   } catch (error) {
     Logger.log("❌ Error reading Performance Statistics: " + error.message);
+    throw error;
+  }
+}
+
+/**
+ * Helper function to check if a transaction is a sale based on description and context
+ * 
+ * @param {string} description - Transaction description
+ * @param {boolean} hasEquityMatch - Whether there's a matching Equity transaction (capital injection)
+ * @param {boolean} hasLiabilityMatch - Whether this is part of a transaction group with Liability
+ * @return {boolean} True if this is a sale transaction
+ */
+function isSaleTransaction(description, hasEquityMatch, hasLiabilityMatch) {
+  if (!description) {
+    return false;
+  }
+  
+  var descriptionLower = String(description).toLowerCase();
+  
+  // Exclude if it's a capital injection (has matching Equity transaction)
+  if (hasEquityMatch) {
+    return false;
+  }
+  
+  // Include if description contains sale keywords
+  for (var i = 0; i < SALES_KEYWORDS.length; i++) {
+    if (descriptionLower.indexOf(SALES_KEYWORDS[i]) !== -1) {
+      return true;
+    }
+  }
+  
+  // Include if it's part of a sales transaction group (has Liability match)
+  if (hasLiabilityMatch) {
+    return true;
+  }
+  
+  return false;
+}
+
+/**
+ * Extract sales from 'offchain transactions' sheet (for AGL4) for the current month
+ * 
+ * @param {Sheet} sheet - The offchain transactions sheet
+ * @param {string} currentMonth - Current month in YYYY-MM format
+ * @return {number} Total sales amount for the current month
+ */
+function extractCurrentMonthSalesFromOffchain(sheet, currentMonth) {
+  var totalSales = 0;
+  
+  try {
+    var lastRow = sheet.getLastRow();
+    if (lastRow < 4) {
+      return 0;
+    }
+    
+    // Process rows starting from row 4 (index 3)
+    var dataRange = sheet.getRange(4, 1, lastRow - 3, 7);
+    var values = dataRange.getValues();
+    
+    for (var i = 0; i < values.length; i++) {
+      var row = values[i];
+      
+      try {
+        // Column A: Transaction Date (YYYYMMDD)
+        var dateStr = String(row[0]).trim();
+        if (!dateStr || dateStr.length < 8) {
+          continue;
+        }
+        
+        // Parse date and get month
+        var year = parseInt(dateStr.substring(0, 4));
+        var month = parseInt(dateStr.substring(4, 6));
+        var day = parseInt(dateStr.substring(6, 8));
+        var date = new Date(year, month - 1, day);
+        var monthKey = Utilities.formatDate(date, Session.getScriptTimeZone(), 'yyyy-MM');
+        
+        // Only process current month
+        if (monthKey !== currentMonth) {
+          continue;
+        }
+        
+        // Column D: Amount
+        var amount = parseFloat(row[3]) || 0;
+        
+        // Column E: Currency
+        var currency = String(row[4] || '').trim();
+        
+        // Column G: Is Revenue (flag)
+        var isRevenue = row[6];
+        var isRevenueFlag = (isRevenue === true || 
+                             String(isRevenue).toUpperCase() === 'TRUE' || 
+                             String(isRevenue).trim() === '1');
+        
+        // Column B: Description
+        var description = String(row[1] || '').toLowerCase();
+        var hasSaleKeyword = false;
+        for (var j = 0; j < SALES_KEYWORDS.length; j++) {
+          if (description.indexOf(SALES_KEYWORDS[j]) !== -1) {
+            hasSaleKeyword = true;
+            break;
+          }
+        }
+        
+        // Filter: USD currency, positive amount, and (Is Revenue = TRUE OR has sale keyword)
+        if (currency === 'USD' && amount > 0 && (isRevenueFlag || hasSaleKeyword)) {
+          totalSales += amount;
+        }
+      } catch (e) {
+        // Skip invalid rows
+        continue;
+      }
+    }
+  } catch (e) {
+    Logger.log("Error extracting sales from offchain transactions: " + e.message);
+  }
+  
+  return totalSales;
+}
+
+/**
+ * Extract sales from 'Transactions' sheet (for other AGL ledgers) for the current month
+ * 
+ * @param {Sheet} sheet - The Transactions sheet
+ * @param {string} currentMonth - Current month in YYYY-MM format
+ * @return {number} Total sales amount for the current month
+ */
+function extractCurrentMonthSalesFromTransactions(sheet, currentMonth) {
+  var totalSales = 0;
+  
+  try {
+    var lastRow = sheet.getLastRow();
+    if (lastRow < 2) {
+      return 0;
+    }
+    
+    // Find header row
+    var headerRow = 0;
+    var allValues = sheet.getDataRange().getValues();
+    for (var i = 0; i < allValues.length; i++) {
+      var firstCol = String(allValues[i][0] || '').trim().toLowerCase();
+      if (firstCol.indexOf('date') !== -1 || firstCol === '') {
+        headerRow = i;
+        break;
+      }
+    }
+    
+    // Get all transactions
+    var transactions = [];
+    for (var i = headerRow + 1; i < allValues.length; i++) {
+      var row = allValues[i];
+      if (row.length < 6) {
+        continue;
+      }
+      
+      try {
+        var dateStr = String(row[0] || '').trim();
+        if (!dateStr) {
+          continue;
+        }
+        
+        var amount = parseFloat(row[3]) || 0;
+        var currency = String(row[4] || '').trim();
+        var category = String(row[5] || '').trim();
+        var description = String(row[1] || '');
+        
+        transactions.push({
+          row: i,
+          dateStr: dateStr,
+          description: description,
+          amount: amount,
+          currency: currency,
+          category: category
+        });
+      } catch (e) {
+        continue;
+      }
+    }
+    
+    // Identify equity matches (capital injections)
+    var equityMatches = {};
+    for (var i = 0; i < transactions.length; i++) {
+      var trans = transactions[i];
+      if (trans.currency === 'USD' && trans.category === 'Assets' && trans.amount > 0) {
+        for (var j = 0; j < transactions.length; j++) {
+          if (i !== j) {
+            var other = transactions[j];
+            if (other.dateStr === trans.dateStr &&
+                other.description === trans.description &&
+                Math.abs(other.amount - trans.amount) < 0.01 &&
+                other.currency === 'USD' &&
+                other.category === 'Equity') {
+              equityMatches[i] = true;
+              break;
+            }
+          }
+        }
+      }
+    }
+    
+    // Identify liability matches (sales pattern)
+    var liabilityMatches = {};
+    for (var i = 0; i < transactions.length; i++) {
+      var trans = transactions[i];
+      if (trans.currency === 'USD' && trans.category === 'Assets' && trans.amount > 0) {
+        for (var j = 0; j < transactions.length; j++) {
+          if (i !== j && Math.abs(i - j) <= 2) {
+            var other = transactions[j];
+            if (other.dateStr === trans.dateStr && other.category === 'Liability') {
+              liabilityMatches[i] = true;
+              break;
+            }
+          }
+        }
+      }
+    }
+    
+    // Extract sales for current month
+    for (var i = 0; i < transactions.length; i++) {
+      var trans = transactions[i];
+      
+      if (trans.currency === 'USD' && trans.category === 'Assets' && trans.amount > 0) {
+        // Parse date
+        try {
+          var dateObj;
+          if (trans.dateStr.length >= 8 && /^\d+$/.test(trans.dateStr.substring(0, 8))) {
+            // YYYYMMDD format
+            var year = parseInt(trans.dateStr.substring(0, 4));
+            var month = parseInt(trans.dateStr.substring(4, 6));
+            var day = parseInt(trans.dateStr.substring(6, 8));
+            dateObj = new Date(year, month - 1, day);
+          } else {
+            // Try other formats
+            dateObj = new Date(trans.dateStr.split(' ')[0]);
+          }
+          
+          var monthKey = Utilities.formatDate(dateObj, Session.getScriptTimeZone(), 'yyyy-MM');
+          
+          // Only process current month
+          if (monthKey === currentMonth) {
+            var hasEquity = equityMatches[i] || false;
+            var hasLiability = liabilityMatches[i] || false;
+            
+            if (isSaleTransaction(trans.description, hasEquity, hasLiability)) {
+              totalSales += trans.amount;
+            }
+          }
+        } catch (e) {
+          // Skip invalid dates
+          continue;
+        }
+      }
+    }
+  } catch (e) {
+    Logger.log("Error extracting sales from Transactions sheet: " + e.message);
+  }
+  
+  return totalSales;
+}
+
+/**
+ * Calculate current month's sales volume from all ledgers
+ * 
+ * @return {number} Total sales volume for the current month
+ */
+function calculateCurrentMonthSales() {
+  var currentDate = new Date();
+  var currentMonth = Utilities.formatDate(currentDate, Session.getScriptTimeZone(), 'yyyy-MM');
+  
+  Logger.log("Calculating sales for current month: " + currentMonth);
+  
+  var totalSales = 0;
+  
+  try {
+    var spreadsheet = SpreadsheetApp.openById(ledgerDocId);
+    var shipmentSheet = spreadsheet.getSheetByName(SHIPMENT_LEDGER_SHEET_NAME);
+    
+    if (!shipmentSheet) {
+      Logger.log("⚠️  Shipment Ledger Listing sheet not found");
+      return 0;
+    }
+    
+    var lastRow = shipmentSheet.getLastRow();
+    if (lastRow < 2) {
+      Logger.log("⚠️  No data in Shipment Ledger Listing");
+      return 0;
+    }
+    
+    // Read data from Shipment Ledger Listing
+    // Column A (1) = Shipment ID
+    // Column AB (28) = Resolved Ledger URL
+    var dataRange = shipmentSheet.getRange(2, 1, lastRow - 1, 28);
+    var data = dataRange.getValues();
+    
+    for (var i = 0; i < data.length; i++) {
+      var row = data[i];
+      var shipmentId = String(row[0] || '').trim();
+      var resolvedUrl = String(row[27] || '').trim();
+      
+      if (!shipmentId || !resolvedUrl || shipmentId === '0') {
+        continue;
+      }
+      
+      if (!resolvedUrl.includes('docs.google.com/spreadsheets')) {
+        continue;
+      }
+      
+      try {
+        // Check if it's AGL4 (use main ledger's offchain transactions)
+        if (shipmentId.toUpperCase() === 'AGL4') {
+          var offchainSheet = spreadsheet.getSheetByName('offchain transactions');
+          if (offchainSheet) {
+            var sales = extractCurrentMonthSalesFromOffchain(offchainSheet, currentMonth);
+            totalSales += sales;
+            Logger.log("AGL4: Found $" + sales.toFixed(2) + " in sales for " + currentMonth);
+          }
+        } else {
+          // Open the ledger spreadsheet
+          var ledgerSpreadsheet = SpreadsheetApp.openByUrl(resolvedUrl);
+          var transactionsSheet = ledgerSpreadsheet.getSheetByName('Transactions');
+          if (transactionsSheet) {
+            var sales = extractCurrentMonthSalesFromTransactions(transactionsSheet, currentMonth);
+            totalSales += sales;
+            Logger.log(shipmentId + ": Found $" + sales.toFixed(2) + " in sales for " + currentMonth);
+          }
+        }
+      } catch (e) {
+        Logger.log("⚠️  Error processing " + shipmentId + ": " + e.message);
+        continue;
+      }
+    }
+  } catch (e) {
+    Logger.log("❌ Error calculating current month sales: " + e.message);
+    return 0;
+  }
+  
+  Logger.log("✅ Total current month sales: $" + totalSales.toFixed(2));
+  return totalSales;
+}
+
+/**
+ * Update current month's statistics in the Monthly Statistics sheet
+ * This function calculates the current month's sales and updates the sheet
+ */
+function updateCurrentMonthStatistics() {
+  try {
+    var spreadsheet = SpreadsheetApp.openById(ledgerDocId);
+    var monthlySheet = spreadsheet.getSheetByName(MONTHLY_STATISTICS_SHEET_NAME);
+    
+    if (!monthlySheet) {
+      Logger.log("⚠️  Monthly Statistics sheet not found - skipping update");
+      return;
+    }
+    
+    var currentDate = new Date();
+    var currentMonth = Utilities.formatDate(currentDate, Session.getScriptTimeZone(), 'yyyy-MM');
+    
+    // Calculate current month's sales
+    var currentMonthSales = calculateCurrentMonthSales();
+    
+    // Find the row with this month
+    var lastRow = monthlySheet.getLastRow();
+    var rowIndex = -1;
+    
+    if (lastRow >= 2) {
+      var dataRange = monthlySheet.getRange(2, 1, lastRow - 1, 1); // Column A (Year-Month)
+      var months = dataRange.getValues();
+      
+      for (var i = 0; i < months.length; i++) {
+        var monthValue = String(months[i][0] || '').trim();
+        if (monthValue === currentMonth) {
+          rowIndex = i + 2; // +2 because data starts at row 2
+          break;
+        }
+      }
+    }
+    
+    // Calculate cumulative sales (sum of all previous months + current month)
+    var cumulativeSales = currentMonthSales;
+    if (lastRow >= 2) {
+      // Sum all previous months
+      var dataRange = monthlySheet.getRange(2, 2, lastRow - 1, 1); // Column B (Monthly Sales)
+      var monthlyValues = dataRange.getValues();
+      for (var i = 0; i < monthlyValues.length; i++) {
+        // If this is the current month row, don't double-count
+        if (rowIndex > 0 && i + 2 === rowIndex) {
+          continue;
+        }
+        cumulativeSales += parseFloat(monthlyValues[i][0] || 0);
+      }
+    }
+    
+    if (rowIndex === -1) {
+      // Month not found - add new row
+      monthlySheet.appendRow([
+        currentMonth,
+        currentMonthSales,
+        cumulativeSales,
+        new Date() // Column D: Last Updated
+      ]);
+      Logger.log("✅ Added new row for " + currentMonth + ": $" + currentMonthSales.toFixed(2) + " (Cumulative: $" + cumulativeSales.toFixed(2) + ")");
+    } else {
+      // Update existing row
+      monthlySheet.getRange(rowIndex, 2).setValue(currentMonthSales); // Column B: Monthly Sales Volume
+      monthlySheet.getRange(rowIndex, 3).setValue(cumulativeSales); // Column C: Cumulative Sales Volume
+      monthlySheet.getRange(rowIndex, 4).setValue(new Date()); // Column D: Last Updated
+      Logger.log("✅ Updated row " + rowIndex + " for " + currentMonth + ": $" + currentMonthSales.toFixed(2) + " (Cumulative: $" + cumulativeSales.toFixed(2) + ")");
+    }
+    
+  } catch (error) {
+    Logger.log("❌ Error updating Monthly Statistics: " + error.message);
     throw error;
   }
 }
@@ -1653,6 +2153,15 @@ function syncAllPerformanceStatistics() {
     } catch (e) {
       report.errors.push({ key: "USD_TREASURY_YIELD_1_MONTH", error: e.message });
       Logger.log("❌ Error updating USD_TREASURY_YIELD_1_MONTH: " + e.message);
+    }
+    
+    // 7. Update current month's statistics in Monthly Statistics sheet
+    try {
+      updateCurrentMonthStatistics();
+      Logger.log("✅ Updated current month statistics in Monthly Statistics sheet");
+    } catch (e) {
+      report.errors.push({ key: "MONTHLY_STATISTICS", error: e.message });
+      Logger.log("❌ Error updating Monthly Statistics: " + e.message);
     }
     
     Logger.log("✅ Sync complete!");

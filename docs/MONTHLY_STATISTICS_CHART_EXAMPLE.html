@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TrueSight DAO - Monthly Sales Statistics</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            border-radius: 8px;
+            padding: 30px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+        }
+        .chart-container {
+            position: relative;
+            height: 400px;
+            margin-bottom: 30px;
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-top: 30px;
+        }
+        .stat-card {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 6px;
+            text-align: center;
+        }
+        .stat-label {
+            font-size: 14px;
+            color: #666;
+            margin-bottom: 8px;
+        }
+        .stat-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #333;
+        }
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+        .error {
+            background: #fee;
+            color: #c33;
+            padding: 15px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Monthly Sales Statistics</h1>
+        <p class="subtitle">TrueSight DAO Sales Volume Over Time</p>
+        
+        <div id="error-container"></div>
+        <div id="loading" class="loading">Loading monthly statistics...</div>
+        
+        <div id="chart-section" style="display: none;">
+            <div class="chart-container">
+                <canvas id="salesChart"></canvas>
+            </div>
+            
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-label">Current Month Sales</div>
+                    <div class="stat-value" id="currentMonthSales">$0.00</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Total Cumulative Sales</div>
+                    <div class="stat-value" id="totalCumulativeSales">$0.00</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Average Monthly Sales</div>
+                    <div class="stat-value" id="averageMonthlySales">$0.00</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Total Months Tracked</div>
+                    <div class="stat-value" id="totalMonths">0</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Google Apps Script web service URL
+        const MONTHLY_STATISTICS_URL = 'https://script.google.com/macros/s/AKfycbzlfOBo9UqKOh7jIqGcmbPAMM1RxCbsJHb-UV_vM6VbvK_HSdT44KyGbbXIeo-_Ovfy/exec?type=monthly';
+        
+        let salesChart = null;
+
+        // Format currency
+        function formatCurrency(amount) {
+            return new Intl.NumberFormat('en-US', {
+                style: 'currency',
+                currency: 'USD',
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
+            }).format(amount);
+        }
+
+        // Format month for display (e.g., "2024-09" -> "Sep 2024")
+        function formatMonth(monthStr) {
+            const [year, month] = monthStr.split('-');
+            const date = new Date(year, parseInt(month) - 1);
+            return date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+        }
+
+        // Load monthly statistics from Google Apps Script
+        async function loadMonthlyStatistics() {
+            try {
+                const response = await fetch(MONTHLY_STATISTICS_URL);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const result = await response.json();
+                
+                if (result.error) {
+                    throw new Error(result.message || 'Unknown error from web service');
+                }
+                
+                const monthlyData = result.data || [];
+                
+                if (monthlyData.length === 0) {
+                    throw new Error('No monthly statistics data available');
+                }
+                
+                // Hide loading, show chart
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('chart-section').style.display = 'block';
+                
+                // Render chart
+                renderChart(monthlyData);
+                
+                // Update statistics cards
+                updateStatisticsCards(monthlyData);
+                
+            } catch (error) {
+                console.error('Error loading monthly statistics:', error);
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('error-container').innerHTML = 
+                    '<div class="error">Error loading monthly statistics: ' + error.message + '</div>';
+            }
+        }
+
+        // Render Chart.js chart
+        function renderChart(data) {
+            const ctx = document.getElementById('salesChart').getContext('2d');
+            
+            // Prepare data for chart
+            const labels = data.map(item => formatMonth(item.month));
+            const monthlySales = data.map(item => item.monthlySales);
+            const cumulativeSales = data.map(item => item.cumulativeSales);
+            
+            // Destroy existing chart if it exists
+            if (salesChart) {
+                salesChart.destroy();
+            }
+            
+            // Create new chart
+            salesChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: 'Monthly Sales',
+                            data: monthlySales,
+                            borderColor: 'rgb(75, 192, 192)',
+                            backgroundColor: 'rgba(75, 192, 192, 0.1)',
+                            tension: 0.1,
+                            yAxisID: 'y',
+                            fill: true
+                        },
+                        {
+                            label: 'Cumulative Sales',
+                            data: cumulativeSales,
+                            borderColor: 'rgb(255, 99, 132)',
+                            backgroundColor: 'rgba(255, 99, 132, 0.1)',
+                            tension: 0.1,
+                            yAxisID: 'y1',
+                            fill: false
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: {
+                        mode: 'index',
+                        intersect: false,
+                    },
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: 'Monthly Sales Volume Over Time'
+                        },
+                        legend: {
+                            display: true,
+                            position: 'top'
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    let label = context.dataset.label || '';
+                                    if (label) {
+                                        label += ': ';
+                                    }
+                                    label += formatCurrency(context.parsed.y);
+                                    return label;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            display: true,
+                            title: {
+                                display: true,
+                                text: 'Month'
+                            }
+                        },
+                        y: {
+                            type: 'linear',
+                            display: true,
+                            position: 'left',
+                            title: {
+                                display: true,
+                                text: 'Monthly Sales (USD)'
+                            },
+                            ticks: {
+                                callback: function(value) {
+                                    return formatCurrency(value);
+                                }
+                            }
+                        },
+                        y1: {
+                            type: 'linear',
+                            display: true,
+                            position: 'right',
+                            title: {
+                                display: true,
+                                text: 'Cumulative Sales (USD)'
+                            },
+                            grid: {
+                                drawOnChartArea: false,
+                            },
+                            ticks: {
+                                callback: function(value) {
+                                    return formatCurrency(value);
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Update statistics cards
+        function updateStatisticsCards(data) {
+            if (data.length === 0) return;
+            
+            // Current month (last entry)
+            const currentMonth = data[data.length - 1];
+            document.getElementById('currentMonthSales').textContent = formatCurrency(currentMonth.monthlySales);
+            
+            // Total cumulative sales (last entry's cumulative value)
+            document.getElementById('totalCumulativeSales').textContent = formatCurrency(currentMonth.cumulativeSales);
+            
+            // Average monthly sales
+            const totalMonthly = data.reduce((sum, item) => sum + item.monthlySales, 0);
+            const average = totalMonthly / data.length;
+            document.getElementById('averageMonthlySales').textContent = formatCurrency(average);
+            
+            // Total months
+            document.getElementById('totalMonths').textContent = data.length;
+        }
+
+        // Load data on page load
+        window.addEventListener('DOMContentLoaded', loadMonthlyStatistics);
+    </script>
+</body>
+</html>
+
