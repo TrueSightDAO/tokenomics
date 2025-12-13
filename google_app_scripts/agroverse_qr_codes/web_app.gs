@@ -50,7 +50,8 @@ function doOptions(e) {
  *
  * Expects either:
  * - 'qr_code' and 'email_address' query parameters for updating email.
- * - 'list=true' query parameter to return QR codes where column D = 'MINTED'.
+ * - 'list=true' query parameter to return QR codes where column D is NOT 'SOLD' (includes MINTED, CONSIGNMENT, etc.).
+ * - 'list_with_members=true' query parameter to return QR codes with details where column D is NOT 'SOLD'.
  *
  * @param {Object} e Event object containing parameters.
  * @return {ContentService.TextOutput} JSON response with results or error.
@@ -67,7 +68,7 @@ function doGet(e) {
       });
     }
 
-    // Check if the request is for listing minted QR codes
+    // Check if the request is for listing QR codes (excluding SOLD)
     if (e.parameter[LIST_PARAM] === 'true') {
       var lastRow = sheet.getLastRow();
       if (lastRow < DATA_START_ROW) {
@@ -79,22 +80,23 @@ function doGet(e) {
 
       // Get QR codes (column A) and status (column D)
       var dataRange = sheet.getRange(DATA_START_ROW, 1, lastRow - DATA_START_ROW + 1, 4).getValues();
-      var mintedQrCodes = [];
+      var availableQrCodes = [];
 
-      // Filter rows where column D (index 3) is 'MINTED'
+      // Filter rows where column D (index 3) is NOT 'SOLD' (include MINTED, CONSIGNMENT, and all other statuses)
       for (var i = 0; i < dataRange.length; i++) {
-        if (dataRange[i][3] === 'MINTED') {
-          mintedQrCodes.push(dataRange[i][0]); // QR code from column A
+        var status = (dataRange[i][3] || '').toString().toUpperCase().trim();
+        if (status !== 'SOLD') {
+          availableQrCodes.push(dataRange[i][0]); // QR code from column A
         }
       }
 
       return createCORSResponse({
         status: 'success',
-        qr_codes: mintedQrCodes
+        qr_codes: availableQrCodes
       });
     }
 
-    // Check if the request is for listing minted QR codes with member names
+    // Check if the request is for listing QR codes with member names (excluding SOLD)
     if (e.parameter[LIST_WITH_MEMBERS_PARAM] === 'true') {
       var lastRow = sheet.getLastRow();
       if (lastRow < DATA_START_ROW) {
@@ -106,18 +108,20 @@ function doGet(e) {
 
       // Get QR codes (column A), status (column D), ledger (column C, index 2), currency (column I, index 8), and manager names (column U, index 20)
       var dataRange = sheet.getRange(DATA_START_ROW, 1, lastRow - DATA_START_ROW + 1, 21).getValues();
-      var mintedQrCodesWithMembers = [];
+      var availableQrCodesWithMembers = [];
 
-      // Filter rows where column D (index 3) is 'MINTED'
+      // Filter rows where column D (index 3) is NOT 'SOLD' (include MINTED, CONSIGNMENT, and all other statuses)
       for (var i = 0; i < dataRange.length; i++) {
-        if (dataRange[i][3] === 'MINTED') {
+        var status = (dataRange[i][3] || '').toString().toUpperCase().trim();
+        if (status !== 'SOLD') {
           var qrCode = dataRange[i][0]; // Column A
           var ledgerShortcut = dataRange[i][2] || ''; // Column C (index 2)
           var currency = dataRange[i][8] || ''; // Column I (index 8)
           var managerName = dataRange[i][20] || ''; // Column U (index 20)
           
-          mintedQrCodesWithMembers.push({
+          availableQrCodesWithMembers.push({
             qr_code: qrCode,
+            status: status, // Include status in response for frontend filtering
             currency: currency,
             ledger_shortcut: ledgerShortcut,
             contributor_name: managerName
@@ -127,7 +131,7 @@ function doGet(e) {
 
       return createCORSResponse({
         status: 'success',
-        items: mintedQrCodesWithMembers
+        items: availableQrCodesWithMembers
       });
     }
 
