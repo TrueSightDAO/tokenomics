@@ -568,7 +568,7 @@ function checkTdgIssued(message, sender, platform) {
   };
 
   const requestData = {
-    "model": "grok-2-latest",
+    "model": "grok-3",
     "messages": [{ "role": "user", "content": payload }],
     "stream": false,
     "temperature": 0
@@ -611,7 +611,7 @@ function getContributorsFromMessage(message, reporter, platform) {
   };
 
   const requestData = {
-    "model": "grok-2-latest",
+    "model": "grok-3",
     "messages": [{ "role": "user", "content": payload }],
     "stream": false,
     "temperature": 0
@@ -1165,7 +1165,8 @@ function extractContributionDetails(message) {
     Logger.log(`extractContributionDetails: Regex failed to match contribution message: ${message}`);
     
     // Fallback parsing to extract fields line by line
-    const lines = message.split('\n').map(line => line.trim());
+    // Split lines but preserve original structure for description field
+    const rawLines = message.split('\n');
     let contributionDetails = {
       type: null,
       amount: null,
@@ -1179,7 +1180,9 @@ function extractContributionDetails(message) {
     let currentField = null;
     let descriptionLines = [];
     
-    for (let line of lines) {
+    for (let rawLine of rawLines) {
+      const line = rawLine.trim();
+      
       if (line.startsWith('[CONTRIBUTION EVENT]')) continue;
       if (line.startsWith('- Type:')) {
         contributionDetails.type = line.replace(/^- Type:\s*/, '').trim();
@@ -1189,7 +1192,8 @@ function extractContributionDetails(message) {
         contributionDetails.amount = amountMatch ? parseFloat(amountMatch[1]) : null;
         currentField = null;
       } else if (line.startsWith('- Description:')) {
-        descriptionLines = [line.replace(/^- Description:\s*/, '').trim()];
+        const descStart = line.replace(/^- Description:\s*/, '').trim();
+        descriptionLines = descStart ? [descStart] : [];
         currentField = 'description';
       } else if (line.startsWith('- Contributor(s):')) {
         contributionDetails.contributors = line.replace(/^- Contributor\(s\):\s*/, '').trim();
@@ -1207,13 +1211,16 @@ function extractContributionDetails(message) {
         currentField = null;
       } else if (line.startsWith('---') || line.startsWith('My Digital Signature:')) {
         break; // Stop parsing at signature or separator
-      } else if (currentField === 'description' && line) {
-        descriptionLines.push(line);
+      } else if (currentField === 'description') {
+        // Preserve original line (including blank lines) for description
+        // This maintains formatting with blank lines between paragraphs
+        descriptionLines.push(rawLine);
       }
     }
     
     if (descriptionLines.length > 0) {
-      contributionDetails.description = descriptionLines.join('\n');
+      // Join with newlines and trim only leading/trailing whitespace
+      contributionDetails.description = descriptionLines.join('\n').trim();
     }
     
     // Check if all required fields were found
