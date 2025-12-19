@@ -189,7 +189,7 @@ function resolveRedirect(url) {
 
 // Function to extract AGL contract name from URL
 function extractAglContractName(url) {
-  const prefix_type_1 = 'https://www.agroverse.shop/';
+  const prefix_type_1 = 'https://agroverse.shop/';
   const prefix_type_2 = 'https://truesight.me/sunmint/';
   if (url.startsWith(prefix_type_1)) {
     return url.slice(prefix_type_1.length);
@@ -271,6 +271,8 @@ function processNonAgl4Transactions() {
       }
       
       // Resolve redirect to get destination spreadsheet URL
+      Logger.log(sourceData[i][QR_CODE_COL])
+      Logger.log(agroverseValue);
       const destSheetUrl = resolveRedirect(agroverseValue);
       if (!destSheetUrl || !destSheetUrl.includes('docs.google.com/spreadsheets')) {
         Logger.log(`Skipping row ${i + 1}: Invalid or non-spreadsheet redirect URL ${destSheetUrl}`);
