@@ -37,13 +37,47 @@ const LEDGER_URL_COL = 11; // Column L - Ledger URL
 
 /**
  * Resolves redirect URLs to get the final URL.
- * Handles both HTTP header redirects and JavaScript-enabled redirects.
+ * First checks "Shipment Ledger Listing" sheet (Column L -> Column AB lookup)
+ * Falls back to HTTP resolution if not found in sheet
  * @param {string} url - The URL to resolve.
  * @return {string} The resolved URL or empty string on error.
  */
 function resolveRedirect(url) {
   console.log("resolving " + url);
   try {
+    // First, try to look up the URL in "Shipment Ledger Listing" sheet
+    // Column L (index 11) = unresolved URL, Column AB (index 27) = resolved URL
+    try {
+      const spreadsheet = SpreadsheetApp.openByUrl(AGROVERSE_QR_SHEET_URL);
+      const shipmentSheet = spreadsheet.getSheetByName(SHIPMENT_LEDGER_SHEET_NAME);
+      
+      if (shipmentSheet) {
+        const lastRow = shipmentSheet.getLastRow();
+        if (lastRow >= 2) {
+          // Read columns A to AB (28 columns) to get both Column L and Column AB
+          const dataRange = shipmentSheet.getRange(2, 1, lastRow - 1, 28);
+          const data = dataRange.getValues();
+          
+          for (let i = 0; i < data.length; i++) {
+            const row = data[i];
+            const ledgerUrl = row[LEDGER_URL_COL] ? row[LEDGER_URL_COL].toString().trim() : ''; // Column L (index 11)
+            
+            // Check if this row's Column L matches the input URL
+            if (ledgerUrl === url || ledgerUrl === url.trim()) {
+              const resolvedUrl = row[27] ? row[27].toString().trim() : ''; // Column AB (index 27)
+              if (resolvedUrl) {
+                Logger.log(`Found resolved URL in sheet: ${url} -> ${resolvedUrl}`);
+                return resolvedUrl;
+              }
+            }
+          }
+        }
+      }
+    } catch (sheetError) {
+      Logger.log(`Could not lookup URL in sheet, falling back to HTTP resolution: ${sheetError.message}`);
+    }
+    
+    // Fallback to HTTP resolution if not found in sheet
     let currentUrl = url;
     let redirectCount = 0;
 

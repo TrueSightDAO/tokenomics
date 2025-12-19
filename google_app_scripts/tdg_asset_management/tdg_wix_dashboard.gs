@@ -96,8 +96,44 @@ var SALES_KEYWORDS = ['sale', 'sales', 'sold', 'purchase', 'payment'];
 var solanaUsdtVaultWalletAddress = "BkcbCEnD14C7cYiN6VwpYuGmpVrjfoRwobhQQScBugqQ";
 
 // Function to resolve redirect URL - handles both HTTP redirects and JavaScript redirects
+// Resolves redirect URLs to get the final URL.
+// First checks "Shipment Ledger Listing" sheet (Column L -> Column AB lookup)
+// Falls back to HTTP resolution if not found in sheet
 function resolveRedirect(url) {
   try {
+    // First, try to look up the URL in "Shipment Ledger Listing" sheet
+    // Column L (index 11) = unresolved URL, Column AB (index 27) = resolved URL
+    try {
+      const spreadsheet = SpreadsheetApp.openById(ledgerDocId);
+      const shipmentSheet = spreadsheet.getSheetByName('Shipment Ledger Listing');
+      
+      if (shipmentSheet) {
+        const lastRow = shipmentSheet.getLastRow();
+        if (lastRow >= 2) {
+          // Read columns A to AB (28 columns) to get both Column L and Column AB
+          const dataRange = shipmentSheet.getRange(2, 1, lastRow - 1, 28);
+          const data = dataRange.getValues();
+          
+          for (let i = 0; i < data.length; i++) {
+            const row = data[i];
+            const ledgerUrl = row[11] ? row[11].toString().trim() : ''; // Column L (index 11)
+            
+            // Check if this row's Column L matches the input URL
+            if (ledgerUrl === url || ledgerUrl === url.trim()) {
+              const resolvedUrl = row[27] ? row[27].toString().trim() : ''; // Column AB (index 27)
+              if (resolvedUrl) {
+                Logger.log(`Found resolved URL in sheet: ${url} -> ${resolvedUrl}`);
+                return resolvedUrl;
+              }
+            }
+          }
+        }
+      }
+    } catch (sheetError) {
+      Logger.log(`Could not lookup URL in sheet, falling back to HTTP resolution: ${sheetError.message}`);
+    }
+    
+    // Fallback to HTTP resolution if not found in sheet
     let currentUrl = url;
     let redirectCount = 0;
     const maxRedirects = 10;
@@ -109,22 +145,41 @@ function resolveRedirect(url) {
       });
       const responseCode = response.getResponseCode();
 
-      // If not a redirect (2xx or other), check if it's a Google Sheets URL
+      // If not a redirect (2xx or other), check for JavaScript redirects
       if (responseCode < 300 || responseCode >= 400) {
-        // Check if it's already a Google Sheets URL
-        if (currentUrl.includes('docs.google.com/spreadsheets')) {
-          return currentUrl;
-        }
-        
-        // If not, try to parse HTML for JavaScript redirects
+        // Check if the response contains JavaScript redirects
         const content = response.getContentText();
-        const resolvedFromHtml = extractUrlFromHtml(content, currentUrl);
-        if (resolvedFromHtml && resolvedFromHtml.includes('docs.google.com/spreadsheets')) {
-          Logger.log(`Resolved JavaScript redirect: ${url} -> ${resolvedFromHtml}`);
-          return resolvedFromHtml;
+        const jsRedirectMatch = content.match(/window\.location\.(replace|href)\s*=\s*['"]([^'"]+)['"]/i) ||
+                                content.match(/window\.location\.replace\(['"]([^'"]+)['"]\)/i) ||
+                                content.match(/<meta\s+http-equiv=['"]refresh['"]\s+content=['"]\d+;url=([^'"]+)['"]/i);
+        
+        if (jsRedirectMatch) {
+          const redirectUrl = jsRedirectMatch[1] || jsRedirectMatch[2];
+          if (redirectUrl) {
+            // Resolve relative URLs to absolute
+            if (redirectUrl.startsWith('http://') || redirectUrl.startsWith('https://')) {
+              currentUrl = redirectUrl;
+              redirectCount++;
+              Logger.log(`Found JavaScript redirect to: ${currentUrl}`);
+              continue;
+            } else {
+              // Relative URL - construct absolute URL
+              try {
+                const baseUrl = new URL(currentUrl);
+                const resolvedUrl = new URL(redirectUrl, baseUrl).toString();
+                currentUrl = resolvedUrl;
+                redirectCount++;
+                Logger.log(`Resolved relative JavaScript redirect to: ${currentUrl}`);
+                continue;
+              } catch (e) {
+                Logger.log(`Error resolving relative JavaScript redirect: ${e.message}`);
+                return currentUrl;
+              }
+            }
+          }
         }
         
-        // If we got a 200 response but it's not a spreadsheet URL, return it anyway
+        // No JavaScript redirect found, return current URL
         return currentUrl;
       }
 
@@ -132,16 +187,32 @@ function resolveRedirect(url) {
       const headers = response.getHeaders();
       const location = headers['Location'] || headers['location'];
       if (!location) {
-        // No Location header - try parsing HTML for JavaScript redirect
+        Logger.log(`No Location header for redirect at ${currentUrl}`);
+        // Try to check for JavaScript redirect in response body
         const content = response.getContentText();
-        const resolvedFromHtml = extractUrlFromHtml(content, currentUrl);
-        if (resolvedFromHtml) {
-          currentUrl = resolvedFromHtml;
-          redirectCount++;
-          continue;
-        }
+        const jsRedirectMatch = content.match(/window\.location\.(replace|href)\s*=\s*['"]([^'"]+)['"]/i) ||
+                                content.match(/window\.location\.replace\(['"]([^'"]+)['"]\)/i) ||
+                                content.match(/<meta\s+http-equiv=['"]refresh['"]\s+content=['"]\d+;url=([^'"]+)['"]/i);
         
-        Logger.log(`No Location header or JavaScript redirect found at ${currentUrl}`);
+        if (jsRedirectMatch) {
+          const redirectUrl = jsRedirectMatch[1] || jsRedirectMatch[2];
+          if (redirectUrl) {
+            if (redirectUrl.startsWith('http://') || redirectUrl.startsWith('https://')) {
+              currentUrl = redirectUrl;
+            } else {
+              try {
+                const baseUrl = new URL(currentUrl);
+                currentUrl = new URL(redirectUrl, baseUrl).toString();
+              } catch (e) {
+                Logger.log(`Error resolving relative JavaScript redirect: ${e.message}`);
+                return '';
+              }
+            }
+            redirectCount++;
+            Logger.log(`Found JavaScript redirect to: ${currentUrl}`);
+            continue;
+          }
+        }
         return '';
       }
 

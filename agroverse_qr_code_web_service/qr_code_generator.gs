@@ -161,8 +161,43 @@ function getLedgerConfigsFromWix() {
 }
 
 // Helper function to resolve redirect URLs
+// First checks "Shipment Ledger Listing" sheet (Column L -> Column AB lookup)
+// Falls back to HTTP resolution if not found in sheet
 function resolveRedirect(url) {
   try {
+    // First, try to look up the URL in "Shipment Ledger Listing" sheet
+    // Column L (index 11) = unresolved URL, Column AB (index 27) = resolved URL
+    try {
+      var spreadsheet = SpreadsheetApp.openByUrl(SPREADSHEET_URL);
+      var shipmentSheet = spreadsheet.getSheetByName(SHIPMENT_LEDGER_SHEET_NAME);
+      
+      if (shipmentSheet) {
+        var lastRow = shipmentSheet.getLastRow();
+        if (lastRow >= 2) {
+          // Read columns A to AB (28 columns) to get both Column L and Column AB
+          var dataRange = shipmentSheet.getRange(2, 1, lastRow - 1, 28);
+          var data = dataRange.getValues();
+          
+          for (var i = 0; i < data.length; i++) {
+            var row = data[i];
+            var ledgerUrl = row[11] ? row[11].toString().trim() : ''; // Column L (index 11)
+            
+            // Check if this row's Column L matches the input URL
+            if (ledgerUrl === url || ledgerUrl === url.trim()) {
+              var resolvedUrl = row[27] ? row[27].toString().trim() : ''; // Column AB (index 27)
+              if (resolvedUrl) {
+                Logger.log('Found resolved URL in sheet: ' + url + ' -> ' + resolvedUrl);
+                return resolvedUrl;
+              }
+            }
+          }
+        }
+      }
+    } catch (sheetError) {
+      Logger.log('Could not lookup URL in sheet, falling back to HTTP resolution: ' + sheetError.message);
+    }
+    
+    // Fallback to HTTP resolution if not found in sheet
     var currentUrl = url;
     var redirectCount = 0;
     var maxRedirects = 10;
@@ -174,17 +209,78 @@ function resolveRedirect(url) {
       });
       var responseCode = response.getResponseCode();
       
+      // If not a redirect (2xx or other), check for JavaScript redirects
       if (responseCode < 300 || responseCode >= 400) {
+        // Check if the response contains JavaScript redirects
+        var content = response.getContentText();
+        var jsRedirectMatch = content.match(/window\.location\.(replace|href)\s*=\s*['"]([^'"]+)['"]/i) ||
+                            content.match(/window\.location\.replace\(['"]([^'"]+)['"]\)/i) ||
+                            content.match(/<meta\s+http-equiv=['"]refresh['"]\s+content=['"]\d+;url=([^'"]+)['"]/i);
+        
+        if (jsRedirectMatch) {
+          var redirectUrl = jsRedirectMatch[1] || jsRedirectMatch[2];
+          if (redirectUrl) {
+            // Resolve relative URLs to absolute
+            if (redirectUrl.startsWith('http://') || redirectUrl.startsWith('https://')) {
+              currentUrl = redirectUrl;
+              redirectCount++;
+              Logger.log('Found JavaScript redirect to: ' + currentUrl);
+              continue;
+            } else {
+              // Relative URL - construct absolute URL
+              try {
+                var baseUrl = new URL(currentUrl);
+                var resolvedUrl = new URL(redirectUrl, baseUrl).toString();
+                currentUrl = resolvedUrl;
+                redirectCount++;
+                Logger.log('Resolved relative JavaScript redirect to: ' + currentUrl);
+                continue;
+              } catch (e) {
+                Logger.log('Error resolving relative JavaScript redirect: ' + e.message);
+                return currentUrl;
+              }
+            }
+          }
+        }
+        
+        // No JavaScript redirect found, return current URL
         return currentUrl;
       }
       
+      // Get the Location header for HTTP redirect
       var headers = response.getHeaders();
       var location = headers['Location'] || headers['location'];
       if (!location) {
         Logger.log('No Location header for redirect at ' + currentUrl);
+        // Try to check for JavaScript redirect in response body
+        var content = response.getContentText();
+        var jsRedirectMatch = content.match(/window\.location\.(replace|href)\s*=\s*['"]([^'"]+)['"]/i) ||
+                            content.match(/window\.location\.replace\(['"]([^'"]+)['"]\)/i) ||
+                            content.match(/<meta\s+http-equiv=['"]refresh['"]\s+content=['"]\d+;url=([^'"]+)['"]/i);
+        
+        if (jsRedirectMatch) {
+          var redirectUrl = jsRedirectMatch[1] || jsRedirectMatch[2];
+          if (redirectUrl) {
+            if (redirectUrl.startsWith('http://') || redirectUrl.startsWith('https://')) {
+              currentUrl = redirectUrl;
+            } else {
+              try {
+                var baseUrl = new URL(currentUrl);
+                currentUrl = new URL(redirectUrl, baseUrl).toString();
+              } catch (e) {
+                Logger.log('Error resolving relative JavaScript redirect: ' + e.message);
+                return '';
+              }
+            }
+            redirectCount++;
+            Logger.log('Found JavaScript redirect to: ' + currentUrl);
+            continue;
+          }
+        }
         return '';
       }
       
+      // Update the current URL and increment redirect count
       currentUrl = location;
       redirectCount++;
     }
