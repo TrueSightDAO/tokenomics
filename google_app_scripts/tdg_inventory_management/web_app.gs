@@ -27,6 +27,7 @@
 const SPREADSHEET_ID = '1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU';
 const SHEET_NAME = 'offchain asset location';
 const CONTACT_SHEET_NAME = 'Contributors contact information';
+const CURRENCIES_SHEET_NAME = 'Currencies';
 const creds = getCredentials(); // Assumed to be defined elsewhere
 const WIX_ACCESS_TOKEN = creds.WIX_API_KEY; // Wix API key
 
@@ -426,6 +427,46 @@ function testAllCurrencies() {
 }
 
 /**
+ * Get weight (in grams) for a currency from the Currencies sheet
+ * @param {string} currencyName - The currency/product name to look up
+ * @return {number|null} Weight in grams, or null if not found
+ */
+function getCurrencyWeight(currencyName) {
+  try {
+    const spreadsheet = SpreadsheetApp.openById(SPREADSHEET_ID);
+    const currenciesSheet = spreadsheet.getSheetByName(CURRENCIES_SHEET_NAME);
+    
+    if (!currenciesSheet) {
+      Logger.log('Currencies sheet not found');
+      return null;
+    }
+    
+    const lastRow = currenciesSheet.getLastRow();
+    if (lastRow < 2) {
+      return null;
+    }
+    
+    // Read columns A (name) and K (weight in grams)
+    const dataRange = currenciesSheet.getRange(2, 1, lastRow - 1, 11).getValues(); // A to K
+    
+    for (let i = 0; i < dataRange.length; i++) {
+      const row = dataRange[i];
+      const productName = row[0] ? row[0].toString().trim() : '';
+      const weightGrams = row[10] ? parseFloat(row[10]) : null; // Column K (index 10)
+      
+      if (productName && productName.toLowerCase() === currencyName.toLowerCase()) {
+        return weightGrams && weightGrams > 0 ? weightGrams : null;
+      }
+    }
+    
+    return null;
+  } catch (error) {
+    Logger.log('Error getting currency weight: ' + error.message);
+    return null;
+  }
+}
+
+/**
  * List all currencies across all ledgers with their quantities
  * Returns currencies from both the main inventory sheet and all external ledgers
  */
@@ -449,6 +490,8 @@ function listAllCurrenciesAcrossLedgers() {
         
         if (currencyName && quantity > 0) {
           if (!currencyQuantities[currencyName]) {
+            // Get weight from Currencies sheet
+            const weightGrams = getCurrencyWeight(currencyName);
             currencyQuantities[currencyName] = {
               product_name: currencyName,
               product_image: '',
@@ -458,6 +501,7 @@ function listAllCurrenciesAcrossLedgers() {
               state: '',
               country: '',
               year: '',
+              unit_weight_g: weightGrams, // Weight in grams from Column K
               total_quantity: 0,
               ledger_quantities: {}
             };
@@ -513,6 +557,8 @@ function listAllCurrenciesAcrossLedgers() {
           
           if (assetName && quantity > 0) {
             if (!currencyQuantities[assetName]) {
+              // Get weight from Currencies sheet
+              const weightGrams = getCurrencyWeight(assetName);
               currencyQuantities[assetName] = {
                 product_name: assetName,
                 product_image: '',
@@ -522,6 +568,7 @@ function listAllCurrenciesAcrossLedgers() {
                 state: '',
                 country: '',
                 year: '',
+                unit_weight_g: weightGrams, // Weight in grams from Column K
                 total_quantity: 0,
                 ledger_quantities: {}
               };
