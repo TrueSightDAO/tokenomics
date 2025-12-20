@@ -266,6 +266,13 @@ function processAllReviewedRows() {
     for (let i = 1; i < originData.length; i++) {
       const status = originData[i][5]; // Column F (index 5)
       const hash_key = originData[i][10]; // Column K (index 10)
+      const columnI = originData[i][8]; // Column I (index 8)
+      
+      // Skip rows where Column I is "RESOLVE FAILED"
+      if (columnI === 'RESOLVE FAILED') {
+        Logger.log(`Skipping row ${i + 1} with hash_key ${hash_key}: Column I is "RESOLVE FAILED"`);
+        continue;
+      }
       
       // Process rows with "Reviewed" status that have a hash key
       if (status === REVIEWED_STATUS && hash_key) {
