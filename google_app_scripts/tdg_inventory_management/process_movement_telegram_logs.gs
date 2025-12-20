@@ -854,13 +854,13 @@ function processInventoryMovementToLedgers() {
       return;
     }
 
-    // Get all data from Inventory Movement (Columns A to N)
+    // Get all data from Inventory Movement (Columns A to O)
     const inventoryLastRow = inventorySheet.getLastRow();
     if (inventoryLastRow < 1) {
       Logger.log('No data in Inventory Movement');
       return;
     }
-    const inventoryData = inventorySheet.getRange(1, 1, inventoryLastRow, 14).getValues(); // Columns A to N
+    const inventoryData = inventorySheet.getRange(1, 1, inventoryLastRow, 15).getValues(); // Columns A to O (to check Column O for backfill)
 
     // Process each row in Inventory Movement
     const updates = []; // Store updates for Column N (status) and Column O (row numbers)
@@ -899,13 +899,26 @@ function processInventoryMovementToLedgers() {
         targetSpreadsheetId = OFFCHAIN_SPREADSHEET_ID;
         targetSheetName = OFFCHAIN_SHEET_NAME;
       } else {
-        // For AGL ledgers, extract spreadsheet ID from ledger_url
-        targetSpreadsheetId = ledgerUrl.match(/\/d\/([^\/]+)/)?.[1] || '';
+        // For AGL ledgers, resolve redirect URL first, then extract spreadsheet ID
+        let resolvedLedgerUrl = ledgerUrl;
+        if (ledgerUrl && typeof ledgerUrl === 'string' && ledgerUrl.trim()) {
+          resolvedLedgerUrl = resolveRedirect(ledgerUrl.trim());
+          if (!resolvedLedgerUrl) {
+            Logger.log(`Skipping row ${rowNumber}: Could not resolve ledger URL for ${ledgerName}: ${ledgerUrl}`);
+            // Mark as error instead of leaving as NEW
+            inventorySheet.getRange(rowNumber, 14).setValue('ERROR: Could not resolve ledger URL');
+            return;
+          }
+        }
+        // Extract spreadsheet ID from resolved URL
+        targetSpreadsheetId = resolvedLedgerUrl.match(/\/d\/([^\/]+)/)?.[1] || '';
         targetSheetName = AGL_SHEET_NAME;
       }
 
       if (!targetSpreadsheetId) {
-        Logger.log(`Skipping row ${rowNumber}: Invalid ledger URL for ${ledgerName}`);
+        Logger.log(`Skipping row ${rowNumber}: Invalid ledger URL for ${ledgerName}: ${ledgerUrl}`);
+        // Mark as error instead of leaving as NEW
+        inventorySheet.getRange(rowNumber, 14).setValue('ERROR: Invalid ledger URL');
         return;
       }
 
@@ -992,9 +1005,29 @@ function processInventoryMovementToLedgers() {
 
     // Update Inventory Movement with row numbers and status
     updates.forEach(update => {
-      inventorySheet.getRange(update.rowNumber, 15).setValue(update.insertedRowNumbers); // Column O
+      // Set Column O as text format to prevent Google Sheets from interpreting comma-separated numbers
+      const columnOCell = inventorySheet.getRange(update.rowNumber, 15);
+      columnOCell.setNumberFormat('@'); // Set format to text
+      columnOCell.setValue(update.insertedRowNumbers); // Column O
       inventorySheet.getRange(update.rowNumber, 14).setValue('PROCESSED'); // Column N
     });
+
+    // Fix: Backfill Column O for rows that are PROCESSED but missing Column O
+    // This handles cases where Column N was updated but Column O update failed
+    let backfilledCount = 0;
+    inventoryData.forEach((row, index) => {
+      const rowNumber = index + 1;
+      if (rowNumber === 1) return; // Skip header row
+      const status = row[13]; // Column N: Status
+      const recordRows = row[14]; // Column O: Record Rows (if available in data range)
+      if (status === 'PROCESSED' && (!recordRows || recordRows.toString().trim() === '')) {
+        Logger.log(`Warning: Row ${rowNumber} is PROCESSED but Column O is empty. Manual review may be needed.`);
+        backfilledCount++;
+      }
+    });
+    if (backfilledCount > 0) {
+      Logger.log(`Found ${backfilledCount} rows with PROCESSED status but missing Column O. Manual review recommended.`);
+    }
 
     if (updates.length > 0) {
       Logger.log(`Processed ${updates.length} records in Inventory Movement`);
