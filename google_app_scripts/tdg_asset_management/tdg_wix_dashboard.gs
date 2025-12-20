@@ -783,7 +783,8 @@ function get30DaysSalesOnWix() {
   return response_obj.dataItem.data.exchangeRate;
 }
 
-// Method to set 30 days sales on Wix (unchanged)
+// Method to set 30 days sales on Wix
+// latest_30days_sales should be ecosystem sales (all ledgers) for display
 function set30DaysSalesOnWix(latest_30days_sales) {
   var options = getWixRequestHeader();  
   var payload = {
@@ -808,8 +809,13 @@ function set30DaysSalesOnWix(latest_30days_sales) {
   var response_obj = JSON.parse(content);  
   Logger.log("Updated 30 Days Sales on Wix: " + latest_30days_sales);
   
-  // Sync to Performance Statistics sheet
+  // Sync to Performance Statistics sheet (ecosystem sales - all ledgers)
   updatePerformanceStatistic("PAST_30_DAYS_SALES", latest_30days_sales, "USD");
+  
+  // Also save DAO revenue (main ledger only) for buy-back budget calculation
+  var daoRevenue = get30DaysSales(); // Main ledger only
+  updatePerformanceStatistic("PAST_30_DAYS_DAO_REVENUE", daoRevenue, "USD");
+  Logger.log("Updated PAST_30_DAYS_DAO_REVENUE: " + daoRevenue);
 }
 
 // Method to get 30 days sales from Google Sheet (simple version using F1)
@@ -850,13 +856,314 @@ function get30DaysSalesWithQuery() {
 
 // Example usage function
 function update30DaysSalesOnWix() {
-  // Choose which version to use:
-  var sales = get30DaysSales();  // Simple F1 version
-  // OR
-  // var sales = get30DaysSalesWithQuery();  // Full query version
+  // Use all-ledgers version for ecosystem sales display
+  var ecosystemSales = get30DaysSalesFromAllLedgers();
+  var daoRevenue = get30DaysSales(); // Main ledger only for DAO revenue
   
-  set30DaysSalesOnWix(sales);
+  set30DaysSalesOnWix(ecosystemSales);
+  // Also save DAO revenue separately
+  updatePerformanceStatistic("PAST_30_DAYS_DAO_REVENUE", daoRevenue, "USD");
   get30DaysSalesOnWix();
+}
+
+/**
+ * Extract sales from 'offchain transactions' sheet for the past 30 days
+ * 
+ * @param {Sheet} sheet - The offchain transactions sheet
+ * @param {Date} cutoffDate - Cutoff date (30 days ago)
+ * @return {number} Total sales amount for the past 30 days
+ */
+function extract30DaysSalesFromOffchain(sheet, cutoffDate) {
+  var totalSales = 0;
+  
+  try {
+    var lastRow = sheet.getLastRow();
+    if (lastRow < 4) {
+      return 0;
+    }
+    
+    // Process rows starting from row 4 (index 3)
+    var dataRange = sheet.getRange(4, 1, lastRow - 3, 7);
+    var values = dataRange.getValues();
+    
+    for (var i = 0; i < values.length; i++) {
+      var row = values[i];
+      
+      try {
+        // Column A: Transaction Date (YYYYMMDD)
+        var dateStr = String(row[0]).trim();
+        if (!dateStr || dateStr.length < 8) {
+          continue;
+        }
+        
+        // Parse date
+        var year = parseInt(dateStr.substring(0, 4));
+        var month = parseInt(dateStr.substring(4, 6));
+        var day = parseInt(dateStr.substring(6, 8));
+        var date = new Date(year, month - 1, day);
+        
+        // Only process transactions from past 30 days
+        if (date < cutoffDate) {
+          continue;
+        }
+        
+        // Column D: Amount
+        var amount = parseFloat(row[3]) || 0;
+        
+        // Column E: Currency
+        var currency = String(row[4] || '').trim();
+        
+        // Column G: Is Revenue (flag)
+        var isRevenue = row[6];
+        var isRevenueFlag = (isRevenue === true || 
+                             String(isRevenue).toUpperCase() === 'TRUE' || 
+                             String(isRevenue).trim() === '1');
+        
+        // Column B: Description
+        var description = String(row[1] || '').toLowerCase();
+        var hasSaleKeyword = false;
+        for (var j = 0; j < SALES_KEYWORDS.length; j++) {
+          if (description.indexOf(SALES_KEYWORDS[j]) !== -1) {
+            hasSaleKeyword = true;
+            break;
+          }
+        }
+        
+        // Filter: USD currency, positive amount, and (Is Revenue = TRUE OR has sale keyword)
+        if (currency === 'USD' && amount > 0 && (isRevenueFlag || hasSaleKeyword)) {
+          totalSales += amount;
+        }
+      } catch (e) {
+        // Skip invalid rows
+        continue;
+      }
+    }
+  } catch (e) {
+    Logger.log("Error extracting 30-day sales from offchain transactions: " + e.message);
+  }
+  
+  return totalSales;
+}
+
+/**
+ * Extract sales from 'Transactions' sheet for the past 30 days
+ * 
+ * @param {Sheet} sheet - The Transactions sheet
+ * @param {Date} cutoffDate - Cutoff date (30 days ago)
+ * @return {number} Total sales amount for the past 30 days
+ */
+function extract30DaysSalesFromTransactions(sheet, cutoffDate) {
+  var totalSales = 0;
+  
+  try {
+    var lastRow = sheet.getLastRow();
+    if (lastRow < 2) {
+      return 0;
+    }
+    
+    // Find header row
+    var headerRow = 0;
+    var allValues = sheet.getDataRange().getValues();
+    for (var i = 0; i < allValues.length; i++) {
+      var firstCol = String(allValues[i][0] || '').trim().toLowerCase();
+      if (firstCol.indexOf('date') !== -1 || firstCol === '') {
+        headerRow = i;
+        break;
+      }
+    }
+    
+    // Get all transactions
+    var transactions = [];
+    for (var i = headerRow + 1; i < allValues.length; i++) {
+      var row = allValues[i];
+      if (row.length < 6) {
+        continue;
+      }
+      
+      try {
+        var dateStr = String(row[0] || '').trim();
+        if (!dateStr) {
+          continue;
+        }
+        
+        var amount = parseFloat(row[3]) || 0;
+        var currency = String(row[4] || '').trim();
+        var category = String(row[5] || '').trim();
+        var description = String(row[1] || '');
+        
+        transactions.push({
+          row: i,
+          dateStr: dateStr,
+          description: description,
+          amount: amount,
+          currency: currency,
+          category: category
+        });
+      } catch (e) {
+        continue;
+      }
+    }
+    
+    // Identify equity matches (capital injections)
+    var equityMatches = {};
+    for (var i = 0; i < transactions.length; i++) {
+      var trans = transactions[i];
+      if (trans.currency === 'USD' && trans.category === 'Assets' && trans.amount > 0) {
+        for (var j = 0; j < transactions.length; j++) {
+          if (i !== j) {
+            var other = transactions[j];
+            if (other.dateStr === trans.dateStr &&
+                other.description === trans.description &&
+                Math.abs(other.amount - trans.amount) < 0.01 &&
+                other.currency === 'USD' &&
+                other.category === 'Equity') {
+              equityMatches[i] = true;
+              break;
+            }
+          }
+        }
+      }
+    }
+    
+    // Identify liability matches (sales pattern)
+    var liabilityMatches = {};
+    for (var i = 0; i < transactions.length; i++) {
+      var trans = transactions[i];
+      if (trans.currency === 'USD' && trans.category === 'Assets' && trans.amount > 0) {
+        for (var j = 0; j < transactions.length; j++) {
+          if (i !== j && Math.abs(i - j) <= 2) {
+            var other = transactions[j];
+            if (other.dateStr === trans.dateStr && other.category === 'Liability') {
+              liabilityMatches[i] = true;
+              break;
+            }
+          }
+        }
+      }
+    }
+    
+    // Extract sales for past 30 days
+    for (var i = 0; i < transactions.length; i++) {
+      var trans = transactions[i];
+      
+      if (trans.currency === 'USD' && trans.category === 'Assets' && trans.amount > 0) {
+        // Parse date
+        try {
+          var dateObj;
+          if (trans.dateStr.length >= 8 && /^\d+$/.test(trans.dateStr.substring(0, 8))) {
+            // YYYYMMDD format
+            var year = parseInt(trans.dateStr.substring(0, 4));
+            var month = parseInt(trans.dateStr.substring(4, 6));
+            var day = parseInt(trans.dateStr.substring(6, 8));
+            dateObj = new Date(year, month - 1, day);
+          } else {
+            // Try other formats
+            dateObj = new Date(trans.dateStr.split(' ')[0]);
+          }
+          
+          // Only process transactions from past 30 days
+          if (dateObj < cutoffDate) {
+            continue;
+          }
+          
+          var hasEquity = equityMatches[i] || false;
+          var hasLiability = liabilityMatches[i] || false;
+          
+          if (isSaleTransaction(trans.description, hasEquity, hasLiability)) {
+            totalSales += trans.amount;
+          }
+        } catch (e) {
+          // Skip invalid dates
+          continue;
+        }
+      }
+    }
+  } catch (e) {
+    Logger.log("Error extracting 30-day sales from Transactions sheet: " + e.message);
+  }
+  
+  return totalSales;
+}
+
+/**
+ * Calculate 30 days sales volume from all ledgers (ecosystem sales)
+ * This aggregates sales from all AGL ledgers + main ledger
+ * 
+ * @return {number} Total ecosystem sales volume for the past 30 days
+ */
+function get30DaysSalesFromAllLedgers() {
+  var cutoffDate = new Date();
+  cutoffDate.setDate(cutoffDate.getDate() - 30);
+  
+  Logger.log("Calculating 30-day sales from all ledgers (cutoff date: " + cutoffDate + ")");
+  
+  var totalSales = 0;
+  
+  try {
+    var spreadsheet = SpreadsheetApp.openById(ledgerDocId);
+    var shipmentSheet = spreadsheet.getSheetByName(SHIPMENT_LEDGER_SHEET_NAME);
+    
+    if (!shipmentSheet) {
+      Logger.log("⚠️  Shipment Ledger Listing sheet not found");
+      return 0;
+    }
+    
+    var lastRow = shipmentSheet.getLastRow();
+    if (lastRow < 2) {
+      Logger.log("⚠️  No data in Shipment Ledger Listing");
+      return 0;
+    }
+    
+    // Read data from Shipment Ledger Listing
+    // Column A (1) = Shipment ID
+    // Column AB (28) = Resolved Ledger URL
+    var dataRange = shipmentSheet.getRange(2, 1, lastRow - 1, 28);
+    var data = dataRange.getValues();
+    
+    for (var i = 0; i < data.length; i++) {
+      var row = data[i];
+      var shipmentId = String(row[0] || '').trim();
+      var resolvedUrl = String(row[27] || '').trim();
+      
+      if (!shipmentId || !resolvedUrl || shipmentId === '0') {
+        continue;
+      }
+      
+      if (!resolvedUrl.includes('docs.google.com/spreadsheets')) {
+        continue;
+      }
+      
+      try {
+        // Check if it's AGL4 (use main ledger's offchain transactions)
+        if (shipmentId.toUpperCase() === 'AGL4') {
+          var offchainSheet = spreadsheet.getSheetByName('offchain transactions');
+          if (offchainSheet) {
+            var sales = extract30DaysSalesFromOffchain(offchainSheet, cutoffDate);
+            totalSales += sales;
+            Logger.log("AGL4: Found $" + sales.toFixed(2) + " in sales for past 30 days");
+          }
+        } else {
+          // Open the ledger spreadsheet
+          var ledgerSpreadsheet = SpreadsheetApp.openByUrl(resolvedUrl);
+          var transactionsSheet = ledgerSpreadsheet.getSheetByName('Transactions');
+          if (transactionsSheet) {
+            var sales = extract30DaysSalesFromTransactions(transactionsSheet, cutoffDate);
+            totalSales += sales;
+            Logger.log(shipmentId + ": Found $" + sales.toFixed(2) + " in sales for past 30 days");
+          }
+        }
+      } catch (e) {
+        Logger.log("⚠️  Error processing " + shipmentId + ": " + e.message);
+        continue;
+      }
+    }
+  } catch (e) {
+    Logger.log("❌ Error calculating 30-day sales from all ledgers: " + e.message);
+    return 0;
+  }
+  
+  Logger.log("✅ Total 30-day ecosystem sales: $" + totalSales.toFixed(2));
+  return totalSales;
 }
 
 function getTdgUsdtPriceLaToken() {
@@ -2188,15 +2495,26 @@ function syncAllPerformanceStatistics() {
       Logger.log("❌ Error updating ASSET_PER_TDG_ISSUED: " + e.message);
     }
     
-    // 4. PAST_30_DAYS_SALES
+    // 4. PAST_30_DAYS_SALES (ecosystem sales - all ledgers)
     try {
-      var sales30Days = get30DaysSales();
-      updatePerformanceStatistic("PAST_30_DAYS_SALES", sales30Days, "USD");
-      report.updated.push({ key: "PAST_30_DAYS_SALES", value: sales30Days });
-      Logger.log("✅ Updated PAST_30_DAYS_SALES: " + sales30Days);
+      var ecosystemSales = get30DaysSalesFromAllLedgers();
+      updatePerformanceStatistic("PAST_30_DAYS_SALES", ecosystemSales, "USD");
+      report.updated.push({ key: "PAST_30_DAYS_SALES", value: ecosystemSales });
+      Logger.log("✅ Updated PAST_30_DAYS_SALES (ecosystem): " + ecosystemSales);
     } catch (e) {
       report.errors.push({ key: "PAST_30_DAYS_SALES", error: e.message });
       Logger.log("❌ Error updating PAST_30_DAYS_SALES: " + e.message);
+    }
+    
+    // 4b. PAST_30_DAYS_DAO_REVENUE (main ledger only - for buy-back budget)
+    try {
+      var daoRevenue = get30DaysSales(); // Main ledger only
+      updatePerformanceStatistic("PAST_30_DAYS_DAO_REVENUE", daoRevenue, "USD");
+      report.updated.push({ key: "PAST_30_DAYS_DAO_REVENUE", value: daoRevenue });
+      Logger.log("✅ Updated PAST_30_DAYS_DAO_REVENUE: " + daoRevenue);
+    } catch (e) {
+      report.errors.push({ key: "PAST_30_DAYS_DAO_REVENUE", error: e.message });
+      Logger.log("❌ Error updating PAST_30_DAYS_DAO_REVENUE: " + e.message);
     }
     
     // 5. TDG_DAILY_BUY_BACK_BUDGET
