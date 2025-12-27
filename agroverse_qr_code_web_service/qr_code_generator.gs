@@ -237,12 +237,12 @@ function resolveRedirect(url) {
                 continue;
               } catch (e) {
                 Logger.log('Error resolving relative JavaScript redirect: ' + e.message);
-                return currentUrl;
+        return currentUrl;
               }
             }
           }
-        }
-        
+      }
+      
         // No JavaScript redirect found, return current URL
         return currentUrl;
       }
