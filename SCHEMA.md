@@ -1,6 +1,6 @@
 # TrueSight DAO - Google Sheets Schema Documentation
 
-> **Last Updated:** 2025-10-07
+> **Last Updated:** 2025-01-28
 > 
 > This document provides a consolidated reference for all Google Sheets used across TrueSight DAO's Google Apps Scripts. Use this as a central schema reference when making code changes.
 
@@ -36,6 +36,9 @@
 - [Ledger history](#sheet-ledger-history)
 - [off chain asset balance](#sheet-off-chain-asset-balance)
 - [Agroverse QR codes](#sheet-agroverse-qr-codes)
+- [Agroverse SKUs](#sheet-agroverse-skus)
+- [Currencies](#sheet-currencies)
+- [Shipment Ledger Listing](#sheet-shipment-ledger-listing)
 
 **Managed AGL Ledgers**
 - [Overview & Active Ledgers List](#-managed-agl-ledgers-dynamic)
@@ -291,16 +294,19 @@ See [`python_scripts/schema_validation/README.md`](./python_scripts/schema_valid
 ##### Sheet: `offchain asset location`
 **Purpose:** Tracks physical inventory locations and managers
 
+**Header Row:** 4
+
 | Column | Name | Type | Description |
 |--------|------|------|-------------|
-| A | Asset Name | String | Name of asset/inventory |
-| B | Manager Names | String | Person managing the asset |
-| C | Asset Quantity | Number | Quantity available |
+| A | Currency | String | Asset/currency identifier (e.g., "AGL4", "AGL8") |
+| B | Location/Manager Name | String | Person managing the asset or location name |
+| C | Amount | Number | Quantity available |
 | D+ | *(varies)* | - | Additional metadata |
 
 **Used by:**
 - [`web_app.gs`](https://github.com/TrueSightDAO/tokenomics/blob/main/google_app_scripts/tdg_inventory_management/web_app.gs) - API for inventory queries and management
 - [`process_movement_telegram_logs.gs`](https://github.com/TrueSightDAO/tokenomics/blob/main/google_app_scripts/tdg_inventory_management/process_movement_telegram_logs.gs) - Updates location after movements
+- [`update_store_inventory.gs`](https://github.com/TrueSightDAO/agroverse_shop/blob/main/google-app-script/update_store_inventory.gs) - Aggregates inventory from main ledger for store managers
 
 ---
 
@@ -331,8 +337,10 @@ See [`python_scripts/schema_validation/README.md`](./python_scripts/schema_valid
 | P | Taxation ID | String | Tax ID |
 | Q | WhatsApp Chat Log ID | String | WhatsApp log ID |
 | R | Digital Signature | String | Public key (legacy location) |
+| T | Is Store Manager | Boolean | TRUE/FALSE flag indicating if contributor is a store manager |
 
 **Used by:**
+- [`update_store_inventory.gs`](https://github.com/TrueSightDAO/agroverse_shop/blob/main/google-app-script/update_store_inventory.gs) - Filters store managers for inventory calculations
 - [`grok_scoring_for_telegram_and_whatsapp_logs.gs`](https://github.com/TrueSightDAO/tokenomics/blob/main/google_app_scripts/tdg_grok_scoring/grok_scoring_for_telegram_and_whatsapp_logs.gs) - Validates contributors when scoring
 - [`process_sales_telegram_logs.gs`](https://github.com/TrueSightDAO/tokenomics/blob/main/google_app_scripts/tdg_inventory_management/process_sales_telegram_logs.gs) - Validates sales reporters
 - [`tdg_expenses_processing.gs`](https://github.com/TrueSightDAO/tokenomics/blob/main/google_app_scripts/tdg_asset_management/tdg_expenses_processing.gs) - Validates expense reporters
@@ -493,6 +501,63 @@ See [`python_scripts/schema_validation/README.md`](./python_scripts/schema_valid
 - [`process_sales_telegram_logs.gs`](https://github.com/TrueSightDAO/tokenomics/blob/main/google_app_scripts/tdg_inventory_management/process_sales_telegram_logs.gs) - Validates QR codes during sales processing
 - [`web_app.gs`](https://github.com/TrueSightDAO/tokenomics/blob/main/google_app_scripts/tdg_inventory_management/web_app.gs) - API for QR code queries and management
 - [`process_qr_code_generation_telegram_logs.gs`](https://github.com/TrueSightDAO/tokenomics/blob/main/google_app_scripts/tdg_inventory_management/process_qr_code_generation_telegram_logs.gs) - Creates and registers new QR codes
+
+---
+
+##### Sheet: `Agroverse SKUs`
+**Purpose:** Product catalog for agroverse.shop with inventory tracking
+
+**Sheet URL:** https://docs.google.com/spreadsheets/d/1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU/edit#gid=98293503
+
+**Header Row:** 1
+
+| Column | Name | Type | Description |
+|--------|------|------|-------------|
+| A | Product ID | String | Unique product identifier (slug) |
+| B | Product Name | String | Full product name |
+| C | Price (USD) | Number | Product price in USD |
+| D | Weight (oz) | Number | Product weight in ounces |
+| E | Category | String | Product category (e.g., "retail", "wholesale") |
+| F | Shipment | String | Shipment/currency identifier (e.g., "AGL4", "AGL8") |
+| G | Farm | String | Farm name associated with product |
+| H | Image Path | String | Full URL to product image |
+| I | Store inventory | Number | Calculated inventory count for store managers (updated by script) |
+
+**Used by:**
+- [`update_store_inventory.gs`](https://github.com/TrueSightDAO/agroverse_shop/blob/main/google-app-script/update_store_inventory.gs) - Updates Column I with aggregated inventory from ledgers
+- [`update_agroverse_skus.py`](https://github.com/TrueSightDAO/tokenomics/blob/main/python_scripts/agroverse_products/update_agroverse_skus.py) - Updates product data from agroverse.shop
+
+---
+
+##### Sheet: `Currencies`
+**Purpose:** Maps currency/asset identifiers to product SKUs
+
+| Column | Name | Type | Description |
+|--------|------|------|-------------|
+| A | Currency | String | Currency/asset identifier (e.g., "AGL4", "AGL8") |
+| M | SKU Product ID | String | Maps to Agroverse SKUs Column A (Product ID) |
+
+**Used by:**
+- [`update_store_inventory.gs`](https://github.com/TrueSightDAO/agroverse_shop/blob/main/google-app-script/update_store_inventory.gs) - Maps ledger currencies to product SKUs for inventory calculation
+
+---
+
+##### Sheet: `Shipment Ledger Listing`
+**Purpose:** Registry of managed ledger spreadsheets with resolved URLs
+
+**Header Row:** 1
+
+| Column | Name | Type | Description |
+|--------|------|------|-------------|
+| A | Shipment ID | String | Ledger identifier (e.g., "AGL4", "AGL8") |
+| L | Ledger URL | String | Original/unresolved ledger spreadsheet URL |
+| AB | Resolved Ledger URL | String | Resolved Google Sheets URL (after redirect resolution) |
+
+**Used by:**
+- [`resolveRedirect` functions](https://github.com/TrueSightDAO/tokenomics/blob/main/google_app_scripts/tdg_asset_management/tdg_expenses_processing.gs) - Primary lookup for resolving ledger URLs (checks Column L -> Column AB before HTTP resolution)
+- [`update_store_inventory.gs`](https://github.com/TrueSightDAO/agroverse_shop/blob/main/google-app-script/update_store_inventory.gs) - Gets list of managed ledger URLs from Column AB
+
+**Note:** Multiple scripts use this sheet for ledger URL resolution. Column L contains the original URL, Column AB contains the resolved URL after following redirects. Scripts should check Column AB first before attempting HTTP resolution.
 
 ---
 
