@@ -115,8 +115,8 @@ function processTokenizedTransactions() {
     const agroverseValue = sourceData[i][AGROVERSE_VALUE_COL];
     const tokenizedStatus = sourceData[i][TOKENIZED_STATUS_COL];
     
-    // Check if Column G is "https://www.agroverse.shop/agl4" and Column J is empty
-    if (agroverseValue === 'https://www.agroverse.shop/agl4' && (!tokenizedStatus || tokenizedStatus === '')) {
+    // Check if Column G is "https://agroverse.shop/agl4" and Column J is empty
+    if (agroverseValue === 'https://agroverse.shop/agl4' && (!tokenizedStatus || tokenizedStatus === '')) {
       // Update Column J to "PROCESSING"
       sourceSheet.getRange(i + 1, TOKENIZED_STATUS_COL + 1).setValue('PROCESSING');
       
@@ -173,7 +173,10 @@ function processTokenizedTransactions() {
       const rowNumbers = [insertRow, insertRow + 1, insertRow + 2].join(',');
       
       // Update Column K in source sheet with row numbers
-      sourceSheet.getRange(i + 1, OFFCHAIN_ROW_NUMS_COL + 1).setValue(rowNumbers);
+      // Set format to text first to prevent Google Sheets from converting to number
+      const rowKRange = sourceSheet.getRange(i + 1, OFFCHAIN_ROW_NUMS_COL + 1);
+      rowKRange.setNumberFormat('@'); // '@' = text format
+      rowKRange.setValue(rowNumbers);
       
       // Update Column J to "TOKENIZED"
       sourceSheet.getRange(i + 1, TOKENIZED_STATUS_COL + 1).setValue('TOKENIZED');

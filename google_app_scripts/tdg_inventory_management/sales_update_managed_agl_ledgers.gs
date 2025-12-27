@@ -261,8 +261,8 @@ function processNonAgl4Transactions() {
     const agroverseValue = sourceData[i][AGROVERSE_VALUE_COL];
     const tokenizedStatus = sourceData[i][TOKENIZED_STATUS_COL];
     
-    // Check if Column G is not "https://www.agroverse.shop/agl4" and Column J is empty
-    if (agroverseValue !== 'https://www.agroverse.shop/agl4' && agroverseValue && (!tokenizedStatus || tokenizedStatus === '')) {
+    // Check if Column G is not "https://agroverse.shop/agl4" and Column J is empty
+    if (agroverseValue !== 'https://agroverse.shop/agl4' && agroverseValue && (!tokenizedStatus || tokenizedStatus === '')) {
       // Extract AGL contract name
       const aglContractName = extractAglContractName(agroverseValue);
       if (!aglContractName) {
@@ -344,7 +344,10 @@ function processNonAgl4Transactions() {
       const rowNumbers = [destInsertRow, destInsertRow + 1, destInsertRow + 2].join(',');
       
       // Update Column K in source sheet with row numbers
-      sourceSheet.getRange(i + 1, OFFCHAIN_ROW_NUMS_COL + 1).setValue(rowNumbers);
+      // Set format to text first to prevent Google Sheets from converting to number
+      const rowKRange = sourceSheet.getRange(i + 1, OFFCHAIN_ROW_NUMS_COL + 1);
+      rowKRange.setNumberFormat('@'); // '@' = text format
+      rowKRange.setValue(rowNumbers);
       
       // Update Column J to "ACCOUNTED"
       sourceSheet.getRange(i + 1, TOKENIZED_STATUS_COL + 1).setValue('ACCOUNTED');
