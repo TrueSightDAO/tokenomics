@@ -89,6 +89,9 @@ var MONTHLY_STATISTICS_SHEET_NAME = "Monthly Statistics";
 // Sheet name for Shipment Ledger Listing
 var SHIPMENT_LEDGER_SHEET_NAME = "Shipment Ledger Listing";
 
+// Sheet name for Currencies (for currency conversion)
+var CURRENCIES_SHEET_NAME = "Currencies";
+
 // Sales identification keywords (case-insensitive)
 var SALES_KEYWORDS = ['sale', 'sales', 'sold', 'purchase', 'payment'];
 
@@ -476,6 +479,272 @@ function getInvestmentHoldingsInAGL() {
   
   Logger.log("Total TrueSight DAO investment holdings in AGL (USD): " + totalHoldings);
   return totalHoldings;
+}
+
+/**
+ * Gets currency exchange rates from the Currencies sheet.
+ * Returns a map of currency name -> price in USD.
+ * 
+ * @return {Object} Map of currency names to USD prices
+ *   Format: { "Ceremonial Cacao Kraft Pouch - 8oz": 25.00, "USD": 1.00, ... }
+ */
+function getCurrencyExchangeRates() {
+  try {
+    var spreadsheet = SpreadsheetApp.openById(ledgerDocId);
+    var currenciesSheet = spreadsheet.getSheetByName(CURRENCIES_SHEET_NAME);
+    
+    if (!currenciesSheet) {
+      Logger.log("⚠️  Currencies sheet not found - using USD only for AUM calculation");
+      return { "USD": 1.0 }; // Default: USD = 1.0
+    }
+    
+    var lastRow = currenciesSheet.getLastRow();
+    if (lastRow < 2) {
+      Logger.log("⚠️  Currencies sheet has no data - using USD only");
+      return { "USD": 1.0 };
+    }
+    
+    // Read data from Currencies sheet
+    // Column A: Currencies (currency/product name)
+    // Column B: Price in USD
+    // Header row is 1, data starts at row 2
+    var dataRange = currenciesSheet.getRange(2, 1, lastRow - 1, 2);
+    var values = dataRange.getValues();
+    
+    var exchangeRates = { "USD": 1.0 }; // Always include USD = 1.0
+    Logger.log(`  [Row 0] USD = $1.00 USD (base currency)`);
+    
+    var loadedCount = 1; // Start at 1 because USD is already included
+    
+    for (var i = 0; i < values.length; i++) {
+      var currencyName = String(values[i][0] || '').trim();
+      var priceInUSD = parseFloat(values[i][1]) || 0;
+      
+      if (currencyName && priceInUSD > 0) {
+        exchangeRates[currencyName] = priceInUSD;
+        Logger.log(`  [Row ${i + 2}] ${currencyName} = $${priceInUSD.toFixed(2)} USD per unit`);
+        loadedCount++;
+      } else if (currencyName) {
+        Logger.log(`  [Row ${i + 2}] ${currencyName} = SKIPPED (invalid price: ${values[i][1]})`);
+      }
+    }
+    
+    Logger.log(`Loaded ${loadedCount} currency exchange rate(s) (including USD)`);
+    return exchangeRates;
+    
+  } catch (e) {
+    Logger.log("⚠️  Error loading currency exchange rates: " + e.message);
+    return { "USD": 1.0 }; // Fallback to USD only
+  }
+}
+
+/**
+ * Converts an asset amount to USD using currency exchange rates.
+ * NOTE: This function is now primarily used for logging purposes.
+ * The actual conversion logic is handled inline in getAllManagedLedgerAssets() for better logging.
+ * 
+ * @param {number} amount - Asset amount
+ * @param {string} currency - Currency name (e.g., "USD", "Ceremonial Cacao Kraft Pouch - 8oz")
+ * @param {Object} exchangeRates - Map of currency names to USD prices
+ * @return {number} Amount in USD, or 0 if currency not found
+ */
+function convertToUSD(amount, currency, exchangeRates) {
+  if (!currency || currency === "USD") {
+    return amount; // USD is already in USD
+  }
+  
+  var currencyKey = String(currency).trim();
+  var pricePerUnit = exchangeRates[currencyKey];
+  
+  if (pricePerUnit && pricePerUnit > 0) {
+    var usdValue = amount * pricePerUnit;
+    return usdValue;
+  } else {
+    return 0; // Currency not found, skip this asset
+  }
+}
+
+/**
+ * Fetches ALL assets (USD and non-USD) from each managed ledger's Balance sheet.
+ * Non-USD assets are converted to USD using exchange rates from the Currencies sheet.
+ * This is different from getTrueSightDAOEquityHoldings which only gets TrueSight DAO equity.
+ * 
+ * @param {Array<string>} ledgerUrls - Array of ledger URLs to process.
+ * @return {number} Total USD value of all assets across all managed ledgers.
+ */
+function getAllManagedLedgerAssets(ledgerUrls) {
+  var totalAssets = 0;
+  
+  Logger.log("Starting getAllManagedLedgerAssets with " + ledgerUrls.length + " ledger URLs");
+  Logger.log("");
+  
+  // Load currency exchange rates once
+  Logger.log("Loading currency exchange rates from Currencies sheet...");
+  var exchangeRates = getCurrencyExchangeRates();
+  Logger.log(`Loaded ${Object.keys(exchangeRates).length} currency exchange rates`);
+  Logger.log("");
+  
+  ledgerUrls.forEach(function(url, index) {
+    Logger.log(`[Ledger ${index + 1}/${ledgerUrls.length}] Processing: ${url}`);
+    Logger.log(`Processing ledger URL ${index + 1} for AUM: ${url}`);
+    
+    // Check if URL is already a resolved Google Sheets URL (from column AB)
+    var resolvedUrl = url;
+    
+    // If it's not already a Google Sheets URL, try to resolve it (fallback for legacy URLs)
+    if (!url.includes('docs.google.com/spreadsheets')) {
+      Logger.log(`URL is not a Google Sheets URL, attempting to resolve: ${url}`);
+      resolvedUrl = resolveRedirect(url);
+      Logger.log(`Resolved URL: ${resolvedUrl}`);
+    } else {
+      Logger.log(`Using pre-resolved URL from column AB: ${resolvedUrl}`);
+    }
+    
+    if (!resolvedUrl || !resolvedUrl.includes('docs.google.com/spreadsheets')) {
+      Logger.log(`Skipping invalid or non-spreadsheet URL: ${resolvedUrl}`);
+      return;
+    }
+    
+    try {
+      // Open the spreadsheet
+      var spreadsheet = SpreadsheetApp.openByUrl(resolvedUrl);
+      var balanceSheet = spreadsheet.getSheetByName("Balance");
+      
+      if (!balanceSheet) {
+        Logger.log(`Balance sheet not found in spreadsheet: ${resolvedUrl}`);
+        return;
+      }
+      
+      Logger.log(`Successfully opened Balance sheet from: ${resolvedUrl}`);
+      
+      // Get all data from the Balance sheet
+      var data = balanceSheet.getDataRange().getValues();
+      Logger.log(`Balance sheet has ${data.length} rows of data`);
+      
+      // Sum all assets (USD and non-USD, converted to USD)
+      // Column A = Entity name, Column B = Amount, Column C = Currency/Type
+      var ledgerAssets = 0;
+      var usdAssets = 0;
+      var convertedAssets = 0;
+      var assetCount = 0;
+      
+      Logger.log(`--- Processing Balance sheet from ${resolvedUrl} ---`);
+      
+      for (var i = 0; i < data.length; i++) {
+        var entityName = data[i][0]; // Column A (index 0) - Entity name
+        var amount = data[i][1];     // Column B (index 1) - Amount
+        var currency = data[i][2];   // Column C (index 2) - Currency/Type
+        
+        // Skip if amount is not a valid number
+        if (typeof amount !== 'number' || isNaN(amount)) {
+          continue;
+        }
+        
+        // Skip if currency is empty
+        if (!currency || String(currency).trim() === '') {
+          continue;
+        }
+        
+        var entityNameStr = entityName ? String(entityName).trim() : '(Unnamed)';
+        var currencyStr = String(currency).trim();
+        var usdValue = 0;
+        var conversionDetails = '';
+        
+        if (currencyStr === "USD") {
+          // Direct USD asset
+          usdValue = amount;
+          usdAssets += usdValue;
+          conversionDetails = `USD (direct)`;
+          assetCount++;
+          Logger.log(`  [Row ${i + 1}] ${entityNameStr}: ${amount.toFixed(2)} ${currencyStr} = $${usdValue.toFixed(2)} USD (${conversionDetails})`);
+        } else {
+          // Non-USD asset - convert to USD using exchange rates
+          var pricePerUnit = exchangeRates[currencyStr];
+          
+          if (pricePerUnit && pricePerUnit > 0) {
+            usdValue = amount * pricePerUnit;
+            convertedAssets += usdValue;
+            assetCount++;
+            conversionDetails = `converted at $${pricePerUnit.toFixed(2)} per unit`;
+            Logger.log(`  [Row ${i + 1}] ${entityNameStr}: ${amount.toFixed(2)} ${currencyStr} = $${usdValue.toFixed(2)} USD (${conversionDetails})`);
+          } else {
+            Logger.log(`  [Row ${i + 1}] ${entityNameStr}: ${amount.toFixed(2)} ${currencyStr} = SKIPPED (currency not found in exchange rates)`);
+            continue; // Skip this asset
+          }
+        }
+        
+        ledgerAssets += usdValue;
+      }
+      
+      Logger.log(`--- Summary for ${resolvedUrl} ---`);
+      Logger.log(`  Total assets processed: ${assetCount}`);
+      Logger.log(`  USD assets: $${usdAssets.toFixed(2)} USD`);
+      Logger.log(`  Converted assets: $${convertedAssets.toFixed(2)} USD`);
+      Logger.log(`  Total ledger assets: $${ledgerAssets.toFixed(2)} USD`);
+      Logger.log(`--- End of ${resolvedUrl} ---`);
+      
+      totalAssets += ledgerAssets;
+      
+    } catch (e) {
+      Logger.log(`Error accessing spreadsheet ${resolvedUrl} for AUM: ${e.message}`);
+    }
+  });
+  
+  Logger.log("");
+  Logger.log("========================================");
+  Logger.log("MANAGED LEDGER ASSETS SUMMARY");
+  Logger.log("========================================");
+  Logger.log(`Total managed ledger assets: $${totalAssets.toFixed(2)} USD`);
+  Logger.log(`Processed ${ledgerUrls.length} ledger(s)`);
+  Logger.log("========================================");
+  Logger.log("");
+  
+  return totalAssets;
+}
+
+/**
+ * Calculates Assets Under Management (AUM).
+ * AUM = Main ledger assets (off-chain assets + USDT vault) + All managed ledger assets
+ * 
+ * @return {number} Total AUM in USD
+ */
+function calculateAUM() {
+  Logger.log("========================================");
+  Logger.log("CALCULATING ASSETS UNDER MANAGEMENT (AUM)");
+  Logger.log("========================================");
+  
+  // Main ledger assets
+  var offChainAssets = getOffChainAssetValue();
+  var usdtVaultBalance = getUSDTBalanceInVault();
+  var mainLedgerAssets = offChainAssets + usdtVaultBalance;
+  
+  Logger.log("");
+  Logger.log("--- MAIN LEDGER ASSETS ---");
+  Logger.log(`  Off-chain assets: $${offChainAssets.toFixed(2)} USD`);
+  Logger.log(`  USDT vault balance: $${usdtVaultBalance.toFixed(2)} USD`);
+  Logger.log(`  Total main ledger assets: $${mainLedgerAssets.toFixed(2)} USD`);
+  Logger.log("");
+  
+  // Get all managed ledger URLs
+  var ledgerUrls = getLedgerUrlsFromWix();
+  Logger.log(`--- MANAGED LEDGER ASSETS (${ledgerUrls.length} ledgers) ---`);
+  Logger.log(`  Processing ${ledgerUrls.length} managed ledger(s)...`);
+  Logger.log("");
+  
+  // Sum all assets (USD and non-USD) from all managed ledgers
+  var managedLedgerAssets = getAllManagedLedgerAssets(ledgerUrls);
+  
+  Logger.log("");
+  Logger.log("--- AUM CALCULATION SUMMARY ---");
+  Logger.log(`  Main ledger assets: $${mainLedgerAssets.toFixed(2)} USD`);
+  Logger.log(`  Managed ledger assets: $${managedLedgerAssets.toFixed(2)} USD`);
+  
+  var aum = mainLedgerAssets + managedLedgerAssets;
+  Logger.log(`  TOTAL AUM: $${aum.toFixed(2)} USD`);
+  Logger.log("========================================");
+  Logger.log("");
+  
+  return aum;
 }
 
 /**
@@ -1671,7 +1940,7 @@ function doGet(e) {
  * 
  * @return {Array<Object>} Array of monthly statistics objects
  *   Format: [
- *     { month: "2024-09", monthlySales: 100.00, cumulativeSales: 100.00, lastUpdated: "2024-09-15T..." },
+ *     { month: "2024-09", monthlySales: 100.00, cumulativeSales: 100.00, aum: 50000.00, lastUpdated: "2024-09-15T..." },
  *     ...
  *   ]
  */
@@ -1694,7 +1963,9 @@ function readMonthlyStatistics() {
     // Column B: Monthly Sales Volume (USD)
     // Column C: Cumulative Sales Volume (USD)
     // Column D: Last Updated (timestamp)
-    var dataRange = sheet.getRange(2, 1, lastRow - 1, 4);
+    // Column E: AUM (USD) - may not exist in older rows
+    // Column F: USD Treasury Balance - may not exist in older rows
+    var dataRange = sheet.getRange(2, 1, lastRow - 1, 6);
     var values = dataRange.getValues();
     
     var monthlyStats = [];
@@ -1705,12 +1976,16 @@ function readMonthlyStatistics() {
       var monthlySales = row[1]; // Column B: Monthly Sales Volume
       var cumulativeSales = row[2]; // Column C: Cumulative Sales Volume
       var lastUpdated = row[3]; // Column D: Last Updated
+      var aum = row[4]; // Column E: AUM (may be empty for older rows)
+      var usdTreasuryBalance = row[5]; // Column F: USD Treasury Balance (may be empty for older rows)
       
       if (month) {
         monthlyStats.push({
           month: String(month).trim(),
           monthlySales: monthlySales !== "" ? parseFloat(monthlySales) : 0,
           cumulativeSales: cumulativeSales !== "" ? parseFloat(cumulativeSales) : 0,
+          aum: aum !== "" && aum !== null && aum !== undefined ? parseFloat(aum) : null,
+          usdTreasuryBalance: usdTreasuryBalance !== "" && usdTreasuryBalance !== null && usdTreasuryBalance !== undefined ? parseFloat(usdTreasuryBalance) : null,
           lastUpdated: lastUpdated instanceof Date ? lastUpdated.toISOString() : (lastUpdated || null)
         });
       }
@@ -2120,7 +2395,7 @@ function calculateCurrentMonthSales() {
 
 /**
  * Update current month's statistics in the Monthly Statistics sheet
- * This function calculates the current month's sales and updates the sheet
+ * This function calculates the current month's sales and AUM, then updates the sheet
  */
 function updateCurrentMonthStatistics() {
   try {
@@ -2137,6 +2412,29 @@ function updateCurrentMonthStatistics() {
     
     // Calculate current month's sales
     var currentMonthSales = calculateCurrentMonthSales();
+    
+    // Calculate current AUM
+    var currentAUM = calculateAUM();
+    
+    // Calculate current USD Treasury Balance (main ledger assets)
+    var usdTreasuryBalance = getOffChainAssetValue() + getUSDTBalanceInVault();
+    
+    // Check if Column E (AUM) and Column F (USD Treasury Balance) headers exist
+    var headerRow = 1;
+    var headerRange = monthlySheet.getRange(headerRow, 1, 1, 6);
+    var headers = headerRange.getValues()[0];
+    
+    // If Column E doesn't have a header, add it
+    if (!headers[4] || headers[4].toString().trim() === '') {
+      monthlySheet.getRange(headerRow, 5).setValue('AUM (USD)');
+      Logger.log("✅ Added AUM column header");
+    }
+    
+    // If Column F doesn't have a header, add it
+    if (!headers[5] || headers[5].toString().trim() === '') {
+      monthlySheet.getRange(headerRow, 6).setValue('USD Treasury Balance');
+      Logger.log("✅ Added USD Treasury Balance column header");
+    }
     
     // Find the row with this month
     var lastRow = monthlySheet.getLastRow();
@@ -2176,15 +2474,19 @@ function updateCurrentMonthStatistics() {
         currentMonth,
         currentMonthSales,
         cumulativeSales,
-        new Date() // Column D: Last Updated
+        new Date(), // Column D: Last Updated
+        currentAUM, // Column E: AUM
+        usdTreasuryBalance // Column F: USD Treasury Balance
       ]);
-      Logger.log("✅ Added new row for " + currentMonth + ": $" + currentMonthSales.toFixed(2) + " (Cumulative: $" + cumulativeSales.toFixed(2) + ")");
+      Logger.log("✅ Added new row for " + currentMonth + ": $" + currentMonthSales.toFixed(2) + " (Cumulative: $" + cumulativeSales.toFixed(2) + ", AUM: $" + currentAUM.toFixed(2) + ", Treasury: $" + usdTreasuryBalance.toFixed(2) + ")");
     } else {
       // Update existing row
       monthlySheet.getRange(rowIndex, 2).setValue(currentMonthSales); // Column B: Monthly Sales Volume
       monthlySheet.getRange(rowIndex, 3).setValue(cumulativeSales); // Column C: Cumulative Sales Volume
       monthlySheet.getRange(rowIndex, 4).setValue(new Date()); // Column D: Last Updated
-      Logger.log("✅ Updated row " + rowIndex + " for " + currentMonth + ": $" + currentMonthSales.toFixed(2) + " (Cumulative: $" + cumulativeSales.toFixed(2) + ")");
+      monthlySheet.getRange(rowIndex, 5).setValue(currentAUM); // Column E: AUM
+      monthlySheet.getRange(rowIndex, 6).setValue(usdTreasuryBalance); // Column F: USD Treasury Balance
+      Logger.log("✅ Updated row " + rowIndex + " for " + currentMonth + ": $" + currentMonthSales.toFixed(2) + " (Cumulative: $" + cumulativeSales.toFixed(2) + ", AUM: $" + currentAUM.toFixed(2) + ", Treasury: $" + usdTreasuryBalance.toFixed(2) + ")");
     }
     
   } catch (error) {
@@ -2544,7 +2846,18 @@ function syncAllPerformanceStatistics() {
       Logger.log("❌ Error updating USD_TREASURY_YIELD_1_MONTH: " + e.message);
     }
     
-    // 7. Update current month's statistics in Monthly Statistics sheet
+    // 7. AUM (Assets Under Management)
+    try {
+      var aum = calculateAUM();
+      updatePerformanceStatistic("AUM", aum, "USD");
+      report.updated.push({ key: "AUM", value: aum });
+      Logger.log("✅ Updated AUM: " + aum);
+    } catch (e) {
+      report.errors.push({ key: "AUM", error: e.message });
+      Logger.log("❌ Error updating AUM: " + e.message);
+    }
+    
+    // 8. Update current month's statistics in Monthly Statistics sheet
     try {
       updateCurrentMonthStatistics();
       Logger.log("✅ Updated current month statistics in Monthly Statistics sheet");
