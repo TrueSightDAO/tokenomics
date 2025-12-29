@@ -1,8 +1,73 @@
 # TrueSight DAO - Google Sheets Schema Documentation
 
-> **Last Updated:** 2025-01-28
+> **Last Updated:** 2025-12-26
 > 
 > This document provides a consolidated reference for all Google Sheets used across TrueSight DAO's Google Apps Scripts. Use this as a central schema reference when making code changes.
+
+## 📝 Recent Changes (2025-12-26)
+
+### Structural Changes Identified
+
+**Column Header Formatting Issues:**
+- Several columns contain line breaks (`\n`) in their headers, which can cause issues with exact string matching in code:
+  - `Telegram Chat Logs`: Column K (`TDGs Issued\n(reviewed by Governor)`) and Column M (`Main Ledger \nLine Number`)
+  - `Contributors Digital Signatures`: Column B (`Created \nTime Stamp`) and Column C (`Last Active \nTime Stamp`)
+  - `Agroverse QR codes`: Column M (`Onboarding Email \nSent Date`), Column N (`Tree Planting Date\n(YYYYMMDD)`), and Column U (`Manager \nName`)
+- `Capital Injection`: Column F header contains tab character and type annotation (`Amount\tNumber`)
+- `Inventory Movement`: All columns H-O are now uppercase (e.g., `SENDER NAME`, `RECIPIENT NAME`, `CURRENCY`, `AMOUNT`, etc.)
+
+**New Columns Added:**
+- `Contributors contact information`: 
+  - Column S: `TikTok` (NEW)
+  - Column T: `Is Store Manager` (NEW)
+- `Agroverse QR codes`: 
+  - Column V: `Ledger Name` (NEW)
+
+**Column Name Updates:**
+- `Contributors contact information`: Column B updated from `TRUESIGHT Wallet Address (Solana)` to `TRUESIGHT Wallet Address (Solana mainnet)`
+- `Inventory Movement`: Column O renamed from `Row Numbers` to `RECORD ROWS`
+- `offchain asset location`: Structure completely changed - now tracks currency, location, amount managed, unit cost, and total value (previously tracked asset name, manager, and quantity)
+
+**New Sheets Documented:**
+- **Telegram & Submissions Spreadsheet:**
+  - `Proposal Submissions` - DAO proposal tracking
+  - `SunMint Tree Planting` - Tree planting submissions
+  - `SunMint Registered Farms` - Farm registrations
+  - `Document Notarizations` - Document notarization tracking
+  - `States` - Status reference values
+
+- **Main Ledger & Contributors Spreadsheet:**
+  - `Outstanding Airdrops` - Pending TDG airdrops
+  - `Recurring Transactions` - Recurring transaction tokenization
+  - `offchain assets in transit` - Shipping and logistics tracking
+  - `Consignments` - Retail consignment inventory
+  - `Contribution submission` - Web form submissions
+  - `Governors` - DAO governor tracking
+  - `Intiatives Scoring Rubric` - Contribution scoring rubric
+  - `TRUESIGHT token details` - Token wallet management
+  - `Agroverse Active Contributors` - Active contributor tracking
+  - `States` - Comprehensive status reference
+  - `Currencies` - Currency and product metadata
+  - `Contributor Staking` - TDG staking tracking
+  - `Recent Contributions - 180` - 180-day contribution summary
+  - `Commodity Prices Exchange Rate` - Commodity price tracking
+  - `Agroverse Price Components` - Price component breakdown
+  - `Agroverse Cacao Category Pricing` - Category pricing multipliers
+  - `Agroverse Cacao Processing Cost` - Processing cost tracking
+  - `Stripe Social Media Checkout ID` - Stripe order tracking
+  - `Shipment Ledger Listing` - Shipment and ledger master list
+  - `Agroverse SKUs` - Product SKU management
+  - `Agroverse News Letter Subscribers` - Newsletter subscribers
+  - `Performance Statistics` - Performance metrics
+  - `Monthly Statistics` - Monthly sales statistics
+
+**Recommendations for Code Updates:**
+1. Use case-insensitive and whitespace-normalized matching for column headers
+2. Handle line breaks in headers by normalizing whitespace before comparison
+3. Update any hardcoded column references to use the new column names
+4. Consider using column indices instead of names for critical operations
+
+---
 
 ## 📑 Table of Contents
 
@@ -25,20 +90,45 @@
 - [Capital Injection](#sheet-capital-injection)
 - [QR Code Sales](#sheet-qr-code-sales)
 - [Inventory Movement](#sheet-inventory-movement)
-- [QR Code Generation Requests](#sheet-qr-code-generation-requests)
+- [QR Code Generation](#sheet-qr-code-generation)
+- [Proposal Submissions](#sheet-proposal-submissions)
+- [SunMint Tree Planting](#sheet-sunmint-tree-planting)
+- [SunMint Registered Farms](#sheet-sunmint-registered-farms)
+- [Document Notarizations](#sheet-document-notarizations)
+- [States](#sheet-states-telegram)
 
 **Main Ledger & Contributors (1GE7P...)**
-- [offchain transactions](#sheet-offchain-transactions)
-- [offchain asset location](#sheet-offchain-asset-location)
+- [Ledger history](#sheet-ledger-history)
+- [Contributors voting weight](#sheet-contributors-voting-weight)
+- [Outstanding Airdrops](#sheet-outstanding-airdrops)
 - [Contributors contact information](#sheet-contributors-contact-information)
 - [Contributors Digital Signatures](#sheet-contributors-digital-signatures)
-- [Contributors voting weight](#sheet-contributors-voting-weight)
-- [Ledger history](#sheet-ledger-history)
+- [offchain transactions](#sheet-offchain-transactions)
+- [offchain asset location](#sheet-offchain-asset-location)
+- [Recurring Transactions](#sheet-recurring-transactions)
+- [offchain assets in transit](#sheet-offchain-assets-in-transit)
 - [off chain asset balance](#sheet-off-chain-asset-balance)
-- [Agroverse QR codes](#sheet-agroverse-qr-codes)
-- [Agroverse SKUs](#sheet-agroverse-skus)
+- [Consignments](#sheet-consignments)
+- [Contribution submission](#sheet-contribution-submission)
+- [Governors](#sheet-governors)
+- [Intiatives Scoring Rubric](#sheet-intiatives-scoring-rubric)
+- [TRUESIGHT token details](#sheet-truesight-token-details)
+- [Agroverse Active Contributors](#sheet-agroverse-active-contributors)
+- [States](#sheet-states-main-ledger)
 - [Currencies](#sheet-currencies)
+- [Contributor Staking](#sheet-contributor-staking)
+- [Recent Contributions - 180](#sheet-recent-contributions-180)
+- [Commodity Prices Exchange Rate](#sheet-commodity-prices-exchange-rate)
+- [Agroverse Price Components](#sheet-agroverse-price-components)
+- [Agroverse Cacao Category Pricing](#sheet-agroverse-cacao-category-pricing)
+- [Agroverse Cacao Processing Cost](#sheet-agroverse-cacao-processing-cost)
+- [Agroverse QR codes](#sheet-agroverse-qr-codes)
+- [Stripe Social Media Checkout ID](#sheet-stripe-social-media-checkout-id)
 - [Shipment Ledger Listing](#sheet-shipment-ledger-listing)
+- [Agroverse SKUs](#sheet-agroverse-skus)
+- [Agroverse News Letter Subscribers](#sheet-agroverse-news-letter-subscribers)
+- [Performance Statistics](#sheet-performance-statistics)
+- [Monthly Statistics](#sheet-monthly-statistics)
 
 **Managed AGL Ledgers**
 - [Overview & Active Ledgers List](#-managed-agl-ledgers-dynamic)
@@ -106,9 +196,9 @@ See [`python_scripts/schema_validation/README.md`](./python_scripts/schema_valid
 | H | Rubric classification | String | Classification category |
 | I | TDGs Provisioned | Number | TDG tokens provisioned |
 | J | Status | String | Status of the contribution |
-| K | TDGs Issued (reviewed by Governor) | String | Issued TDG tokens |
+| K | TDGs Issued\n(reviewed by Governor) | String | Issued TDG tokens (note: header contains line break) |
 | L | Status date | Date | Date of message/status (YYYYMMDD) |
-| M | Main Ledger Line Number | Number | Reference to main ledger |
+| M | Main Ledger \nLine Number | Number | Reference to main ledger (note: header contains line break) |
 | N | Scoring Hash Key | String | SHA-256 hash for deduplication |
 | O | Telegram File IDs | String | Comma-separated file IDs from Telegram |
 | P | Edgar Signature Verification | String | Signature verification status |
@@ -164,7 +254,7 @@ See [`python_scripts/schema_validation/README.md`](./python_scripts/schema_valid
 | C | Capital Injection Log Message | String | Full submission message including all details |
 | D | Reporter Name | String | Person who reported (validated via digital signature) |
 | E | Ledger Name | String | Target managed ledger (e.g., "AGL1", "SEF1") |
-| F | Amount | Number | Capital injection amount (positive, always USD) |
+| F | Amount\tNumber | Number | Capital injection amount (positive, always USD) (note: header contains tab character and type annotation) |
 | G | Ledger URL | String | Resolved URL to target managed ledger |
 | H | Injection Date | Date | Date of capital injection (YYYYMMDD) |
 | I | Description | String | Description of capital injection |
@@ -225,36 +315,173 @@ See [`python_scripts/schema_validation/README.md`](./python_scripts/schema_valid
 | E | Contributor Name | String | Person reporting movement |
 | F | Contribution Made | String | Full movement message |
 | G | Status Date | Date | Date of movement |
-| H | Sender Name | String | Person sending inventory |
-| I | Recipient Name | String | Person receiving inventory |
-| J | Currency | String | Inventory type (without ledger prefix) |
-| K | Amount | Number | Quantity transferred |
-| L | Ledger Name | String | Source ledger name (e.g., "AGL#25" or "offchain") |
-| M | Ledger URL | String | Resolved spreadsheet URL |
-| N | Status | String | "NEW" or "PROCESSED" |
-| O | Row Numbers | String | Comma-separated destination row numbers |
+| H | SENDER NAME | String | Person sending inventory (note: header is uppercase) |
+| I | RECIPIENT NAME | String | Person receiving inventory (note: header is uppercase) |
+| J | CURRENCY | String | Inventory type (without ledger prefix) (note: header is uppercase) |
+| K | AMOUNT | Number | Quantity transferred (note: header is uppercase) |
+| L | LEDGER_NAME | String | Source ledger name (e.g., "AGL#25" or "offchain") (note: header is uppercase with underscore) |
+| M | LEDGER_URL | String | Resolved spreadsheet URL (note: header is uppercase) |
+| N | STATUS | String | "NEW" or "PROCESSED" (note: header is uppercase) |
+| O | RECORD ROWS | String | Comma-separated destination row numbers (note: renamed from "Row Numbers") |
 
 **Used by:**
 - [`process_movement_telegram_logs.gs`](https://github.com/TrueSightDAO/tokenomics/blob/main/google_app_scripts/tdg_inventory_management/process_movement_telegram_logs.gs) - Processes inventory transfers between contributors
 
 ---
 
-##### Sheet: `QR Code Generation Requests`
+##### Sheet: `QR Code Generation`
 **Purpose:** Tracks QR code generation requests from Telegram
+
+**Sheet URL:** https://docs.google.com/spreadsheets/d/1qbZZhf-_7xzmDTriaJVWj6OZshyQsFkdsAV8-pyzASQ/edit#gid=1703901725
+
+**Header Row:** 1
 
 | Column | Name | Type | Description |
 |--------|------|------|-------------|
 | A | Telegram Update ID | Number | Source update ID |
-| B | Chat ID | Number | Telegram chat ID |
-| C | Contributor Name | String | Requester name |
-| D | Currency Name | String | Asset type for QR codes |
-| E | Quantity | Number | Number of QR codes to generate |
-| F | Status | String | "NEW", "PROCESSING", "COMPLETED" |
-| G | Batch ID | String | Generated batch identifier |
-| H | ZIP File URL | String | Google Drive link to ZIP file |
+| B | Telegram Chatroom ID | Number | Telegram chat ID |
+| C | Telegram Chatroom Name | String | Telegram chatroom name |
+| D | Telegram Message ID | Number | Telegram message ID |
+| E | Contributor Name | String | Requester name |
+| F | Contribution Made | String | Full request message |
+| G | Status date | Date | Date of request (YYYYMMDD) |
+| H | Agroverse QR starting line | Number | Starting line number for QR codes |
+| I | Agroverse QR ending line | Number | Ending line number for QR codes |
+| J | Zip file download URL | String | Google Drive link to ZIP file |
+| K | Zip file name | String | Name of the ZIP file |
+| L | status | String | Processing status |
 
 **Used by:**
 - [`process_qr_code_generation_telegram_logs.gs`](https://github.com/TrueSightDAO/tokenomics/blob/main/google_app_scripts/tdg_inventory_management/process_qr_code_generation_telegram_logs.gs) - Processes QR code generation requests from Telegram
+
+---
+
+##### Sheet: `Proposal Submissions`
+**Purpose:** Tracks DAO proposal submissions from Telegram
+
+**Sheet URL:** https://docs.google.com/spreadsheets/d/1qbZZhf-_7xzmDTriaJVWj6OZshyQsFkdsAV8-pyzASQ/edit#gid=837974573
+
+**Header Row:** 1
+
+| Column | Name | Type | Description |
+|--------|------|------|-------------|
+| A | Message ID | Number | Telegram message ID |
+| B | Timestamp | String | Submission timestamp |
+| C | Username | String | Telegram username |
+| D | Message Text | String | Full proposal message |
+| E | Processed | String | Processing status |
+| F | Proposal Title | String | Extracted proposal title |
+| G | Proposal Content | String | Full proposal content |
+| H | Digital Signature | String | Digital signature for authentication |
+| I | Transaction ID | String | Blockchain transaction ID (if applicable) |
+| J | Pull Request Number | String | GitHub PR number (if applicable) |
+| K | Status | String | Proposal status |
+| L | Created Date | Date | Creation date |
+| M | Updated Date | Date | Last update date |
+| N | Submission Type | String | Type of submission |
+
+**Used by:**
+- [`proposal_manager.gs`](https://github.com/TrueSightDAO/tokenomics/blob/main/google_app_scripts/tdg_proposal/proposal_manager.gs) - Manages proposal submissions
+
+---
+
+##### Sheet: `SunMint Tree Planting`
+**Purpose:** Tracks tree planting submissions for SunMint program
+
+**Sheet URL:** https://docs.google.com/spreadsheets/d/1qbZZhf-_7xzmDTriaJVWj6OZshyQsFkdsAV8-pyzASQ/edit#gid=176124122
+
+**Header Row:** 1
+
+| Column | Name | Type | Description |
+|--------|------|------|-------------|
+| A | Telegram Update ID | Number | Source Telegram update ID |
+| B | Telegram Chatroom ID | Number | Telegram chat ID |
+| C | Telegram Chatroom Name | String | Telegram chatroom name |
+| D | Telegram Message ID | Number | Telegram message ID |
+| E | Contributor Name | String | Person who planted the tree |
+| F | Contribution Made | String | Full submission message |
+| G | Status date | Date | Date of planting (YYYYMMDD) |
+| H | Telegram File IDs | String | Comma-separated file IDs |
+| I | Photo of Tree Planted | String | Photo URL |
+| J | Submitted Name | String | Name submitted for the tree |
+| K | Latitude | String | GPS latitude |
+| L | Longitude | String | GPS longitude |
+| M | Status | String | Processing status |
+| N | Specie | String | Tree species |
+| O | Notarization URL | String | Notarization document URL |
+| P | Cost of Tree | Number | Cost per tree |
+| Q | Tree Planting Time | String | Time of planting |
+
+**Used by:**
+- [`process_tree_planting_telegram_logs.gs`](https://github.com/TrueSightDAO/tokenomics/blob/main/google_app_scripts/sunmint_tree_planting/process_tree_planting_telegram_logs.gs) - Processes tree planting submissions
+
+---
+
+##### Sheet: `SunMint Registered Farms`
+**Purpose:** Tracks registered farms for SunMint program
+
+**Sheet URL:** https://docs.google.com/spreadsheets/d/1qbZZhf-_7xzmDTriaJVWj6OZshyQsFkdsAV8-pyzASQ/edit#gid=2011737890
+
+**Header Row:** 1
+
+| Column | Name | Type | Description |
+|--------|------|------|-------------|
+| A | Telegram Update ID | Number | Source Telegram update ID |
+| B | Telegram Chatroom ID | Number | Telegram chat ID |
+| C | Telegram Chatroom Name | String | Telegram chatroom name |
+| D | Telegram Message ID | Number | Telegram message ID |
+| E | Contributor Name | String | Farm owner/manager |
+| F | Contribution Made | String | Full registration message |
+| G | Status date | Date | Registration date (YYYYMMDD) |
+| H | Telegram File IDs | String | Comma-separated file IDs |
+
+**Used by:**
+- SunMint farm registration processes
+
+---
+
+##### Sheet: `Document Notarizations`
+**Purpose:** Tracks document notarization submissions
+
+**Sheet URL:** https://docs.google.com/spreadsheets/d/1qbZZhf-_7xzmDTriaJVWj6OZshyQsFkdsAV8-pyzASQ/edit#gid=520413576
+
+**Header Row:** 1
+
+| Column | Name | Type | Description |
+|--------|------|------|-------------|
+| A | Telegram Update ID | Number | Source Telegram update ID |
+| B | Telegram Chatroom ID | Number | Telegram chat ID |
+| C | Telegram Chatroom Name | String | Telegram chatroom name |
+| D | Telegram Message ID | Number | Telegram message ID |
+| E | Contributor Name | String | Person submitting document |
+| F | Contribution Made | String | Full submission message |
+| G | Status date | Date | Submission date (YYYYMMDD) |
+| H | Telegram File IDs | String | Comma-separated file IDs |
+| I | GitHub RAW url | String | GitHub raw file URL |
+| J | Submitter Name | String | Name of submitter |
+| K | Latitude | String | GPS latitude |
+| L | Longitude | String | GPS longitude |
+| M | Document Type | String | Type of document |
+| N | Description | String | Document description |
+| O | Git Commit Hash | String | GitHub commit hash |
+| P | Status | String | Processing status |
+
+**Used by:**
+- [`process_notarization_telegram_logs.gs`](https://github.com/TrueSightDAO/tokenomics/blob/main/google_app_scripts/agroverse_notarizations/process_notarization_telegram_logs.gs) - Processes document notarizations
+
+---
+
+##### Sheet: `States`
+**Purpose:** Reference sheet for status values
+
+**Sheet URL:** https://docs.google.com/spreadsheets/d/1qbZZhf-_7xzmDTriaJVWj6OZshyQsFkdsAV8-pyzASQ/edit#gid=225494713
+
+**Header Row:** 2
+
+| Column | Name | Type | Description |
+|--------|------|------|-------------|
+| A | TOKENIZED | String | Status value |
+| B | When the sales record is updated directly on our main ledger | String | Description |
 
 ---
 
@@ -294,19 +521,17 @@ See [`python_scripts/schema_validation/README.md`](./python_scripts/schema_valid
 ##### Sheet: `offchain asset location`
 **Purpose:** Tracks physical inventory locations and managers
 
-**Header Row:** 4
-
 | Column | Name | Type | Description |
 |--------|------|------|-------------|
-| A | Currency | String | Asset/currency identifier (e.g., "AGL4", "AGL8") |
-| B | Location/Manager Name | String | Person managing the asset or location name |
-| C | Amount | Number | Quantity available |
-| D+ | *(varies)* | - | Additional metadata |
+| A | Currency | String | Asset/currency type |
+| B | Location | String | Physical location of asset |
+| C | Amount Managed | Number | Quantity managed at this location |
+| D | Unit Cost | Number | Cost per unit |
+| E | Total Value | Number | Total value (Amount Managed × Unit Cost) |
 
 **Used by:**
 - [`web_app.gs`](https://github.com/TrueSightDAO/tokenomics/blob/main/google_app_scripts/tdg_inventory_management/web_app.gs) - API for inventory queries and management
 - [`process_movement_telegram_logs.gs`](https://github.com/TrueSightDAO/tokenomics/blob/main/google_app_scripts/tdg_inventory_management/process_movement_telegram_logs.gs) - Updates location after movements
-- [`update_store_inventory.gs`](https://github.com/TrueSightDAO/agroverse_shop/blob/main/google-app-script/update_store_inventory.gs) - Aggregates inventory from main ledger for store managers
 
 ---
 
@@ -320,7 +545,7 @@ See [`python_scripts/schema_validation/README.md`](./python_scripts/schema_valid
 | Column | Name | Type | Description |
 |--------|------|------|-------------|
 | A | Name | String | Contributor's full name |
-| B | TRUESIGHT Wallet Address (Solana) | String | Solana wallet address |
+| B | TRUESIGHT Wallet Address (Solana mainnet) | String | Solana wallet address (note: updated to specify "mainnet") |
 | C | Ethereum Wallet Address | String | Ethereum wallet address |
 | D | Email | String | Email address |
 | E | Address | String | Physical address |
@@ -337,10 +562,10 @@ See [`python_scripts/schema_validation/README.md`](./python_scripts/schema_valid
 | P | Taxation ID | String | Tax ID |
 | Q | WhatsApp Chat Log ID | String | WhatsApp log ID |
 | R | Digital Signature | String | Public key (legacy location) |
-| T | Is Store Manager | Boolean | TRUE/FALSE flag indicating if contributor is a store manager |
+| S | TikTok | String | TikTok handle (NEW - added 2025-12-26) |
+| T | Is Store Manager | String | Store manager flag (NEW - added 2025-12-26) |
 
 **Used by:**
-- [`update_store_inventory.gs`](https://github.com/TrueSightDAO/agroverse_shop/blob/main/google-app-script/update_store_inventory.gs) - Filters store managers for inventory calculations
 - [`grok_scoring_for_telegram_and_whatsapp_logs.gs`](https://github.com/TrueSightDAO/tokenomics/blob/main/google_app_scripts/tdg_grok_scoring/grok_scoring_for_telegram_and_whatsapp_logs.gs) - Validates contributors when scoring
 - [`process_sales_telegram_logs.gs`](https://github.com/TrueSightDAO/tokenomics/blob/main/google_app_scripts/tdg_inventory_management/process_sales_telegram_logs.gs) - Validates sales reporters
 - [`tdg_expenses_processing.gs`](https://github.com/TrueSightDAO/tokenomics/blob/main/google_app_scripts/tdg_asset_management/tdg_expenses_processing.gs) - Validates expense reporters
@@ -358,8 +583,8 @@ See [`python_scripts/schema_validation/README.md`](./python_scripts/schema_valid
 | Column | Name | Type | Description |
 |--------|------|------|-------------|
 | A | Contributor Name | String | Full name of contributor |
-| B | Created Time Stamp | String | Format: "YYYY-MM-DD HH:MM:SS" |
-| C | Last Active Time Stamp | String | Format: "YYYYMMDD HH:MM:SS" |
+| B | Created \nTime Stamp | String | Format: "YYYY-MM-DD HH:MM:SS" (note: header contains line break) |
+| C | Last Active \nTime Stamp | String | Format: "YYYYMMDD HH:MM:SS" (note: header contains line break) |
 | D | Status | String | "ACTIVE", "INACTIVE", etc. |
 | E | Digital Signature | String | Public key for authentication |
 | F | Contributor Email Address | String | Email address |
@@ -487,15 +712,16 @@ See [`python_scripts/schema_validation/README.md`](./python_scripts/schema_valid
 | J | QR code creation date (YYYYMMDD) | String | Creation date |
 | K | QR code location | String | Storage location URL |
 | L | Owner Email | String | Owner email |
-| M | Onboarding Email Sent Date | String | Onboarding date |
-| N | Tree Planting Date (YYYYMMDD) | String | Planting date |
+| M | Onboarding Email \nSent Date | String | Onboarding date (note: header contains line break) |
+| N | Tree Planting Date\n(YYYYMMDD) | String | Planting date (note: header contains line break) |
 | O | Latitude | String | GPS latitude |
 | P | Longitude | String | GPS longitude |
 | Q | Planting Video URL | String | Video URL |
 | R | Tree Seedling Photo URL | String | Photo URL |
 | S | Product Image | String | Product image URL |
 | T | Price | Number | Price |
-| U | Manager Name | String | Manager name |
+| U | Manager \nName | String | Manager name (note: header contains line break) |
+| V | Ledger Name | String | Associated ledger name (NEW - added 2025-12-26) |
 
 **Used by:**
 - [`process_sales_telegram_logs.gs`](https://github.com/TrueSightDAO/tokenomics/blob/main/google_app_scripts/tdg_inventory_management/process_sales_telegram_logs.gs) - Validates QR codes during sales processing
@@ -504,8 +730,466 @@ See [`python_scripts/schema_validation/README.md`](./python_scripts/schema_valid
 
 ---
 
+##### Sheet: `Outstanding Airdrops`
+**Purpose:** Tracks TDG tokens pending airdrop to contributors
+
+**Sheet URL:** https://docs.google.com/spreadsheets/d/1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU/edit#gid=1569170936
+
+**Header Row:** 4
+
+| Column | Name | Type | Description |
+|--------|------|------|-------------|
+| A | Contributor Name | String | Full name of contributor |
+| B | TDG Amount | Number | Amount of TDG tokens to airdrop |
+| C | Solana Wallet Address | String | Recipient wallet address |
+| D | Status | String | Airdrop status |
+
+**Used by:**
+- Airdrop processing scripts
+
+---
+
+##### Sheet: `Recurring Transactions`
+**Purpose:** Tracks recurring financial transactions for tokenization
+
+**Sheet URL:** https://docs.google.com/spreadsheets/d/1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU/edit#gid=33812003
+
+**Header Row:** 4
+
+| Column | Name | Type | Description |
+|--------|------|------|-------------|
+| A | Description | String | Transaction description |
+| B | Source | String | Source of transaction |
+| C | Transaction Type | String | Type of recurring transaction |
+| D | Amount (USD) | Number | Transaction amount in USD |
+| E | Billing Period | String | Billing frequency |
+| F | Most Recent Tokenization Date | Date | Last tokenization date |
+| G | Start Date | Date | Transaction start date |
+| H | Edgar AWS \nBilling Automation \nSecurity Key Identifier | String | Security key for automation (note: header contains line breaks) |
+| I | Automation Remarks | String | Automation notes |
+
+**Used by:**
+- Recurring tokenization scripts
+
+---
+
+##### Sheet: `offchain assets in transit`
+**Purpose:** Tracks physical assets being shipped between locations
+
+**Sheet URL:** https://docs.google.com/spreadsheets/d/1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU/edit#gid=1888711771
+
+**Header Row:** 1
+
+| Column | Name | Type | Description |
+|--------|------|------|-------------|
+| A | Destination DAO member | String | Recipient member name |
+| B | Origin Asset Name | String | Asset being shipped |
+| C | Unit Value | Number | Value per unit |
+| D | Destination Address | String | Shipping destination |
+| E | Origin DAO member | String | Sender member name |
+| F | Origin Address | String | Shipping origin |
+| G | Recipient Tax ID | String | Tax ID of recipient |
+| H | Phone Number | String | Contact phone number |
+| I | *(empty)* | - | Reserved column |
+| J | Courier Service | String | Shipping company |
+| K | Tracking Number | String | Package tracking number |
+| L | Expected Arrival Date\n(YYYYMMDD) | Date | Expected delivery date (note: header contains line break) |
+| M | Destination Asset Name | String | Asset name at destination |
+| N | Ledger Location | String | Ledger reference |
+| O | Ledger Line Number | Number | Ledger row number |
+| P | Status | String | Shipping status |
+
+**Used by:**
+- Shipping and logistics tracking
+
+---
+
+##### Sheet: `Consignments`
+**Purpose:** Tracks consignment inventory at retail locations
+
+**Sheet URL:** https://docs.google.com/spreadsheets/d/1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU/edit#gid=1401078120
+
+**Header Row:** 1
+
+| Column | Name | Type | Description |
+|--------|------|------|-------------|
+| A | Store Name | String | Retail store name |
+| B | Status Date | Date | Last status update |
+| C | Last Visit | Date | Last visit date |
+| D | Units | Number | Units on consignment |
+| E | Asset Type | String | Product type |
+| F | Retail Price | Number | Retail price per unit |
+| G | Settlement Price | Number | Settlement price per unit |
+| H | Person In Charge | String | Store contact person |
+| I | Job Title | String | Contact person's title |
+| J | Email | String | Contact email |
+| K | Physical Address | String | Store physical address |
+| L | USPS Mailing Address | String | Mailing address |
+| M | Phone | String | Contact phone |
+| N | Remarks | String | Additional notes |
+
+**Used by:**
+- Consignment management
+
+---
+
+##### Sheet: `Contribution submission`
+**Purpose:** Web form submissions for contributions
+
+**Sheet URL:** https://docs.google.com/spreadsheets/d/1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU/edit#gid=322675155
+
+**Header Row:** 4
+
+| Column | Name | Type | Description |
+|--------|------|------|-------------|
+| A | Timestamp | String | Submission timestamp |
+| B | Contributor Name \nMember whom you observed made a valuable contribution to our DAO. | String | Contributor name (note: header contains line break and description) |
+| C | Description of the Contribution\nMore details on the contribution made? Provide links to resources that were contributed if applicable. \n\nThis might include links to tweets, google docs or artwork that were uploaded | String | Contribution description (note: header contains line breaks and instructions) |
+| D | What kind of contribution it is \nnumber on the left shows the amount of governance tokens it should be worth | String | Contribution category (note: header contains line break and instructions) |
+| E | Email Address | String | Submitter email |
+| F | Project Name\nWhich project did you observed received a contribution? | String | Associated project (note: header contains line break) |
+| G | Governance tokens to be awarded\nThe amount should be informed by the amount associated with the category selected above | Number | TDG tokens to award (note: header contains line breaks and instructions) |
+| H | *(empty)* | - | Reserved column |
+| I | Notarizing Governor | String | Governor who notarized |
+| J | Notarization Status | String | Notarization status |
+| K | Ledger Line Number | Number | Reference to ledger |
+
+**Used by:**
+- Contribution submission web forms
+
+---
+
+##### Sheet: `Governors`
+**Purpose:** Tracks DAO governors and their terms
+
+**Sheet URL:** https://docs.google.com/spreadsheets/d/1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU/edit#gid=842148543
+
+**Header Row:** 7
+
+| Column | Name | Type | Description |
+|--------|------|------|-------------|
+| A | End Period | String | Period end date |
+| B | 20251229 | String | Specific date value |
+| C | *(empty)* | - | Reserved column |
+| D | Vernal Equinox | String | Seasonal marker |
+| E | 20th March | String | Date value |
+
+**Note:** This sheet appears to be a calendar/reference sheet with specific formatting.
+
+---
+
+##### Sheet: `Intiatives Scoring Rubric`
+**Purpose:** Scoring rubric for contribution categories
+
+**Sheet URL:** https://docs.google.com/spreadsheets/d/1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU/edit#gid=129025382
+
+**Header Row:** 4
+
+| Column | Name | Type | Description |
+|--------|------|------|-------------|
+| A | Category of Contributions | String | Contribution category |
+| B | Type of contribution | String | Contribution type |
+| C | TDG Tokens Awarded | Number | TDG tokens for this category |
+| D | *(empty)* | - | Reserved column |
+| E | *(empty)* | - | Reserved column |
+| F | States | String | Status values |
+
+**Used by:**
+- Scoring and tokenization scripts
+
+---
+
+##### Sheet: `TRUESIGHT token details`
+**Purpose:** Master list of TRUESIGHT token wallets
+
+**Sheet URL:** https://docs.google.com/spreadsheets/d/1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU/edit#gid=257194538
+
+**Header Row:** 1
+
+| Column | Name | Type | Description |
+|--------|------|------|-------------|
+| A | Wallet Type | String | Type of wallet |
+| B | Wallet Address | String | Wallet address |
+| C | Managers | String | Wallet managers |
+| D | Total TDG | Number | Total TDG in wallet |
+
+**Used by:**
+- Wallet management scripts
+
+---
+
+##### Sheet: `Agroverse Active Contributors`
+**Purpose:** Tracks active contributors in Agroverse project
+
+**Sheet URL:** https://docs.google.com/spreadsheets/d/1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU/edit#gid=1053818602
+
+**Header Row:** 1
+
+| Column | Name | Type | Description |
+|--------|------|------|-------------|
+| A | Contributor Name | String | Contributor name |
+| B | Total Contributions - past 90 days | Number | Contribution count |
+
+**Used by:**
+- Contributor activity tracking
+
+---
+
+##### Sheet: `States`
+**Purpose:** Reference sheet for all status values and enums
+
+**Sheet URL:** https://docs.google.com/spreadsheets/d/1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU/edit#gid=1250222719
+
+**Header Row:** 1
+
+| Column | Name | Type | Description |
+|--------|------|------|-------------|
+| A | Initiative States | String | Initiative status values |
+| B | *(empty)* | - | Reserved column |
+| C | Proposal States | String | Proposal status values |
+| D | *(empty)* | - | Reserved column |
+| E | Betting Pool States | String | Betting pool status |
+| F | Betting Direction | String | Betting direction values |
+| G | *(empty)* | - | Reserved column |
+| H | Contribution Submission States | String | Contribution submission status |
+| I | *(empty)* | - | Reserved column |
+| J | Scope | String | Scope values |
+| K | Project Tokenization Status | String | Tokenization status |
+| L | Project Activity Status | String | Activity status |
+| M | *(empty)* | - | Reserved column |
+| N | Currencies | String | Currency names |
+| O | Price in USD | Number | Currency prices |
+| P | *(empty)* | - | Reserved column |
+| Q | Recurring Transaction Type | String | Transaction types |
+| R | *(empty)* | - | Reserved column |
+| S | Physica Asset Transition Status | String | Asset transition status (note: typo in header "Physica") |
+| T | *(empty)* | - | Reserved column |
+| U | QR code states | String | QR code status values |
+| V | *(empty)* | - | Reserved column |
+| W | Digital Signature Status | String | Signature status values |
+
+**Used by:**
+- All scripts for status validation
+
+---
+
+##### Sheet: `Currencies`
+**Purpose:** Master list of currencies and product metadata
+
+**Sheet URL:** https://docs.google.com/spreadsheets/d/1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU/edit#gid=1552160318
+
+**Header Row:** 1
+
+| Column | Name | Type | Description |
+|--------|------|------|-------------|
+| A | Currencies | String | Currency/product name |
+| B | Price in USD | Number | Price per unit |
+| C | Serializable | String | Whether product is serialized |
+| D | Product Image | String | Product image URL |
+| E | landing_page | String | Landing page URL |
+| F | ledger | String | Associated ledger URL |
+| G | farm name | String | Farm name |
+| H | state | String | State/region |
+| I | country | String | Country |
+| J | Year | String | Year |
+| K | Unit Weight (grams) | Number | Weight in grams |
+| L | Unit Weight (ounces) | Number | Weight in ounces |
+| M | SKU Product ID | String | SKU identifier |
+
+**Used by:**
+- Product and pricing management
+
+---
+
+##### Sheet: `Contributor Staking`
+**Purpose:** Tracks TDG staking by contributors
+
+**Sheet URL:** https://docs.google.com/spreadsheets/d/1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU/edit#gid=734074565
+
+**Header Row:** 1
+
+| Column | Name | Type | Description |
+|--------|------|------|-------------|
+| A | Contributor Name | String | Contributor name |
+| B | Milestones achieved | String | Milestones completed |
+| C | Status | String | Staking status |
+| D | TDGs staked | Number | Amount of TDG staked |
+| E | Status date | Date | Status update date |
+
+**Used by:**
+- Staking management
+
+---
+
+##### Sheet: `Recent Contributions - 180`
+**Purpose:** Summary of contributions in the last 180 days
+
+**Sheet URL:** https://docs.google.com/spreadsheets/d/1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU/edit#gid=2001293596
+
+**Header Row:** 6
+
+**Note:** This appears to be a summary/report sheet with dynamic data.
+
+---
+
+##### Sheet: `Commodity Prices Exchange Rate`
+**Purpose:** Tracks commodity prices and exchange rates
+
+**Sheet URL:** https://docs.google.com/spreadsheets/d/1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU/edit#gid=398142035
+
+**Header Row:** 1
+
+| Column | Name | Type | Description |
+|--------|------|------|-------------|
+| A | company symbol | String | Company/ticker symbol |
+| B | company name | String | Company name |
+| C | company page | String | Company page URL |
+| D | close | Number | Closing price |
+| E | high | Number | High price |
+| F | low | Number | Low price |
+| G | volume | Number | Trading volume |
+| H | origin_pattern | String | Data source pattern |
+| I | origin_url | String | Data source URL |
+| J | createdAt | Date | Creation timestamp |
+| K | updatedAt | Date | Update timestamp |
+| L | pingedAt | Date | Last ping timestamp |
+
+**Used by:**
+- Price tracking and exchange rate calculations
+
+---
+
+##### Sheet: `Agroverse Price Components`
+**Purpose:** Price component breakdown for Agroverse products
+
+**Sheet URL:** https://docs.google.com/spreadsheets/d/1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU/edit#gid=1311453882
+
+**Header Row:** 1
+
+| Column | Name | Type | Description |
+|--------|------|------|-------------|
+| A | Description | String | Price component description |
+| B | Amount | Number | Component amount |
+
+**Used by:**
+- Pricing calculations
+
+---
+
+##### Sheet: `Agroverse Cacao Category Pricing`
+**Purpose:** Pricing multipliers by cacao category
+
+**Sheet URL:** https://docs.google.com/spreadsheets/d/1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU/edit#gid=1760569208
+
+**Header Row:** 1
+
+| Column | Name | Type | Description |
+|--------|------|------|-------------|
+| A | Type | String | Cacao category type |
+| B | Multiplier | Number | Price multiplier |
+
+**Used by:**
+- Category-based pricing
+
+---
+
+##### Sheet: `Agroverse Cacao Processing Cost`
+**Purpose:** Tracks processing costs for cacao
+
+**Sheet URL:** https://docs.google.com/spreadsheets/d/1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU/edit#gid=603759787
+
+**Header Row:** 1
+
+| Column | Name | Type | Description |
+|--------|------|------|-------------|
+| A | Facility Name | String | Processing facility |
+| B | Process name | String | Process type |
+| C | Cost | Number | Processing cost |
+| D | Currency | String | Cost currency |
+| E | Status Date | Date | Status update date |
+| F | Contact Information / Whats App | String | Contact details |
+| G | Alibaba | String | Alibaba reference |
+
+**Used by:**
+- Cost tracking and pricing
+
+---
+
+##### Sheet: `Stripe Social Media Checkout ID`
+**Purpose:** Tracks Stripe checkout sessions and orders
+
+**Sheet URL:** https://docs.google.com/spreadsheets/d/1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU/edit#gid=1787371190
+
+**Header Row:** 1
+
+| Column | Name | Type | Description |
+|--------|------|------|-------------|
+| A | Timestamp | String | Order timestamp |
+| B | Customer Name | String | Customer name |
+| C | Stripe Session ID | String | Stripe checkout session ID |
+| D | Wix Order Number | String | Wix order number |
+| E | Wix Order ID | String | Wix order ID |
+| F | Items Purchased | String | Purchased items |
+| G | Total Quantity | Number | Total item quantity |
+| H | Amount | Number | Order amount |
+| I | Currency | String | Order currency |
+| J | Shipping Address | String | Shipping destination |
+| K | Shipping Cost | Number | Shipping cost |
+| L | Stripe Transaction Fee | Number | Stripe processing fee |
+| M | Shipping Provider | String | Shipping carrier |
+| N | Tracking Number | String | Package tracking number |
+| O | Tracking Notification Sent | String | Email notification status |
+
+**Used by:**
+- Stripe order processing and tracking
+
+---
+
+##### Sheet: `Shipment Ledger Listing`
+**Purpose:** Master list of all shipments and their associated ledgers
+
+**Sheet URL:** https://docs.google.com/spreadsheets/d/1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU/edit#gid=483234653
+
+**Header Row:** 1
+
+| Column | Name | Type | Description |
+|--------|------|------|-------------|
+| A | *(empty)* | - | Reserved column |
+| B | Shipment Date | Date | Shipment date |
+| C | Status | String | Shipment status |
+| D | Description | String | Shipment description |
+| E | Shipment Image | String | Image URL |
+| F | Cargo Size | String | Cargo size |
+| G | Cacao (kg) | Number | Cacao weight in kg |
+| H | Transaction Type | String | Transaction type |
+| I | Investment ROI | Number | Return on investment |
+| J | Capital Injection | Number | Capital injection amount |
+| K | Total Revenue | Number | Total revenue |
+| L | Ledger URL | String | Ledger spreadsheet URL |
+| M | Contract URL | String | Contract document URL |
+| N | FDA Prior Notice | String | FDA notice URL |
+| O | Invoice URL | String | Invoice document URL |
+| P | Purchase Order URL | String | PO document URL |
+| Q | Lab Report | String | Lab report URL |
+| R | Video Reel | String | Video URL |
+| S | TrueSight DAO URL | String | DAO page URL |
+| T | Trees to be Planted | Number | Tree planting commitment |
+| U | Google Maps URL | String | Location map URL |
+| V | Latitude | String | GPS latitude |
+| W | Longitude | String | GPS longitude |
+| X | Is Cacao Shipment | String | Cacao shipment flag |
+| Y | Serialized | String | Serialization status |
+| Z | Created Date | Date | Creation date |
+| AA | Updated Date | Date | Last update date |
+| AB | Resolved URL | String | Resolved ledger URL |
+
+**Used by:**
+- Shipment and ledger management
+
+---
+
 ##### Sheet: `Agroverse SKUs`
-**Purpose:** Product catalog for agroverse.shop with inventory tracking
+**Purpose:** Master list of product SKUs
 
 **Sheet URL:** https://docs.google.com/spreadsheets/d/1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU/edit#gid=98293503
 
@@ -513,51 +1197,76 @@ See [`python_scripts/schema_validation/README.md`](./python_scripts/schema_valid
 
 | Column | Name | Type | Description |
 |--------|------|------|-------------|
-| A | Product ID | String | Unique product identifier (slug) |
-| B | Product Name | String | Full product name |
-| C | Price (USD) | Number | Product price in USD |
-| D | Weight (oz) | Number | Product weight in ounces |
-| E | Category | String | Product category (e.g., "retail", "wholesale") |
-| F | Shipment | String | Shipment/currency identifier (e.g., "AGL4", "AGL8") |
-| G | Farm | String | Farm name associated with product |
-| H | Image Path | String | Full URL to product image |
-| I | Store inventory | Number | Calculated inventory count for store managers (updated by script) |
+| A | Product ID | String | Product identifier |
+| B | Product Name | String | Product name |
+| C | Price (USD) | Number | Product price |
+| D | Weight (oz) | Number | Product weight |
+| E | Category | String | Product category |
+| F | Shipment | String | Associated shipment |
+| G | Farm | String | Source farm |
+| H | Image Path | String | Product image URL |
+| I | Store inventory | Number | Store inventory count |
 
 **Used by:**
-- [`update_store_inventory.gs`](https://github.com/TrueSightDAO/agroverse_shop/blob/main/google-app-script/update_store_inventory.gs) - Updates Column I with aggregated inventory from ledgers
-- [`update_agroverse_skus.py`](https://github.com/TrueSightDAO/tokenomics/blob/main/python_scripts/agroverse_products/update_agroverse_skus.py) - Updates product data from agroverse.shop
+- Product and inventory management
 
 ---
 
-##### Sheet: `Currencies`
-**Purpose:** Maps currency/asset identifiers to product SKUs
+##### Sheet: `Agroverse News Letter Subscribers`
+**Purpose:** Newsletter subscriber list
 
-| Column | Name | Type | Description |
-|--------|------|------|-------------|
-| A | Currency | String | Currency/asset identifier (e.g., "AGL4", "AGL8") |
-| M | SKU Product ID | String | Maps to Agroverse SKUs Column A (Product ID) |
-
-**Used by:**
-- [`update_store_inventory.gs`](https://github.com/TrueSightDAO/agroverse_shop/blob/main/google-app-script/update_store_inventory.gs) - Maps ledger currencies to product SKUs for inventory calculation
-
----
-
-##### Sheet: `Shipment Ledger Listing`
-**Purpose:** Registry of managed ledger spreadsheets with resolved URLs
+**Sheet URL:** https://docs.google.com/spreadsheets/d/1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU/edit#gid=1078776582
 
 **Header Row:** 1
 
 | Column | Name | Type | Description |
 |--------|------|------|-------------|
-| A | Shipment ID | String | Ledger identifier (e.g., "AGL4", "AGL8") |
-| L | Ledger URL | String | Original/unresolved ledger spreadsheet URL |
-| AB | Resolved Ledger URL | String | Resolved Google Sheets URL (after redirect resolution) |
+| A | Email | String | Subscriber email |
+| B | Status | String | Subscription status |
+| C | Created Date | Date | Subscription date |
+| D | Imported Date | Date | Import date |
 
 **Used by:**
-- [`resolveRedirect` functions](https://github.com/TrueSightDAO/tokenomics/blob/main/google_app_scripts/tdg_asset_management/tdg_expenses_processing.gs) - Primary lookup for resolving ledger URLs (checks Column L -> Column AB before HTTP resolution)
-- [`update_store_inventory.gs`](https://github.com/TrueSightDAO/agroverse_shop/blob/main/google-app-script/update_store_inventory.gs) - Gets list of managed ledger URLs from Column AB
+- Newsletter management
 
-**Note:** Multiple scripts use this sheet for ledger URL resolution. Column L contains the original URL, Column AB contains the resolved URL after following redirects. Scripts should check Column AB first before attempting HTTP resolution.
+---
+
+##### Sheet: `Performance Statistics`
+**Purpose:** Performance metrics and statistics
+
+**Sheet URL:** https://docs.google.com/spreadsheets/d/1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU/edit#gid=560310588
+
+**Header Row:** 1
+
+| Column | Name | Type | Description |
+|--------|------|------|-------------|
+| A | 12/7/2025 | Date | Date column (format varies) |
+| B | Description | String | Metric description |
+| C | Exchange Rate / Value | Number | Metric value |
+| D | Currency | String | Currency code |
+| E | Updated Date | Date | Last update date |
+
+**Used by:**
+- Performance tracking
+
+---
+
+##### Sheet: `Monthly Statistics`
+**Purpose:** Monthly sales and revenue statistics
+
+**Sheet URL:** https://docs.google.com/spreadsheets/d/1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU/edit#gid=1026348250
+
+**Header Row:** 1
+
+| Column | Name | Type | Description |
+|--------|------|------|-------------|
+| A | Year-Month | String | Year and month (YYYY-MM) |
+| B | Monthly Sales Volume (USD) | Number | Monthly sales amount |
+| C | Cumulative Sales Volume (USD) | Number | Cumulative sales total |
+| D | Last Updated | Date | Last update timestamp |
+
+**Used by:**
+- Sales reporting and analytics
 
 ---
 
