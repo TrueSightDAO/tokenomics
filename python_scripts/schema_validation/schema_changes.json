@@ -1,0 +1,630 @@
+[
+  {
+    "sheet_name": "Telegram Chat Logs",
+    "spreadsheet_id": "1qbZZhf-_7xzmDTriaJVWj6OZshyQsFkdsAV8-pyzASQ",
+    "header_row": 2,
+    "documented_columns": 18,
+    "actual_columns": 18,
+    "missing_columns": [
+      {
+        "column": "K",
+        "name": "TDGs Issued (reviewed by Governor)",
+        "type": "String"
+      },
+      {
+        "column": "M",
+        "name": "Main Ledger Line Number",
+        "type": "Number"
+      }
+    ],
+    "extra_columns": [
+      {
+        "column": "K",
+        "name": "TDGs Issued\n(reviewed by Governor) ",
+        "index": 10
+      },
+      {
+        "column": "M",
+        "name": "Main Ledger \nLine Number",
+        "index": 12
+      }
+    ],
+    "column_name_changes": [],
+    "column_order_changes": [],
+    "status": "changed",
+    "actual_headers": [
+      "Telegram Update ID",
+      "Telegram Chatroom ID",
+      "Telegram Chatroom Name",
+      "Telegram Message ID",
+      "Contributor Name",
+      "Project Name",
+      "Contribution Made",
+      "Rubric classification",
+      "TDGs Provisioned",
+      "Status",
+      "TDGs Issued\n(reviewed by Governor) ",
+      "Status date",
+      "Main Ledger \nLine Number",
+      "Scoring Hash Key",
+      "Telegram File IDs",
+      "Edgar Signature Verification",
+      "External API call status",
+      "External API call response"
+    ]
+  },
+  {
+    "sheet_name": "Scored Expense Submissions",
+    "spreadsheet_id": "1qbZZhf-_7xzmDTriaJVWj6OZshyQsFkdsAV8-pyzASQ",
+    "header_row": 1,
+    "documented_columns": 12,
+    "actual_columns": 12,
+    "missing_columns": [],
+    "extra_columns": [],
+    "column_name_changes": [],
+    "column_order_changes": [],
+    "status": "match",
+    "actual_headers": [
+      "Telegram Update ID",
+      "Telegram Chatroom ID",
+      "Telegram Chatroom Name",
+      "Telegram Message ID",
+      "Reporter Name",
+      "Expense Reported",
+      "Status date",
+      "Contributor Name",
+      "Currency ",
+      "Amount",
+      "Scoring Hash Key",
+      "Ledger Lines Number"
+    ]
+  },
+  {
+    "sheet_name": "Capital Injection",
+    "spreadsheet_id": "1qbZZhf-_7xzmDTriaJVWj6OZshyQsFkdsAV8-pyzASQ",
+    "header_row": 1,
+    "documented_columns": 11,
+    "actual_columns": 11,
+    "missing_columns": [
+      {
+        "column": "F",
+        "name": "Amount",
+        "type": "Number"
+      }
+    ],
+    "extra_columns": [
+      {
+        "column": "F",
+        "name": "Amount\tNumber",
+        "index": 5
+      }
+    ],
+    "column_name_changes": [],
+    "column_order_changes": [],
+    "status": "changed",
+    "actual_headers": [
+      "Telegram Update ID",
+      "Telegram Message ID",
+      "Capital Injection Log Message",
+      "Reporter Name",
+      "Ledger Name",
+      "Amount\tNumber",
+      "Ledger URL",
+      "Injection Date",
+      "Description",
+      "Status",
+      "Ledger Lines Number"
+    ]
+  },
+  {
+    "sheet_name": "QR Code Sales",
+    "spreadsheet_id": "1qbZZhf-_7xzmDTriaJVWj6OZshyQsFkdsAV8-pyzASQ",
+    "header_row": 1,
+    "documented_columns": 11,
+    "actual_columns": 11,
+    "missing_columns": [],
+    "extra_columns": [],
+    "column_name_changes": [],
+    "column_order_changes": [],
+    "status": "match",
+    "actual_headers": [
+      "Telegram Update ID",
+      "Telegram Message ID",
+      "Sales Report Log Message",
+      "Reporter Name",
+      "QR Code value",
+      "Sale Price",
+      "AGL Ledger URL",
+      "Sales Date",
+      "Currency",
+      "Status",
+      "Ledger Lines Number"
+    ]
+  },
+  {
+    "sheet_name": "Inventory Movement",
+    "spreadsheet_id": "1qbZZhf-_7xzmDTriaJVWj6OZshyQsFkdsAV8-pyzASQ",
+    "header_row": 1,
+    "documented_columns": 15,
+    "actual_columns": 15,
+    "missing_columns": [
+      {
+        "column": "H",
+        "name": "Sender Name",
+        "type": "String"
+      },
+      {
+        "column": "I",
+        "name": "Recipient Name",
+        "type": "String"
+      },
+      {
+        "column": "J",
+        "name": "Currency",
+        "type": "String"
+      },
+      {
+        "column": "K",
+        "name": "Amount",
+        "type": "Number"
+      },
+      {
+        "column": "L",
+        "name": "Ledger Name",
+        "type": "String"
+      },
+      {
+        "column": "M",
+        "name": "Ledger URL",
+        "type": "String"
+      },
+      {
+        "column": "N",
+        "name": "Status",
+        "type": "String"
+      },
+      {
+        "column": "O",
+        "name": "Row Numbers",
+        "type": "String"
+      }
+    ],
+    "extra_columns": [
+      {
+        "column": "H",
+        "name": "SENDER NAME",
+        "index": 7
+      },
+      {
+        "column": "I",
+        "name": "RECIPIENT NAME",
+        "index": 8
+      },
+      {
+        "column": "J",
+        "name": "CURRENCY",
+        "index": 9
+      },
+      {
+        "column": "K",
+        "name": "AMOUNT",
+        "index": 10
+      },
+      {
+        "column": "L",
+        "name": "LEDGER_NAME",
+        "index": 11
+      },
+      {
+        "column": "M",
+        "name": "LEDGER_URL",
+        "index": 12
+      },
+      {
+        "column": "N",
+        "name": "STATUS",
+        "index": 13
+      },
+      {
+        "column": "O",
+        "name": "RECORD ROWS",
+        "index": 14
+      }
+    ],
+    "column_name_changes": [
+      {
+        "column": "H",
+        "documented_name": "Sender Name",
+        "actual_name": "SENDER NAME",
+        "type": "String"
+      },
+      {
+        "column": "I",
+        "documented_name": "Recipient Name",
+        "actual_name": "RECIPIENT NAME",
+        "type": "String"
+      },
+      {
+        "column": "J",
+        "documented_name": "Currency",
+        "actual_name": "CURRENCY",
+        "type": "String"
+      },
+      {
+        "column": "K",
+        "documented_name": "Amount",
+        "actual_name": "AMOUNT",
+        "type": "Number"
+      },
+      {
+        "column": "N",
+        "documented_name": "Status",
+        "actual_name": "STATUS",
+        "type": "String"
+      }
+    ],
+    "column_order_changes": [],
+    "status": "changed",
+    "actual_headers": [
+      "Telegram Update ID",
+      "Telegram Chatroom ID",
+      "Telegram Chatroom Name",
+      "Telegram Message ID",
+      "Contributor Name",
+      "Contribution Made",
+      "Status Date",
+      "SENDER NAME",
+      "RECIPIENT NAME",
+      "CURRENCY",
+      "AMOUNT",
+      "LEDGER_NAME",
+      "LEDGER_URL",
+      "STATUS",
+      "RECORD ROWS"
+    ]
+  },
+  {
+    "sheet_name": "QR Code Generation Requests",
+    "spreadsheet_id": "1qbZZhf-_7xzmDTriaJVWj6OZshyQsFkdsAV8-pyzASQ",
+    "header_row": 1,
+    "documented_columns": 8,
+    "actual_columns": 0,
+    "missing_columns": [],
+    "extra_columns": [],
+    "column_name_changes": [],
+    "column_order_changes": [],
+    "status": "error",
+    "error": "Could not read header row"
+  },
+  {
+    "sheet_name": "offchain transactions",
+    "spreadsheet_id": "1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU",
+    "header_row": 4,
+    "documented_columns": 7,
+    "actual_columns": 7,
+    "missing_columns": [],
+    "extra_columns": [],
+    "column_name_changes": [],
+    "column_order_changes": [],
+    "status": "match",
+    "actual_headers": [
+      "Transaction Date",
+      "Description",
+      "Fund Handler",
+      "Amount",
+      "Currency",
+      "Ledger Line",
+      "Is Revenue"
+    ]
+  },
+  {
+    "sheet_name": "offchain asset location",
+    "spreadsheet_id": "1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU",
+    "header_row": 1,
+    "documented_columns": 3,
+    "actual_columns": 1,
+    "missing_columns": [
+      {
+        "column": "A",
+        "name": "Asset Name",
+        "type": "String"
+      },
+      {
+        "column": "B",
+        "name": "Manager Names",
+        "type": "String"
+      },
+      {
+        "column": "C",
+        "name": "Asset Quantity",
+        "type": "Number"
+      }
+    ],
+    "extra_columns": [
+      {
+        "column": "A",
+        "name": "Physical Asset Locations",
+        "index": 0
+      }
+    ],
+    "column_name_changes": [],
+    "column_order_changes": [],
+    "status": "changed",
+    "actual_headers": [
+      "Physical Asset Locations"
+    ]
+  },
+  {
+    "sheet_name": "Contributors contact information",
+    "spreadsheet_id": "1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU",
+    "header_row": 4,
+    "documented_columns": 18,
+    "actual_columns": 20,
+    "missing_columns": [
+      {
+        "column": "B",
+        "name": "TRUESIGHT Wallet Address (Solana)",
+        "type": "String"
+      }
+    ],
+    "extra_columns": [
+      {
+        "column": "B",
+        "name": "TRUESIGHT Wallet Address (Solana mainnet)",
+        "index": 1
+      },
+      {
+        "column": "S",
+        "name": "TikTok",
+        "index": 18
+      },
+      {
+        "column": "T",
+        "name": "Is Store Manager",
+        "index": 19
+      }
+    ],
+    "column_name_changes": [],
+    "column_order_changes": [],
+    "status": "changed",
+    "actual_headers": [
+      "Name",
+      "TRUESIGHT Wallet Address (Solana mainnet)",
+      "Ethereum Wallet Address",
+      "Email",
+      "Address",
+      "Phone / WhatsApp",
+      "Discord ID",
+      "Telegram ID",
+      "Twitter",
+      "Projects ",
+      "LinkedIn",
+      "Facebook",
+      "Github",
+      "Instagram",
+      "Website",
+      "Taxation ID",
+      "WhatsApp Chat Log ID",
+      "Digital Signature",
+      "TikTok",
+      "Is Store Manager"
+    ]
+  },
+  {
+    "sheet_name": "Contributors Digital Signatures",
+    "spreadsheet_id": "1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU",
+    "header_row": 1,
+    "documented_columns": 6,
+    "actual_columns": 6,
+    "missing_columns": [
+      {
+        "column": "B",
+        "name": "Created Time Stamp",
+        "type": "String"
+      },
+      {
+        "column": "C",
+        "name": "Last Active Time Stamp",
+        "type": "String"
+      }
+    ],
+    "extra_columns": [
+      {
+        "column": "B",
+        "name": "Created \nTime Stamp",
+        "index": 1
+      },
+      {
+        "column": "C",
+        "name": "Last Active \nTime Stamp",
+        "index": 2
+      }
+    ],
+    "column_name_changes": [],
+    "column_order_changes": [],
+    "status": "changed",
+    "actual_headers": [
+      "Contributor Name",
+      "Created \nTime Stamp",
+      "Last Active \nTime Stamp",
+      "Status",
+      "Digital Signature",
+      "Contributor Email Address"
+    ]
+  },
+  {
+    "sheet_name": "Contributors voting weight",
+    "spreadsheet_id": "1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU",
+    "header_row": 4,
+    "documented_columns": 14,
+    "actual_columns": 14,
+    "missing_columns": [],
+    "extra_columns": [],
+    "column_name_changes": [],
+    "column_order_changes": [],
+    "status": "match",
+    "actual_headers": [
+      "Ownership Rank - Controlled",
+      "Voting Weightage Rank",
+      "Contributors",
+      "Solana Wallet Address",
+      "Quadratic Voting Power",
+      "Total TDG in registered wallet",
+      "Total TDG unissued",
+      "Total TDG controlled (legacy)",
+      "Total TDG controlled",
+      "Total Percentage Controlled",
+      "Total Voting Power",
+      "Ranking",
+      "Quadratic Votes",
+      "Sold"
+    ]
+  },
+  {
+    "sheet_name": "Ledger history",
+    "spreadsheet_id": "1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU",
+    "header_row": 4,
+    "documented_columns": 15,
+    "actual_columns": 15,
+    "missing_columns": [],
+    "extra_columns": [],
+    "column_name_changes": [],
+    "column_order_changes": [],
+    "status": "match",
+    "actual_headers": [
+      "Contributor Name",
+      "Project Name",
+      "Contribution Made",
+      "Rubric classification",
+      "TDGs Provisioned",
+      "Status",
+      "TDGs Issued",
+      "Status date",
+      "Solana Transfer Hash",
+      "TDGs yet Air Dropped",
+      "Discord ID",
+      "Within past 90 days",
+      "Within past 90 days vesting",
+      "Within past 180 days",
+      "Within past 180 days vesting"
+    ]
+  },
+  {
+    "sheet_name": "off chain asset balance",
+    "spreadsheet_id": "1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU",
+    "header_row": 4,
+    "documented_columns": 4,
+    "actual_columns": 4,
+    "missing_columns": [],
+    "extra_columns": [],
+    "column_name_changes": [],
+    "column_order_changes": [],
+    "status": "match",
+    "actual_headers": [
+      "Asset Type",
+      "Balance",
+      "Unit Value",
+      "Value (USD)"
+    ]
+  },
+  {
+    "sheet_name": "Agroverse QR codes",
+    "spreadsheet_id": "1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU",
+    "header_row": 1,
+    "documented_columns": 21,
+    "actual_columns": 22,
+    "missing_columns": [
+      {
+        "column": "M",
+        "name": "Onboarding Email Sent Date",
+        "type": "String"
+      },
+      {
+        "column": "N",
+        "name": "Tree Planting Date (YYYYMMDD)",
+        "type": "String"
+      },
+      {
+        "column": "U",
+        "name": "Manager Name",
+        "type": "String"
+      }
+    ],
+    "extra_columns": [
+      {
+        "column": "M",
+        "name": "Onboarding Email \nSent Date",
+        "index": 12
+      },
+      {
+        "column": "N",
+        "name": "Tree Planting Date\n(YYYYMMDD)",
+        "index": 13
+      },
+      {
+        "column": "U",
+        "name": "Manager \nName",
+        "index": 20
+      },
+      {
+        "column": "V",
+        "name": "Ledger Name",
+        "index": 21
+      }
+    ],
+    "column_name_changes": [],
+    "column_order_changes": [],
+    "status": "changed",
+    "actual_headers": [
+      "qr_code",
+      "landing_page",
+      "ledger",
+      "status",
+      "farm name",
+      "state",
+      "country",
+      "Year",
+      "Currency",
+      "QR code creation date (YYYYMMDD)",
+      "QR code location",
+      "Owner Email",
+      "Onboarding Email \nSent Date",
+      "Tree Planting Date\n(YYYYMMDD)",
+      "Latitude",
+      "Longitude",
+      "Planting Video URL",
+      "Tree Seedling Photo URL",
+      "Product Image",
+      "Price",
+      "Manager \nName",
+      "Ledger Name"
+    ]
+  },
+  {
+    "sheet_name": "Scored Chatlogs",
+    "spreadsheet_id": "1Tbj7H5ur_egQLRugdXUaSIhEYIKp0vvVv2IZ7WTLCUo",
+    "header_row": 3,
+    "documented_columns": 13,
+    "actual_columns": 13,
+    "missing_columns": [],
+    "extra_columns": [],
+    "column_name_changes": [],
+    "column_order_changes": [],
+    "status": "match",
+    "actual_headers": [
+      "Contributor Name",
+      "Project Name",
+      "Contribution Made",
+      "Rubric classification",
+      "TDGs Provisioned",
+      "Status",
+      "TDGs Issued",
+      "Status date",
+      "Existing Contributor",
+      "Reporter Name",
+      "Scoring Hash Key",
+      "Main Ledger Row Number",
+      "Reviewer Email"
+    ]
+  }
+]
