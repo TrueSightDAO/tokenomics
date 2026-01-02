@@ -2436,9 +2436,10 @@ function updateCurrentMonthStatistics() {
       Logger.log("✅ Added USD Treasury Balance column header");
     }
     
-    // Find the row with this month
+    // Find the row with this month (check all rows to handle duplicates)
     var lastRow = monthlySheet.getLastRow();
     var rowIndex = -1;
+    var duplicateRowIndices = []; // Track duplicate rows to remove them
     
     if (lastRow >= 2) {
       var dataRange = monthlySheet.getRange(2, 1, lastRow - 1, 1); // Column A (Year-Month)
@@ -2446,10 +2447,27 @@ function updateCurrentMonthStatistics() {
       
       for (var i = 0; i < months.length; i++) {
         var monthValue = String(months[i][0] || '').trim();
-        if (monthValue === currentMonth) {
-          rowIndex = i + 2; // +2 because data starts at row 2
-          break;
+        // Normalize the month value for comparison (handle dates that might be formatted differently)
+        if (monthValue === currentMonth || monthValue.startsWith(currentMonth)) {
+          if (rowIndex === -1) {
+            // First match - this is the row we'll update
+            rowIndex = i + 2; // +2 because data starts at row 2
+          } else {
+            // Duplicate found - mark for deletion
+            duplicateRowIndices.push(i + 2);
+          }
         }
+      }
+      
+      // Remove duplicate rows (delete from bottom to top to maintain correct indices)
+      if (duplicateRowIndices.length > 0) {
+        duplicateRowIndices.sort(function(a, b) { return b - a; }); // Sort descending
+        for (var d = 0; d < duplicateRowIndices.length; d++) {
+          monthlySheet.deleteRow(duplicateRowIndices[d]);
+          Logger.log("✅ Removed duplicate row " + duplicateRowIndices[d] + " for month " + currentMonth);
+        }
+        // Recalculate lastRow after deletions
+        lastRow = monthlySheet.getLastRow();
       }
     }
     
@@ -2470,17 +2488,19 @@ function updateCurrentMonthStatistics() {
     
     if (rowIndex === -1) {
       // Month not found - add new row
-      monthlySheet.appendRow([
-        currentMonth,
-        currentMonthSales,
-        cumulativeSales,
-        new Date(), // Column D: Last Updated
-        currentAUM, // Column E: AUM
-        usdTreasuryBalance // Column F: USD Treasury Balance
-      ]);
+      var newRowIndex = monthlySheet.getLastRow() + 1;
+      monthlySheet.getRange(newRowIndex, 1).setValue(currentMonth); // Column A: Year-Month (as text)
+      monthlySheet.getRange(newRowIndex, 1).setNumberFormat('@'); // Force text format
+      monthlySheet.getRange(newRowIndex, 2).setValue(currentMonthSales); // Column B: Monthly Sales Volume
+      monthlySheet.getRange(newRowIndex, 3).setValue(cumulativeSales); // Column C: Cumulative Sales Volume
+      monthlySheet.getRange(newRowIndex, 4).setValue(new Date()); // Column D: Last Updated
+      monthlySheet.getRange(newRowIndex, 5).setValue(currentAUM); // Column E: AUM
+      monthlySheet.getRange(newRowIndex, 6).setValue(usdTreasuryBalance); // Column F: USD Treasury Balance
       Logger.log("✅ Added new row for " + currentMonth + ": $" + currentMonthSales.toFixed(2) + " (Cumulative: $" + cumulativeSales.toFixed(2) + ", AUM: $" + currentAUM.toFixed(2) + ", Treasury: $" + usdTreasuryBalance.toFixed(2) + ")");
     } else {
       // Update existing row
+      monthlySheet.getRange(rowIndex, 1).setValue(currentMonth); // Column A: Year-Month (as text)
+      monthlySheet.getRange(rowIndex, 1).setNumberFormat('@'); // Force text format
       monthlySheet.getRange(rowIndex, 2).setValue(currentMonthSales); // Column B: Monthly Sales Volume
       monthlySheet.getRange(rowIndex, 3).setValue(cumulativeSales); // Column C: Cumulative Sales Volume
       monthlySheet.getRange(rowIndex, 4).setValue(new Date()); // Column D: Last Updated
