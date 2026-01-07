@@ -3,6 +3,8 @@
  * Repository: https://github.com/TrueSightDAO/tokenomics
  * 
  * Description: Updates the main DAO offchain ledger with sales revenue transactions.
+ * 
+ * Deployment URL: https://script.google.com/macros/s/AKfycbyVeNZdBngZodsyDzPQS1yUGYaaaDUd3DwbFx05KsOs9vwAtAFQoV1I5qf_B6IgMggWGA/exec
  */
 
 // Load API keys and configuration settings from Credentials.gs
