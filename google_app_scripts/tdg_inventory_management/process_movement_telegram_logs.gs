@@ -3,6 +3,8 @@
  * Repository: https://github.com/TrueSightDAO/tokenomics
  * 
  * Description: Processes inventory movement requests from Telegram, validates them, and updates both source and destination ledgers.
+ * 
+ * Deployment URL: https://script.google.com/macros/s/AKfycbzECOd1Y3mH7L0zU8hOC4AxQctYICX0Ws8j2-Md1dWg0k3GFGQx_4Cf7n-CM0usmSJ1/exec
  */
 
 // Load API keys and configuration settings from Credentials.gs
@@ -1060,6 +1062,38 @@ function testProcessInventoryReport() {
     "- Quantity: 100";
   const resultOffchain = processInventoryReport(testReportOffchain);
   Logger.log(JSON.stringify(resultOffchain, null, 2));
+}
+
+/**
+ * Webhook handler for HTTP GET requests.
+ * Supports two actions:
+ * - processTelegramChatLogs: Processes Telegram Chat Logs to Inventory Movement, then to Ledgers
+ * - processInventoryMovementToLedgers: Processes only Inventory Movement to Ledgers (for retries)
+ */
+function doGet(e) {
+  const action = e.parameter?.action;
+  
+  if (action === 'processTelegramChatLogs') {
+    try {
+      Logger.log("Webhook triggered: processing inventory movements from Telegram Chat Logs");
+      processTelegramChatLogs();
+      return ContentService.createTextOutput("✅ Inventory movements processed from Telegram Chat Logs");
+    } catch (err) {
+      Logger.log("Error in processTelegramChatLogs webhook: " + err.message);
+      return ContentService.createTextOutput("❌ Error: " + err.message);
+    }
+  } else if (action === 'processInventoryMovementToLedgers') {
+    try {
+      Logger.log("Webhook triggered: processing Inventory Movement to Ledgers");
+      processInventoryMovementToLedgers();
+      return ContentService.createTextOutput("✅ Inventory Movement processed to Ledgers");
+    } catch (err) {
+      Logger.log("Error in processInventoryMovementToLedgers webhook: " + err.message);
+      return ContentService.createTextOutput("❌ Error: " + err.message);
+    }
+  }
+  
+  return ContentService.createTextOutput("ℹ️ No valid action specified. Use ?action=processTelegramChatLogs or ?action=processInventoryMovementToLedgers");
 }
 
 /**

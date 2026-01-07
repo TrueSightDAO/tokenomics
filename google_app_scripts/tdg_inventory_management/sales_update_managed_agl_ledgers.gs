@@ -3,6 +3,8 @@
  * Repository: https://github.com/TrueSightDAO/tokenomics
  * 
  * Description: Updates managed AGL ledgers with sales transactions, inserting both transaction and balance records.
+ * 
+ * Deployment URL: https://script.google.com/a/macros/agroverse.shop/s/AKfycbwh35n5hOLCTPFseDqfnbV93vCpdnCqdlQ2iHFZWw9YenJN0cPpc-EIoIDOnoqtdGUohg/exec
  */
 
 // Load API keys and configuration settings from Credentials.gs
