@@ -17,6 +17,8 @@
 // Configuration Variables
 const SOURCE_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1qbZZhf-_7xzmDTriaJVWj6OZshyQsFkdsAV8-pyzASQ/edit?gid=0#gid=0';
 const SOURCE_SHEET_NAME = 'Telegram Chat Logs';
+const TRACKING_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1qbZZhf-_7xzmDTriaJVWj6OZshyQsFkdsAV8-pyzASQ/edit?gid=408450426#gid=408450426';
+const TRACKING_SHEET_NAME = 'QR Code Update';
 const DESTINATION_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU/edit?gid=472328231#gid=472328231';
 const DESTINATION_SHEET_NAME = 'Agroverse QR codes';
 
@@ -86,6 +88,45 @@ function processQrCodeUpdatesFromTelegramChatLogs() {
       throw new Error(`Sheet "${SOURCE_SHEET_NAME}" not found in ${SOURCE_SHEET_URL}`);
     }
 
+    // Open tracking spreadsheet (QR Code Update)
+    const trackingSpreadsheet = SpreadsheetApp.openByUrl(TRACKING_SHEET_URL);
+    let trackingSheet = trackingSpreadsheet.getSheetByName(TRACKING_SHEET_NAME);
+    
+    // Create tracking sheet if it doesn't exist
+    if (!trackingSheet) {
+      trackingSheet = trackingSpreadsheet.insertSheet(TRACKING_SHEET_NAME);
+      // Set up header row
+      const headers = [
+        'Row Number',
+        'Telegram Update ID',
+        'QR Code',
+        'Status Updated',
+        'Email Updated',
+        'Member Updated',
+        'Processed Timestamp',
+        'Processed By'
+      ];
+      trackingSheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+      trackingSheet.getRange(1, 1, 1, headers.length).setFontWeight('bold');
+    }
+
+    // Get processed row numbers from tracking sheet
+    const trackingData = trackingSheet.getDataRange().getValues();
+    const processedRowNumbers = new Set();
+    const processedTelegramUpdateIds = new Set();
+    
+    // Skip header row (index 0)
+    for (let t = 1; t < trackingData.length; t++) {
+      const rowNum = trackingData[t][0]; // Column A: Row Number
+      const telegramUpdateId = trackingData[t][1]; // Column B: Telegram Update ID
+      if (rowNum) {
+        processedRowNumbers.add(Number(rowNum));
+      }
+      if (telegramUpdateId) {
+        processedTelegramUpdateIds.add(telegramUpdateId.toString());
+      }
+    }
+
     // Open destination spreadsheet (Agroverse QR codes)
     const destSpreadsheet = SpreadsheetApp.openByUrl(DESTINATION_SHEET_URL);
     const destSheet = destSpreadsheet.getSheetByName(DESTINATION_SHEET_NAME);
@@ -114,6 +155,7 @@ function processQrCodeUpdatesFromTelegramChatLogs() {
     for (let i = 1; i < sourceData.length; i++) {
       const row = sourceData[i];
       const rowNumber = i + 1; // Actual row number in spreadsheet (1-based)
+      const telegramUpdateId = (row[TELEGRAM_UPDATE_ID_COL] || '').toString();
 
       try {
         const message = (row[MESSAGE_COL] || '').toString();
@@ -124,7 +166,14 @@ function processQrCodeUpdatesFromTelegramChatLogs() {
           continue;
         }
 
-        // Skip rows that are already processed
+        // Skip rows that are already processed (check tracking sheet)
+        if (processedRowNumbers.has(rowNumber) || (telegramUpdateId && processedTelegramUpdateIds.has(telegramUpdateId))) {
+          Logger.log(`Row ${rowNumber}: Skipping - already processed in tracking sheet`);
+          result.skipped++;
+          continue;
+        }
+
+        // Also skip rows that are marked as processed in Telegram Chat Logs (backward compatibility)
         if (status !== '' && status !== 'PENDING' && status !== 'NEW') {
           Logger.log(`Row ${rowNumber}: Skipping - already processed (status: ${status})`);
           result.skipped++;
@@ -185,8 +234,23 @@ function processQrCodeUpdatesFromTelegramChatLogs() {
         }
 
         if (updatesMade) {
-          // Mark the source row as processed
+          // Mark the source row as processed in Telegram Chat Logs (backward compatibility)
           sourceSheet.getRange(rowNumber, STATUS_COL + 1).setValue('PROCESSED');
+          
+          // Record in tracking sheet
+          const timestamp = new Date();
+          const trackingRow = [
+            rowNumber,                                    // Row Number
+            telegramUpdateId,                             // Telegram Update ID
+            extracted.qrCode,                             // QR Code
+            extracted.status || '',                       // Status Updated
+            extracted.email || '',                        // Email Updated
+            extracted.member || '',                       // Member Updated
+            timestamp.toISOString(),                      // Processed Timestamp
+            'QR Code Update Processor'                   // Processed By
+          ];
+          trackingSheet.appendRow(trackingRow);
+          
           result.processed++;
           result.details.push({
             row: rowNumber,
@@ -259,18 +323,32 @@ function extractQrCodeUpdateInfo(message) {
       result.member = memberMatch[1].trim();
     }
 
-    // Extract New Status (optional)
-    const statusMatch = message.match(/- New Status:\s*([^\n]+)/i);
-    if (statusMatch) {
-      const statusValue = statusMatch[1].trim().toUpperCase();
-      // Validate status values
-      const validStatuses = ['ACTIVE', 'SOLD', 'MINTED', 'CONSIGNMENT'];
-      if (validStatuses.includes(statusValue)) {
-        result.status = statusValue;
-      } else {
-        Logger.log(`Warning: Invalid status value "${statusValue}" - skipping status update`);
+      // Extract New Status (optional)
+      const statusMatch = message.match(/- New Status:\s*([^\n]+)/i);
+      if (statusMatch) {
+        const statusValue = statusMatch[1].trim();
+        // Validate status values (preserve original case for statuses with spaces)
+        const validStatuses = [
+          'SCHEDULED_FOR_MINTING',
+          'MINTED',
+          'WAREHOUSED',
+          'ON CONSIGNMENT',
+          'CACAO CIRCLE',
+          'LOST',
+          'SOLD',
+          'EXPENSED',
+          'ASSIGNED_TO_TREE',
+          'GIFT'
+        ];
+        const statusValueUpper = statusValue.toUpperCase();
+        // Check if status matches (case-insensitive)
+        const matchedStatus = validStatuses.find(s => s.toUpperCase() === statusValueUpper);
+        if (matchedStatus) {
+          result.status = matchedStatus; // Use the canonical form from validStatuses
+        } else {
+          Logger.log(`Warning: Invalid status value "${statusValue}" - skipping status update`);
+        }
       }
-    }
 
     // Extract New Email (optional)
     const emailMatch = message.match(/- New Email:\s*([^\n@]+@[^\n@]+\.[^\n@]+)/i);
