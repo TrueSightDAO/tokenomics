@@ -1,9 +1,10 @@
 # Agroverse QR Code System
 
-This system provides two main components for managing QR codes in the cacao supply chain:
+This system provides three main components for managing QR codes in the cacao supply chain:
 
 1. **QR Code Generation**: Automated workflow for creating batch QR codes from user requests
 2. **QR Code Verification API**: Smart endpoint to verify cacao bags when QR codes are scanned
+3. **QR Code Update Processing**: Automated workflow for updating QR code status and email addresses
 
 ## QR Code Generation
 
@@ -336,6 +337,119 @@ The generation system includes several test functions to help verify functionali
 2. **Test single row processing**: Use `testProcessSpecificRow()` on a known batch QR request
 3. **Test multiple rows**: Use `testProcessMultipleRows()` to process a range
 4. **Verify complete workflow**: Use `testCompleteWorkflow()` to test end-to-end functionality
+
+## QR Code Update Processing
+
+The QR code update system processes status and email updates from the DApp and applies them to the Agroverse QR codes sheet.
+
+### Overview
+
+Following the established pattern used by other DAO tools:
+1. **Reads** from the "Telegram Chat Logs" sheet (security: no direct parameter injection)
+2. **Processes** QR code update requests containing `[QR CODE UPDATE EVENT]`
+3. **Updates** the "Agroverse QR codes" sheet:
+   - Column D (status) if provided
+   - Column L (email) if provided
+   - Column U (manager name) if member association provided
+4. **Marks** source row in "Telegram Chat Logs" as "PROCESSED"
+
+### Update Architecture
+
+- **Google Apps Script** (`process_qr_code_updates.gs`)
+  - Monitors the "Telegram Chat Logs" sheet for new update requests
+  - Extracts QR code, status, and email from `[QR CODE UPDATE EVENT]` messages
+  - Updates corresponding records in the "Agroverse QR codes" sheet
+  - Marks processed rows in "Telegram Chat Logs"
+
+- **Data Flow**
+  - User submits update via `update_qr_code.html` → Edgar → Telegram Chat Logs
+  - Script processes telegram logs → Updates "Agroverse QR codes" sheet
+  - Status updated in "Telegram Chat Logs" → "PROCESSED"
+
+### Update Workflow
+
+1. **User submits update** via the HTML form (`update_qr_code.html`)
+2. **Request goes to Edgar** → Logged to "Telegram Chat Logs" sheet
+3. **Webhook triggered** (via Sidekiq) → Calls Google Apps Script `doGet` with action `processQrCodeUpdatesFromTelegramChatLogs`
+4. **Script processes logs** → Extracts QR code, status, email
+5. **Script updates Agroverse QR codes** sheet
+6. **Status updated** → "PROCESSED" in "Telegram Chat Logs"
+
+### Update Setup
+
+1. **Copy the script** (`process_qr_code_updates.gs`) to your Google Apps Script project
+2. **Deploy as web app** (Deploy > New deployment > Web app)
+3. **Copy the web app URL** and update `config/application.rb`:
+   ```ruby
+   config.qr_code_update_webhook_url = "YOUR_WEBHOOK_URL/exec"
+   ```
+4. **Set up time-driven trigger** for `processQrCodeUpdatesCron()`:
+   - Click "Triggers" (clock icon) in left sidebar
+   - Click "+ Add Trigger"
+   - Function: `processQrCodeUpdatesCron`
+   - Event source: "Time-driven"
+   - Type: "Minutes timer" or "Hour timer"
+   - Interval: Every 5-15 minutes (recommended)
+5. **Verify** the "Agroverse QR codes" sheet exists and is accessible
+
+### Update Message Format
+
+The script processes messages starting with `[QR CODE UPDATE EVENT]` and extracts:
+
+```
+[QR CODE UPDATE EVENT]
+- QR Code: <qr_code>
+- Associated Member: <member_name> (optional)
+- New Status: <status> (optional)
+- New Email: <email> (optional)
+- Updated by: <contributor_name>
+- Submission Source: <source_url>
+--------
+
+My Digital Signature: <public_key>
+Request Transaction ID: <signed_hash>
+...
+```
+
+### Valid Status Values
+
+- `ACTIVE` - QR code is active and available
+- `SOLD` - QR code has been sold
+- `MINTED` - QR code has been minted/generated
+- `CONSIGNMENT` - QR code is on consignment
+
+### Update Processing Functions
+
+#### `processQrCodeUpdatesFromTelegramChatLogs()`
+- Main processing function
+- Reads from "Telegram Chat Logs" sheet
+- Updates "Agroverse QR codes" sheet
+- Marks processed rows
+- Returns processing result with counts
+
+#### `processQrCodeUpdatesCron()`
+- Cron-triggered function for backup processing
+- Processes any unprocessed records
+- Runs on a schedule (e.g., every 5-15 minutes)
+
+#### `extractQrCodeUpdateInfo(message)`
+- Extracts QR code, member, status, and email from message text
+- Validates status values
+- Returns structured data object
+
+### Security Features
+
+- **No parameter injection**: Webhook handler does not accept parameters - all data read from "Telegram Chat Logs" sheet
+- **Status validation**: Only valid status values are accepted
+- **Email validation**: Email format is validated before updating
+- **Deduplication**: Processes only rows with status "PENDING", "NEW", or empty
+
+### GitHub Location
+
+- Script: [`google_app_scripts/agroverse_qr_codes/process_qr_code_updates.gs`](https://github.com/TrueSightDAO/tokenomics/blob/main/google_app_scripts/agroverse_qr_codes/process_qr_code_updates.gs)
+- DApp Module: [`dapp/update_qr_code.html`](https://github.com/TrueSightDAO/dapp/blob/main/update_qr_code.html)
+- Edgar Endpoint: [`sentiment_importer/app/controllers/dao_controller.rb`](https://github.com/TrueSightDAO/tokenomics/blob/main/sentiment_importer/app/controllers/dao_controller.rb)
+- Documentation: [`API_ENDPOINTS.md`](https://github.com/TrueSightDAO/tokenomics/blob/main/API_ENDPOINTS.md)
 
 ## License
 

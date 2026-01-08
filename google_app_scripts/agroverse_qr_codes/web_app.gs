@@ -16,6 +16,7 @@ var QR_CODE_SHEET_NAME = 'Agroverse QR codes';
 var QR_CODE_PARAM = 'qr_code';
 var EMAIL_ADDRESS_PARAM = 'email_address';
 var LIST_PARAM = 'list';
+var LIST_ALL_PARAM = 'list_all';
 var LIST_WITH_MEMBERS_PARAM = 'list_with_members';
 var LOOKUP_PARAM = 'lookup';
 var HEADER_ROW = 2;
@@ -51,6 +52,7 @@ function doOptions(e) {
  * Expects either:
  * - 'qr_code' and 'email_address' query parameters for updating email.
  * - 'list=true' query parameter to return QR codes where column D is NOT 'SOLD' (includes MINTED, CONSIGNMENT, etc.).
+ * - 'list_all=true' query parameter to return ALL QR codes including SOLD status.
  * - 'list_with_members=true' query parameter to return QR codes with details where column D is NOT 'SOLD'.
  *
  * @param {Object} e Event object containing parameters.
@@ -65,6 +67,32 @@ function doGet(e) {
       return createCORSResponse({
         status: 'error',
         message: 'Sheet not found: ' + QR_CODE_SHEET_NAME
+      });
+    }
+
+    // Check if the request is for listing all QR codes (including SOLD)
+    if (e.parameter[LIST_ALL_PARAM] === 'true') {
+      var lastRow = sheet.getLastRow();
+      if (lastRow < DATA_START_ROW) {
+        return createCORSResponse({
+          status: 'error',
+          message: 'No data found in sheet starting from row ' + DATA_START_ROW
+        });
+      }
+
+      // Get QR codes (column A) - include ALL statuses including SOLD
+      var dataRange = sheet.getRange(DATA_START_ROW, 1, lastRow - DATA_START_ROW + 1, 1).getValues();
+      var allQrCodes = [];
+
+      for (var i = 0; i < dataRange.length; i++) {
+        if (dataRange[i][0]) {
+          allQrCodes.push(dataRange[i][0]); // QR code from column A
+        }
+      }
+
+      return createCORSResponse({
+        status: 'success',
+        qr_codes: allQrCodes
       });
     }
 
@@ -153,7 +181,7 @@ function doGet(e) {
         });
       }
 
-      // Get QR codes (column A), ledger (column C, index 2), currency (column I, index 8), and manager (column U, index 20)
+      // Get QR codes (column A), ledger (column C, index 2), currency (column I, index 8), status (column D, index 3), email (column L, index 11), and manager (column U, index 20)
       var dataRange = sheet.getRange(DATA_START_ROW, 1, lastRow - DATA_START_ROW + 1, 21).getValues();
       
       // Search for the QR code
@@ -161,6 +189,8 @@ function doGet(e) {
         if (dataRange[i][0] === qrCode) {
           var currency = dataRange[i][8] || ''; // Column I (index 8)
           var ledgerShortcut = dataRange[i][2] || ''; // Column C (index 2)
+          var status = dataRange[i][3] || ''; // Column D (index 3)
+          var email = dataRange[i][11] || ''; // Column L (index 11)
           var managerName = dataRange[i][20] || ''; // Column U (index 20)
           
           return createCORSResponse({
@@ -168,6 +198,8 @@ function doGet(e) {
             qr_code: qrCode,
             currency: currency,
             ledger_shortcut: ledgerShortcut,
+            qr_status: status,
+            email: email,
             manager_name: managerName
           });
         }
