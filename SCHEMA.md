@@ -234,9 +234,10 @@ See [`python_scripts/schema_validation/README.md`](./python_scripts/schema_valid
 | J | Amount | Number | Quantity (negative for expenses) |
 | K | Scoring Hash Key | String | Unique identifier for deduplication |
 | L | Ledger Lines Number | String | Row number in destination ledger |
+| M | Target Ledger | String | Target ledger name (e.g., "AGL10", "offchain") - explicitly set in expense form (NEW - added 2025-01-XX) |
 
 **Used by:**
-- [`tdg_expenses_processing.gs`](https://github.com/TrueSightDAO/tokenomics/blob/main/google_app_scripts/tdg_asset_management/tdg_expenses_processing.gs) - Inserts scored expenses into ledgers
+- [`tdg_expenses_processing.gs`](https://github.com/TrueSightDAO/tokenomics/blob/main/google_app_scripts/tdg_asset_management/tdg_expenses_processing.gs) - Inserts scored expenses into ledgers. Reads ledger configurations from "Shipment Ledger Listing" sheet (Column A: name, Column L: URL) instead of Wix API. Processes only rows from the last 30 days to prevent timeouts.
 
 ---
 
@@ -1507,7 +1508,7 @@ TELEGRAM_FILE_ID_COL = 14     // Column O
 - `contract_url` - URL to ledger spreadsheet (may redirect)
 
 **Used by:**
-- `tdg_expenses_processing.gs` - `getLedgerConfigsFromWix()`
+- `tdg_expenses_processing.gs` - `getLedgerConfigsFromSheet()` (reads from "Shipment Ledger Listing" Google Sheet instead of Wix API - updated 2025-01-XX)
 - `process_movement_telegram_logs.gs` - `getLedgerConfigsFromWix()`
 - `web_app.gs` - Multiple inventory functions
 - `tdg_wix_dashboard.gs` - Dashboard updates

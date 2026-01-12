@@ -526,12 +526,60 @@ function processInventoryReport(reportText) {
       
       // Get the actual ledger URL from WIX data
       const ledgerConfigs = getLedgerConfigsFromWix();
+      
+      // Log available ledger configs for debugging
+      Logger.log(`Available ledger configs: ${ledgerConfigs.map(c => c.ledger_name).join(', ')}`);
+      
+      // Try multiple matching strategies
       const ledgerConfig = ledgerConfigs.find(config => {
-        // Match by ledger name or by URL containing the shortcut
-        const configName = config.ledger_name.toLowerCase();
-        const shortcutLower = ledgerShortcut.toLowerCase();
-        return configName === shortcutLower || 
-               config.ledger_url.toLowerCase().includes(shortcutLower);
+        const configName = config.ledger_name.toLowerCase().trim();
+        const shortcutLower = ledgerShortcut.toLowerCase().trim();
+        const configUrl = config.ledger_url.toLowerCase();
+        
+        // Strategy 1: Exact match of ledger name
+        if (configName === shortcutLower) {
+          Logger.log(`Matched ledger by exact name: ${config.ledger_name}`);
+          return true;
+        }
+        
+        // Strategy 2: URL contains the shortcut
+        if (configUrl.includes(shortcutLower)) {
+          Logger.log(`Matched ledger by URL containing shortcut: ${config.ledger_name}`);
+          return true;
+        }
+        
+        // Strategy 3: Remove spaces/dashes and match (e.g., "AGL 10" or "AGL-10" matches "AGL10")
+        const configNameNormalized = configName.replace(/[\s\-_]/g, '');
+        const shortcutNormalized = shortcutLower.replace(/[\s\-_]/g, '');
+        if (configNameNormalized === shortcutNormalized) {
+          Logger.log(`Matched ledger by normalized name: ${config.ledger_name}`);
+          return true;
+        }
+        
+        // Strategy 4: Extract number from AGL format and match (e.g., "AGL10" -> "10", matches "AGL 10")
+        const aglNumberMatch = shortcutLower.match(/agl\s*(\d+)/i);
+        if (aglNumberMatch) {
+          const number = aglNumberMatch[1];
+          const configNumberMatch = configName.match(/agl\s*(\d+)/i);
+          if (configNumberMatch && configNumberMatch[1] === number) {
+            Logger.log(`Matched ledger by AGL number: ${config.ledger_name}`);
+            return true;
+          }
+        }
+        
+        // Strategy 5: Extract ledger identifier from URL (e.g., "https://agroverse.shop/agl10" -> "agl10")
+        // and match to ledger name (e.g., "AGL10")
+        const urlMatch = shortcutLower.match(/\/(agl\d+|sef\d+|pp\d+)/i);
+        if (urlMatch) {
+          const urlLedgerId = urlMatch[1].toLowerCase();
+          const configLedgerMatch = configName.match(/(agl\d+|sef\d+|pp\d+)/i);
+          if (configLedgerMatch && configLedgerMatch[1].toLowerCase() === urlLedgerId) {
+            Logger.log(`Matched ledger by URL identifier extraction: ${config.ledger_name}`);
+            return true;
+          }
+        }
+        
+        return false;
       });
       
       if (ledgerConfig && ledgerConfig.ledger_url) {
@@ -541,9 +589,9 @@ function processInventoryReport(reportText) {
           ledger_name: ledgerConfig.ledger_name,
           ledger_url: ledgerConfig.ledger_url
         };
-        Logger.log(`Found ledger from QR code shortcut: ${ledgerConfig.ledger_name}`);
+        Logger.log(`Found ledger from QR code shortcut: ${ledgerConfig.ledger_name} (URL: ${ledgerConfig.ledger_url})`);
       } else {
-        Logger.log(`Warning: Ledger shortcut ${ledgerShortcut} from QR code not found in WIX data, treating as offchain`);
+        Logger.log(`Warning: Ledger shortcut "${ledgerShortcut}" from QR code not found in Shipment Ledger Listing. Available ledgers: ${ledgerConfigs.map(c => c.ledger_name).join(', ')}. Treating as offchain.`);
         currencySource = {
           spreadsheet_id: OFFCHAIN_SPREADSHEET_ID,
           sheet_name: OFFCHAIN_ASSET_SHEET_NAME,

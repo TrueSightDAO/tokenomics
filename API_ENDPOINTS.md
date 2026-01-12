@@ -190,6 +190,15 @@ All webhooks are triggered via Sidekiq background jobs from Edgar after submissi
 
 **Function:** Processes expenses from "Telegram Chat Logs" → "Scored Expense Submissions" → Ledgers
 
+**Key Features:**
+- **30-Day Filtering**: Only processes rows from the last 30 days (based on Status Date column) to prevent timeouts
+- **Target Ledger Support**: Records Target Ledger in Column M of "Scored Expense Submissions" sheet. Ledger resolution priority:
+  1. Column M (Target Ledger) - explicitly set in expense form
+  2. Extracted Target Ledger from expense message
+  3. Ledger prefix in inventory type format `[ledger name] inventoryType`
+  4. Default to "offchain" transactions sheet
+- **Ledger Configuration**: Reads ledger configurations from "Shipment Ledger Listing" Google Sheet (Column A: name, Column L: URL) instead of Wix API
+
 **GitHub Location:**
 - [`google_app_scripts/tdg_asset_management/tdg_expenses_processing.gs`](https://github.com/TrueSightDAO/tokenomics/blob/main/google_app_scripts/tdg_asset_management/tdg_expenses_processing.gs)
 
@@ -304,9 +313,13 @@ These functions run on a schedule (via Google Apps Script time-driven triggers) 
 
 **Function:** `parseAndProcessTelegramLogs()` (in `tdg_expenses_processing.gs`)
 
-**Schedule:** *(To be documented)*
+**Schedule:** *(To be documented - recommended: every 15-30 minutes)*
 
 **Purpose:** Backup processing for `[DAO Inventory Expense Event]` submissions
+
+**Performance Optimization:**
+- Processes only rows from the last 30 days (based on Status Date column) to prevent timeouts
+- Skips rows older than 30 days automatically
 
 **GitHub Location:**
 - [`google_app_scripts/tdg_asset_management/tdg_expenses_processing.gs`](https://github.com/TrueSightDAO/tokenomics/blob/main/google_app_scripts/tdg_asset_management/tdg_expenses_processing.gs)

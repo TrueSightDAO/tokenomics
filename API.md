@@ -371,24 +371,38 @@ Request Transaction ID: {signature_hash}
 
 **Attachments**: Receipt, invoice, or proof of sale (optional)
 
-### 4. DAO Expenses Report
+### 4. DAO Inventory Expense Event
 
 **Format**:
 ```
-[DAO EXPENSES REPORT]
-Contributor: {contributor_name}
-Expense type: {expense_type}
-Amount: {amount}
-Currency: {currency}
-Date: {date}
-Description: {description}
-Receipt/Proof: {receipt_info}
+[DAO Inventory Expense Event]
+- DAO Member Name: {dao_member_name}
+- Target Ledger: {target_ledger} (optional, e.g., "AGL10", "offchain")
+- Latitude: {latitude} (optional)
+- Longitude: {longitude} (optional)
+- Inventory Type: {inventory_type} (may include ledger prefix: [ledger name] inventoryType)
+- Inventory Quantity: {quantity}
+- Description: {description}
+- Attached Filename: {filename_or_None}
+- Destination Expense File Location: {github_url_or_No_file_attached}
+- Submission Source: {source_url}
 --------
 
 My Digital Signature: {public_key}
 
 Request Transaction ID: {signature_hash}
+
+This submission was generated using {source_url}
+
+Verify submission here: https://dapp.truesight.me/verify_request.html
 ```
+
+**Target Ledger Field:**
+- If specified, the expense will be recorded in the specified ledger (e.g., "AGL10", "SEF1")
+- If "offchain" or omitted, the expense will be recorded in the default offchain transactions sheet
+- The ledger name can also be encoded in the Inventory Type field using format: `[ledger name] inventoryType`
+
+**Attachments:** Receipt, invoice, or proof of expense (optional)
 
 ### 5. Inventory Movement Report
 
