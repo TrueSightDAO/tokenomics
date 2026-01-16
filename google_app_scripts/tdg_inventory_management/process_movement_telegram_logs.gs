@@ -109,10 +109,36 @@ function resolveRedirect(url) {
               Logger.log(`Found JavaScript redirect to: ${currentUrl}`);
               continue;
             } else {
-              // Relative URL - construct absolute URL
+              // Relative URL - construct absolute URL using string manipulation
               try {
-                const baseUrl = new URL(currentUrl);
-                const resolvedUrl = new URL(redirectUrl, baseUrl).toString();
+                let resolvedUrl = redirectUrl;
+                if (redirectUrl.startsWith('./')) {
+                  // Relative to current directory
+                  const baseUrlParts = currentUrl.split('/');
+                  baseUrlParts.pop(); // Remove current file
+                  resolvedUrl = baseUrlParts.join('/') + '/' + redirectUrl.substring(2);
+                } else if (redirectUrl.startsWith('../')) {
+                  // Relative to parent directory
+                  const baseUrlParts = currentUrl.split('/');
+                  baseUrlParts.pop(); // Remove current file
+                  baseUrlParts.pop(); // Remove current directory
+                  resolvedUrl = baseUrlParts.join('/') + '/' + redirectUrl.substring(3);
+                } else if (!redirectUrl.startsWith('/')) {
+                  // Relative to current URL
+                  const lastSlashIndex = currentUrl.lastIndexOf('/');
+                  if (lastSlashIndex > 0) {
+                    resolvedUrl = currentUrl.substring(0, lastSlashIndex + 1) + redirectUrl;
+                  } else {
+                    resolvedUrl = currentUrl + '/' + redirectUrl;
+                  }
+                } else {
+                  // Absolute path on same domain
+                  const domainMatch = currentUrl.match(/^(https?:\/\/[^\/]+)/);
+                  if (domainMatch) {
+                    resolvedUrl = domainMatch[1] + redirectUrl;
+                  }
+                }
+
                 currentUrl = resolvedUrl;
                 redirectCount++;
                 Logger.log(`Resolved relative JavaScript redirect to: ${currentUrl}`);
@@ -148,8 +174,35 @@ function resolveRedirect(url) {
               currentUrl = redirectUrl;
             } else {
               try {
-                const baseUrl = new URL(currentUrl);
-                currentUrl = new URL(redirectUrl, baseUrl).toString();
+                // Resolve relative URL using string manipulation
+                let resolvedUrl = redirectUrl;
+                if (redirectUrl.startsWith('./')) {
+                  // Relative to current directory
+                  const baseUrlParts = currentUrl.split('/');
+                  baseUrlParts.pop(); // Remove current file
+                  resolvedUrl = baseUrlParts.join('/') + '/' + redirectUrl.substring(2);
+                } else if (redirectUrl.startsWith('../')) {
+                  // Relative to parent directory
+                  const baseUrlParts = currentUrl.split('/');
+                  baseUrlParts.pop(); // Remove current file
+                  baseUrlParts.pop(); // Remove current directory
+                  resolvedUrl = baseUrlParts.join('/') + '/' + redirectUrl.substring(3);
+                } else if (!redirectUrl.startsWith('/')) {
+                  // Relative to current URL
+                  const lastSlashIndex = currentUrl.lastIndexOf('/');
+                  if (lastSlashIndex > 0) {
+                    resolvedUrl = currentUrl.substring(0, lastSlashIndex + 1) + redirectUrl;
+                  } else {
+                    resolvedUrl = currentUrl + '/' + redirectUrl;
+                  }
+                } else {
+                  // Absolute path on same domain
+                  const domainMatch = currentUrl.match(/^(https?:\/\/[^\/]+)/);
+                  if (domainMatch) {
+                    resolvedUrl = domainMatch[1] + redirectUrl;
+                  }
+                }
+                currentUrl = resolvedUrl;
               } catch (e) {
                 Logger.log(`Error resolving relative JavaScript redirect: ${e.message}`);
                 return '';
@@ -180,9 +233,16 @@ function resolveRedirect(url) {
 /**
  * Fetches ledger configurations from Google Sheets "Shipment Ledger Listing".
  * Migrated from Wix API to Google Sheets for cost savings.
+ * Includes caching to avoid repeated URL resolution within the same execution.
  * @return {Array} Array of ledger configuration objects.
  */
 function getLedgerConfigsFromWix() {
+  // Cache ledger configs to avoid repeated URL resolution
+  if (typeof getLedgerConfigsFromWix.cache !== 'undefined') {
+    Logger.log('Using cached ledger configurations');
+    return getLedgerConfigsFromWix.cache;
+  }
+
   // Note: Function name kept for backward compatibility, but now reads from Google Sheets
   try {
     const spreadsheet = SpreadsheetApp.openByUrl(AGROVERSE_QR_SHEET_URL);
@@ -246,6 +306,10 @@ function getLedgerConfigsFromWix() {
 
     Logger.log(`Ledger configs fetched from ${SHIPMENT_LEDGER_SHEET_NAME}: ${ledgerConfigs.length} configs`);
     Logger.log('Ledger configs: ' + JSON.stringify(ledgerConfigs));
+
+    // Cache the result for subsequent calls within the same execution
+    getLedgerConfigsFromWix.cache = ledgerConfigs;
+
     return ledgerConfigs;
   } catch (e) {
     Logger.log(`Error fetching ledger configs from ${SHIPMENT_LEDGER_SHEET_NAME}: ${e.message}`);
@@ -583,13 +647,21 @@ function processInventoryReport(reportText) {
       });
       
       if (ledgerConfig && ledgerConfig.ledger_url) {
+        let finalLedgerName = ledgerConfig.ledger_name;
+
+        // Special logic: AGL4 with QR codes should be treated as offchain
+        if (qrCode && finalLedgerName.toLowerCase() === 'agl4') {
+          finalLedgerName = 'offchain';
+          Logger.log(`AGL4 ledger with QR code detected - forcing to offchain ledger`);
+        }
+
         currencySource = {
-          spreadsheet_id: ledgerConfig.ledger_url.match(/\/d\/([^\/]+)/)?.[1] || '',
-          sheet_name: DEFAULT_AGL_SHEET_NAME,
-          ledger_name: ledgerConfig.ledger_name,
-          ledger_url: ledgerConfig.ledger_url
+          spreadsheet_id: finalLedgerName === 'offchain' ? OFFCHAIN_SPREADSHEET_ID : ledgerConfig.ledger_url.match(/\/d\/([^\/]+)/)?.[1] || '',
+          sheet_name: finalLedgerName === 'offchain' ? OFFCHAIN_ASSET_SHEET_NAME : DEFAULT_AGL_SHEET_NAME,
+          ledger_name: finalLedgerName,
+          ledger_url: finalLedgerName === 'offchain' ? `https://docs.google.com/spreadsheets/d/${OFFCHAIN_SPREADSHEET_ID}/edit` : ledgerConfig.ledger_url
         };
-        Logger.log(`Found ledger from QR code shortcut: ${ledgerConfig.ledger_name} (URL: ${ledgerConfig.ledger_url})`);
+        Logger.log(`Found ledger from QR code shortcut: ${finalLedgerName} (URL: ${currencySource.ledger_url})`);
       } else {
         Logger.log(`Warning: Ledger shortcut "${ledgerShortcut}" from QR code not found in Shipment Ledger Listing. Available ledgers: ${ledgerConfigs.map(c => c.ledger_name).join(', ')}. Treating as offchain.`);
         currencySource = {
@@ -704,24 +776,37 @@ function processTelegramChatLogsToInventoryMovement() {
     // Prepare array to collect new rows for batch insertion
     const newRows = [];
 
+    // Statistics counters
+    let stats = {
+      totalRowsProcessed: 0,
+      rowsWithInventoryMovements: 0,
+      rowsSkippedExisting: 0,
+      rowsSkippedInvalid: 0,
+      rowsAddedToMovement: 0
+    };
+
     // Process each row in Telegram Chat Logs
     telegramData.forEach((row, index) => {
+      stats.totalRowsProcessed++;
       const updateId = row[0]; // Column A: Telegram Update ID
       const contribution = row[6]; // Column G: Contribution Made
 
       // Skip if updateId is empty or already exists in Inventory Movement
       if (!updateId || existingUpdateIds.includes(updateId)) {
+        stats.rowsSkippedExisting++;
         return;
       }
 
       // Check if Contribution Made matches [INVENTORY MOVEMENT] pattern
       if (typeof contribution === 'string' && contribution.trim().startsWith('[INVENTORY MOVEMENT]')) {
+        stats.rowsWithInventoryMovements++;
         // Get file IDs from the previous row (if it exists)
         const fileIdsString = (index > 0 && telegramData[index - 1][14]) ? telegramData[index - 1][14].toString().trim() : '';
 
         const reportResult = processInventoryReport(contribution);
         if (reportResult.error) {
           Logger.log(`Error processing contribution for Update ID ${updateId}: ${reportResult.error}`);
+          stats.rowsSkippedInvalid++;
           return;
         }
 
@@ -811,18 +896,36 @@ function processTelegramChatLogsToInventoryMovement() {
         ];
 
         newRows.push(newRow);
+        stats.rowsAddedToMovement++;
+      } else {
+        stats.rowsSkippedInvalid++;
       }
     });
 
-    // Insert new rows into Inventory Movement sheet
+    // Insert new rows into Inventory Movement sheet immediately
     if (newRows.length > 0) {
       inventorySheet.getRange(inventoryLastRow + 1, 1, newRows.length, 14).setValues(newRows);
-      Logger.log(`Inserted ${newRows.length} new records into Inventory Movement`);
-    } else {
-      Logger.log('No new valid inventory movement records found in Telegram Chat Logs');
+      Logger.log(`✅ Immediately inserted ${newRows.length} new records into Inventory Movement sheet`);
+    }
+
+    // Log comprehensive execution summary
+    Logger.log(`=== EXECUTION SUMMARY: processTelegramChatLogsToInventoryMovement ===`);
+    Logger.log(`📊 Total rows processed from Telegram logs: ${stats.totalRowsProcessed}`);
+    Logger.log(`🔄 Rows skipped (already exist): ${stats.rowsSkippedExisting}`);
+    Logger.log(`📦 Rows with [INVENTORY MOVEMENT]: ${stats.rowsWithInventoryMovements}`);
+    Logger.log(`❌ Rows skipped (invalid/failed): ${stats.rowsSkippedInvalid}`);
+    Logger.log(`✅ Rows added to Inventory Movement: ${stats.rowsAddedToMovement}`);
+    Logger.log(`📋 Total records inserted: ${newRows.length}`);
+
+    const processingRate = stats.totalRowsProcessed > 0 ?
+      ((stats.rowsWithInventoryMovements / stats.totalRowsProcessed) * 100).toFixed(1) : 0;
+    Logger.log(`📈 Processing rate: ${processingRate}% of rows contained inventory movements`);
+
+    if (newRows.length === 0) {
+      Logger.log('ℹ️ No new valid inventory movement records found in Telegram Chat Logs');
     }
   } catch (error) {
-    Logger.log(`Error in processTelegramChatLogsToInventoryMovement: ${error.message}`);
+    Logger.log(`❌ Error in processTelegramChatLogsToInventoryMovement: ${error.message}`);
   }
 }
 
@@ -840,6 +943,7 @@ function sendInventoryTransactionNotification(contributionMade, ledgerName, ledg
   }
 
   const apiUrl = `https://api.telegram.org/bot${token}/sendMessage`;
+  const MAX_RETRIES = 3;
 
   // Format the notification message with details from contributionMade
   const messageText = `✅ Transaction successfully updated on ${ledgerName} ledger.\n\nDetails:\n${contributionMade}\n\nReview here: ${ledgerUrl}`;
@@ -856,19 +960,54 @@ function sendInventoryTransactionNotification(contributionMade, ledgerName, ledg
     muteHttpExceptions: true
   };
 
-  try {
-    Logger.log(`sendInventoryTransactionNotification: Sending notification for transaction on ${ledgerName} to chat ${TELEGRAM_CHAT_ID}`);
-    const response = UrlFetchApp.fetch(apiUrl, options);
-    const status = response.getResponseCode();
-    const responseText = response.getContentText();
-    if (status === 200) {
-      Logger.log(`sendInventoryTransactionNotification: Successfully sent notification for transaction on ${ledgerName} to chat ${TELEGRAM_CHAT_ID}`);
-    } else {
-      Logger.log(`sendInventoryTransactionNotification: Failed to send notification for ${ledgerName}. Status: ${status}, Response: ${responseText}`);
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      Logger.log(`sendInventoryTransactionNotification: Sending notification for transaction on ${ledgerName} to chat ${TELEGRAM_CHAT_ID} (attempt ${attempt}/${MAX_RETRIES})`);
+      const response = UrlFetchApp.fetch(apiUrl, options);
+      const status = response.getResponseCode();
+      const responseText = response.getContentText();
+
+      if (status === 200) {
+        Logger.log(`sendInventoryTransactionNotification: Successfully sent notification for transaction on ${ledgerName} to chat ${TELEGRAM_CHAT_ID}`);
+        return; // Success, exit the retry loop
+      } else if (status === 429) {
+        // Rate limited - parse retry_after and wait
+        try {
+          const responseData = JSON.parse(responseText);
+          const retryAfter = responseData.parameters?.retry_after || 12; // Default to 12 seconds if not specified
+
+          Logger.log(`sendInventoryTransactionNotification: Rate limited (429). Waiting ${retryAfter} seconds before retry ${attempt}/${MAX_RETRIES} for ${ledgerName}`);
+
+          if (attempt < MAX_RETRIES) {
+            Utilities.sleep(retryAfter * 1000); // Sleep for retry_after seconds
+            continue; // Retry the request
+          } else {
+            Logger.log(`sendInventoryTransactionNotification: Max retries (${MAX_RETRIES}) exceeded for rate limited request on ${ledgerName}`);
+            break; // Exit retry loop
+          }
+        } catch (parseError) {
+          Logger.log(`sendInventoryTransactionNotification: Failed to parse rate limit response for ${ledgerName}: ${parseError.message}`);
+          break; // Exit retry loop on parse error
+        }
+      } else {
+        // Other error status codes - log and exit (don't retry)
+        Logger.log(`sendInventoryTransactionNotification: Failed to send notification for ${ledgerName}. Status: ${status}, Response: ${responseText}`);
+        break; // Exit retry loop
+      }
+    } catch (e) {
+      Logger.log(`sendInventoryTransactionNotification: Error sending Telegram notification for ${ledgerName} (attempt ${attempt}/${MAX_RETRIES}): ${e.message}`);
+      if (attempt < MAX_RETRIES) {
+        // Wait a bit before retrying on network errors
+        Utilities.sleep(2000); // 2 second delay
+        continue;
+      } else {
+        break; // Exit retry loop after max retries
+      }
     }
-  } catch (e) {
-    Logger.log(`sendInventoryTransactionNotification: Error sending Telegram notification for ${ledgerName}: ${e.message}`);
   }
+
+  // If we get here, all retries failed
+  Logger.log(`sendInventoryTransactionNotification: All retry attempts failed for notification on ${ledgerName}`);
 }
 
 /**
@@ -912,6 +1051,18 @@ function processInventoryMovementToLedgers() {
     }
     const inventoryData = inventorySheet.getRange(1, 1, inventoryLastRow, 15).getValues(); // Columns A to O (to check Column O for backfill)
 
+    // Cache for resolved ledger URLs to avoid repeated HTTP requests
+    const resolvedUrlCache = new Map();
+
+    // Statistics counters
+    let stats = {
+      totalRowsAttempted: 0,
+      rowsSuccessfullyProcessed: 0,
+      rowsFailed: 0,
+      totalTransactionsCreated: 0,
+      rowsSkipped: 0
+    };
+
     // Process each row in Inventory Movement
     const updates = []; // Store updates for Column N (status) and Column O (row numbers)
     inventoryData.forEach((row, index) => {
@@ -920,6 +1071,8 @@ function processInventoryMovementToLedgers() {
       if (status !== 'NEW') {
         return; // Skip if status is not NEW
       }
+
+      stats.totalRowsAttempted++;
 
       const ledgerName = row[11]; // Column L: ledger_name
       const ledgerUrl = row[12]; // Column M: ledger_url
@@ -941,6 +1094,7 @@ function processInventoryMovementToLedgers() {
       // Validate required fields
       if (!statusDate || !contributionMade || !senderName || !recipientName || !currency || !amount) {
         Logger.log(`Skipping row ${rowNumber}: Missing required fields`);
+        stats.rowsSkipped++;
         return;
       }
 
@@ -952,12 +1106,22 @@ function processInventoryMovementToLedgers() {
         // For AGL ledgers, resolve redirect URL first, then extract spreadsheet ID
         let resolvedLedgerUrl = ledgerUrl;
         if (ledgerUrl && typeof ledgerUrl === 'string' && ledgerUrl.trim()) {
-          resolvedLedgerUrl = resolveRedirect(ledgerUrl.trim());
+          const cacheKey = ledgerUrl.trim();
+          if (resolvedUrlCache.has(cacheKey)) {
+            resolvedLedgerUrl = resolvedUrlCache.get(cacheKey);
+            Logger.log(`Using cached resolved URL for ${ledgerName}: ${cacheKey} -> ${resolvedLedgerUrl}`);
+          } else {
+            resolvedLedgerUrl = resolveRedirect(cacheKey);
           if (!resolvedLedgerUrl) {
             Logger.log(`Skipping row ${rowNumber}: Could not resolve ledger URL for ${ledgerName}: ${ledgerUrl}`);
             // Mark as error instead of leaving as NEW
             inventorySheet.getRange(rowNumber, 14).setValue('ERROR: Could not resolve ledger URL');
+            stats.rowsFailed++;
             return;
+          }
+            // Cache the resolved URL for future use
+            resolvedUrlCache.set(cacheKey, resolvedLedgerUrl);
+            Logger.log(`Cached resolved URL for ${ledgerName}: ${cacheKey} -> ${resolvedLedgerUrl}`);
           }
         }
         // Extract spreadsheet ID from resolved URL
@@ -969,6 +1133,7 @@ function processInventoryMovementToLedgers() {
         Logger.log(`Skipping row ${rowNumber}: Invalid ledger URL for ${ledgerName}: ${ledgerUrl}`);
         // Mark as error instead of leaving as NEW
         inventorySheet.getRange(rowNumber, 14).setValue('ERROR: Invalid ledger URL');
+        stats.rowsFailed++;
         return;
       }
 
@@ -1016,8 +1181,18 @@ function processInventoryMovementToLedgers() {
         targetSheet.getRange(targetLastRow + 1, 1, 2, 6).setValues(doubleEntryRows);
         // Record the row numbers (1-based) of the inserted records
         const insertedRowNumbers = `${targetLastRow + 1},${targetLastRow + 2}`;
-        updates.push({ rowNumber, insertedRowNumbers });
-        Logger.log(`Inserted double-entry records for row ${rowNumber} in ${targetSheetName} (rows ${insertedRowNumbers})`);
+
+        // Immediately update the Inventory Movement sheet for this row
+        const columnOCell = inventorySheet.getRange(rowNumber, 15);
+        columnOCell.setNumberFormat('@'); // Set format to text
+        columnOCell.setValue(insertedRowNumbers); // Column O
+        inventorySheet.getRange(rowNumber, 14).setValue('PROCESSED'); // Column N
+
+        Logger.log(`Inserted double-entry records for row ${rowNumber} in ${targetSheetName} (rows ${insertedRowNumbers}) and updated status to PROCESSED`);
+
+        // Increment success counters
+        stats.rowsSuccessfullyProcessed++;
+        stats.totalTransactionsCreated += 2; // Each successful row creates 2 transactions (debit + credit)
 
         // Check if recipient exists, if not add them to Contributors sheet
         // This ensures new recipients are added even when processing from Inventory Movement sheet
@@ -1049,20 +1224,14 @@ function processInventoryMovementToLedgers() {
         sendInventoryTransactionNotification(contributionMade, ledgerName, ledgerUrl);
       } catch (e) {
         Logger.log(`Error inserting double-entry records for row ${rowNumber} in ${targetSheetName}: ${e.message}`);
+        // Mark as failed immediately
+        inventorySheet.getRange(rowNumber, 14).setValue('ERROR: Processing failed');
+        stats.rowsFailed++;
         return;
       }
     });
 
-    // Update Inventory Movement with row numbers and status
-    updates.forEach(update => {
-      // Set Column O as text format to prevent Google Sheets from interpreting comma-separated numbers
-      const columnOCell = inventorySheet.getRange(update.rowNumber, 15);
-      columnOCell.setNumberFormat('@'); // Set format to text
-      columnOCell.setValue(update.insertedRowNumbers); // Column O
-      inventorySheet.getRange(update.rowNumber, 14).setValue('PROCESSED'); // Column N
-    });
-
-    // Fix: Backfill Column O for rows that are PROCESSED but missing Column O
+    // Fix: Backfill Column O for rows that are PROCESSED but missing Column O (from previous runs)
     // This handles cases where Column N was updated but Column O update failed
     let backfilledCount = 0;
     inventoryData.forEach((row, index) => {
@@ -1079,13 +1248,29 @@ function processInventoryMovementToLedgers() {
       Logger.log(`Found ${backfilledCount} rows with PROCESSED status but missing Column O. Manual review recommended.`);
     }
 
-    if (updates.length > 0) {
-      Logger.log(`Processed ${updates.length} records in Inventory Movement`);
+    // Log comprehensive execution summary
+    Logger.log(`=== EXECUTION SUMMARY: processInventoryMovementToLedgers ===`);
+    Logger.log(`📊 Total rows attempted: ${stats.totalRowsAttempted}`);
+    Logger.log(`✅ Rows successfully processed: ${stats.rowsSuccessfullyProcessed}`);
+    Logger.log(`❌ Rows failed: ${stats.rowsFailed}`);
+    Logger.log(`⏭️ Rows skipped: ${stats.rowsSkipped}`);
+    Logger.log(`💰 Total transactions created: ${stats.totalTransactionsCreated}`);
+
+    if (backfilledCount > 0) {
+      Logger.log(`🔧 Backfilled ${backfilledCount} rows with missing Column O data`);
+    }
+
+    const successRate = stats.totalRowsAttempted > 0 ?
+      ((stats.rowsSuccessfullyProcessed / stats.totalRowsAttempted) * 100).toFixed(1) : 0;
+    Logger.log(`📈 Success rate: ${successRate}%`);
+
+    if (stats.rowsSuccessfullyProcessed > 0) {
+      Logger.log(`✅ Processing completed successfully - all updates applied immediately`);
     } else {
-      Logger.log('No new records with status NEW found in Inventory Movement');
+      Logger.log('ℹ️ No new records with status NEW found in Inventory Movement');
     }
   } catch (error) {
-    Logger.log(`Error in processInventoryMovementToLedgers: ${error.message}`);
+    Logger.log(`❌ Error in processInventoryMovementToLedgers: ${error.message}`);
   }
 }
 
@@ -1146,10 +1331,28 @@ function doGet(e) {
 
 /**
  * Runs both processTelegramChatLogsToInventoryMovement and processInventoryMovementToLedgers sequentially.
+ * This is the main entry point for processing inventory movements from start to finish.
  */
 function processTelegramChatLogs() {
-  processTelegramChatLogsToInventoryMovement();
-  processInventoryMovementToLedgers();
+  Logger.log('🚀 Starting complete inventory movement processing pipeline');
+  const startTime = new Date();
+
+  try {
+    // Phase 1: Process Telegram logs to Inventory Movement sheet
+    Logger.log('📥 Phase 1: Processing Telegram Chat Logs → Inventory Movement');
+    processTelegramChatLogsToInventoryMovement();
+
+    // Phase 2: Process Inventory Movement to final ledgers
+    Logger.log('📤 Phase 2: Processing Inventory Movement → Ledgers');
+    processInventoryMovementToLedgers();
+
+    const endTime = new Date();
+    const duration = (endTime - startTime) / 1000; // Duration in seconds
+
+    Logger.log(`✅ Complete inventory movement processing pipeline finished in ${duration.toFixed(1)} seconds`);
+  } catch (error) {
+    Logger.log(`❌ Error in complete inventory movement processing pipeline: ${error.message}`);
+  }
 }
 
 // Function to generate a unique GitHub filename with a running number
