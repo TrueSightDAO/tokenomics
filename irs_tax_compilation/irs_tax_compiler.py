@@ -708,6 +708,28 @@ def compile_irs_filing_summary(client, main_ledger_sales: List[List], main_ledge
             if isinstance(row[3], (int, float)) and row[3] > 0
         )
         
+        # Calculate sales breakdown by ledger
+        sales_by_ledger = {}
+        if all_sales:
+            for row in all_sales:
+                if isinstance(row[3], (int, float)) and row[3] > 0:
+                    ledger_name = str(row[5]).strip() if len(row) > 5 else "Unknown"
+                    if ledger_name not in sales_by_ledger:
+                        sales_by_ledger[ledger_name] = 0.0
+                    sales_by_ledger[ledger_name] += row[3]
+        
+        # Calculate expenses breakdown by ledger
+        expenses_by_ledger = {}
+        for row in operational_expenses:
+            ledger_name = str(row[5]).strip() if len(row) > 5 else "Unknown"
+            if ledger_name not in expenses_by_ledger:
+                expenses_by_ledger[ledger_name] = 0.0
+            expenses_by_ledger[ledger_name] += abs(row[3])  # Expenses are negative, so use abs
+        
+        # Sort ledgers alphabetically for consistent display
+        sorted_sales_ledgers = sorted(sales_by_ledger.items(), key=lambda x: x[0])
+        sorted_expenses_ledgers = sorted(expenses_by_ledger.items(), key=lambda x: x[0])
+        
         # Net income/loss
         net_income_loss = total_sales - total_expenses
         
@@ -737,7 +759,23 @@ def compile_irs_filing_summary(client, main_ledger_sales: List[List], main_ledge
             [""],  # Blank row
             ["Income Statement"],
             ["Total Sales (Revenue)", f"${total_sales:,.2f}"],
-            ["Total Expenses", f"${total_expenses:,.2f}"],
+        ]
+        
+        # Add sales breakdown by ledger
+        if sorted_sales_ledgers:
+            for ledger_name, ledger_total in sorted_sales_ledgers:
+                summary_rows.append([f"  - {ledger_name}", f"${ledger_total:,.2f}"])
+        
+        summary_rows.append([""])  # Blank row
+        summary_rows.append(["Total Expenses", f"${total_expenses:,.2f}"])
+        
+        # Add expenses breakdown by ledger
+        if sorted_expenses_ledgers:
+            for ledger_name, ledger_total in sorted_expenses_ledgers:
+                summary_rows.append([f"  - {ledger_name}", f"${ledger_total:,.2f}"])
+        
+        summary_rows.extend([
+            [""],  # Blank row
             ["Net Income (Loss)", f"${net_income_loss:,.2f}"],
             [""],  # Blank row
             ["Balance Sheet (Main Ledger Only)"],
@@ -745,7 +783,7 @@ def compile_irs_filing_summary(client, main_ledger_sales: List[List], main_ledge
             [""],  # Blank row
             ["Transaction Counts"],
             ["Number of Sales Transactions", len(all_sales) if all_sales else len(main_ledger_sales)],
-            ["Number of Expense Transactions", len(main_ledger_expenses)],
+            ["Number of Expense Transactions", len(all_expenses) if all_expenses else len(main_ledger_expenses)],
             ["Number of Liquidity Injections", len(liquidity_injections)],
             [""],  # Blank row
             ["Notes"],
@@ -755,7 +793,7 @@ def compile_irs_filing_summary(client, main_ledger_sales: List[List], main_ledge
             ["- Assets are main ledger only (DAO assets)"],
             ["- Assets represent off-chain physical assets from main ledger"],
             ["- Liquidity injections are capital contributions, not revenue"],
-        ]
+        ])
         
     except Exception as e:
         print(f"Error compiling IRS filing summary: {e}")
