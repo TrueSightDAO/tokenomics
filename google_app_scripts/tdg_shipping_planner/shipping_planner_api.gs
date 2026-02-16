@@ -70,6 +70,15 @@ const DEFAULT_PALLET_WEIGHT_KG = 35;
 // Freight weight tiers (in kg) - must match the freight cost sheet
 const FREIGHT_WEIGHT_TIERS = [200, 300, 500, 750, 1000];
 
+// Restock recommender: optional sheets in main spreadsheet
+const PARTNER_ADDRESSES_SHEET_NAME = 'Partner addresses';
+const PARTNER_SALES_SHEET_NAME = 'Partner sales';
+const RESTOCK_QUANTITIES = [6, 12, 18, 24, 36, 48];
+const DEFAULT_MONTHLY_SALES = 4;
+const TARGET_WEEKS_MIN = 4;
+const TARGET_WEEKS_MAX = 10;
+const MAX_WEEKS_STOCK = 12;
+
 // ============================================================================
 // HELPER FUNCTIONS
 // ============================================================================
@@ -210,6 +219,138 @@ function getProductWeights() {
     Logger.log('Error loading product weights: ' + error.message);
     return {};
   }
+}
+
+/**
+ * Get partner shipping address from "Partner addresses" sheet.
+ * Columns: A=partner_id, B=street1, C=city, D=state, E=zip, F=country
+ * @param {String} partnerId - Partner key (e.g. go-ask-alice)
+ * @returns {Object|null} { street1, city, state, zip, country } or null
+ */
+function getPartnerAddress(partnerId) {
+  try {
+    const spreadsheet = SpreadsheetApp.openById(MAIN_SPREADSHEET_ID);
+    const sheet = spreadsheet.getSheetByName(PARTNER_ADDRESSES_SHEET_NAME);
+    if (!sheet) return null;
+    const lastRow = sheet.getLastRow();
+    if (lastRow < 2) return null;
+    const data = sheet.getRange(2, 1, lastRow, 6).getValues();
+    const key = (partnerId || '').toString().trim().toLowerCase();
+    for (let i = 0; i < data.length; i++) {
+      const row = data[i];
+      const id = (row[0] || '').toString().trim().toLowerCase();
+      if (id === key && row[1]) {
+        return {
+          street1: (row[1] || '').toString().trim(),
+          city: (row[2] || '').toString().trim(),
+          state: (row[3] || '').toString().trim(),
+          zip: (row[4] || '').toString().trim(),
+          country: (row[5] || 'US').toString().trim()
+        };
+      }
+    }
+    return null;
+  } catch (e) {
+    Logger.log('getPartnerAddress error: ' + e.message);
+    return null;
+  }
+}
+
+/**
+ * Get partner sales rate (units per month) from "Partner sales" sheet.
+ * Columns: A=partner_id, B=product, C=units_last_90_days (or monthly avg)
+ * @param {String} partnerId - Partner key
+ * @param {String} product - Product name (e.g. Ceremonial Cacao 200g)
+ * @returns {Number} Units per month
+ */
+function getPartnerSalesRate(partnerId, product) {
+  try {
+    const spreadsheet = SpreadsheetApp.openById(MAIN_SPREADSHEET_ID);
+    const sheet = spreadsheet.getSheetByName(PARTNER_SALES_SHEET_NAME);
+    if (!sheet) return DEFAULT_MONTHLY_SALES;
+    const lastRow = sheet.getLastRow();
+    if (lastRow < 2) return DEFAULT_MONTHLY_SALES;
+    const data = sheet.getRange(2, 1, lastRow, 3).getValues();
+    const key = (partnerId || '').toString().trim().toLowerCase();
+    const prod = (product || '').toString().trim();
+    for (let i = 0; i < data.length; i++) {
+      const row = data[i];
+      const id = (row[0] || '').toString().trim().toLowerCase();
+      const p = (row[1] || '').toString().trim();
+      if (id === key && (!prod || p === prod)) {
+        const units = parseFloat(row[2]) || 0;
+        if (units > 0) return units / 3;
+        return DEFAULT_MONTHLY_SALES;
+      }
+    }
+    return DEFAULT_MONTHLY_SALES;
+  } catch (e) {
+    Logger.log('getPartnerSalesRate error: ' + e.message);
+    return DEFAULT_MONTHLY_SALES;
+  }
+}
+
+/**
+ * Compute restock recommendation: optimal N bags to send partner from SF,
+ * minimizing shipping cost while capping weeks-of-stock (capital at partner).
+ * @param {String} partnerId - Partner key
+ * @param {String} product - Product name (must exist in Currencies with weight)
+ * @returns {Object} { recommended_N, shipping_cost_usd, weeks_of_stock, alternatives }
+ */
+function computeRestockRecommendation(partnerId, product) {
+  const address = getPartnerAddress(partnerId);
+  if (!address || !address.street1 || !address.zip) {
+    return { error: 'Partner address not found. Add "Partner addresses" sheet with columns: partner_id, street1, city, state, zip, country.' };
+  }
+  const productWeights = getProductWeights();
+  const weightGrams = productWeights[product] || 0;
+  if (weightGrams <= 0) {
+    return { error: 'Product weight not found for "' + product + '". Check Currencies sheet Column K or L.' };
+  }
+  const monthlyRate = getPartnerSalesRate(partnerId, product);
+  const candidates = [];
+  for (let i = 0; i < RESTOCK_QUANTITIES.length; i++) {
+    const N = RESTOCK_QUANTITIES[i];
+    const selectedItems = [{ currency: product, quantity: N, weight_grams: weightGrams }];
+    const weightInfo = calculateTotalWeight(selectedItems, 'box');
+    const options = calculateEasyPostRates(weightInfo.total_weight_oz, address);
+    const shippingUsd = options.length > 0 ? options[0].rate : null;
+    const weeksOfStock = monthlyRate > 0 ? N / (monthlyRate * 4.33) : MAX_WEEKS_STOCK;
+    candidates.push({
+      N: N,
+      shipping_usd: shippingUsd,
+      weeks_of_stock: weeksOfStock,
+      shipping_per_bag: (shippingUsd != null && N > 0) ? shippingUsd / N : null
+    });
+  }
+  var best = null;
+  var inRange = [];
+  var underMax = [];
+  for (let i = 0; i < candidates.length; i++) {
+    const c = candidates[i];
+    if (c.shipping_usd == null) continue;
+    if (c.weeks_of_stock <= MAX_WEEKS_STOCK) underMax.push(c);
+    if (c.weeks_of_stock >= TARGET_WEEKS_MIN && c.weeks_of_stock <= TARGET_WEEKS_MAX) inRange.push(c);
+  }
+  if (inRange.length > 0) {
+    inRange.sort(function(a, b) { return (a.shipping_per_bag || 999) - (b.shipping_per_bag || 999); });
+    best = inRange[0];
+  } else if (underMax.length > 0) {
+    underMax.sort(function(a, b) { return (a.shipping_per_bag || 999) - (b.shipping_per_bag || 999); });
+    best = underMax[0];
+  } else {
+    for (let i = 0; i < candidates.length; i++) {
+      if (candidates[i].shipping_usd != null) { best = candidates[i]; break; }
+    }
+  }
+  if (!best) best = { N: 12, shipping_usd: null, weeks_of_stock: 0 };
+  return {
+    recommended_N: best.N,
+    shipping_cost_usd: best.shipping_usd != null ? Math.round(best.shipping_usd * 100) / 100 : null,
+    weeks_of_stock: Math.round(best.weeks_of_stock * 10) / 10,
+    partner_monthly_rate: monthlyRate,
+    alternatives: candidates.filter(function(c) { return c.N !== best.N && c.shipping_usd != null; }).slice(0, 3)
+  };
 }
 
 /**
@@ -962,6 +1103,33 @@ function doGet(e) {
         inventory: inventory,
         total_items: inventory.length
       });
+    }
+    
+    // Get partner address (for Restock Recommender address display)
+    if (action === 'get_partner_address') {
+      const partnerId = (e.parameter.partner_id || '').toString().trim();
+      if (!partnerId) {
+        return createErrorResponse('Missing partner_id parameter');
+      }
+      const address = getPartnerAddress(partnerId);
+      if (!address) {
+        return createSuccessResponse({ address: null, message: 'Address not on file. Add this partner to the Partner addresses sheet.' });
+      }
+      return createSuccessResponse({ address: address });
+    }
+    
+    // Restock recommendation (optimal N bags from SF using prior sales + shipping cost)
+    if (action === 'restock_recommend') {
+      const partnerId = (e.parameter.partner_id || '').toString().trim();
+      const product = (e.parameter.product || 'Ceremonial Cacao 200g').toString().trim();
+      if (!partnerId) {
+        return createErrorResponse('Missing partner_id parameter');
+      }
+      const data = computeRestockRecommendation(partnerId, product);
+      if (data.error) {
+        return createErrorResponse(data.error);
+      }
+      return createSuccessResponse(data);
     }
     
     // Calculate shipping estimate

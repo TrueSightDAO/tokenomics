@@ -48,6 +48,12 @@ function doGet(e) {
       return handleVerifySignature(signature);
     }
     
+    // Webhook from Edgar (sentiment_importer): process DApp submissions so PR is created without waiting for cron
+    const action = e.parameter.action;
+    if (action === 'process_dapp_payloads') {
+      return handleProcessDAppPayloads();
+    }
+    
     // Otherwise, check for mode parameter
     const mode = e.parameter.mode;
     
@@ -66,6 +72,20 @@ function doGet(e) {
   } catch (error) {
     Logger.log(`Error in doGet: ${error.message}`);
     return createErrorResponse(`Server error: ${error.message}`);
+  }
+}
+
+/**
+ * Handle webhook request to process DApp payloads (proposal creation / votes) from Telegram Chat Logs.
+ * Called by Edgar (sentiment_importer) via Sidekiq after submit_contribution so the PR is created without waiting for cron.
+ */
+function handleProcessDAppPayloads() {
+  try {
+    const result = processDAppPayloads();
+    return createSuccessResponse(result);
+  } catch (error) {
+    Logger.log(`Error in handleProcessDAppPayloads: ${error.message}`);
+    return createErrorResponse(`Failed to process DApp payloads: ${error.message}`);
   }
 }
 
@@ -233,15 +253,23 @@ function getProposalFileContent(branchName, config) {
       }
     });
     
-    // Find the proposal file (exclude README.md and other common files)
-    const proposalFile = tree.tree.find(file => 
-      file.type === 'blob' && 
-      file.path.endsWith('.md') && 
-      !file.path.includes('/') && // Only files in root directory
-      file.path.toLowerCase() !== 'readme.md' && // Exclude README
-      file.path.toLowerCase() !== 'license.md' && // Exclude LICENSE
-      file.path.toLowerCase() !== 'changelog.md' // Exclude CHANGELOG
-    );
+    // Helper: is this a valid proposal .md (root, not README/LICENSE/CHANGELOG)
+    function isProposalMd(file) {
+      return file.type === 'blob' &&
+        file.path.endsWith('.md') &&
+        !file.path.includes('/') &&
+        file.path.toLowerCase() !== 'readme.md' &&
+        file.path.toLowerCase() !== 'license.md' &&
+        file.path.toLowerCase() !== 'changelog.md';
+    }
+    
+    // Prefer the file that matches this PR's branch (e.g. branch "proposal-standardize-..." -> "standardize-....md")
+    const branchBase = branchName.replace(/^proposal-/, '');
+    const expectedPath = branchBase + '.md';
+    let proposalFile = tree.tree.find(file => isProposalMd(file) && file.path === expectedPath);
+    if (!proposalFile) {
+      proposalFile = tree.tree.find(file => isProposalMd(file));
+    }
     
     if (!proposalFile) {
       Logger.log(`❌ No specific proposal file found, trying fallback...`);
