@@ -40,13 +40,18 @@ Market making strategies for TDG token on Raydium AMM (Solana):
 
 See [raydium_market_making/README.md](./raydium_market_making/README.md) for configuration.
 
-### On Hold
+### On Hold / Deprecated
 
 #### 4. **[la_token_market_making_python](./la_token_market_making_python/)** - LATOKEN Market Making
 Python-based market making bot for LATOKEN exchange.  
 **Status**: On hold pending LATOKEN engineering team response to trade execution issues.
 
 See [la_token_market_making_python/README.md](./la_token_market_making_python/README.md) for details.
+
+#### 5. **[deprecated/tdg_wix_gas_fees_deprecated.gs](./google_app_scripts/deprecated/tdg_wix_gas_fees_deprecated.gs)** - Wix Gas Fee Management (DEPRECATED)
+**Status**: Deprecated — Wix integration no longer used.  
+**Issue**: Calls LATOKEN API (`setEcosystemGasFees()` → `getTdgUsdtPriceLaToken()`) which returns 503 errors.  
+**Action**: Archived for reference only. Do not execute. LATOKEN calls disabled in `tdg_wix_dashboard.gs`.
 
 ---
 
