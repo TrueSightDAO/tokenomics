@@ -99,6 +99,18 @@ The sheet should have weight tiers (200, 300, 500, 750, 1000 kg) with correspond
 8. Click "Calculate Shipping Cost"
 9. View estimated costs
 
+### Restock Recommender (on-the-fly)
+
+When a partner texts to restock, use the **Restock Recommender** page (dapp: `restock_recommender.html`) to get the optimal number of bags from Kirsten’s (SF), using prior sales and shipping cost.
+
+**Required:** In the main spreadsheet, add a sheet **“Partner addresses”** with columns: **A** = partner_id (e.g. `go-ask-alice`), **B** = street1, **C** = city, **D** = state, **E** = zip, **F** = country.
+
+**Optional:** Sheet **“Partner sales”** with columns: **A** = partner_id, **B** = product, **C** = units last 90 days. If missing, a default sales rate is used.
+
+**API:** `GET ?action=restock_recommend&partner_id=<id>&product=<name>` returns `recommended_N`, `shipping_cost_usd`, `weeks_of_stock`.
+
+---
+
 ### API Endpoints
 
 #### List Managers
