@@ -15,7 +15,9 @@
  * The function setEcosystemGasFees() calls getTdgUsdtPriceLaToken() which hits LATOKEN API.
  */
 
-var wixAccessToken = "IST.eyJraWQiOiJQb3pIX2FDMiIsImFsZyI6IlJTMjU2In0.eyJkYXRhIjoie1wiaWRcIjpcImYyNGZjZWY4LTljZDctNGE2ZS04NzdmLThlOWJkOThkZTk5Y1wiLFwiaWRlbnRpdHlcIjp7XCJ0eXBlXCI6XCJhcHBsaWNhdGlvblwiLFwiaWRcIjpcIjQ4MjU1ZDA5LWI5NTUtNGUwNi1iZjYxLTAyN2NiZThkN2MzNFwifSxcInRlbmFudFwiOntcInR5cGVcIjpcImFjY291bnRcIixcImlkXCI6XCIwZTJjZGU1Zi1iMzUzLTQ2OGItOWY0ZS0zNjgzNWZjNjBhMGVcIn19IiwiaWF0IjoxNzIxMzIwNTU5fQ.cLoxDKW5m4TYXdR-820GwrKrOkfkk_8OJZy956XOSwOQ4i1RqE9XjrHOFuZyhiq6FR0Hxy8ZJxmBB_1oTuA09nuYnhrMDJjevBDK0sVqQCCg4bTX1LF65VABEIj7WBCVcklhelmrc_X9_6J09whC8Al-D6Ttq_i-cCGh97EqFqqcQilSz9LjrL7jiMgpYMabjRYEP9FmzPseOXSv_HjU9zxgYzHhdHltENYq5dQiYJIDLbOu4Pp3YU52FtZUd4yrWDhqryjZ_QCtR1ygRI6153xnBRt-WqrD63XhEMiNpTIY7ZDwfuUfS9SFHj8vucp1MCgxgp9DCliDKxavFf-B1g";
+// SECURITY: Token removed. Use getCredentials().WIX_API_KEY or Script Properties.
+// This script is DEPRECATED and should not be executed.
+var wixAccessToken = "";
 
 var exchangeRateCollectionId = "ExchangeRate";
 var agroverseTokenomicsCollectionId = "AgroverseTokenomics";
