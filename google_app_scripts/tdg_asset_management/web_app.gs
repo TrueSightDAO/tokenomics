@@ -27,7 +27,8 @@
  *        "voting_rights": <value>,
  *        "voting_rights_circulated": <value>,
  *        "total_assets": <number, 5 decimal places>,
- *        "asset_per_circulated_voting_right": <number, 5 decimal places>
+ *        "asset_per_circulated_voting_right": <number, 5 decimal places>,
+ *        "usd_provisions_for_cash_out": <number, 5 decimal places>  // USD set aside for cash-outs; limits realistic payout
  *      }
  *    - If full=false or omitted: { "contributor_name": <string> }
  *    - Error: { "error": "No matching signature found" } or { "error": "Signature parameter missing" }
@@ -301,6 +302,30 @@ function getOffChainAssetValue() {
 }
 
 /**
+ * Fetches the USD provisions set aside for voting rights cash-out from the "off chain asset balance" sheet.
+ * This is the row "USD - provisions for voting rights cash out" (Column A); returns Value USD (Column D).
+ * This amount represents how much can realistically be paid out when contributors cash out voting rights.
+ * @return {number} USD provisions for cash-out, to 5 decimal places. Returns 0 if row not found.
+ */
+function getUsdProvisionsForCashOut() {
+  const offChainAssetBalanceTab = SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName(ASSET_SHEET_NAME);
+  const data = offChainAssetBalanceTab.getDataRange().getValues();
+  const searchStr = 'USD - provisions for voting rights cash out';
+  for (var i = 1; i < data.length; i++) {
+    var assetType = data[i][0] ? data[i][0].toString().trim() : '';
+    if (assetType.indexOf(searchStr) !== -1) {
+      var value = data[i][3]; // Column D = Value (USD)
+      var num = typeof value === 'number' ? value : parseFloat(value);
+      var result = isNaN(num) ? 0 : parseFloat(num.toFixed(5));
+      Logger.log('USD provisions for voting rights cash out: ' + result);
+      return result;
+    }
+  }
+  Logger.log('USD provisions for voting rights cash out: row not found, returning 0');
+  return 0;
+}
+
+/**
  * Fetches the USDT balance in the Solana vault.
  * @return {number} The USDT balance in the vault, to 5 decimal places.
  */
@@ -453,6 +478,9 @@ function doGet(e) {
   // Step 5: Calculate asset_per_circulated_voting_right
   const assetPerCirculatedVotingRight = votingRightsCirculated !== 0 ? totalAssets / votingRightsCirculated : 0;
 
+  // Step 6: Get USD provisions for voting rights cash-out (amount realistically available for payouts)
+  const usdProvisionsForCashOut = getUsdProvisionsForCashOut();
+
   // Return full result with asset values formatted to 5 decimal places
   return ContentService.createTextOutput(
     JSON.stringify({
@@ -460,7 +488,8 @@ function doGet(e) {
       voting_rights: votingRights,
       voting_rights_circulated: votingRightsCirculated,
       total_assets: parseFloat(totalAssets.toFixed(5)),
-      asset_per_circulated_voting_right: parseFloat(assetPerCirculatedVotingRight.toFixed(5))
+      asset_per_circulated_voting_right: parseFloat(assetPerCirculatedVotingRight.toFixed(5)),
+      usd_provisions_for_cash_out: parseFloat(usdProvisionsForCashOut.toFixed(5))
     })
   ).setMimeType(ContentService.MimeType.JSON);
 }
