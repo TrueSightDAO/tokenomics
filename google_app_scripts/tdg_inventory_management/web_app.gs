@@ -19,17 +19,16 @@
  *   B: inventory manager name
  *   C: amount
  *
- * Ledger URLs are dynamically fetched from Wix AgroverseShipments data collection.
- * Ledger names are derived from the last segment of the URL (after the last '/') and capitalized.
+ * Ledger configs are read from the "Shipment Ledger Listing" sheet in the main spreadsheet.
+ * Column A = ledger name, Column K = Ledger URL (truesight.me), Column L = Contract URL, Column AB = Resolved URL.
  */
 
 // Constants for spreadsheet ID, sheet names, and API credentials
 const SPREADSHEET_ID = '1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU';
 const SHEET_NAME = 'offchain asset location';
+const SHIPMENT_LEDGER_LISTING_SHEET = 'Shipment Ledger Listing';
 const CONTACT_SHEET_NAME = 'Contributors contact information';
 const CURRENCIES_SHEET_NAME = 'Currencies';
-const creds = getCredentials(); // Assumed to be defined elsewhere
-const WIX_ACCESS_TOKEN = creds.WIX_API_KEY; // Wix API key
 
 // Helper to convert column letter(s) to number
 function letterToColumn(letter) {
@@ -173,59 +172,80 @@ function resolveRedirect(url) {
   }
 }
 
-// Fetches unique ledger URLs from Wix AgroverseShipments and constructs LEDGER_CONFIGS
-function getLedgerConfigsFromWix() {
-  const options = {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': WIX_ACCESS_TOKEN,
-      'wix-account-id': '0e2cde5f-b353-468b-9f4e-36835fc60a0e',
-      'wix-site-id': 'd45a189f-d0cc-48de-95ee-30635a95385f'
-    },
-    payload: JSON.stringify({})
-  };
-  const request_url = 'https://www.wixapis.com/wix-data/v2/items/query?dataCollectionId=AgroverseShipments';
-
+// Fetches ledger configs from "Shipment Ledger Listing" sheet in the main spreadsheet.
+// Column A = ledger name, Column K = Ledger URL (truesight.me for View Ledger link),
+// Column L = Contract URL, Column AB = Resolved URL (Google Sheets for data access).
+function getLedgerConfigsFromSheet() {
   try {
-    const response = UrlFetchApp.fetch(request_url, options);
-    const content = response.getContentText();
-    const response_obj = JSON.parse(content);
+    const spreadsheet = SpreadsheetApp.openById(SPREADSHEET_ID);
+    const shipmentSheet = spreadsheet.getSheetByName(SHIPMENT_LEDGER_LISTING_SHEET);
+    if (!shipmentSheet) {
+      Logger.log('Shipment Ledger Listing sheet not found');
+      return [];
+    }
 
-    // Construct LEDGER_CONFIGS dynamically using title from WIX data
-    const ledgerConfigs = response_obj.dataItems
-      .filter(item => item.data.contract_url && item.data.contract_url !== '')
-      .map(item => {
-        const resolvedUrl = resolveRedirect(item.data.contract_url);
-        return {
-          ledger_name: item.data.title,
-          ledger_url: resolvedUrl,
+    const lastRow = shipmentSheet.getLastRow();
+    if (lastRow < 2) {
+      return [];
+    }
+
+    // Read columns A, K, L, AB (indices 0, 10, 11, 27). Row 1 is header. Exclude last row (may be summary).
+    const dataRange = shipmentSheet.getRange(2, 1, Math.max(2, lastRow - 1), 28);
+    const data = dataRange.getValues();
+
+    const ledgerConfigs = [];
+    for (let i = 0; i < data.length; i++) {
+      const row = data[i];
+      const ledgerName = row[0] ? row[0].toString().trim() : '';
+      const ledgerViewUrl = row[10] ? row[10].toString().trim() : '';  // Column K
+      const contractUrl = row[11] ? row[11].toString().trim() : '';    // Column L
+      const resolvedUrl = row[27] ? row[27].toString().trim() : '';    // Column AB
+
+      // Skip empty rows or rows without a ledger name
+      if (!ledgerName || ledgerName === '0') continue;
+
+      // Use resolved URL (Column AB) if available, else resolve Contract URL (Column L)
+      let ledgerSpreadsheetUrl = resolvedUrl || (contractUrl ? resolveRedirect(contractUrl) : '');
+
+      // Only include rows that have a valid Google Sheets URL for data access
+      if (!ledgerSpreadsheetUrl || !ledgerSpreadsheetUrl.includes('docs.google.com/spreadsheets')) {
+        continue;
+      }
+
+      // Use Column K (Ledger URL / truesight.me) for "View Ledger" link when available, else spreadsheet URL
+      const displayUrl = ledgerViewUrl || ledgerSpreadsheetUrl;
+
+      ledgerConfigs.push({
+        ledger_name: ledgerName,
+        ledger_url: displayUrl,
+        ledger_spreadsheet_url: ledgerSpreadsheetUrl,
         sheet_name: 'Balance',
         manager_names_column: 'H',
         asset_name_column: 'J',
         asset_quantity_column: 'I',
         record_start_row: 6
-      };
-    });
+      });
+    }
 
-    Logger.log('Ledger configs fetched from Wix: ' + JSON.stringify(ledgerConfigs));
+    Logger.log('Ledger configs from Shipment Ledger Listing: ' + ledgerConfigs.length + ' ledgers');
     return ledgerConfigs;
   } catch (e) {
-    Logger.log('Error fetching ledger URLs from Wix: ' + e.message);
+    Logger.log('Error fetching ledger configs from sheet: ' + e.message);
     return [];
   }
 }
 
 // Augment the result array with assets from external ledgers
 function augmentWithLedgers(managerName, result) {
-  const ledgerConfigs = getLedgerConfigsFromWix();
+  const ledgerConfigs = getLedgerConfigsFromSheet();
   ledgerConfigs.forEach(function(config) {
     try {
-      if (!config.ledger_url || !config.ledger_url.includes('docs.google.com/spreadsheets')) {
-        Logger.log(`Skipping invalid or non-spreadsheet URL: ${config.ledger_url}`);
+      const spreadsheetUrl = config.ledger_spreadsheet_url || config.ledger_url;
+      if (!spreadsheetUrl || !spreadsheetUrl.includes('docs.google.com/spreadsheets')) {
+        Logger.log(`Skipping invalid or non-spreadsheet URL: ${spreadsheetUrl}`);
         return;
       }
-      const ss = SpreadsheetApp.openByUrl(config.ledger_url);
+      const ss = SpreadsheetApp.openByUrl(spreadsheetUrl);
       const sheet = ss.getSheetByName(config.sheet_name);
       if (!sheet) return;
       const startRow = config.record_start_row;
@@ -258,14 +278,15 @@ function augmentWithLedgers(managerName, result) {
 function getManagersFromLedgers() {
   const names = [];
   const seen = {};
-  const ledgerConfigs = getLedgerConfigsFromWix();
+  const ledgerConfigs = getLedgerConfigsFromSheet();
   ledgerConfigs.forEach(function(config) {
     try {
-      if (!config.ledger_url || !config.ledger_url.includes('docs.google.com/spreadsheets')) {
-        Logger.log(`Skipping invalid or non-spreadsheet URL: ${config.ledger_url}`);
+      const spreadsheetUrl = config.ledger_spreadsheet_url || config.ledger_url;
+      if (!spreadsheetUrl || !spreadsheetUrl.includes('docs.google.com/spreadsheets')) {
+        Logger.log(`Skipping invalid or non-spreadsheet URL: ${spreadsheetUrl}`);
         return;
       }
-      const ss = SpreadsheetApp.openByUrl(config.ledger_url);
+      const ss = SpreadsheetApp.openByUrl(spreadsheetUrl);
       const sheet = ss.getSheetByName(config.sheet_name);
       if (!sheet) return;
       const startRow = config.record_start_row;
@@ -368,13 +389,13 @@ function doGet(e) {
       .setMimeType(ContentService.MimeType.JSON);
   }
 
-  // Return list of ledger names and URLs from WIX AgroverseShipments
+  // Return list of ledger names and URLs from Shipment Ledger Listing sheet
   if (e.parameter.ledgers) {
-    const ledgerConfigs = getLedgerConfigsFromWix();
+    const ledgerConfigs = getLedgerConfigsFromSheet();
     const ledgers = ledgerConfigs.map(function(config) {
       return {
         ledger_name: config.ledger_name,
-        ledger_url: config.ledger_url
+        ledger_url: config.ledger_url  // truesight.me View Ledger link or spreadsheet URL
       };
     });
     return ContentService
@@ -414,6 +435,16 @@ function testList() {
   const e = { parameter: { list: 'true' } };
   const output = doGet(e);
   Logger.log('Manager list: %s', output.getContent());
+}
+
+/**
+ * Test function: list all ledgers from Shipment Ledger Listing.
+ * Usage (in Apps Script console): testLedgers();
+ */
+function testLedgers() {
+  const e = { parameter: { ledgers: 'true' } };
+  const output = doGet(e);
+  Logger.log('Ledgers: %s', output.getContent());
 }
 
 /**
@@ -513,19 +544,20 @@ function listAllCurrenciesAcrossLedgers() {
     }
     
     // Then, get currencies from all external ledgers
-    const ledgerConfigs = getLedgerConfigsFromWix();
+    const ledgerConfigs = getLedgerConfigsFromSheet();
     Logger.log('Processing ' + ledgerConfigs.length + ' external ledgers for currencies');
     
     ledgerConfigs.forEach(function(config) {
       try {
-        Logger.log('Processing ledger: ' + config.ledger_name + ' - ' + config.ledger_url);
+        const spreadsheetUrl = config.ledger_spreadsheet_url || config.ledger_url;
+        Logger.log('Processing ledger: ' + config.ledger_name + ' - ' + spreadsheetUrl);
         
-        if (!config.ledger_url || !config.ledger_url.includes('docs.google.com/spreadsheets')) {
-          Logger.log('Skipping invalid or non-spreadsheet URL: ' + config.ledger_url);
+        if (!spreadsheetUrl || !spreadsheetUrl.includes('docs.google.com/spreadsheets')) {
+          Logger.log('Skipping invalid or non-spreadsheet URL: ' + spreadsheetUrl);
           return;
         }
         
-        const ledgerSpreadsheet = SpreadsheetApp.openByUrl(config.ledger_url);
+        const ledgerSpreadsheet = SpreadsheetApp.openByUrl(spreadsheetUrl);
         const ledgerSheet = ledgerSpreadsheet.getSheetByName(config.sheet_name);
         if (!ledgerSheet) {
           Logger.log('Sheet not found: ' + config.sheet_name + ' in ledger ' + config.ledger_name);
