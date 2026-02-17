@@ -2,7 +2,10 @@
  * File: google_app_scripts/tdg_asset_management/tdg_wix_dashboard.gs
  * Repository: https://github.com/TrueSightDAO/tokenomics
  * 
- * Description: Updates Wix dashboard metrics including treasury balance, TDG issuance, and exchange rates.
+ * Description: Updates Performance Statistics (formerly Wix dashboard metrics) including treasury balance, TDG issuance, and exchange rates.
+ * 
+ * NOTE: Wix integration is deprecated. This script now updates Google Sheets "Performance Statistics" directly.
+ * LATOKEN API calls are disabled (on hold) to prevent 503 errors.
  */
 
 /**
@@ -14,7 +17,7 @@
  * KEY FEATURES:
  * - Asset Management: Tracks off-chain assets, USDT vault balance, and AGL investment holdings
  * - Tokenomics Calculations: Calculates asset per TDG, voting rights, and buy-back budgets
- * - Wix Integration: Syncs data with Wix platform for public display
+ * - Performance Statistics: Updates Google Sheets "Performance Statistics" tab (Wix integration deprecated)
  * - Performance Statistics Sync: Automatically syncs Wix updates to Google Sheet "Performance Statistics" tab
  * - Web Service: Exposes doGet endpoint to return Performance Statistics as JSON for index.html
  * - Transaction Automation: Creates daily buy-back provisions and recurring tokenizations
@@ -43,9 +46,12 @@
  * 
  * DATA SOURCES:
  * - Google Sheets: Ledger history, off-chain transactions, asset balances, Performance Statistics
- * - Wix APIs: Public data display and exchange rates
  * - Solana Blockchain: USDT vault balance monitoring
  * - US Treasury: Real-time yield data for calculations
+ * 
+ * DEPRECATED/DISABLED:
+ * - Wix APIs: Deprecated (no longer using Wix)
+ * - LATOKEN API: Disabled (on hold - see tokenomics/README.md)
  * 
  * SPREADSHEET STRUCTURE:
  * - "Ledger history": TDG token issuance and voting rights tracking
@@ -1435,21 +1441,37 @@ function get30DaysSalesFromAllLedgers() {
   return totalSales;
 }
 
+/**
+ * Get TDG/USDT price from LATOKEN Exchange.
+ * NOTE: LATOKEN market making is ON HOLD. This function is disabled.
+ * Returns null to avoid 503 errors from LATOKEN API.
+ * 
+ * @return {number|null} The TDG/USDT price, or null if LATOKEN is unavailable/disabled.
+ */
 function getTdgUsdtPriceLaToken() {
+  // LATOKEN market making is on hold - see tokenomics/README.md
+  // Disabling LATOKEN API calls to avoid 503 errors
+  Logger.log("⚠️ LATOKEN API disabled (on hold). Returning null.");
+  return null;
+  
+  /* DISABLED - LATOKEN market making on hold
   var tdg_id = "cbfd4c19-259c-420b-9bb2-498493265648";
   var usdt_id = "0c3a106d-bde3-4c13-a26e-3fd2394529e5";
   var request_url = "https://api.latoken.com/v2/ticker/" + tdg_id + "/" + usdt_id;
   Logger.log(request_url );
-  var response = UrlFetchApp.fetch(request_url);
-  var content = response.getContentText();
-  // Logger.log(content);
-  var response_obj = JSON.parse(content);
-  // Logger.log(response_obj);
-  var last_price = response_obj.lastPrice;
-  // var last_price = response_obj.bestAsk;
   
-  Logger.log("The latest price on LATOKEN Exchange: " + last_price);
-  return last_price;
+  try {
+    var response = UrlFetchApp.fetch(request_url);
+    var content = response.getContentText();
+    var response_obj = JSON.parse(content);
+    var last_price = response_obj.lastPrice;
+    Logger.log("The latest price on LATOKEN Exchange: " + last_price);
+    return last_price;
+  } catch (e) {
+    Logger.log("❌ Error fetching LATOKEN price (503 or other): " + e.message);
+    return null;
+  }
+  */
 }
 
 /**
