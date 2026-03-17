@@ -1053,9 +1053,17 @@ function parseAndProcessTelegramLogs() {
           }
         }
         
+        // Column I: Clean currency only (strip [ledger] prefix). Ledger goes in Column M.
+        const ledgerPrefixMatch = expenseDetails.inventoryType.match(/^\[([^\]]+)\]\s*(.+)$/);
+        const cleanCurrency = ledgerPrefixMatch ? ledgerPrefixMatch[2].trim() : expenseDetails.inventoryType.trim();
+        // Column M: Target Ledger - from message, or extracted from inventory type if embedded
+        const targetLedgerForColumnM = expenseDetails.targetLedger
+          || (ledgerPrefixMatch ? ledgerPrefixMatch[1] : null)
+          || '';
+        
         // Prepare row data for Scored Expense Submissions sheet
         // Columns: A=Update ID, B=Chat ID, C=Chat Name, D=Message ID, E=Reporter, F=Expense Reported,
-        //          G=Status Date, H=Contributor Name, I=Currency, J=Amount, K=Hash Key, L=Ledger Lines, M=Target Ledger
+        //          G=Status Date, H=Contributor Name, I=Currency (clean, no ledger), J=Amount, K=Hash Key, L=Ledger Lines, M=Target Ledger
         const rowToAppend = [
           sourceData[i][TELEGRAM_UPDATE_ID_COL], // Column A: Telegram Update ID
           sourceData[i][CHAT_ID_COL], // Column B: Telegram Chatroom ID
@@ -1065,11 +1073,11 @@ function parseAndProcessTelegramLogs() {
           message, // Column F: Expense Reported (full message text)
           sourceData[i][SALES_DATE_COL], // Column G: Status Date (YYYYMMDD format)
           expenseDetails.daoMemberName, // Column H: Contributor Name (DAO Member who incurred expense)
-          expenseDetails.inventoryType, // Column I: Currency (Inventory Type, may include [ledger name] prefix)
+          cleanCurrency, // Column I: Currency (clean, no [ledger] prefix - ledger is in Column M)
           expenseDetails.quantity * -1, // Column J: Amount (negative for expense)
           hashKey, // Column K: Scoring Hash Key (for deduplication)
           '', // Column L: Ledger Lines Number (will be filled after InsertExpenseRecords)
-          expenseDetails.targetLedger || '' // Column M: Target Ledger (from expense form, e.g., "AGL10", "offchain")
+          targetLedgerForColumnM // Column M: Target Ledger (from form or extracted from inventory type)
         ];
         
         const lastRow = scoredExpenseSheet.getLastRow();

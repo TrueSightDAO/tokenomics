@@ -230,11 +230,11 @@ See [`python_scripts/schema_validation/README.md`](./python_scripts/schema_valid
 | F | Expense Reported | String | Full expense message |
 | G | Status date | Date | Date of expense (YYYYMMDD) |
 | H | Contributor Name | String | DAO member who incurred expense |
-| I | Currency  | String | Type of inventory (note trailing space) |
+| I | Currency | String | Clean currency/inventory type only (e.g., "USD"). Must NOT include ledger prefix `[ledger name]` — ledger is in Column M |
 | J | Amount | Number | Quantity (negative for expenses) |
 | K | Scoring Hash Key | String | Unique identifier for deduplication |
 | L | Ledger Lines Number | String | Row number in destination ledger |
-| M | Target Ledger | String | Target ledger name (e.g., "AGL10", "offchain") - explicitly set in expense form (NEW - added 2025-01-XX) |
+| M | Target Ledger | String | Target ledger name (e.g., "AGL15", "AGL10", "offchain"). Set explicitly in expense form or derived from Inventory Type when embedded as `[ledger] currency` |
 
 **Used by:**
 - [`tdg_expenses_processing.gs`](https://github.com/TrueSightDAO/tokenomics/blob/main/google_app_scripts/tdg_asset_management/tdg_expenses_processing.gs) - Inserts scored expenses into ledgers. Reads ledger configurations from "Shipment Ledger Listing" sheet (Column A: name, Column L: URL) instead of Wix API. Processes only rows from the last 30 days to prevent timeouts.
