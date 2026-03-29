@@ -1437,7 +1437,13 @@ function testUploadFileToGitHub(fileId, destinationUrl, message) {
 function shouldSkipMessage(message) {
   const messageUpper = message.toUpperCase();
   // Also convert skip strings to uppercase for case-insensitive matching
-  const shouldSkip = SKIP_MESSAGE_STRINGS.some(skipString => messageUpper.includes(skipString.toUpperCase()));
+  let shouldSkip = SKIP_MESSAGE_STRINGS.some(skipString => messageUpper.includes(skipString.toUpperCase()));
+  // Belt-and-suspenders: expense reports use "[DAO Inventory Expense Event]" (see dapp report_dao_expenses.html).
+  // Match even if spacing/unicode spaces differ so Grok never writes these to "Scored Chatlogs".
+  if (!shouldSkip && /\[DAO\s+INVENTORY\s+EXPENSE\s+EVENT\]/i.test(message)) {
+    shouldSkip = true;
+    Logger.log(`shouldSkipMessage: Matched DAO Inventory Expense Event via flexible regex`);
+  }
   
   if (shouldSkip) {
     Logger.log(`shouldSkipMessage: Skipping message due to DAO-specific event: ${message.substring(0, 100)}`);

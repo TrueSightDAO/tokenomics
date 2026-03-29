@@ -16,6 +16,7 @@ This repository contains Google Apps Script projects that power the TrueSight DA
 
 ### External Services
 - **[agroverse_qr_code_web_service](./agroverse_qr_code_web_service/)** - Standalone web service for QR code operations and currency management
+- **[holistic_hit_list_store_history](./holistic_hit_list_store_history/)** - Read-only web API for the holistic wellness hit list: store autocomplete and interaction history for the DApp human-in-the-loop email workflow
 
 ## Getting Started
 
