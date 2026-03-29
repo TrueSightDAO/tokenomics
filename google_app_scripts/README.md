@@ -4,7 +4,7 @@ This repository contains Google Apps Script projects that power the TrueSight DA
 
 ## Source of truth for Google (clasp)
 
-**`clasp_mirrors/<scriptId>/` is the canonical working tree on your machine for Apps Script.** Use `clasp pull` / `clasp push` only from that folder. Git tracks each mirror’s **`.clasp.json`**, plus **`MIGRATION_CHECKLIST.tsv`** / **`MANIFEST.json`** / **README** — not `*.js` or `appsscript.json` (pull those after clone; see [`clasp_mirrors/README.md`](../clasp_mirrors/README.md)).
+**`clasp_mirrors/<scriptId>/` is the canonical working tree on your machine for Apps Script.** Use `clasp pull` / `clasp push` only from that folder. Git tracks each mirror’s **`.clasp.json`**, plus **`PROJECT_INDEX.md`** (Google **project title** → `scriptId` → folder + editor link), **`MIGRATION_CHECKLIST.tsv`** / **`MANIFEST.json`** / **README** — not `*.js` or `appsscript.json` (pull those after clone; see [`clasp_mirrors/README.md`](../clasp_mirrors/README.md)).
 
 **`google_app_scripts/**` here is reference / human-friendly layout** (split `.gs` files, READMEs, headers pointing at GitHub). It is not wired to clasp anymore. Do not add clasp pull artifacts here (`Code.js`, `appsscript.json`, `Credentials*.js`); they are **gitignored** and belong only under **`clasp_mirrors/<scriptId>/`**. When changing production code, edit (or merge into) the corresponding mirror tree, push to Google, and optionally backport split `.gs` files here for readability.
 

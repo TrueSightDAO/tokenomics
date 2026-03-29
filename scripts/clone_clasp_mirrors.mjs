@@ -4,7 +4,9 @@
  *    tokenomics/clasp_mirrors/<scriptId>/  (one folder per scriptId).
  *    That tree is the canonical clasp working copy for push/pull; google_app_scripts/
  *    is reference layout only (see clasp_mirrors/README.md).
- * 2) Write clasp_mirrors/MIGRATION_CHECKLIST.tsv comparing all .gs under
+ * 2) Write clasp_mirrors/PROJECT_INDEX.md (+ PROJECT_INDEX.tsv) mapping
+ *    scriptId -> project title from clasp list (readable names; folders stay id-only).
+ * 3) Write clasp_mirrors/MIGRATION_CHECKLIST.tsv comparing all .gs under
  *    google_app_scripts/ to mirrored files (hash, basename, then full-text
  *    embedding in a mirror file — e.g. monolithic Code.js vs split repo .gs).
  *
@@ -156,6 +158,51 @@ function findEmbeddingHits(localNorm, mirrorList, minLocalChars) {
     if (m.norm.includes(localNorm)) hits.push(`${m.scriptId}:${m.fileName}`);
   }
   return hits;
+}
+
+/** Markdown table cell: no pipes or newlines. */
+function escapeMdCell(s) {
+  return String(s || '')
+    .replace(/\|/g, '\\|')
+    .replace(/\r?\n/g, ' ')
+    .trim();
+}
+
+/**
+ * Human-readable index: Google project title -> scriptId -> folder (for docs & search).
+ * Folders remain clasp_mirrors/<scriptId>/ only; clasp does not support renaming to titles.
+ */
+function writeProjectIndexFiles(projects, mirrorRoot) {
+  const sorted = [...projects].sort((a, b) =>
+    a.title.localeCompare(b.title, undefined, { sensitivity: 'base' }),
+  );
+  const mdLines = [
+    '# Clasp mirror projects (Google names)',
+    '',
+    'The **project title** is the name you set in [Google Apps Script](https://script.google.com/home) (from **`clasp list --noShorten`**). On disk, mirrors stay **`clasp_mirrors/<scriptId>/`** so `clasp clone` / `clasp pull` keep working.',
+    '',
+    '| Name (Google) | scriptId | Repo folder | Editor |',
+    '|---|---|---|---|',
+    ...sorted.map(({ title, scriptId }) => {
+      const folder = path.join('clasp_mirrors', scriptId);
+      const editor = `https://script.google.com/home/projects/${scriptId}/edit`;
+      return `| ${escapeMdCell(title)} | \`${scriptId}\` | \`${folder}\` | [Open](${editor}) |`;
+    }),
+    '',
+  ];
+  const mdPath = path.join(mirrorRoot, 'PROJECT_INDEX.md');
+  fs.writeFileSync(mdPath, mdLines.join('\n'), 'utf8');
+
+  const tsvLines = [
+    ['script_id', 'title'].join('\t'),
+    ...sorted.map(({ scriptId, title }) =>
+      [scriptId, String(title).replace(/\t/g, ' ')].join('\t'),
+    ),
+  ];
+  const tsvPath = path.join(mirrorRoot, 'PROJECT_INDEX.tsv');
+  fs.writeFileSync(tsvPath, tsvLines.join('\n') + '\n', 'utf8');
+
+  return { mdPath, tsvPath };
 }
 
 function buildContentHashIndex(byScript) {
@@ -344,12 +391,17 @@ function main() {
   ];
   fs.writeFileSync(tsvPath, tsvLines.join('\n') + '\n', 'utf8');
 
+  const { mdPath: projectIndexMd, tsvPath: projectIndexTsv } = writeProjectIndexFiles(projects, MIRROR_ROOT);
+
   const manifestPath = path.join(MIRROR_ROOT, 'MANIFEST.json');
   const manifest = {
     generatedAt: new Date().toISOString(),
     mirrorRoot: path.relative(TOKENOMICS_ROOT, MIRROR_ROOT),
     projectCount: projects.length,
     mirrorDirs: listMirrorProjectDirs().length,
+    projects: [...projects]
+      .map(({ title, scriptId }) => ({ title, scriptId }))
+      .sort((a, b) => a.title.localeCompare(b.title, undefined, { sensitivity: 'base' })),
     cloneLog,
     checklistRows: rows.length,
   };
@@ -366,6 +418,8 @@ function main() {
   });
   const embedded = rows.filter((r) => String(r[4]).startsWith('EMBEDDED_')).length;
   console.error(`\nWrote ${path.relative(TOKENOMICS_ROOT, tsvPath)} (${rows.length} local .gs rows)`);
+  console.error(`Wrote ${path.relative(TOKENOMICS_ROOT, projectIndexMd)}`);
+  console.error(`Wrote ${path.relative(TOKENOMICS_ROOT, projectIndexTsv)}`);
   console.error(`Wrote ${path.relative(TOKENOMICS_ROOT, manifestPath)}`);
   console.error(`\nContent embedded in a mirror (likely Code.js bundle): ${embedded}`);
   console.error(`Needs attention (no hash/embed resolve): ${needsAttention.length}`);
