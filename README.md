@@ -13,8 +13,9 @@ This repository contains the complete automation infrastructure for managing Tru
 
 ### Active Development
 
-#### 1. **[google_app_scripts](./google_app_scripts/)** - Core DAO Automation
-Modern Google Apps Scripts for managing all DAO operations:
+#### 1. **[google_app_scripts](./google_app_scripts/)** - Core DAO Automation (reference layout)
+Modern Google Apps Scripts for managing all DAO operations (readable `.gs` split by domain). **Deploy and edit live code with clasp from [`clasp_mirrors/<scriptId>/`](./clasp_mirrors/README.md)** — mirrors are the canonical tree for `clasp push` / `clasp pull`; `google_app_scripts/` stays in sync as reference when you reconcile or backport.
+
 - **Asset Management** (`tdg_asset_management/`) - Expense processing, digital signatures
 - **Inventory Management** (`tdg_inventory_management/`) - Sales, movements, QR code generation
 - **Grok Scoring** (`tdg_grok_scoring/`) - AI-powered contribution scoring from Telegram/WhatsApp
@@ -210,7 +211,7 @@ Contributions are welcome! Please:
 4. Update documentation
 5. Submit pull requests with clear descriptions
 
-**Note**: `python_scripts` contains legacy systems. New development should focus on `google_app_scripts` unless maintaining existing Python functionality.
+**Note**: `python_scripts` contains legacy systems. For **Google Apps Script**, implement and deploy from **`clasp_mirrors/<scriptId>/`**; keep **`google_app_scripts/`** updated as reference when practical. For non-GAS work, prefer current Python/TypeScript areas unless maintaining legacy Python only.
 
 ---
 

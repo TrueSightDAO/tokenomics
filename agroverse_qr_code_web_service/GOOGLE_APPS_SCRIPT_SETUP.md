@@ -1,5 +1,7 @@
 # Google Apps Script QR Code Generator Setup
 
+**Repo layout:** Production Apps Script for the QR system is maintained with clasp under **`tokenomics/clasp_mirrors/<scriptId>/`** (see `tokenomics/clasp_mirrors/README.md`). Thematic reference `.gs` files live in **`tokenomics/google_app_scripts/agroverse_qr_codes/`**. Prefer editing the mirror and `clasp push`; use this doc for integration steps (tokens, web app, triggers).
+
 This document explains how to set up the Google Apps Script (`qr_code_generator.gs`) to automatically trigger GitHub Actions for QR code generation.
 
 ## Overview

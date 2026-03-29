@@ -1,8 +1,9 @@
 /**
- * File: google_app_scripts/agroverse_products/update_agroverse_skus.gs
+ * File: google_app_scripts/deprecated/update_agroverse_skus_deprecated.gs
  * Repository: https://github.com/TrueSightDAO/tokenomics
- * 
- * Description: Updates the "Agroverse SKUs" Google Sheet with product information from agroverse.shop
+ *
+ * DEPRECATED: Never deployed to Google Apps Script; kept for reference only.
+ * Description (historical): Updates the "Agroverse SKUs" Google Sheet with product information from agroverse.shop
  */
 
 const SPREADSHEET_ID = '1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU';

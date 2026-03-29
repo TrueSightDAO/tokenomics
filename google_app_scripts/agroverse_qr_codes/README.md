@@ -1,5 +1,7 @@
 # Agroverse QR Code System
 
+**Clasp:** Update production code under **`tokenomics/clasp_mirrors/<scriptId>/`** (`clasp push` / `clasp pull`). This directory is **reference** (readable `.gs` layout); see [`../README.md`](../README.md) and [`../../clasp_mirrors/README.md`](../../clasp_mirrors/README.md).
+
 This system provides three main components for managing QR codes in the cacao supply chain:
 
 1. **QR Code Generation**: Automated workflow for creating batch QR codes from user requests

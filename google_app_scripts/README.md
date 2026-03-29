@@ -2,6 +2,12 @@
 
 This repository contains Google Apps Script projects that power the TrueSight DAO Decentralized Governance ecosystem. Each folder contains specialized scripts for different aspects of the DAO operations, from asset management to content scheduling.
 
+## Source of truth for Google (clasp)
+
+**`clasp_mirrors/<scriptId>/` is the canonical working tree on your machine for Apps Script.** Use `clasp pull` / `clasp push` only from that folder. Git tracks each mirror’s **`.clasp.json`**, plus **`MIGRATION_CHECKLIST.tsv`** / **`MANIFEST.json`** / **README** — not `*.js` or `appsscript.json` (pull those after clone; see [`clasp_mirrors/README.md`](../clasp_mirrors/README.md)).
+
+**`google_app_scripts/**` here is reference / human-friendly layout** (split `.gs` files, READMEs, headers pointing at GitHub). It is not wired to clasp anymore. Do not add clasp pull artifacts here (`Code.js`, `appsscript.json`, `Credentials*.js`); they are **gitignored** and belong only under **`clasp_mirrors/<scriptId>/`**. When changing production code, edit (or merge into) the corresponding mirror tree, push to Google, and optionally backport split `.gs` files here for readability.
+
 ## 📁 Repository Structure
 
 ### Core DAO Management
@@ -16,6 +22,8 @@ This repository contains Google Apps Script projects that power the TrueSight DA
 
 ### External Services
 - **[agroverse_qr_code_web_service](./agroverse_qr_code_web_service/)** - Standalone web service for QR code operations and currency management
+- **[holistic_hit_list_store_history](./holistic_hit_list_store_history/)** - Read-only web API for the holistic wellness hit list: store autocomplete and interaction history for the DApp human-in-the-loop email workflow
+- **[newsletter_subscriber_sync](./newsletter_subscriber_sync/)** - Daily (time-driven) sync into **Agroverse News Letter Subscribers** from Email Agent Suggestions, Agroverse QR codes, and Hit List rows with Status **Partnered**
 
 ## Getting Started
 
@@ -59,9 +67,9 @@ This repository contains Google Apps Script projects that power the TrueSight DA
 
 ### Google Apps Script Deployment
 
-- Open the Google Apps Script editor from a Google Sheet or at script.google.com.
-- Copy the relevant `.gs` files from the respective subfolder into your project.
-- Configure API keys and other settings as described in the subfolder's `README`.
+- Prefer **clasp** from **`clasp_mirrors/<scriptId>/`** (see above). Do not rely on copying only from this folder into the editor unless you are bootstrapping a brand-new project.
+- For manual setup: open script.google.com (or the bound script), then align content with the mirror or these reference `.gs` files.
+- Configure API keys and other settings as described in each subfolder’s `README` (use Script Properties in production).
 
 ## Security Considerations
 
