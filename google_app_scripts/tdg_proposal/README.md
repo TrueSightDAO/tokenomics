@@ -2,6 +2,8 @@
 
 This folder contains Google Apps Scripts for managing proposal workflows and governance processes within the TrueSight DAO ecosystem.
 
+**Clasp / production:** The authoritative Apps Script tree for push/pull is **`clasp_mirrors/<scriptId>/`** at the tokenomics repo root (see [`../README.md`](../README.md) and [`../../clasp_mirrors/README.md`](../../clasp_mirrors/README.md)). Files here (split `.gs` sources such as `proposal_manager.gs` only; no `Code.js` / `appsscript.json` in git — those live in **`clasp_mirrors/<scriptId>/`**) are **reference**; after editing live code in a mirror, backport here if you want the thematic layout to stay aligned.
+
 ## 📁 Files Overview
 
 ### Core Scripts

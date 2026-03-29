@@ -19,6 +19,19 @@ token.json
 **/credentials.json
 **/token.json
 
+# Apps Script sources that typically embed API keys / secrets (basename contains "credential(s)")
+google_app_scripts/**/*redential*.gs
+
+# Clasp mirror pulls — never commit script sources (tokens, JWTs, bot keys; includes Code.js, Credentials.js, etc.)
+clasp_mirrors/**/*.js
+# Regenerated on every clasp clone/pull; not needed in git
+clasp_mirrors/**/appsscript.json
+
+# Clasp-generated filenames in thematic folder only — canonical copies live under clasp_mirrors/<scriptId>/
+google_app_scripts/**/Code.js
+google_app_scripts/**/appsscript.json
+google_app_scripts/**/Credentials*.js
+
 # Schema validation output
 python_scripts/schema_validation/discovered_headers.json
 schema_output.txt
