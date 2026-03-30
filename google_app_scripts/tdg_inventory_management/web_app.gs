@@ -11,13 +11,18 @@
  *
  * Query parameters:
  *   list=true       : returns array of objects { key, name } for each unique manager name.
- *   manager=<key>   : returns array of objects { currency, amount } for the given manager.
+ *   manager=<key>   : returns array of objects { currency, amount, unit_cost?, total_value? } for the given manager.
  *                     <key> must be the URL-encoded manager name from the list output.
+ *                     unit_cost (D) and total_value (E) are included for main-ledger rows when present; managed AGL
+ *                     Balance rows may omit unit_cost (null) until those sheets expose cost columns.
+ *   main_only=true  : optional with manager=<key>; skips managed-AGL Balance sheet aggregation (faster; main ledger only).
  *
  * Data range starts at row 5 (row 4 is header), columns:
  *   A: currency
  *   B: inventory manager name
  *   C: amount
+ *   D: unit cost (USD)
+ *   E: total value
  *
  * Ledger configs are read from the "Shipment Ledger Listing" sheet in the main spreadsheet.
  * Column A = ledger name, Column K = Ledger URL (truesight.me), Column L = Contract URL, Column AB = Resolved URL.
@@ -264,7 +269,9 @@ function augmentWithLedgers(managerName, result) {
           const quantity = qtys[i][0];
           result.push({
             currency: `[${config.ledger_name}] ${assetName}`,
-            amount: quantity
+            amount: quantity,
+            unit_cost: null,
+            total_value: null
           });
         }
       }
@@ -319,7 +326,7 @@ function doGet(e) {
   }
   const lastRow = sheet.getLastRow();
   const numRows = Math.max(0, lastRow - 4);
-  const data = numRows > 0 ? sheet.getRange(5, 1, numRows, 3).getValues() : [];
+  const data = numRows > 0 ? sheet.getRange(5, 1, numRows, 5).getValues() : [];
 
   // Return list of possible recipients from "Contributors contact information" sheet
   if (e.parameter.recipients) {
@@ -379,11 +386,27 @@ function doGet(e) {
     const result = [];
     data.forEach(function(row) {
       if (row[1] === managerName) {
-        result.push({ currency: row[0], amount: row[2] });
+        const unitCost = row[3];
+        const totalVal = row[4];
+        const item = {
+          currency: row[0],
+          amount: row[2]
+        };
+        if (unitCost !== '' && unitCost !== null && unitCost !== undefined) {
+          const uc = parseFloat(unitCost);
+          if (!isNaN(uc)) item.unit_cost = uc;
+        }
+        if (totalVal !== '' && totalVal !== null && totalVal !== undefined) {
+          const tv = parseFloat(totalVal);
+          if (!isNaN(tv)) item.total_value = tv;
+        }
+        result.push(item);
       }
     });
-    // Augment result with assets from external ledgers
-    augmentWithLedgers(managerName, result);
+    // Augment result with assets from external ledgers (skip when main_only=true for faster response)
+    if (e.parameter.main_only !== 'true') {
+      augmentWithLedgers(managerName, result);
+    }
     return ContentService
       .createTextOutput(JSON.stringify(result))
       .setMimeType(ContentService.MimeType.JSON);
