@@ -2,11 +2,14 @@
 
 This repository contains Google Apps Script projects that power the TrueSight DAO Decentralized Governance ecosystem. Each folder contains specialized scripts for different aspects of the DAO operations, from asset management to content scheduling.
 
-## Source of truth for Google (clasp)
+## Git source vs clasp mirror (explicit)
 
-**`clasp_mirrors/<scriptId>/` is the canonical working tree on your machine for Apps Script.** Use `clasp pull` / `clasp push` only from that folder. Git tracks each mirror’s **`.clasp.json`**, plus **`PROJECT_INDEX.md`** (Google **project title** → `scriptId` → folder + editor link), **`MIGRATION_CHECKLIST.tsv`** / **`MANIFEST.json`** / **README** — not `*.js` or `appsscript.json` (pull those after clone; see [`clasp_mirrors/README.md`](../clasp_mirrors/README.md)).
+- **Pull requests and `main`:** Tracked **`.gs`** files under **`google_app_scripts/**`** (for example **`tdg_inventory_management/web_app.gs`**) are what appear in GitHub diffs. **Commit and review here.**
+- **`clasp_mirrors/<scriptId>/`:** **Only** this path should be used for **`clasp pull`** / **`clasp push`**. Mirror **`*.js`** and **`appsscript.json`** are **gitignored** — **`Code.js` will not show in a PR**, by design (see root `.gitignore` and [`clasp_mirrors/README.md`](../clasp_mirrors/README.md)).
+- **Typical flow:** Edit **`*.gs`** → open PR → after merge (or when deploying), copy into the right mirror file(s), e.g. `cp google_app_scripts/tdg_inventory_management/web_app.gs clasp_mirrors/1QtK-InsHH6SBtxoxc33-y4vQvuNkbhlkUi_9S1X-AaEgIlSlygM1iZtP/Code.js` (paths from repo root; resolve **`scriptId`** in **`clasp_mirrors/PROJECT_INDEX.md`**) → **`clasp push`**. If you edit only in the mirror, **`clasp pull`** then **backport** into **`google_app_scripts/**`** so GitHub stays accurate.
+- **Metadata in git:** Each mirror’s **`.clasp.json`**, plus **`clasp_mirrors/PROJECT_INDEX.md`**, **`MIGRATION_CHECKLIST.tsv`**, **`MANIFEST.json`**, and mirror **README** — not the ignored script bodies.
 
-**`google_app_scripts/**` here is reference / human-friendly layout** (split `.gs` files, READMEs, headers pointing at GitHub). It is not wired to clasp anymore. Do not add clasp pull artifacts here (`Code.js`, `appsscript.json`, `Credentials*.js`); they are **gitignored** and belong only under **`clasp_mirrors/<scriptId>/`**. When changing production code, edit (or merge into) the corresponding mirror tree, push to Google, and optionally backport split `.gs` files here for readability.
+Do not add clasp artifacts **`Code.js`**, **`appsscript.json`**, or **`Credentials*.js`** under **`google_app_scripts/**`**; those patterns are **gitignored** there too where applicable. They belong only under **`clasp_mirrors/<scriptId>/`** locally.
 
 ## 📁 Repository Structure
 
@@ -67,7 +70,7 @@ This repository contains Google Apps Script projects that power the TrueSight DA
 
 ### Google Apps Script Deployment
 
-- Prefer **clasp** from **`clasp_mirrors/<scriptId>/`** (see above). Do not rely on copying only from this folder into the editor unless you are bootstrapping a brand-new project.
+- Prefer **clasp** from **`clasp_mirrors/<scriptId>/`** (see above). After editing **`.gs`** in a PR branch, **copy into the mirror** (e.g. **`web_app.gs` → `Code.js`**) before **`clasp push`**. Do not rely on copying only from this folder into the editor unless you are bootstrapping a brand-new project.
 - For manual setup: open script.google.com (or the bound script), then align content with the mirror or these reference `.gs` files.
 - Configure API keys and other settings as described in each subfolder’s `README` (use Script Properties in production).
 

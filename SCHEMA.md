@@ -1,8 +1,15 @@
 # TrueSight DAO - Google Sheets Schema Documentation
 
-> **Last Updated:** 2025-12-26
+> **Last Updated:** 2026-03-31
 > 
 > This document provides a consolidated reference for all Google Sheets used across TrueSight DAO's Google Apps Scripts. Use this as a central schema reference when making code changes.
+
+## 📝 Recent Changes (2026-03-31)
+
+### `Agroverse SKUs` — GTIN (column J)
+
+- **Column J:** **`GTIN`** — Global trade item number for retail SKUs; use for Merchant Center / product feed alignment, GA4 `purchase` line items, and optional **Google Customer Reviews** `products: [{ "gtin": "..." }]` payloads. Join from **`Product ID`** (column A) to site cart / Stripe line metadata where needed.
+- **Sheet:** Main Ledger spreadsheet · tab **`Agroverse SKUs`** · `gid=98293503`.
 
 ## 📝 Recent Changes (2025-12-26)
 
@@ -1207,9 +1214,11 @@ See [`python_scripts/schema_validation/README.md`](./python_scripts/schema_valid
 | G | Farm | String | Source farm |
 | H | Image Path | String | Product image URL |
 | I | Store inventory | Number | Store inventory count |
+| J | GTIN | String | Global trade item number (UPC/EAN as applicable); for feeds, analytics, and review integrations |
 
 **Used by:**
 - Product and inventory management
+- Merchant Center / agroverse.shop feed and **Google Customer Reviews** optional `gtin` list (map from `Product ID`)
 
 ---
 

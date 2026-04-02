@@ -17,6 +17,13 @@ This Google Apps Script provides a simple web API to:
   - Column A: `recipient name`
 - Example Reference: https://docs.google.com/spreadsheets/d/1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU/edit?gid=1487841772#gid=1487841772
 
+## Git and clasp (this project)
+
+- **What GitHub tracks:** `google_app_scripts/tdg_inventory_management/web_app.gs` — this file is what shows up in **pull requests** (not mirror `Code.js`; see root `.gitignore`: `clasp_mirrors/**/*.js`).
+- **Clasp project:** `clasp_mirrors/1QtK-InsHH6SBtxoxc33-y4vQvuNkbhlkUi_9S1X-AaEgIlSlygM1iZtP/` (listed in **`clasp_mirrors/PROJECT_INDEX.md`** as *TDG - tdg_inventory_management web_app.gs*). From the **tokenomics** repo root, typical deploy sync:  
+  `cp google_app_scripts/tdg_inventory_management/web_app.gs clasp_mirrors/1QtK-InsHH6SBtxoxc33-y4vQvuNkbhlkUi_9S1X-AaEgIlSlygM1iZtP/Code.js`  
+  then `cd` into that mirror folder and run **`clasp push`**. After **`clasp pull`**, copy or merge **`Code.js`** back into **`web_app.gs`** if production changed. Details: [`clasp_mirrors/README.md`](../../clasp_mirrors/README.md).
+
 ## Installation
 1. Go to [Google Apps Script](https://script.google.com/) and create a new project.
 2. Add a new script file named `web_app.gs`.
