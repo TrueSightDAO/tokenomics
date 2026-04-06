@@ -48,6 +48,39 @@ If the browser blocks the response with a **CORS** error:
 2. Confirm **Execute as: Me** and that the account can open the spreadsheet.
 3. After edits, create a **New version** deployment; update the **`.../exec`** URL in `dapp/store_interaction_history.html` and in this file’s **Deployment URL** if Google issues a new URL.
 
+## Hit List status: **Bulk Info Requested**
+
+The DApp status **Bulk Info Requested** means the buyer asked for wholesale / bulk pricing. It is separate from **Manager Follow-up** (field-visit → manager email). Python automation:
+
+- Drafts with PDF: `market_research/scripts/suggest_bulk_info_drafts.py` (after `generate_retailer_wholesale_attachment_pdf.py`).
+- Sent-mail log: `sync_email_agent_followup.py` includes both **Manager Follow-up** and **Bulk Info Requested** rows when syncing to **Email Agent Follow Up**.
+
+If your **Stores Nearby** `update_status` Apps Script validates allowed statuses, add the exact string `Bulk Info Requested` to that whitelist (same spelling as `dapp/stores_nearby.html` and the **States** sheet).
+
+### Making the wholesale PDF available to **Google Apps Script**
+
+Apps Script cannot read your laptop path. Pick one:
+
+1. **Google Drive file ID (recommended for private PDFs)** — Upload `agroverse_wholesale_retail_overview_2026.pdf` (or current export) to Drive. Copy the file ID from the URL. In the script project: **Project Settings → Script properties**, set e.g. `BULK_PDF_DRIVE_FILE_ID`. In code: `DriveApp.getFileById(id).getBlob()` and attach to `GmailApp.createDraft(...)` or the advanced Gmail API (multipart message). The executing user must have access to the file.
+2. **GitHub `raw.githubusercontent.com` (version with your site repo)** — The wholesale PDF is committed under **`agroverse_shop_beta`** at  
+   `assets/documents/wholesale/agroverse_wholesale_retail_overview_2026.pdf`.  
+   After you merge to **`main`**, Apps Script can pull the bytes with `UrlFetchApp` (no Git client in Apps Script—HTTP only):
+
+   ```javascript
+   var PDF_URL =
+     'https://raw.githubusercontent.com/TrueSightDAO/agroverse_shop_beta/main/assets/documents/wholesale/agroverse_wholesale_retail_overview_2026.pdf';
+   var resp = UrlFetchApp.fetch(PDF_URL, { muteHttpExceptions: true });
+   if (resp.getResponseCode() !== 200) throw new Error('PDF fetch failed: ' + resp.getResponseCode());
+   var blob = resp.getBlob().setName('Agroverse_wholesale_retail_overview_2026.pdf');
+   ```
+
+   **Requirements:** the repository (or file path) must be **world-readable** on GitHub, or you must send a **personal access token** in the `Authorization` header (store the token in **Script properties**, never in source). **Caching:** `raw.githubusercontent.com` can cache aggressively; after replacing the PDF, either change the filename (e.g. `_2026-04.pdf`) or add a dummy query string (`?v=2`) in the URL the script uses.
+
+3. **Public HTTPS on agroverse.shop** — Host the same file under your static site if you prefer your own CDN/cache rules. Use `UrlFetchApp.fetch(url).getBlob()` the same way.
+4. **Inside the spreadsheet** — Not ideal for binary PDFs; prefer Drive, GitHub raw, or HTTPS.
+
+A time-driven trigger can run a “create drafts for rows with Status = Bulk Info Requested” function; mirror the Python cadence (pending drafts, min days since last send) or keep Apps Script as a manual menu until you need full parity.
+
 ## Recording human edits / sent mail (not in this script)
 
 - **Sent mail**: your existing `sync_email_agent_followup.py` (and Gmail sync workflows) already push structured follow-up rows into **Email Agent Follow Up**; that gives future history without this API writing.
