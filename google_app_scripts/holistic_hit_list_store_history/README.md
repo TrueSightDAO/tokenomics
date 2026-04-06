@@ -9,7 +9,7 @@ Google Apps Script web app backing the **Store Interaction History** DApp page. 
 ## Setup
 
 1. In Google Drive: **Extensions → Apps Script** on the spreadsheet, or create a standalone project and run as an account that can open the spreadsheet.
-2. Paste `store_interaction_history_api.gs` into the project (replace default `Code.gs` or add as a file).
+2. Paste `store_interaction_history_api.gs` into the project (replace default `Code.gs` or add as a file). Optionally add `email_agent_drafts.gs` in the **same** or a **separate** project (see **Email Agent drafts** below).
 3. **Deploy → New deployment → Web app**
    - Execute as: **Me**
    - Who has access: **Anyone** (for `truesight.me` static DApp to call it) — or **Anyone within org** if you only use an internal host.
@@ -27,6 +27,25 @@ Agentic context: `agentic_ai_context/CONTEXT_UPDATES.md`, `PROJECT_INDEX.md` (da
    - `STORE_HISTORY_API_TOKEN` — long random string; if set, all requests must include `&token=...` (must match the value in the HTML constant `API_TOKEN`).
 
 The script runs under your Google account; it only reads the spreadsheet (no writes).
+
+## Email Agent drafts (Gmail + Hit List)
+
+**File:** `email_agent_drafts.gs` — creates **Gmail drafts** for:
+
+- **Manager Follow-up** (plain text template; no attachment) — same stage as `suggest_manager_followup_drafts.py`
+- **Bulk Info Requested** (same template family as `suggest_bulk_info_drafts.py`, plus **wholesale PDF** attachment)
+
+**Install:** Add `email_agent_drafts.gs` to an Apps Script project that runs as **`garyjob@agroverse.shop`** (or set `EXPECTED_MAILBOX`), with **Sheets** + **Gmail** access. Prefer **container-bound** script on the Hit List spreadsheet so `onOpen` adds the **Email Agent drafts** menu.
+
+**Wholesale PDF:** Fetched over HTTPS from **`TrueSightDAO/content_schedule`** (local folder `market_research`), **not** `agroverse_shop_beta`. Default raw URL (branch **`main`** after you merge):
+
+`https://raw.githubusercontent.com/TrueSightDAO/content_schedule/main/retail_price_list/agroverse_wholesale_retail_overview_2026.pdf`
+
+If `main` does not yet contain the file, set script property **`BULK_PDF_RAW_URL`** to your branch URL, e.g. `…/content_schedule/seo_agroverse/retail_price_list/…pdf`.
+
+Cadence matches Python: skip recipients with **`Email Agent Suggestions`** `status=pending_review`, and skip if last **`Email Agent Follow Up`** `sent_at` for that `to_email` is newer than **`MIN_DAYS_SINCE_SENT`** (default 7). Run **`sync_email_agent_followup.py`** (CI or locally) so the log includes **Bulk Info Requested** sends.
+
+**Note:** Primary automation remains **GitHub Actions** + Python on `content_schedule`; this Apps Script is for manual / in-sheet runs.
 
 ## Endpoints (GET)
 
@@ -62,22 +81,23 @@ If your **Stores Nearby** `update_status` Apps Script validates allowed statuses
 Apps Script cannot read your laptop path. Pick one:
 
 1. **Google Drive file ID (recommended for private PDFs)** — Upload `agroverse_wholesale_retail_overview_2026.pdf` (or current export) to Drive. Copy the file ID from the URL. In the script project: **Project Settings → Script properties**, set e.g. `BULK_PDF_DRIVE_FILE_ID`. In code: `DriveApp.getFileById(id).getBlob()` and attach to `GmailApp.createDraft(...)` or the advanced Gmail API (multipart message). The executing user must have access to the file.
-2. **GitHub `raw.githubusercontent.com` (version with your site repo)** — The wholesale PDF is committed under **`agroverse_shop_beta`** at  
-   `assets/documents/wholesale/agroverse_wholesale_retail_overview_2026.pdf`.  
-   After you merge to **`main`**, Apps Script can pull the bytes with `UrlFetchApp` (no Git client in Apps Script—HTTP only):
+2. **GitHub `raw.githubusercontent.com` — `content_schedule` (market_research)** — Canonical location for the wholesale PDF:  
+   `retail_price_list/agroverse_wholesale_retail_overview_2026.pdf` in repo **`TrueSightDAO/content_schedule`**.  
+   After merge to **`main`**:
 
    ```javascript
    var PDF_URL =
-     'https://raw.githubusercontent.com/TrueSightDAO/agroverse_shop_beta/main/assets/documents/wholesale/agroverse_wholesale_retail_overview_2026.pdf';
+     'https://raw.githubusercontent.com/TrueSightDAO/content_schedule/main/retail_price_list/agroverse_wholesale_retail_overview_2026.pdf';
    var resp = UrlFetchApp.fetch(PDF_URL, { muteHttpExceptions: true });
    if (resp.getResponseCode() !== 200) throw new Error('PDF fetch failed: ' + resp.getResponseCode());
    var blob = resp.getBlob().setName('Agroverse_wholesale_retail_overview_2026.pdf');
    ```
 
-   **Requirements:** the repository (or file path) must be **world-readable** on GitHub, or you must send a **personal access token** in the `Authorization` header (store the token in **Script properties**, never in source). **Caching:** `raw.githubusercontent.com` can cache aggressively; after replacing the PDF, either change the filename (e.g. `_2026-04.pdf`) or add a dummy query string (`?v=2`) in the URL the script uses.
+   **`email_agent_drafts.gs`** uses this URL by default; override with script property **`BULK_PDF_RAW_URL`** (e.g. feature branch until `main` has the file). **Repo must be public** for anonymous `raw` fetch, or use a token in headers (Script properties only). **Caching:** bump filename or `?v=` query when replacing the binary.
 
-3. **Public HTTPS on agroverse.shop** — Host the same file under your static site if you prefer your own CDN/cache rules. Use `UrlFetchApp.fetch(url).getBlob()` the same way.
-4. **Inside the spreadsheet** — Not ideal for binary PDFs; prefer Drive, GitHub raw, or HTTPS.
+3. **Public HTTPS on agroverse.shop** — Optional mirror; same `UrlFetchApp.fetch` pattern.
+4. **Google Drive file ID** — Still fine for private PDFs (`DriveApp.getFileById`).
+5. **Inside the spreadsheet** — Not ideal for binary PDFs.
 
 A time-driven trigger can run a “create drafts for rows with Status = Bulk Info Requested” function; mirror the Python cadence (pending drafts, min days since last send) or keep Apps Script as a manual menu until you need full parity.
 
