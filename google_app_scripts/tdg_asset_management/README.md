@@ -125,6 +125,108 @@ The script performs the following key functions:
 ## License
 
 This project is unlicensed. Use and modify at your own risk.
+
+## Stripe Subscription Sales Sync to Offchain Transactions
+
+This Google Apps Script (`stripe_sales_sync.gs`) provides a **direct route** from Stripe API to the "offchain transactions" sheet for **Edgar's market sell-off dashboard SaaS subscription** revenue. It polls Stripe for charges associated with a specific product ID and writes both subscription sales revenue and transaction fees directly to the offchain transactions sheet, bypassing intermediate sheets.
+
+### ⚠️ Important: Non-Interference with Existing Flows
+
+**This script ONLY processes Stripe charges that are NOT already handled by existing flows.** It automatically checks both sheets and skips any charges that are already being processed by:
+- **QR Code Sales sheet**: 
+  - QR code checkout via Edgar (`qr_code_check_controller.rb` → "QR Code Sales" → `sales_update_main_dao_offchain_ledger.gs`)
+  - Telegram sales events (`process_sales_telegram_logs.gs` → "QR Code Sales")
+- **Stripe Social Media Checkout ID sheet**:
+  - Meta Checkout orders (`MetaCheckoutOrderSync` → "Stripe Social Media Checkout ID" → Wix Store API)
+
+This ensures that **Agroverse sales via Edgar and Meta Checkout orders are handled exclusively by their respective flows** and this script only processes Edgar's market sell-off dashboard SaaS subscription sales for the target product that don't go through these existing flows.
+
+### Features
+- **Direct Integration**: Stripe API → offchain transactions (no intermediate sheets)
+- **Product Filtering**: Only processes charges for a specific Stripe product ID (Edgar's market sell-off dashboard SaaS subscription)
+- **Duplicate Prevention**: 
+  - Checks existing descriptions in offchain transactions to avoid duplicates
+  - **Checks "QR Code Sales" sheet** to skip charges already handled by QR code checkout flow
+  - **Checks "Stripe Social Media Checkout ID" sheet** to skip charges already handled by Meta Checkout flow
+- **Fee Tracking**: Automatically records Stripe transaction fees as separate negative entries
+- **Time Window**: Configurable lookback period (default: 30 days)
+- **Non-Interference**: Automatically skips charges already in existing sheets to prevent duplicate processing
+
+### Spreadsheet Requirements
+- **Target Sheet**: `offchain transactions` in spreadsheet `1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU`
+- **Sheet Structure**:
+  - Column A: Transaction Date (YYYYMMDD format)
+  - Column B: Description
+  - Column C: Fund Handler
+  - Column D: Amount (positive for sales, negative for fees)
+  - Column E: Currency
+  - Column F: Ledger Line (empty)
+  - Column G: Is Revenue (TRUE for sales, empty for fees)
+
+### Installation & Setup
+
+1. **Add the Script**:
+   - In your Apps Script project, add a new script file named `stripe_sales_sync.gs`
+   - Copy the contents from the repository
+
+2. **Configure Credentials**:
+   - Update your `Credentials.gs` file to include Stripe API key:
+   ```js
+   function setApiKeys() {
+     PropertiesService.getScriptProperties()
+       .setProperty('STRIPE_API_KEY', 'sk_live_...'); // Your Stripe secret key
+   }
+   
+   function getCredentials() {
+     return {
+       STRIPE_API_KEY: PropertiesService.getScriptProperties().getProperty('STRIPE_API_KEY'),
+       // ... other credentials
+     };
+   }
+   ```
+   - Run `setApiKeys()` once to initialize the Stripe API key
+
+3. **Configure Product ID**:
+   - Update `TARGET_PRODUCT_ID` in `stripe_sales_sync.gs` to match your Stripe product ID for Edgar's market sell-off dashboard SaaS subscriptions
+   - Update `FUND_HANDLER` if needed (default: "Gary Teh")
+   - Adjust `DAYS_BACK` to change the lookback period (default: 30 days)
+
+### Execution
+
+- **Manual Run**: In the Apps Script editor, select the function `fetchStripeTransactions` and click **Run**
+- **Automated Trigger**: 
+  - Run `createTrigger()` once to set up an hourly trigger
+  - Or manually create a time-based trigger in Apps Script > Triggers
+  - To remove the trigger, run `removeTrigger()`
+
+### How It Works
+
+1. Fetches the last 100 charges from Stripe API
+2. Filters charges that:
+   - Are paid and succeeded
+   - Were created within the lookback period (default: 30 days)
+   - Are associated with the target product ID (via invoice or payment intent)
+3. **Checks existing sheets** to skip charges already handled by existing flows:
+   - **QR Code Sales sheet**: Looks for Stripe session IDs in Columns A, B, or C, and charge IDs in messages
+   - **Stripe Social Media Checkout ID sheet**: Looks for Stripe session IDs in Column C (Stripe Session ID)
+   - Skips any matches to prevent duplicate processing
+4. For each matching charge (not in existing sheets):
+   - Creates a sale record (positive amount, marked as revenue)
+   - Creates a fee record (negative amount, if transaction fee exists)
+5. Checks for duplicates in offchain transactions by comparing descriptions
+6. Appends new records to the offchain transactions sheet
+
+### Notes
+
+- This script provides a **direct** Stripe → offchain transactions route for **Edgar's market sell-off dashboard SaaS subscription revenue**, unlike other sales processing scripts that go through intermediate sheets
+- **The script will NOT process charges that are already in "QR Code Sales" or "Stripe Social Media Checkout ID"** - this ensures:
+  - Agroverse sales via Edgar continue to be handled by the existing QR code checkout flow
+  - Meta Checkout orders continue to be handled by the Meta Checkout sync flow
+- The script handles both invoice-based and payment intent-based charges
+- Customer email is included in the description for traceability
+- Transaction fees are automatically calculated from Stripe balance transactions
+- Use this script specifically for Edgar's market sell-off dashboard SaaS subscription Stripe sales that need direct recording to offchain transactions
+
 ## TDG Wallet Balance Script
 
 This new Google Apps Script file (`tdg_wallet_balance_check.gs`) fetches the TDG token balances for wallet addresses listed in the `Contributors voting weight` sheet and updates the latest TDG holdings in your Google Spreadsheet. Since TDG is now trading, this script ensures your sheet reflects on-chain TDG balances after trading.

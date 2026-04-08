@@ -1,0 +1,132 @@
+name: QR Code Generation Webhook
+
+on:
+  # Trigger via repository_dispatch (external webhook)
+  repository_dispatch:
+    types: [qr-code-generation]
+  
+  # Trigger via workflow_dispatch (manual trigger)
+  workflow_dispatch:
+    inputs:
+      sheet_row:
+        description: 'Row number from Agroverse QR codes sheet to generate QR code for'
+        required: true
+        type: number
+      no_commit:
+        description: 'Skip committing to repository'
+        required: false
+        type: boolean
+        default: false
+
+env:
+  PYTHON_VERSION: '3.9'
+
+jobs:
+  generate-qr-code:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout tokenomics repository (code)
+      uses: actions/checkout@v4
+      with:
+        repository: TrueSightDAO/tokenomics
+        token: ${{ secrets.GITHUB_TOKEN }}
+        path: tokenomics
+    
+    # No longer need to checkout qr_codes repository since we're using GitHub API
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        cd tokenomics/agroverse_qr_code_web_service
+        pip install -r requirements.txt
+    
+    - name: Extract parameters from webhook
+      id: extract-params
+      run: |
+        if [ "${{ github.event_name }}" = "repository_dispatch" ]; then
+          echo "sheet_row=${{ github.event.client_payload.sheet_row }}" >> $GITHUB_OUTPUT
+          echo "no_commit=${{ github.event.client_payload.no_commit || 'false' }}" >> $GITHUB_OUTPUT
+        else
+          echo "sheet_row=${{ github.event.inputs.sheet_row }}" >> $GITHUB_OUTPUT
+          echo "no_commit=${{ github.event.inputs.no_commit || 'false' }}" >> $GITHUB_OUTPUT
+        fi
+    
+    - name: Generate QR Code
+      env:
+        QR_CODE_REPOSITORY_TOKEN: ${{ secrets.QR_CODE_REPOSITORY_TOKEN }}
+        GITHUB_REPOSITORY: TrueSightDAO/qr_codes
+        GDRIVE_KEY: ${{ secrets.GDRIVE_KEY }}
+      run: |
+        # Change to the agroverse_qr_code_web_service directory
+        cd tokenomics/agroverse_qr_code_web_service
+        
+        # Create a temporary script to handle arguments properly
+        cat > run_webhook.sh << 'EOF'
+        #!/bin/bash
+        set -e
+        
+        SHEET_ROW="$1"
+        OUTPUT_FILE="$2"
+        NO_COMMIT="$3"
+        
+        CMD="python github_webhook_handler.py --sheet-row \"$SHEET_ROW\" --output-file \"$OUTPUT_FILE\""
+        
+        if [ "$NO_COMMIT" = "true" ]; then
+          CMD="$CMD --no-commit"
+        fi
+        
+        echo "Running: $CMD"
+        eval $CMD
+        EOF
+        
+        chmod +x run_webhook.sh
+        
+        # Run the webhook handler
+        ./run_webhook.sh \
+          "${{ steps.extract-params.outputs.sheet_row }}" \
+          "results.json" \
+          "${{ steps.extract-params.outputs.no_commit }}"
+        
+        # Display results
+        cat results.json
+    
+    - name: Upload results as artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: qr-code-results
+        path: tokenomics/agroverse_qr_code_web_service/results.json
+    
+    - name: Comment on issue (if triggered from issue)
+      if: github.event_name == 'repository_dispatch' && github.event.client_payload.issue_number
+      uses: actions/github-script@v6
+      with:
+        script: |
+          const fs = require('fs');
+          const results = JSON.parse(fs.readFileSync('tokenomics/agroverse_qr_code_web_service/results.json', 'utf8'));
+          
+          let comment = `## QR Code Generation Results\n\n`;
+          
+          if (results.success) {
+            comment += `✅ **Success!** QR code generated for product: \`${results.product.product_name}\`\n\n`;
+            comment += `**QR Code:** \`${results.qr_code}\`\n`;
+            comment += `**GitHub URL:** ${results.github_url}\n`;
+            comment += `**Sheet Row:** ${results.row_added}\n`;
+            comment += `**Timestamp:** ${results.timestamp}\n`;
+          } else {
+            comment += `❌ **Error:** ${results.error}\n\n`;
+            comment += `**Product:** ${results.product_name}\n`;
+            comment += `**Timestamp:** ${results.timestamp}\n`;
+          }
+          
+          github.rest.issues.createComment({
+            issue_number: ${{ github.event.client_payload.issue_number }},
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: comment
+          });

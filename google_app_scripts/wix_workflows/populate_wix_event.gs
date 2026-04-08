@@ -1,4 +1,11 @@
 /**
+ * File: google_app_scripts/wix_workflows/populate_wix_event.gs
+ * Repository: https://github.com/TrueSightDAO/tokenomics
+ * 
+ * Description: Triggers Wix automation workflows by creating events in the Wix Events API.
+ */
+
+/**
  * Google Apps Script to create an Agroverse cacao circle event in Wix
  * from a Luma event page URL.
  *

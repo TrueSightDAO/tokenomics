@@ -1,4 +1,11 @@
 /**
+ * File: google_app_scripts/tdg_asset_management/tdg_wallet_balance_check.gs
+ * Repository: https://github.com/TrueSightDAO/tokenomics
+ * 
+ * Description: Google Apps Script for TrueSight DAO automation.
+ */
+
+/**
  * TDG Wallet Balance Check
  *
  * Provides functions to fetch the balance of a TDG token account on Solana using QuickNode RPC,

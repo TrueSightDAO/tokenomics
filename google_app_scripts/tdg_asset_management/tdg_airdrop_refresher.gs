@@ -1,3 +1,10 @@
+/**
+ * File: google_app_scripts/tdg_asset_management/tdg_airdrop_refresher.gs
+ * Repository: https://github.com/TrueSightDAO/tokenomics
+ * 
+ * Description: Google Apps Script for TrueSight DAO automation.
+ */
+
 function processAirdrops() {
   // Access the source and destination spreadsheets
   var ledgerSpreadsheet = SpreadsheetApp.openById('1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU');

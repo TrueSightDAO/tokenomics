@@ -1,50 +1,246 @@
-# TrueSight DAO Governance Ecosystem Automation
+# TrueSight DAO - Tokenomics Automation & Infrastructure
 
-This repository contains scripts for automating data management and contribution scoring within the TrueSight DAO Governance (TDG) ecosystem. The project is divided into three main subfolders, each focusing on a specific aspect of the TDG ecosystem:
+This repository contains the complete automation infrastructure for managing TrueSight DAO's tokenomics, including contribution scoring, inventory management, market making, and ledger updates.
 
- - **[google_app_scripts](./google_app_scripts)**: Modern Google Apps Scripts for managing DAO assets and scoring Telegram/WhatsApp chat logs.
- - **[raydium_market_making](./raydium_market_making)**: Market making strategies for the Raydium AMM on Solana. Contains a TypeScript-based implementation (`raydium_type_script/`) (the default working implementation) and a Python-based experimental implementation (`raydium_py/`) (not maintained). See raydium_market_making/README.md for details.
- - **[la_token_market_making_python](./la_token_market_making_python)**: Python-based market making bot for LA_TOKEN tokens, including the main script and a sandbox notebook. Work on this project is currently on hold as the LA_TOKEN internal engineering team has been unresponsive to our outreach to resolve trade execution issues. See la_token_market_making_python/README.md for setup and usage instructions.
- - **[python_scripts](/python_scripts)**: Legacy Python-based scripts for scoring DAO member contributions and updating Agroverse AGL contracts.
+## 📚 Documentation
 
-## Repository Structure                                                                                                        │
+### Essential References
+- **[SCHEMA.md](./SCHEMA.md)** - Complete Google Sheets schema documentation with column definitions, data types, and script references
+- **[API.md](./API.md)** - Comprehensive API documentation for all DApp endpoints and webhooks
+- **Schema Validation** - Automated testing to verify schema accuracy: `python_scripts/schema_validation/`
 
-This project is organized into four main subfolders, ordered by active development focus:                                      │
+## 🏗️ Repository Structure
 
-- [google_app_scripts](./google_app_scripts)                                                                                   │
-- [raydium_market_making](./raydium_market_making)                                                                             │
-- [la_token_market_making_python](./la_token_market_making_python)                                                             │
-- [python_scripts](./python_scripts)                                                                                           │
+### Active Development
 
-Each subfolder contains a README with detailed setup and usage instructions.                                                   │
+#### 1. **[google_app_scripts](./google_app_scripts/)** - Core DAO Automation (reference layout)
+Modern Google Apps Scripts for managing all DAO operations (readable `.gs` split by domain). **Deploy and edit live code with clasp from [`clasp_mirrors/<scriptId>/`](./clasp_mirrors/README.md)** — mirrors are the canonical tree for `clasp push` / `clasp pull`; `google_app_scripts/` stays in sync as reference when you reconcile or backport.
 
-## Getting Started
+- **Asset Management** (`tdg_asset_management/`) - Expense processing, digital signatures
+- **Inventory Management** (`tdg_inventory_management/`) - Sales, movements, QR code generation
+- **Grok Scoring** (`tdg_grok_scoring/`) - AI-powered contribution scoring from Telegram/WhatsApp
+- **Proposal System** (`tdg_proposal/`) - DAO proposal management and voting
+- **Dashboard Updates** (`tdg_wix_dashboard/`) - Wix metrics and exchange rate updates
 
-### Setup & Prerequisites
+See [google_app_scripts/README.md](./google_app_scripts/README.md) for details.
 
-Clone the repository:
+#### 2. **[python_scripts](./python_scripts/)** - Python Utilities & Tools
+Python-based tools and utilities:
+- **Schema Validation** (`schema_validation/`) - Validates SCHEMA.md accuracy against live data
+- **Reference & Testimonials** (`reference_and_testimonials/`) - Generates professional references for DAO members
+- **QR Code Generation** (`agroverse_qr_code_generator/`) - Batch QR code generator with branding
+- **Asset Management** (`tdg_asset_management/`) - AWS cost tokenization scripts
+- **Analysis Tools** (`analysis/`) - Contribution analysis and metrics
 
+See [python_scripts/README.md](./python_scripts/README.md) for setup.
+
+#### 3. **[raydium_market_making](./raydium_market_making/)** - Solana Market Making
+Market making strategies for TDG token on Raydium AMM (Solana):
+- **TypeScript Implementation** (`raydium_type_script/`) - Primary active implementation
+- **Python Implementation** (`raydium_py/`) - Experimental (not maintained)
+
+See [raydium_market_making/README.md](./raydium_market_making/README.md) for configuration.
+
+### On Hold / Deprecated
+
+#### 4. **[la_token_market_making_python](./la_token_market_making_python/)** - LATOKEN Market Making
+Python-based market making bot for LATOKEN exchange.  
+**Status**: On hold pending LATOKEN engineering team response to trade execution issues.
+
+See [la_token_market_making_python/README.md](./la_token_market_making_python/README.md) for details.
+
+#### 5. **[deprecated/tdg_wix_gas_fees_deprecated.gs](./google_app_scripts/deprecated/tdg_wix_gas_fees_deprecated.gs)** - Wix Gas Fee Management (DEPRECATED)
+**Status**: Deprecated — Wix integration no longer used.  
+**Issue**: Calls LATOKEN API (`setEcosystemGasFees()` → `getTdgUsdtPriceLaToken()`) which returns 503 errors.  
+**Action**: Archived for reference only. Do not execute. LATOKEN calls disabled in `tdg_wix_dashboard.gs`.
+
+---
+
+## 🚀 Quick Start
+
+### Prerequisites
+- **Google Apps Script**: Google account with access to TrueSight DAO spreadsheets
+- **Python Scripts**: Python 3.11+, virtual environment
+- **Market Making**: Node.js 18+ (Raydium), Python 3.11+ (LATOKEN)
+
+### Clone Repository
 ```bash
-git clone <repository-url>
+git clone https://github.com/TrueSightDAO/tokenomics.git
+cd tokenomics
 ```
 
-For detailed setup, configuration, and prerequisites, please see the README in the relevant subfolder:
+### Schema Validation Setup
+Verify your Google Sheets schema matches documentation:
+```bash
+cd python_scripts
+pip install -r requirements.txt
+cd schema_validation
+# Add your credentials.json file
+python test_schema_validation.py
+```
 
-- [python_scripts](./python_scripts/README.md)
-- [google_app_scripts](./google_app_scripts/README.md)
-- [la_token_market_making_python](./la_token_market_making_python/README.md)
-- [raydium_market_making](./raydium_market_making/README.md)
+See [python_scripts/schema_validation/README.md](./python_scripts/schema_validation/README.md) for detailed setup.
 
-## Security Considerations
+---
 
-- Store API keys securely (e.g., using environment variables for [python_scripts](./python_scripts) or Google Apps Script's Properties Service for [google_app_scripts](./google_app_scripts)).
-- Be aware of rate limits for external APIs (OpenAI, Wix, Solana, LATOKEN, xAI, Telegram).
-- Validate all external data to prevent processing errors or security issues.
+## 🔐 Security & Configuration
 
-## Contributing
+### Credential Management
+- **Google Apps Script**: Use Properties Service for API keys
+- **Python Scripts**: Use `.env` files (see `.env.example` in each directory)
+- **Never commit credentials** - All credential files are in `.gitignore`
 
-Contributions are welcome! Please submit pull requests or open issues for bug reports, feature requests, or improvements. Ensure changes are tested and documented in the relevant subfolder's `README`. Note that [python_scripts](./python_scripts) is a legacy system, and new development should focus on [google_app_scripts](./google_app_scripts) unless maintaining legacy functionality.
+### Required Credentials
+- **[Google Sheets API](https://console.cloud.google.com/)** - For schema validation and data access
+- **[Wix API](https://dev.wix.com/)** - For managed AGL ledger configurations and dashboard updates
+- **[Telegram Bot API](https://core.telegram.org/bots/api)** - For chat log imports and bot interactions
+- **[OpenAI API](https://platform.openai.com/)** / **[xAI API](https://x.ai/)** - For AI-powered contribution scoring
+- **[Solana RPC](https://solana.com/docs/rpc)** - For Raydium market making
+- **[LATOKEN API](https://api.latoken.com/)** - For LATOKEN market making (if resuming)
 
-## License
+### API Rate Limits
+Be mindful of rate limits for:
+- [OpenAI API](https://platform.openai.com/docs/guides/rate-limits) (Grok scoring)
+- [Wix Data API](https://dev.wix.com/docs/rest/articles/getting-started/rate-limits) (ledger configs)
+- [Telegram Bot API](https://core.telegram.org/bots/faq#my-bot-is-hitting-limits-how-do-i-avoid-this) (message imports)
+- [Solana RPC](https://docs.solana.com/cluster/rpc-endpoints) (market making)
+- [Google Sheets API](https://developers.google.com/sheets/api/limits) (all read/write operations)
+
+---
+
+## 📊 Key Workflows
+
+### Expense Processing
+1. Telegram message → `Telegram Chat Logs` sheet
+2. `tdg_expenses_processing.gs` validates and scores
+3. Insert into `Scored Expense Submissions`
+4. Transfer to appropriate ledger (offchain or managed AGL)
+
+### Sales Processing
+1. Telegram message → `Telegram Chat Logs` sheet
+2. `process_sales_telegram_logs.gs` parses and validates
+3. Insert into `QR Code Sales` sheet
+4. Update managed AGL ledgers and/or main offchain ledger
+
+### Contribution Scoring
+1. Chat logs collected from Telegram/WhatsApp
+2. `grok_scoring_for_telegram_and_whatsapp_logs.gs` scores with AI
+3. Results stored in `Scored Chatlogs` (Grok spreadsheet)
+4. `transfer_scored_contributions_to_main_ledger.gs` transfers approved scores
+5. Updates `Ledger history` for token distribution
+
+---
+
+## 🧪 Testing & Validation
+
+### Schema Validation
+```bash
+cd python_scripts/schema_validation
+python test_schema_validation.py
+```
+
+Validates:
+- ✅ All spreadsheet IDs and sheet names
+- ✅ Column structures match documentation
+- ✅ Wix collection accessibility
+- ✅ Data integrity checks
+
+### Google Apps Script Testing
+Each script includes test functions:
+- `testParseAndProcessRow()` - Test individual row processing
+- `testLedgerResolution()` - Test dynamic ledger resolution
+- `test_*()` - Various unit tests per script
+
+---
+
+## 🗂️ Data Architecture
+
+### Google Sheets
+- **Main Ledger** (`1GE7PUq...`) - Contributors, transactions, voting, assets
+- **Telegram & Submissions** (`1qbZZhf...`) - Chat logs, expenses, sales, movements
+- **Grok Scored** (`1Tbj7H5...`) - AI-scored contributions
+- **Managed AGL Ledgers** (Dynamic) - Individual shipment/contract ledgers
+
+### Wix Data Collections
+- **AgroverseShipments** - Ledger URLs and configurations
+- **ExchangeRate** - Financial metrics and exchange rates
+- **Statistics** - Website analytics and metrics
+
+See [SCHEMA.md](./SCHEMA.md) for complete data structure documentation.
+
+---
+
+## 🛠️ Development Guidelines
+
+### Adding New Scripts
+1. Add file header with path and description
+2. Document in SCHEMA.md under relevant sheets
+3. Include test functions
+4. Update this README if adding new functionality
+
+### Modifying Schemas
+1. Update SCHEMA.md immediately
+2. Run schema validation tests
+3. Check all dependent scripts (use grep or SCHEMA.md references)
+4. Test with existing data before deploying
+
+### Code Style
+- **Google Apps Script**: Follow existing patterns, use constants for sheet names
+- **Python**: Follow PEP 8, use type hints
+- **TypeScript**: Follow existing Raydium patterns
+
+---
+
+## 📈 Active Development Focus
+
+Current priorities (as of 2025):
+1. ✅ **Schema Documentation** - Complete and validated
+2. 🔄 **Expense Processing** - Dynamic ledger resolution
+3. 🔄 **Sales Automation** - AGL ledger updates
+4. 📋 **Contribution Scoring** - AI-powered automation
+5. 💱 **Market Making** - Raydium AMM optimization
+
+---
+
+## 🤝 Contributing
+
+Contributions are welcome! Please:
+1. Check [SCHEMA.md](./SCHEMA.md) for data structure
+2. Follow existing code patterns
+3. Add tests for new functionality
+4. Update documentation
+5. Submit pull requests with clear descriptions
+
+**Note**: `python_scripts` contains legacy systems. For **Google Apps Script**, implement and deploy from **`clasp_mirrors/<scriptId>/`**; keep **`google_app_scripts/`** updated as reference when practical. For non-GAS work, prefer current Python/TypeScript areas unless maintaining legacy Python only.
+
+---
+
+## 📝 License
 
 This project is unlicensed. Use and modify at your own risk.
+
+---
+
+## 🔗 Related Projects
+
+- **[TrueSight DAO DApp](https://github.com/TrueSightDAO/dapp)** - Web interface for DAO operations
+- **[Agroverse](https://agroverse.shop)** - Sustainable agriculture marketplace  
+- **[SunMint](https://truesight.me/sunmint)** - Partner program platform
+- **[TrueSight DAO Website](https://truesight.me)** - Main DAO website
+- **[Raydium AMM](https://raydium.io/)** - Solana-based automated market maker
+- **[LATOKEN Exchange](https://latoken.com/)** - Cryptocurrency exchange platform
+
+---
+
+## 📞 Support
+
+For questions or issues:
+1. Check [SCHEMA.md](./SCHEMA.md) for data structure questions
+2. Check [API.md](./API.md) for API endpoint documentation
+3. Check subfolder READMEs for specific setup questions
+4. Open an issue on GitHub for bugs or feature requests
+
+---
+
+**Last Updated**: 2025-10-07  
+**Repository**: https://github.com/TrueSightDAO/tokenomics

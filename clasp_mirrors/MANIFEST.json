@@ -1,0 +1,194 @@
+{
+  "generatedAt": "2026-03-29T05:27:14.632Z",
+  "mirrorRoot": "clasp_mirrors",
+  "projectCount": 46,
+  "mirrorDirs": 46,
+  "projects": [
+    {
+      "title": "Agroverse - content Marketing feedbacks",
+      "scriptId": "1Uq1EHReKpXtf3CnT94Rax9YD8oKxmvyFOBGqnI4heqiW_VTnRzurgido"
+    },
+    {
+      "title": "Agroverse - Newsletter subscriber sync",
+      "scriptId": "1XIz0hs7lH4DgjamUwQZeO4DwVTG8tqKjGElL9XB2StrkPXbHYeETOWBx"
+    },
+    {
+      "title": "Agroverse - Parse Telegram ChatLogs For Sales",
+      "scriptId": "1dsWecVwbN0dOvilIz9r8DNt7LD3Ay13V8G9qliow4tZtF5LHsvQOFpF7"
+    },
+    {
+      "title": "Agroverse - Parse Telegram for QR code batch generation",
+      "scriptId": "1N6o00N9VtRK_L3e0NQXEsmC6QME1KObZdmdbJgo0Tbgj_7P-ElNL5THn"
+    },
+    {
+      "title": "Agroverse - QR code creation web service",
+      "scriptId": "1slQVojn5P2wC7l5LdFesFT243afkZ2HQ9no9mciExl574VeOe3Wom2rW"
+    },
+    {
+      "title": "Agroverse - QR code subscriber events automation",
+      "scriptId": "1IBrXqW_uTsFkbKU-fiOTrkfBlxLnX8KHsKSw2qqF3NoOa36wU0OKEVGH"
+    },
+    {
+      "title": "Agroverse - QR CODE UPDATE EVENT",
+      "scriptId": "1UrBgqLnnQc6PV4-gMIDh2SYwWu62wTdSrV30xk9q_eVr2UdoxdzXN38v"
+    },
+    {
+      "title": "Agroverse - shipping planner",
+      "scriptId": "1Og2g8Q0_SdM9A5mJNO-tq_9r8XMQ00ybBmss4L3tItBAJ01-KdM-w40c"
+    },
+    {
+      "title": "Agroverse - Shopping Cart",
+      "scriptId": "1ovx-Hq5L5MgzF32qB_cPV_G5Hc6XshKMAYOmiJY8tZ355gzWUqvFCPvn"
+    },
+    {
+      "title": "Agroverse - Site Statistics",
+      "scriptId": "1Y8sJ22lZuqQYS_kF_3ItMuyfiAzbJ4wRA1xGC_bGx7FPB7uLTvrUObly"
+    },
+    {
+      "title": "Agroverse - Store interaction history",
+      "scriptId": "14gKJ0VW49RsSn4S03pgxKXy0sp4Z7Z3Wm1Wj8jQiWW5dj1sFuPnp95sh"
+    },
+    {
+      "title": "Agroverse - Stores Nearby",
+      "scriptId": "1NpHrKJW8Q4suu6-f5gXQcbjHqUZtGOG-KcIf81M1GG8lDShm5-fLphD2"
+    },
+    {
+      "title": "Agroverse - Tokenize Main Vault Sales Transactions from Serialized Product Sale",
+      "scriptId": "1wmgYPwfRDxpiboa8OH-C6Ndovklf8HaJY305n7dhRzs7BmUBQg7fL_sZ"
+    },
+    {
+      "title": "Agroverse - Update managed ledger sales transactions from Serialized Product Sale",
+      "scriptId": "1duQFfTO0Pj0lC4tPVNmMOhNOS1GvJgzqVxXbsEDu-eqt_64DwxvrOVyl"
+    },
+    {
+      "title": "Agroverse - update store inventory",
+      "scriptId": "1P0Mg33i_dD9x9IeoHYvtKrf0xFcmUznpqAswyC_KXR3VJZu-0C-UOP0v"
+    },
+    {
+      "title": "Api.TrueSight.me - QR code reader web service",
+      "scriptId": "1y6JVYwqdrFD4zHT4zyIfU762RRsW7GgZKPVuzorpwUS61mDnFQZ65Qsz"
+    },
+    {
+      "title": "Cacao farm site verification report generator",
+      "scriptId": "1EBoewfPK3hkHAhEGXD_E6lEIF_qFon6Vh5udnd_wJa_ZENf4APdL1_V2"
+    },
+    {
+      "title": "capital_injection_processing.gs",
+      "scriptId": "1orWgdGckts55owiYOysR_y4sde52T_eUmrtDGAEkb4YV5DlUfJ0JZC5J"
+    },
+    {
+      "title": "Edgar - Submissions Listener",
+      "scriptId": "1XmwyzzauOoLUZAbm5jK1GBwWNIDLHBrlA465a3EE7bnNW3cvhqzIR8ml"
+    },
+    {
+      "title": "Grok Physical Assets Tracking",
+      "scriptId": "1yDOuOZgfbzOllbbxHpMTNLZo3-7SNl1-wtq1oQzqiMPOoxiFpMrhzSOw"
+    },
+    {
+      "title": "Hierling - HelloCash",
+      "scriptId": "1DYSZKFYM-PsQuCMII7ki-T5H3D8q92yn-9GZ3lzUOLxpH8o3zyxLUFyO"
+    },
+    {
+      "title": "LATOKENS market maker",
+      "scriptId": "1YpJCLtmSEFLiY9bfvMB_-BToxcTPr9Pf9Wi7YKWzQ6ugkoR3gMVkBUmo"
+    },
+    {
+      "title": "Luma to Wix event",
+      "scriptId": "1_3D4o2RdHdPuu5EHCUwkMQe8sFJBqXWqCiE-wpwME2Gdr6_oTt3VBAVC"
+    },
+    {
+      "title": "Stripe:superadmin@getdata.io - OffChain",
+      "scriptId": "15qbfLN3ZCk-Ee6YNQnLj2OryWN3bWGh4BkqBaADonGQSLGzRyIo5skDR"
+    },
+    {
+      "title": "SunMint - Process Tree Planting Submission",
+      "scriptId": "1Jp8qNIBCZaRTlmOmbJoJmYnSFyXtQkUHP2Qv5uqKZpt0Ugo-e25nhASF"
+    },
+    {
+      "title": "TDG - Asset Balances",
+      "scriptId": "1ZQjgSZvAXL2PB3e3YW289xY7Ork4S5wV4uKTXJyw83xQT4R0lh_hwNWn"
+    },
+    {
+      "title": "TDG - Asset Management Web App",
+      "scriptId": "1rLl94jQ9tDYdRvudnP0prPY5SEjvM07R4gPs6-vRyZEpSJhUqbiE3CZY"
+    },
+    {
+      "title": "TDG - Email Identity Management",
+      "scriptId": "1K1wcXFAopSA0cI7oBpu5bl1sagrJ2Quv44B0ppjiIxtl3MKJ_PCsppCf"
+    },
+    {
+      "title": "TDG - Grok Telegram/WhatsApp combined scoring",
+      "scriptId": "1BHAGZd_T1I5mQnqnAFqUJKX2x_N8Uv05n1O2OohRA908Ja8wVwVxaR7K"
+    },
+    {
+      "title": "TDG - Monthly Recurring Tokenization",
+      "scriptId": "1LxWu9hOs56JZ6Mbxra3eDv74xjpjgkJQW40xjpQBIHObsqiv1D5jr5fK"
+    },
+    {
+      "title": "TDG - Notarization",
+      "scriptId": "1vC3p_WfKQT-fl5tHZ9-E3aotYon3gQdOiFVLmyVElMqB-hi_FT3rcB8W"
+    },
+    {
+      "title": "TDG - Parse and Compile All Telegram logs",
+      "scriptId": "1Q5HfGR_AcSYmrKCy5bs-Jo8pdtV-vZJ6Zhv2VCY0HGo2haVoeWMjOCGC"
+    },
+    {
+      "title": "TDG - Process Inventory Movements",
+      "scriptId": "1wONDeDwZ_fXNapDKpstWrBION3aV3r7NXwq7PCdqbW1LvI5ceaykQNbR"
+    },
+    {
+      "title": "TDG - Process Vault Expense Submission Processing",
+      "scriptId": "19Wag9x-sjbLVgIsPh2vj90ZG7Rgq2iGaVOomAeAvtg6CdZKJHLZ9AJrC"
+    },
+    {
+      "title": "TDG - proposals",
+      "scriptId": "1Dh_QQUn8hGGo75RsPpsN-GMn-uFgw-akwyv3uSZgO140J3NfQzsnuu9s"
+    },
+    {
+      "title": "TDG - tabulate airdrops",
+      "scriptId": "177OJC0tVytZfSa6gMldKCqS5LxUZGnV_dT2NJ_FJE1uwvoGHzqC8HbyG"
+    },
+    {
+      "title": "TDG - tdg_inventory_management web_app.gs",
+      "scriptId": "1QtK-InsHH6SBtxoxc33-y4vQvuNkbhlkUi_9S1X-AaEgIlSlygM1iZtP"
+    },
+    {
+      "title": "TDG - Telegram Identity Management",
+      "scriptId": "10NKp8uLMGyfgDv0ByakHVGioOYzvDV7NbHMSBigB2TCVcY7aqYXhbywv"
+    },
+    {
+      "title": "TDG - Telegram Webhook Listener",
+      "scriptId": "1m2sQONdMGw6HbxIVP0H0JJJ1aYrYLSRRlHb2MIplrDDsKhm8-IwKBntk"
+    },
+    {
+      "title": "TDG - transfer scored and reviewed to main ledger",
+      "scriptId": "1-ts0WTM8J4nOWdI29I9NJLzPQBGqph3ajSB8d8qrAHINJaZynwxLzPx8"
+    },
+    {
+      "title": "TDG - update balance in wallets on Ledger",
+      "scriptId": "1QKqUTyl3_pyDHfVMoRUkzvU75eV6UtizIw5bR5xeDMaLyZGUPzWTz8Et"
+    },
+    {
+      "title": "TDG USDT exchange rate update",
+      "scriptId": "1zAXSdLe_vigsygxqX41w_evQb3KfrtzUc4rFI3AxwdUjp8E-h3nIvgDG"
+    },
+    {
+      "title": "TrueSight DAO Gas Fee Update",
+      "scriptId": "1E6XFs1X7GMqAEOJxoINHEYPazuYI7HYSyjqW2s9OhFXENm09ne0mUOER"
+    },
+    {
+      "title": "Untitled project",
+      "scriptId": "1KreecWzQ1ZRXcqsWuoT8qY1SlQ5MWkmI1YrVBhQ6EMZ67MCV7pTdKx46"
+    },
+    {
+      "title": "Untitled project",
+      "scriptId": "17KSH5GQW1TINrI_O4Kn2F3EvdzCqOC15nASX-hmwCf4_eBlD0c64vKrY"
+    },
+    {
+      "title": "Written Assurance Letter - Template Generation",
+      "scriptId": "1CpAVMPR2mAHlnt20oDhi-_-C8gRbiPbHiemHzlrlpiRgrL0r8MLTMYhi"
+    }
+  ],
+  "cloneLog": [],
+  "checklistRows": 35
+}

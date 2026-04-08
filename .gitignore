@@ -8,7 +8,30 @@ python_scripts/jupyter.log
 # Ignore Python bytecode caches in our LATOKEN client
 la_token_market_making_python/__pycache__/
 # Ignore local environment file for python_scripts
-python_scripts/.env
+python_scripts/**/.env
 
 # macOS system files
 .DS_Store
+
+# Google API credentials and tokens
+*credentials*.json
+token.json
+**/credentials.json
+**/token.json
+
+# Apps Script sources that typically embed API keys / secrets (basename contains "credential(s)")
+google_app_scripts/**/*redential*.gs
+
+# Clasp mirror pulls — never commit script sources (tokens, JWTs, bot keys; includes Code.js, Credentials.js, etc.)
+clasp_mirrors/**/*.js
+# Regenerated on every clasp clone/pull; not needed in git
+clasp_mirrors/**/appsscript.json
+
+# Clasp-generated filenames in thematic folder only — canonical copies live under clasp_mirrors/<scriptId>/
+google_app_scripts/**/Code.js
+google_app_scripts/**/appsscript.json
+google_app_scripts/**/Credentials*.js
+
+# Schema validation output
+python_scripts/schema_validation/discovered_headers.json
+schema_output.txt

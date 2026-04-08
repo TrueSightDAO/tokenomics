@@ -1,7 +1,17 @@
 /**
- * Google Apps Script to handle HTTP GET and POST requests for retrieving voting rights and asset information based on a digital signature.
+ * File: google_app_scripts/tdg_asset_management/web_app.gs
+ * Repository: https://github.com/TrueSightDAO/tokenomics
+ * 
+ * Description: REST API endpoints for inventory management, QR code queries, voting rights, and asset valuation. Provides data access for the TrueSight DAO DApp.
+ */
+
+/**
+ * Google Apps Script to handle HTTP GET and POST for retrieving voting rights and asset information based on a digital signature.
  * The total_assets value is calculated as the sum of off-chain assets, USDT vault balance, and AGL investment holdings.
  * Asset values (total_assets, asset_per_circulated_voting_right) are formatted to 5 decimal places.
+ * If query param (GET) or JSON field full is true, returns full response; otherwise, returns only contributor_name.
+ *
+ * Deployment URL: https://script.google.com/macros/s/AKfycbygmwRbyqse-dpCYMco0rb93NSgg-Jc1QIw7kUiBM7CZK6jnWnMB5DEjdoX_eCsvVs7/exec
  *
  * Instructions to call this endpoint:
  * 1. Deploy this script as a web app:
@@ -9,25 +19,24 @@
  *    - Set "Execute as" to "Me" and "Who has access" to "Anyone" (or restrict as needed).
  *    - Click Deploy and copy the web app URL (e.g., https://script.google.com/macros/s/<ID>/exec).
  * 2. Make an HTTP GET request with the digital signature as a query parameter:
- *    - URL format: <web_app_url>?signature=<publicKeyBase64>
- *    - Example: https://script.google.com/macros/s/<ID>/exec?signature=MIICIjANBgkqhkiG9w0BAQEFAAOCAg8AMI...
- * 3. Make an HTTP POST request with a JSON payload:
- *    - URL: <web_app_url>
- *    - Payload: { "signature": "<publicKeyBase64>" }
- *    - Example: curl -X POST -H "Content-Type: application/json" -d '{"signature":"MIICIjANBgkqhkiG9w0BAQEFAAOCAg8AMI..."}' <web_app_url>
+ *    - URL format: <web_app_url>?signature=<publicKeyBase64>&full=true
+ *    - Example: https://script.google.com/macros/s/<ID>/exec?signature=MIICIjANBgkqhkiG9w0BAQEFAAOCAg8AMI...&full=true
+ * 3. Or make an HTTP POST with JSON body: { "signature": "<publicKeyBase64>", "full": true } (full optional; defaults like GET).
+ *    - Example: curl -X POST -H "Content-Type: application/json" -d '{"signature":"...","full":true}' <web_app_url>
  * 4. The response will be a JSON object:
- *    - Success: {
+ *    - If full=true: {
  *        "contributor_name": <string>,
  *        "voting_rights": <value>,
  *        "voting_rights_circulated": <value>,
  *        "total_assets": <number, 5 decimal places>,
- *        "asset_per_circulated_voting_right": <number, 5 decimal places>
+ *        "asset_per_circulated_voting_right": <number, 5 decimal places>,
+ *        "usd_provisions_for_cash_out": <number, 5 decimal places>  // USD set aside for cash-outs; limits realistic payout
  *      }
- *    - Error: { "error": "No matching signature found" } or { "error": "Signature parameter missing" } or { "error": "Invalid JSON payload" }
+ *    - If full=false or omitted: { "contributor_name": <string> }
+ *    - Error: { "error": "No matching signature found" } or missing signature / invalid JSON messages as applicable
  * 5. Use a tool like curl, Postman, or JavaScript fetch to test:
- *    - GET: curl "<web_app_url>?signature=<publicKeyBase64>"
- *    - POST: curl -X POST -H "Content-Type: application/json" -d '{"signature":"MIICIjANBgkqhkiG9w0BAQEFAAOCAg8AMI..."}' <web_app_url>
- *    - JavaScript (POST): fetch("<web_app_url>", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ signature: "<publicKeyBase64>" }) }).then(res => res.json())
+ *    - curl: curl "<web_app_url>?signature=<publicKeyBase64>&full=true"
+ *    - JavaScript: fetch("<web_app_url>?signature=<publicKeyBase64>&full=true").then(res => res.json())
  * 6. To troubleshoot signature lookup:
  *    - Open the script editor and run the testSignatureLookup function with a test signature.
  *    - Example: testSignatureLookup("MIICIjANBgkqhkiG9w0BAQEFAAOCAg8AMI...");
@@ -55,8 +64,44 @@ const SOLANA_USDT_VAULT_WALLET_ADDRESS = 'BkcbCEnD14C7cYiN6VwpYuGmpVrjfoRwobhQQS
  * @param {string} url - The URL to resolve.
  * @return {string} The resolved URL or empty string on error.
  */
+// Resolves redirect URLs to get the final URL.
+// First checks "Shipment Ledger Listing" sheet (Column L -> Column AB lookup)
+// Falls back to HTTP resolution if not found in sheet
 function resolveRedirect(url) {
   try {
+    // First, try to look up the URL in "Shipment Ledger Listing" sheet
+    // Column L (index 11) = unresolved URL, Column AB (index 27) = resolved URL
+    try {
+      const spreadsheet = SpreadsheetApp.openById(SPREADSHEET_ID);
+      const shipmentSheet = spreadsheet.getSheetByName('Shipment Ledger Listing');
+      
+      if (shipmentSheet) {
+        const lastRow = shipmentSheet.getLastRow();
+        if (lastRow >= 2) {
+          // Read columns A to AB (28 columns) to get both Column L and Column AB
+          const dataRange = shipmentSheet.getRange(2, 1, lastRow - 1, 28);
+          const data = dataRange.getValues();
+          
+          for (let i = 0; i < data.length; i++) {
+            const row = data[i];
+            const ledgerUrl = row[11] ? row[11].toString().trim() : ''; // Column L (index 11)
+            
+            // Check if this row's Column L matches the input URL
+            if (ledgerUrl === url || ledgerUrl === url.trim()) {
+              const resolvedUrl = row[27] ? row[27].toString().trim() : ''; // Column AB (index 27)
+              if (resolvedUrl) {
+                Logger.log(`Found resolved URL in sheet: ${url} -> ${resolvedUrl}`);
+                return resolvedUrl;
+              }
+            }
+          }
+        }
+      }
+    } catch (sheetError) {
+      Logger.log(`Could not lookup URL in sheet, falling back to HTTP resolution: ${sheetError.message}`);
+    }
+    
+    // Fallback to HTTP resolution if not found in sheet
     let currentUrl = url;
     let redirectCount = 0;
     const maxRedirects = 10;
@@ -68,17 +113,78 @@ function resolveRedirect(url) {
       });
       const responseCode = response.getResponseCode();
 
+      // If not a redirect (2xx or other), check for JavaScript redirects
       if (responseCode < 300 || responseCode >= 400) {
+        // Check if the response contains JavaScript redirects
+        const content = response.getContentText();
+        const jsRedirectMatch = content.match(/window\.location\.(replace|href)\s*=\s*['"]([^'"]+)['"]/i) ||
+                                content.match(/window\.location\.replace\(['"]([^'"]+)['"]\)/i) ||
+                                content.match(/<meta\s+http-equiv=['"]refresh['"]\s+content=['"]\d+;url=([^'"]+)['"]/i);
+        
+        if (jsRedirectMatch) {
+          const redirectUrl = jsRedirectMatch[1] || jsRedirectMatch[2];
+          if (redirectUrl) {
+            // Resolve relative URLs to absolute
+            if (redirectUrl.startsWith('http://') || redirectUrl.startsWith('https://')) {
+              currentUrl = redirectUrl;
+              redirectCount++;
+              Logger.log(`Found JavaScript redirect to: ${currentUrl}`);
+              continue;
+            } else {
+              // Relative URL - construct absolute URL
+              try {
+                const baseUrl = new URL(currentUrl);
+                const resolvedUrl = new URL(redirectUrl, baseUrl).toString();
+                currentUrl = resolvedUrl;
+                redirectCount++;
+                Logger.log(`Resolved relative JavaScript redirect to: ${currentUrl}`);
+                continue;
+              } catch (e) {
+                Logger.log(`Error resolving relative JavaScript redirect: ${e.message}`);
+                return currentUrl;
+              }
+            }
+          }
+        }
+        
+        // No JavaScript redirect found, return current URL
         return currentUrl;
       }
 
+      // Get the Location header for HTTP redirect
       const headers = response.getHeaders();
       const location = headers['Location'] || headers['location'];
       if (!location) {
         Logger.log(`No Location header for redirect at ${currentUrl}`);
+        // Try to check for JavaScript redirect in response body
+        const content = response.getContentText();
+        const jsRedirectMatch = content.match(/window\.location\.(replace|href)\s*=\s*['"]([^'"]+)['"]/i) ||
+                                content.match(/window\.location\.replace\(['"]([^'"]+)['"]\)/i) ||
+                                content.match(/<meta\s+http-equiv=['"]refresh['"]\s+content=['"]\d+;url=([^'"]+)['"]/i);
+        
+        if (jsRedirectMatch) {
+          const redirectUrl = jsRedirectMatch[1] || jsRedirectMatch[2];
+          if (redirectUrl) {
+            if (redirectUrl.startsWith('http://') || redirectUrl.startsWith('https://')) {
+              currentUrl = redirectUrl;
+            } else {
+              try {
+                const baseUrl = new URL(currentUrl);
+                currentUrl = new URL(redirectUrl, baseUrl).toString();
+              } catch (e) {
+                Logger.log(`Error resolving relative JavaScript redirect: ${e.message}`);
+                return '';
+              }
+            }
+            redirectCount++;
+            Logger.log(`Found JavaScript redirect to: ${currentUrl}`);
+            continue;
+          }
+        }
         return '';
       }
 
+      // Update the current URL and increment redirect count
       currentUrl = location;
       redirectCount++;
     }
@@ -198,6 +304,30 @@ function getOffChainAssetValue() {
 }
 
 /**
+ * Fetches the USD provisions set aside for voting rights cash-out from the "off chain asset balance" sheet.
+ * This is the row "USD - provisions for voting rights cash out" (Column A); returns Value USD (Column D).
+ * This amount represents how much can realistically be paid out when contributors cash out voting rights.
+ * @return {number} USD provisions for cash-out, to 5 decimal places. Returns 0 if row not found.
+ */
+function getUsdProvisionsForCashOut() {
+  const offChainAssetBalanceTab = SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName(ASSET_SHEET_NAME);
+  const data = offChainAssetBalanceTab.getDataRange().getValues();
+  const searchStr = 'USD - provisions for voting rights cash out';
+  for (var i = 1; i < data.length; i++) {
+    var assetType = data[i][0] ? data[i][0].toString().trim() : '';
+    if (assetType.indexOf(searchStr) !== -1) {
+      var value = data[i][3]; // Column D = Value (USD)
+      var num = typeof value === 'number' ? value : parseFloat(value);
+      var result = isNaN(num) ? 0 : parseFloat(num.toFixed(5));
+      Logger.log('USD provisions for voting rights cash out: ' + result);
+      return result;
+    }
+  }
+  Logger.log('USD provisions for voting rights cash out: row not found, returning 0');
+  return 0;
+}
+
+/**
  * Fetches the USDT balance in the Solana vault.
  * @return {number} The USDT balance in the vault, to 5 decimal places.
  */
@@ -286,108 +416,89 @@ function findContributorBySignature(signature, spreadsheet) {
  * Test function for troubleshooting signature lookup.
  * @param {string} testSignature - The signature to test (optional, defaults to a sample).
  */
-function testSignatureLookup() {
-  testSignature = "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAuEFYA91EyDGo+1POPNh6VrLgYGtLdY/7F3SKGFrWCEzTDEwRu443r1J91TcZpJkj1eJrdMC/9mmTuK+3CgZ90KxEYuWWWbG128yNnSQ9isr0F2sTQXXEjEWuawalVb/b/qrCK2PDIz1CfvFN3+O0kGwtEEcEqOWuNUlJl8wLBO4TZC/05Fd1JRDkXD4YRN+wr2DrhjazHqZmxRP8NcQmswW4kBCHzAdraM5c/MGPMwolwUaz3MJzi5wk2mAAeFlaQyGInsi8V4L5teNfmFWGKvlfToCbzpbjNZmLK+HklPjIf/n5WuHSSWS+2d+0bicpqsaxysgPbS8lYJyyQtllMwIDAQAB"
+function testSignatureLookup(testSignature = 'MIICIjANBgkqhkiG9w0BAQEFAAOCAg8AMI...') {
   const spreadsheet = SpreadsheetApp.openById(SPREADSHEET_ID);
   const result = findContributorBySignature(testSignature, spreadsheet);
   Logger.log(JSON.stringify(result));
 }
 
 /**
- * Processes the core logic for both GET and POST requests.
- * @param {string} signature - The digital signature to process.
- * @returns {Object} - JSON response object.
+ * @param {string|undefined} signature
+ * @param {boolean} isFullResponse
+ * @param {string} missingSignatureError
+ * @returns {GoogleAppsScript.Content.TextOutput}
  */
-function processRequest(signature) {
-  // Open the spreadsheet
-  const spreadsheet = SpreadsheetApp.openById(SPREADSHEET_ID);
-
-  // Step 1: Search for signature using findContributorBySignature
-  const { contributorName, error } = findContributorBySignature(signature, spreadsheet);
-  if (error) {
-    return { error };
+function respondForSignature(signature, isFullResponse, missingSignatureError) {
+  if (!signature) {
+    return ContentService.createTextOutput(
+      JSON.stringify({ error: missingSignatureError })
+    ).setMimeType(ContentService.MimeType.JSON);
   }
 
-  // Step 2: Find voting weight in "Contributors voting weight" Column H (index 7) where Column C (index 2) matches contributorName
+  const spreadsheet = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const { contributorName, error } = findContributorBySignature(signature, spreadsheet);
+  if (error) {
+    return ContentService.createTextOutput(
+      JSON.stringify({ error })
+    ).setMimeType(ContentService.MimeType.JSON);
+  }
+
+  if (!isFullResponse) {
+    return ContentService.createTextOutput(
+      JSON.stringify({ contributor_name: contributorName })
+    ).setMimeType(ContentService.MimeType.JSON);
+  }
+
   const votingSheet = spreadsheet.getSheetByName(VOTING_SHEET_NAME);
   const votingData = votingSheet.getDataRange().getValues();
   let votingRights = null;
 
-  for (let i = 1; i < votingData.length; i++) { // Skip header row
-    if (votingData[i][2] === contributorName) { // Column C
-      votingRights = votingData[i][7]; // Column H
+  for (let i = 1; i < votingData.length; i++) {
+    if (votingData[i][2] === contributorName) {
+      votingRights = votingData[i][7];
       break;
     }
   }
 
   if (votingRights === null) {
-    return { error: 'No matching contributor found in voting weight sheet' };
-  }
-
-  // Step 3: Get voting_rights_circulated from "Ledger history" cell E1
-  const ledgerSheet = spreadsheet.getSheetByName(LEDGER_SHEET_NAME);
-  const votingRightsCirculated = ledgerSheet.getRange('E1').getValue();
-
-  // Step 4: Calculate total_assets as off-chain assets + USDT vault balance + AGL investment holdings
-  const totalAssets = getOffChainAssetValue() + getUSDTBalanceInVault() + getInvestmentHoldingsInAGL();
-
-  // Step 5: Calculate asset_per_circulated_voting_right
-  const assetPerCirculatedVotingRight = votingRightsCirculated !== 0 ? totalAssets / votingRightsCirculated : 0;
-
-  // Return result with asset values formatted to 5 decimal places
-  return {
-    contributor_name: contributorName,
-    voting_rights: votingRights,
-    voting_rights_circulated: votingRightsCirculated,
-    total_assets: parseFloat(totalAssets.toFixed(5)),
-    asset_per_circulated_voting_right: parseFloat(assetPerCirculatedVotingRight.toFixed(5))
-  };
-}
-
-/**
- * Handles HTTP GET requests.
- * @param {Object} e - The event object containing request parameters.
- * @returns {ContentService} - JSON response.
- */
-function doGet(e) {
-  // Check for signature parameter
-  const signature = e.parameter.signature;
-  if (!signature) {
     return ContentService.createTextOutput(
-      JSON.stringify({ error: 'Signature parameter missing' })
+      JSON.stringify({ error: 'No matching contributor found in voting weight sheet' })
     ).setMimeType(ContentService.MimeType.JSON);
   }
 
-  // Process the request
-  const result = processRequest(signature);
+  const ledgerSheet = spreadsheet.getSheetByName(LEDGER_SHEET_NAME);
+  const votingRightsCirculated = ledgerSheet.getRange('E1').getValue();
+  const totalAssets = getOffChainAssetValue() + getUSDTBalanceInVault() + getInvestmentHoldingsInAGL();
+  const assetPerCirculatedVotingRight = votingRightsCirculated !== 0 ? totalAssets / votingRightsCirculated : 0;
+  const usdProvisionsForCashOut = getUsdProvisionsForCashOut();
+
   return ContentService.createTextOutput(
-    JSON.stringify(result)
+    JSON.stringify({
+      contributor_name: contributorName,
+      voting_rights: votingRights,
+      voting_rights_circulated: votingRightsCirculated,
+      total_assets: parseFloat(totalAssets.toFixed(5)),
+      asset_per_circulated_voting_right: parseFloat(assetPerCirculatedVotingRight.toFixed(5)),
+      usd_provisions_for_cash_out: parseFloat(usdProvisionsForCashOut.toFixed(5))
+    })
   ).setMimeType(ContentService.MimeType.JSON);
 }
 
+function doGet(e) {
+  const signature = e.parameter.signature;
+  const isFullResponse = e.parameter.full === 'true';
+  return respondForSignature(signature, isFullResponse, 'Signature parameter missing');
+}
+
 /**
- * Handles HTTP POST requests.
- * Expects a JSON payload with a "signature" field.
- * @param {Object} e - The event object containing request data.
- * @returns {ContentService} - JSON response.
+ * POST JSON body: { "signature": "<publicKeyBase64>", "full": true|false } (full optional).
  */
 function doPost(e) {
   try {
-    // Parse the POST data
     const postData = JSON.parse(e.postData.contents);
     const signature = postData.signature;
-
-    if (!signature) {
-      return ContentService.createTextOutput(
-        JSON.stringify({ error: 'Signature field missing in JSON payload' })
-      ).setMimeType(ContentService.MimeType.JSON);
-    }
-
-    // Process the request
-    const result = processRequest(signature);
-    return ContentService.createTextOutput(
-      JSON.stringify(result)
-    ).setMimeType(ContentService.MimeType.JSON);
+    const isFullResponse = postData.full === true || postData.full === 'true';
+    return respondForSignature(signature, isFullResponse, 'Signature field missing in JSON payload');
   } catch (error) {
     return ContentService.createTextOutput(
       JSON.stringify({ error: 'Invalid JSON payload or processing error: ' + error.message })

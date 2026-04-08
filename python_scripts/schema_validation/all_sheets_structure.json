@@ -1,0 +1,943 @@
+{
+  "1qbZZhf-_7xzmDTriaJVWj6OZshyQsFkdsAV8-pyzASQ": {
+    "name": "Telegram & Submissions",
+    "id": "1qbZZhf-_7xzmDTriaJVWj6OZshyQsFkdsAV8-pyzASQ",
+    "sheets": {
+      "Telegram Chat Logs": {
+        "name": "Telegram Chat Logs",
+        "gid": 0,
+        "header_row": 2,
+        "columns": [
+          "Telegram Update ID",
+          "Telegram Chatroom ID",
+          "Telegram Chatroom Name",
+          "Telegram Message ID",
+          "Contributor Name",
+          "Project Name",
+          "Contribution Made",
+          "Rubric classification",
+          "TDGs Provisioned",
+          "Status",
+          "TDGs Issued\n(reviewed by Governor) ",
+          "Status date",
+          "Main Ledger \nLine Number",
+          "Scoring Hash Key",
+          "Telegram File IDs",
+          "Edgar Signature Verification",
+          "External API call status",
+          "External API call response"
+        ],
+        "column_count": 18,
+        "url": "https://docs.google.com/spreadsheets/d/1qbZZhf-_7xzmDTriaJVWj6OZshyQsFkdsAV8-pyzASQ/edit#gid=0"
+      },
+      "Capital Injection": {
+        "name": "Capital Injection",
+        "gid": 1159222428,
+        "header_row": 1,
+        "columns": [
+          "Telegram Update ID",
+          "Telegram Message ID",
+          "Capital Injection Log Message",
+          "Reporter Name",
+          "Ledger Name",
+          "Amount\tNumber",
+          "Ledger URL",
+          "Injection Date",
+          "Description",
+          "Status",
+          "Ledger Lines Number"
+        ],
+        "column_count": 11,
+        "url": "https://docs.google.com/spreadsheets/d/1qbZZhf-_7xzmDTriaJVWj6OZshyQsFkdsAV8-pyzASQ/edit#gid=1159222428"
+      },
+      "Proposal Submissions": {
+        "name": "Proposal Submissions",
+        "gid": 837974573,
+        "header_row": 1,
+        "columns": [
+          "Message ID",
+          "Timestamp",
+          "Username",
+          "Message Text",
+          "Processed",
+          "Proposal Title",
+          "Proposal Content",
+          "Digital Signature",
+          "Transaction ID",
+          "Pull Request Number",
+          "Status",
+          "Created Date",
+          "Updated Date",
+          "Submission Type"
+        ],
+        "column_count": 14,
+        "url": "https://docs.google.com/spreadsheets/d/1qbZZhf-_7xzmDTriaJVWj6OZshyQsFkdsAV8-pyzASQ/edit#gid=837974573"
+      },
+      "QR Code Generation": {
+        "name": "QR Code Generation",
+        "gid": 1703901725,
+        "header_row": 1,
+        "columns": [
+          "Telegram Update ID",
+          "Telegram Chatroom ID",
+          "Telegram Chatroom Name",
+          "Telegram Message ID",
+          "Contributor Name",
+          "Contribution Made",
+          "Status date",
+          "Agroverse QR starting line",
+          "Agroverse QR ending line",
+          "Zip file download URL",
+          "Zip file name",
+          "status"
+        ],
+        "column_count": 12,
+        "url": "https://docs.google.com/spreadsheets/d/1qbZZhf-_7xzmDTriaJVWj6OZshyQsFkdsAV8-pyzASQ/edit#gid=1703901725"
+      },
+      "QR Code Sales": {
+        "name": "QR Code Sales",
+        "gid": 1003674539,
+        "header_row": 1,
+        "columns": [
+          "Telegram Update ID",
+          "Telegram Message ID",
+          "Sales Report Log Message",
+          "Reporter Name",
+          "QR Code value",
+          "Sale Price",
+          "AGL Ledger URL",
+          "Sales Date",
+          "Currency",
+          "Status",
+          "Ledger Lines Number"
+        ],
+        "column_count": 11,
+        "url": "https://docs.google.com/spreadsheets/d/1qbZZhf-_7xzmDTriaJVWj6OZshyQsFkdsAV8-pyzASQ/edit#gid=1003674539"
+      },
+      "SunMint Tree Planting": {
+        "name": "SunMint Tree Planting",
+        "gid": 176124122,
+        "header_row": 1,
+        "columns": [
+          "Telegram Update ID",
+          "Telegram Chatroom ID",
+          "Telegram Chatroom Name",
+          "Telegram Message ID",
+          "Contributor Name",
+          "Contribution Made",
+          "Status date",
+          "Telegram File IDs",
+          "Photo of Tree Planted",
+          "Submitted Name",
+          "Latitude",
+          "Longitude",
+          "Status",
+          "Specie",
+          "Notarization URL",
+          "Cost of Tree",
+          "Tree Planting Time"
+        ],
+        "column_count": 17,
+        "url": "https://docs.google.com/spreadsheets/d/1qbZZhf-_7xzmDTriaJVWj6OZshyQsFkdsAV8-pyzASQ/edit#gid=176124122"
+      },
+      "SunMint Registered Farms": {
+        "name": "SunMint Registered Farms",
+        "gid": 2011737890,
+        "header_row": 1,
+        "columns": [
+          "Telegram Update ID",
+          "Telegram Chatroom ID",
+          "Telegram Chatroom Name",
+          "Telegram Message ID",
+          "Contributor Name",
+          "Contribution Made",
+          "Status date",
+          "Telegram File IDs"
+        ],
+        "column_count": 8,
+        "url": "https://docs.google.com/spreadsheets/d/1qbZZhf-_7xzmDTriaJVWj6OZshyQsFkdsAV8-pyzASQ/edit#gid=2011737890"
+      },
+      "Scored Expense Submissions": {
+        "name": "Scored Expense Submissions",
+        "gid": 452226667,
+        "header_row": 1,
+        "columns": [
+          "Telegram Update ID",
+          "Telegram Chatroom ID",
+          "Telegram Chatroom Name",
+          "Telegram Message ID",
+          "Reporter Name",
+          "Expense Reported",
+          "Status date",
+          "Contributor Name",
+          "Currency ",
+          "Amount",
+          "Scoring Hash Key",
+          "Ledger Lines Number"
+        ],
+        "column_count": 12,
+        "url": "https://docs.google.com/spreadsheets/d/1qbZZhf-_7xzmDTriaJVWj6OZshyQsFkdsAV8-pyzASQ/edit#gid=452226667"
+      },
+      "Inventory Movement": {
+        "name": "Inventory Movement",
+        "gid": 83682662,
+        "header_row": 1,
+        "columns": [
+          "Telegram Update ID",
+          "Telegram Chatroom ID",
+          "Telegram Chatroom Name",
+          "Telegram Message ID",
+          "Contributor Name",
+          "Contribution Made",
+          "Status Date",
+          "SENDER NAME",
+          "RECIPIENT NAME",
+          "CURRENCY",
+          "AMOUNT",
+          "LEDGER_NAME",
+          "LEDGER_URL",
+          "STATUS",
+          "RECORD ROWS"
+        ],
+        "column_count": 15,
+        "url": "https://docs.google.com/spreadsheets/d/1qbZZhf-_7xzmDTriaJVWj6OZshyQsFkdsAV8-pyzASQ/edit#gid=83682662"
+      },
+      "Document Notarizations": {
+        "name": "Document Notarizations",
+        "gid": 520413576,
+        "header_row": 1,
+        "columns": [
+          "Telegram Update ID",
+          "Telegram Chatroom ID",
+          "Telegram Chatroom Name",
+          "Telegram Message ID",
+          "Contributor Name",
+          "Contribution Made",
+          "Status date",
+          "Telegram File IDs",
+          "GitHub RAW url",
+          "Submitter Name",
+          "Latitude",
+          "Longitude",
+          "Document Type",
+          "Description",
+          "Git Commit Hash",
+          "Status"
+        ],
+        "column_count": 16,
+        "url": "https://docs.google.com/spreadsheets/d/1qbZZhf-_7xzmDTriaJVWj6OZshyQsFkdsAV8-pyzASQ/edit#gid=520413576"
+      },
+      "States": {
+        "name": "States",
+        "gid": 225494713,
+        "header_row": 2,
+        "columns": [
+          "TOKENIZED",
+          "When the sales record is updated directly on our main ledger"
+        ],
+        "column_count": 2,
+        "url": "https://docs.google.com/spreadsheets/d/1qbZZhf-_7xzmDTriaJVWj6OZshyQsFkdsAV8-pyzASQ/edit#gid=225494713"
+      }
+    }
+  },
+  "1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU": {
+    "name": "Main Ledger & Contributors",
+    "id": "1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU",
+    "sheets": {
+      "Ledger history": {
+        "name": "Ledger history",
+        "gid": 0,
+        "header_row": 4,
+        "columns": [
+          "Contributor Name",
+          "Project Name",
+          "Contribution Made",
+          "Rubric classification",
+          "TDGs Provisioned",
+          "Status",
+          "TDGs Issued",
+          "Status date",
+          "Solana Transfer Hash",
+          "TDGs yet Air Dropped",
+          "Discord ID",
+          "Within past 90 days",
+          "Within past 90 days vesting",
+          "Within past 180 days",
+          "Within past 180 days vesting"
+        ],
+        "column_count": 15,
+        "url": "https://docs.google.com/spreadsheets/d/1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU/edit#gid=0"
+      },
+      "Contributors voting weight": {
+        "name": "Contributors voting weight",
+        "gid": 950541536,
+        "header_row": 4,
+        "columns": [
+          "Ownership Rank - Controlled",
+          "Voting Weightage Rank",
+          "Contributors",
+          "Solana Wallet Address",
+          "Quadratic Voting Power",
+          "Total TDG in registered wallet",
+          "Total TDG unissued",
+          "Total TDG controlled (legacy)",
+          "Total TDG controlled",
+          "Total Percentage Controlled",
+          "Total Voting Power",
+          "Ranking",
+          "Quadratic Votes",
+          "Sold"
+        ],
+        "column_count": 14,
+        "url": "https://docs.google.com/spreadsheets/d/1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU/edit#gid=950541536"
+      },
+      "Outstanding Airdrops": {
+        "name": "Outstanding Airdrops",
+        "gid": 1569170936,
+        "header_row": 4,
+        "columns": [
+          "Contributor Name",
+          "TDG Amount",
+          "Solana Wallet Address",
+          "Status"
+        ],
+        "column_count": 4,
+        "url": "https://docs.google.com/spreadsheets/d/1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU/edit#gid=1569170936"
+      },
+      "Contributors contact information": {
+        "name": "Contributors contact information",
+        "gid": 1460794618,
+        "header_row": 4,
+        "columns": [
+          "Name",
+          "TRUESIGHT Wallet Address (Solana mainnet)",
+          "Ethereum Wallet Address",
+          "Email",
+          "Address",
+          "Phone / WhatsApp",
+          "Discord ID",
+          "Telegram ID",
+          "Twitter",
+          "Projects ",
+          "LinkedIn",
+          "Facebook",
+          "Github",
+          "Instagram",
+          "Website",
+          "Taxation ID",
+          "WhatsApp Chat Log ID",
+          "Digital Signature",
+          "TikTok",
+          "Is Store Manager"
+        ],
+        "column_count": 20,
+        "url": "https://docs.google.com/spreadsheets/d/1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU/edit#gid=1460794618"
+      },
+      "Contributors Digital Signatures": {
+        "name": "Contributors Digital Signatures",
+        "gid": 577022511,
+        "header_row": 1,
+        "columns": [
+          "Contributor Name",
+          "Created \nTime Stamp",
+          "Last Active \nTime Stamp",
+          "Status",
+          "Digital Signature",
+          "Contributor Email Address"
+        ],
+        "column_count": 6,
+        "url": "https://docs.google.com/spreadsheets/d/1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU/edit#gid=577022511"
+      },
+      "offchain transactions": {
+        "name": "offchain transactions",
+        "gid": 995916231,
+        "header_row": 4,
+        "columns": [
+          "Transaction Date",
+          "Description",
+          "Fund Handler",
+          "Amount",
+          "Currency",
+          "Ledger Line",
+          "Is Revenue"
+        ],
+        "column_count": 7,
+        "url": "https://docs.google.com/spreadsheets/d/1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU/edit#gid=995916231"
+      },
+      "offchain asset location": {
+        "name": "offchain asset location",
+        "gid": 1487841772,
+        "header_row": 4,
+        "columns": [
+          "Currency",
+          "Location",
+          "Amount Managed",
+          "Unit Cost",
+          "Total Value"
+        ],
+        "column_count": 5,
+        "url": "https://docs.google.com/spreadsheets/d/1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU/edit#gid=1487841772"
+      },
+      "Recurring Transactions": {
+        "name": "Recurring Transactions",
+        "gid": 33812003,
+        "header_row": 4,
+        "columns": [
+          "Description",
+          "Source",
+          "Transaction Type",
+          "Amount (USD)",
+          "Billing Period",
+          "Most Recent Tokenization Date",
+          "Start Date",
+          "Edgar AWS \nBilling Automation \nSecurity Key Identifier",
+          "Automation Remarks"
+        ],
+        "column_count": 9,
+        "url": "https://docs.google.com/spreadsheets/d/1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU/edit#gid=33812003"
+      },
+      "offchain assets in transit": {
+        "name": "offchain assets in transit",
+        "gid": 1888711771,
+        "header_row": 1,
+        "columns": [
+          "Destination DAO member",
+          "Origin Asset Name",
+          "Unit Value",
+          "Destination Address",
+          "Origin DAO member",
+          "Origin Address",
+          "Recipient Tax ID",
+          "Phone Number",
+          "",
+          "Courier Service",
+          "Tracking Number",
+          "Expected Arrival Date\n(YYYYMMDD)",
+          "Destination Asset Name",
+          "Ledger Location",
+          "Ledger Line Number",
+          "Status"
+        ],
+        "column_count": 16,
+        "url": "https://docs.google.com/spreadsheets/d/1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU/edit#gid=1888711771"
+      },
+      "off chain asset balance": {
+        "name": "off chain asset balance",
+        "gid": 2083442561,
+        "header_row": 4,
+        "columns": [
+          "Asset Type",
+          "Balance",
+          "Unit Value",
+          "Value (USD)"
+        ],
+        "column_count": 4,
+        "url": "https://docs.google.com/spreadsheets/d/1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU/edit#gid=2083442561"
+      },
+      "Consignments": {
+        "name": "Consignments",
+        "gid": 1401078120,
+        "header_row": 1,
+        "columns": [
+          "Store Name",
+          "Status Date",
+          "Last Visit",
+          "Units",
+          "Asset Type",
+          "Retail Price",
+          "Settlement Price",
+          "Person In Charge",
+          "Job Title",
+          "Email",
+          "Physical Address",
+          "USPS Mailing Address",
+          "Phone",
+          "Remarks"
+        ],
+        "column_count": 14,
+        "url": "https://docs.google.com/spreadsheets/d/1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU/edit#gid=1401078120"
+      },
+      "Contribution submission": {
+        "name": "Contribution submission",
+        "gid": 322675155,
+        "header_row": 4,
+        "columns": [
+          "Timestamp",
+          "Contributor Name \nMember whom you observed made a valuable contribution to our DAO.",
+          "Description of the Contribution\nMore details on the contribution made? Provide links to resources that were contributed if applicable. \n\nThis might include links to tweets, google docs or artwork that were uploaded",
+          "What kind of contribution it is \nnumber on the left shows the amount of governance tokens it should be worth",
+          "Email Address",
+          "Project Name\nWhich project did you observed received a contribution?",
+          "Governance tokens to be awarded\nThe amount should be informed by the amount associated with the category selected above",
+          "",
+          "Notarizing Governor",
+          "Notarization Status",
+          "Ledger Line Number"
+        ],
+        "column_count": 11,
+        "url": "https://docs.google.com/spreadsheets/d/1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU/edit#gid=322675155"
+      },
+      "Governors": {
+        "name": "Governors",
+        "gid": 842148543,
+        "header_row": 7,
+        "columns": [
+          "End Period",
+          "20251229",
+          "",
+          "Vernal Equinox",
+          "20th March"
+        ],
+        "column_count": 5,
+        "url": "https://docs.google.com/spreadsheets/d/1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU/edit#gid=842148543"
+      },
+      "Intiatives Scoring Rubric": {
+        "name": "Intiatives Scoring Rubric",
+        "gid": 129025382,
+        "header_row": 4,
+        "columns": [
+          "Category of Contributions",
+          "Type of contribution",
+          "TDG Tokens Awarded",
+          "",
+          "",
+          "States"
+        ],
+        "column_count": 6,
+        "url": "https://docs.google.com/spreadsheets/d/1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU/edit#gid=129025382"
+      },
+      "TRUESIGHT token details": {
+        "name": "TRUESIGHT token details",
+        "gid": 257194538,
+        "header_row": 1,
+        "columns": [
+          "Wallet Type",
+          "Wallet Address",
+          "Managers",
+          "Total TDG"
+        ],
+        "column_count": 4,
+        "url": "https://docs.google.com/spreadsheets/d/1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU/edit#gid=257194538"
+      },
+      "Agroverse Active Contributors": {
+        "name": "Agroverse Active Contributors",
+        "gid": 1053818602,
+        "header_row": 1,
+        "columns": [
+          "Contributor Name",
+          "Total Contributions - past 90 days"
+        ],
+        "column_count": 2,
+        "url": "https://docs.google.com/spreadsheets/d/1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU/edit#gid=1053818602"
+      },
+      "States": {
+        "name": "States",
+        "gid": 1250222719,
+        "header_row": 1,
+        "columns": [
+          "Initiative States",
+          "",
+          "Proposal States",
+          "",
+          "Betting Pool States",
+          "Betting Direction",
+          "",
+          "Contribution Submission States",
+          "",
+          "Scope",
+          "Project Tokenization Status",
+          "Project Activity Status",
+          "",
+          "Currencies",
+          "Price in USD",
+          "",
+          "Recurring Transaction Type",
+          "",
+          "Physica Asset Transition Status",
+          "",
+          "QR code states",
+          "",
+          "Digital Signature Status"
+        ],
+        "column_count": 23,
+        "url": "https://docs.google.com/spreadsheets/d/1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU/edit#gid=1250222719"
+      },
+      "Currencies": {
+        "name": "Currencies",
+        "gid": 1552160318,
+        "header_row": 1,
+        "columns": [
+          "Currencies",
+          "Price in USD",
+          "Serializable",
+          "Product Image",
+          "landing_page",
+          "ledger",
+          "farm name",
+          "state",
+          "country",
+          "Year",
+          "Unit Weight (grams)",
+          "Unit Weight (ounces)",
+          "SKU Product ID"
+        ],
+        "column_count": 13,
+        "url": "https://docs.google.com/spreadsheets/d/1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU/edit#gid=1552160318"
+      },
+      "Contributor Staking": {
+        "name": "Contributor Staking",
+        "gid": 734074565,
+        "header_row": 1,
+        "columns": [
+          "Contributor Name",
+          "Milestones achieved",
+          "Status",
+          "TDGs staked",
+          "Status date"
+        ],
+        "column_count": 5,
+        "url": "https://docs.google.com/spreadsheets/d/1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU/edit#gid=734074565"
+      },
+      "Recent Contributions - 180": {
+        "name": "Recent Contributions - 180",
+        "gid": 2001293596,
+        "header_row": 6,
+        "columns": [
+          "Gary Teh",
+          "154480.3972",
+          "",
+          " Laura Liew",
+          "0"
+        ],
+        "column_count": 5,
+        "url": "https://docs.google.com/spreadsheets/d/1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU/edit#gid=2001293596"
+      },
+      "Commodity Prices Exchange Rate": {
+        "name": "Commodity Prices Exchange Rate",
+        "gid": 398142035,
+        "header_row": 1,
+        "columns": [
+          "company symbol",
+          "company name",
+          "company page",
+          "close",
+          "high",
+          "low",
+          "volume",
+          "origin_pattern",
+          "origin_url",
+          "createdAt",
+          "updatedAt",
+          "pingedAt"
+        ],
+        "column_count": 12,
+        "url": "https://docs.google.com/spreadsheets/d/1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU/edit#gid=398142035"
+      },
+      "Agroverse Price Components": {
+        "name": "Agroverse Price Components",
+        "gid": 1311453882,
+        "header_row": 1,
+        "columns": [
+          "Description",
+          "Amount"
+        ],
+        "column_count": 2,
+        "url": "https://docs.google.com/spreadsheets/d/1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU/edit#gid=1311453882"
+      },
+      "Agroverse Cacao Category Pricing": {
+        "name": "Agroverse Cacao Category Pricing",
+        "gid": 1760569208,
+        "header_row": 1,
+        "columns": [
+          "Type",
+          "Multiplier"
+        ],
+        "column_count": 2,
+        "url": "https://docs.google.com/spreadsheets/d/1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU/edit#gid=1760569208"
+      },
+      "Agroverse Cacao Processing Cost": {
+        "name": "Agroverse Cacao Processing Cost",
+        "gid": 603759787,
+        "header_row": 1,
+        "columns": [
+          "Facility Name",
+          "Process name",
+          "Cost",
+          "Currency",
+          "Status Date",
+          "Contact Information / Whats App",
+          "Alibaba"
+        ],
+        "column_count": 7,
+        "url": "https://docs.google.com/spreadsheets/d/1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU/edit#gid=603759787"
+      },
+      "Agroverse QR codes": {
+        "name": "Agroverse QR codes",
+        "gid": 472328231,
+        "header_row": 1,
+        "columns": [
+          "qr_code",
+          "landing_page",
+          "ledger",
+          "status",
+          "farm name",
+          "state",
+          "country",
+          "Year",
+          "Currency",
+          "QR code creation date (YYYYMMDD)",
+          "QR code location",
+          "Owner Email",
+          "Onboarding Email \nSent Date",
+          "Tree Planting Date\n(YYYYMMDD)",
+          "Latitude",
+          "Longitude",
+          "Planting Video URL",
+          "Tree Seedling Photo URL",
+          "Product Image",
+          "Price",
+          "Manager \nName",
+          "Ledger Name"
+        ],
+        "column_count": 22,
+        "url": "https://docs.google.com/spreadsheets/d/1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU/edit#gid=472328231"
+      },
+      "Stripe Social Media Checkout ID": {
+        "name": "Stripe Social Media Checkout ID",
+        "gid": 1787371190,
+        "header_row": 1,
+        "columns": [
+          "Timestamp",
+          "Customer Name",
+          "Stripe Session ID",
+          "Wix Order Number",
+          "Wix Order ID",
+          "Items Purchased",
+          "Total Quantity",
+          "Amount",
+          "Currency",
+          "Shipping Address",
+          "Shipping Cost",
+          "Stripe Transaction Fee",
+          "Shipping Provider",
+          "Tracking Number",
+          "Tracking Notification Sent"
+        ],
+        "column_count": 15,
+        "url": "https://docs.google.com/spreadsheets/d/1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU/edit#gid=1787371190"
+      },
+      "Shipment Ledger Listing": {
+        "name": "Shipment Ledger Listing",
+        "gid": 483234653,
+        "header_row": 1,
+        "columns": [
+          " ",
+          "Shipment Date",
+          "Status",
+          "Description",
+          "Shipment Image",
+          "Cargo Size",
+          "Cacao (kg)",
+          "Transaction Type",
+          "Investment ROI",
+          "Capital Injection",
+          "Total Revenue",
+          "Ledger URL",
+          "Contract URL",
+          "FDA Prior Notice",
+          "Invoice URL",
+          "Purchase Order URL",
+          "Lab Report",
+          "Video Reel",
+          "TrueSight DAO URL",
+          "Trees to be Planted",
+          "Google Maps URL",
+          "Latitude",
+          "Longitude",
+          "Is Cacao Shipment",
+          "Serialized",
+          "Created Date",
+          "Updated Date",
+          "Resolved URL"
+        ],
+        "column_count": 28,
+        "url": "https://docs.google.com/spreadsheets/d/1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU/edit#gid=483234653"
+      },
+      "Agroverse SKUs": {
+        "name": "Agroverse SKUs",
+        "gid": 98293503,
+        "header_row": 1,
+        "columns": [
+          "Product ID",
+          "Product Name",
+          "Price (USD)",
+          "Weight (oz)",
+          "Category",
+          "Shipment",
+          "Farm",
+          "Image Path",
+          "Store inventory"
+        ],
+        "column_count": 9,
+        "url": "https://docs.google.com/spreadsheets/d/1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU/edit#gid=98293503"
+      },
+      "Agroverse News Letter Subscribers": {
+        "name": "Agroverse News Letter Subscribers",
+        "gid": 1078776582,
+        "header_row": 1,
+        "columns": [
+          "Email",
+          "Status",
+          "Created Date",
+          "Imported Date"
+        ],
+        "column_count": 4,
+        "url": "https://docs.google.com/spreadsheets/d/1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU/edit#gid=1078776582"
+      },
+      "Performance Statistics": {
+        "name": "Performance Statistics",
+        "gid": 560310588,
+        "header_row": 1,
+        "columns": [
+          "12/7/2025",
+          "Description",
+          "Exchange Rate / Value",
+          "Currency",
+          "Updated Date"
+        ],
+        "column_count": 5,
+        "url": "https://docs.google.com/spreadsheets/d/1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU/edit#gid=560310588"
+      },
+      "Monthly Statistics": {
+        "name": "Monthly Statistics",
+        "gid": 1026348250,
+        "header_row": 1,
+        "columns": [
+          "Year-Month",
+          "Monthly Sales Volume (USD)",
+          "Cumulative Sales Volume (USD)",
+          "Last Updated"
+        ],
+        "column_count": 4,
+        "url": "https://docs.google.com/spreadsheets/d/1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU/edit#gid=1026348250"
+      }
+    }
+  },
+  "1Tbj7H5ur_egQLRugdXUaSIhEYIKp0vvVv2IZ7WTLCUo": {
+    "name": "Grok Scored Contributions",
+    "id": "1Tbj7H5ur_egQLRugdXUaSIhEYIKp0vvVv2IZ7WTLCUo",
+    "sheets": {
+      "Dashboard": {
+        "name": "Dashboard",
+        "gid": 672708136,
+        "header_row": 1,
+        "columns": [
+          "$TDG contributions to be tokenized",
+          "",
+          "7,722.36"
+        ],
+        "column_count": 3,
+        "url": "https://docs.google.com/spreadsheets/d/1Tbj7H5ur_egQLRugdXUaSIhEYIKp0vvVv2IZ7WTLCUo/edit#gid=672708136"
+      },
+      "WhatsApp Chatlog status": {
+        "name": "WhatsApp Chatlog status",
+        "gid": 712609557,
+        "header_row": 1,
+        "columns": [
+          "ChatLog File",
+          "ChatLog File Location",
+          "Status",
+          "date processed",
+          "line number processed",
+          "total line numbers to be processed"
+        ],
+        "column_count": 6,
+        "url": "https://docs.google.com/spreadsheets/d/1Tbj7H5ur_egQLRugdXUaSIhEYIKp0vvVv2IZ7WTLCUo/edit#gid=712609557"
+      },
+      "Scored Chatlogs": {
+        "name": "Scored Chatlogs",
+        "gid": 0,
+        "header_row": 3,
+        "columns": [
+          "Contributor Name",
+          "Project Name",
+          "Contribution Made",
+          "Rubric classification",
+          "TDGs Provisioned",
+          "Status",
+          "TDGs Issued",
+          "Status date",
+          "Existing Contributor",
+          "Reporter Name",
+          "Scoring Hash Key",
+          "Main Ledger Row Number",
+          "Reviewer Email"
+        ],
+        "column_count": 13,
+        "url": "https://docs.google.com/spreadsheets/d/1Tbj7H5ur_egQLRugdXUaSIhEYIKp0vvVv2IZ7WTLCUo/edit#gid=0"
+      },
+      "To Be Airdropped": {
+        "name": "To Be Airdropped",
+        "gid": 1153422455,
+        "header_row": 4,
+        "columns": [
+          "Contributor Name",
+          "TDG Amount",
+          "Solana Wallet Address",
+          "Status"
+        ],
+        "column_count": 4,
+        "url": "https://docs.google.com/spreadsheets/d/1Tbj7H5ur_egQLRugdXUaSIhEYIKp0vvVv2IZ7WTLCUo/edit#gid=1153422455"
+      },
+      "Unregistered Contributors": {
+        "name": "Unregistered Contributors",
+        "gid": 1531029637,
+        "header_row": 1,
+        "columns": [
+          "Unregistered Users"
+        ],
+        "column_count": 1,
+        "url": "https://docs.google.com/spreadsheets/d/1Tbj7H5ur_egQLRugdXUaSIhEYIKp0vvVv2IZ7WTLCUo/edit#gid=1531029637"
+      },
+      "Registered Contributors": {
+        "name": "Registered Contributors",
+        "gid": 1436391132,
+        "header_row": 1,
+        "columns": [
+          "Registered Contributors Name"
+        ],
+        "column_count": 1,
+        "url": "https://docs.google.com/spreadsheets/d/1Tbj7H5ur_egQLRugdXUaSIhEYIKp0vvVv2IZ7WTLCUo/edit#gid=1436391132"
+      },
+      "States": {
+        "name": "States",
+        "gid": 1703591124,
+        "header_row": 1,
+        "columns": [
+          "Initiative States",
+          "",
+          "Contribution Registration States",
+          "",
+          "To Be Airdropped States"
+        ],
+        "column_count": 5,
+        "url": "https://docs.google.com/spreadsheets/d/1Tbj7H5ur_egQLRugdXUaSIhEYIKp0vvVv2IZ7WTLCUo/edit#gid=1703591124"
+      },
+      "Initiatives Scoring Rubric": {
+        "name": "Initiatives Scoring Rubric",
+        "gid": 432873270,
+        "header_row": 4,
+        "columns": [
+          "Category of Contributions",
+          "Type of contribution",
+          "TDG Tokens Awarded",
+          "",
+          "",
+          "States"
+        ],
+        "column_count": 6,
+        "url": "https://docs.google.com/spreadsheets/d/1Tbj7H5ur_egQLRugdXUaSIhEYIKp0vvVv2IZ7WTLCUo/edit#gid=432873270"
+      }
+    }
+  }
+}

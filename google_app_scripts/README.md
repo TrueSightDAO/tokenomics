@@ -1,23 +1,29 @@
-# TDG Ecosystem Scripts
+# Google Apps Scripts for TrueSight DAO Ecosystem
 
-This repository contains Google Apps Script projects for managing and analyzing data within the TrueSight DAO Decentralized Governance ecosystem. The repository is organized into two main subfolders, each focusing on a distinct aspect of the ecosystem:
+This repository contains Google Apps Script projects that power the TrueSight DAO Decentralized Governance ecosystem. Each folder contains specialized scripts for different aspects of the DAO operations, from asset management to content scheduling.
 
-- [tdg_asset_management](./tdg_asset_management): Manages DAO asset data, including off-chain and on-chain balances, sales, and token buy-back budgets.
-- [tdg_scoring](./tdg_scoring): Processes and scores Telegram and WhatsApp chat logs to assign TDG tokens based on contributions.
+## Source of truth for Google (clasp)
 
-## Repository Structure
+**`clasp_mirrors/<scriptId>/` is the canonical working tree on your machine for Apps Script.** Use `clasp pull` / `clasp push` only from that folder. Git tracks each mirror’s **`.clasp.json`**, plus **`PROJECT_INDEX.md`** (Google **project title** → `scriptId` → folder + editor link), **`MIGRATION_CHECKLIST.tsv`** / **`MANIFEST.json`** / **README** — not `*.js` or `appsscript.json` (pull those after clone; see [`clasp_mirrors/README.md`](../clasp_mirrors/README.md)).
 
-- [tdg_asset_management](./tdg_asset_management)\
-  Contains a Google Apps Script for managing Decentralized Autonomous Organization (DAO) assets. It integrates with Google Sheets, Wix APIs, Solana blockchain, LATOKEN exchange, and U.S. Treasury yield data to track and update asset balances, TDG token issuance, sales, and buy-back budgets.\
-  See detailed README for setup and usage instructions.
+**`google_app_scripts/**` here is reference / human-friendly layout** (split `.gs` files, READMEs, headers pointing at GitHub). It is not wired to clasp anymore. Do not add clasp pull artifacts here (`Code.js`, `appsscript.json`, `Credentials*.js`); they are **gitignored** and belong only under **`clasp_mirrors/<scriptId>/`**. When changing production code, edit (or merge into) the corresponding mirror tree, push to Google, and optionally backport split `.gs` files here for readability.
 
-- [tdg_scoring](./tdg_scoring)`\
-  Contains Google Apps Scripts for importing and scoring chat logs from Telegram and WhatsApp. It uses AI APIs (xAI's Grok and OpenAI) to evaluate contributions and assign TDG tokens, with data stored in Google Sheets and notifications sent via Telegram.\
-  See detailed README for setup and usage instructions.
+## 📁 Repository Structure
 
-- [tdg_inventory_management](./tdg_inventory_management)\\
-  Provides a Google Apps Script web app to list inventory managers, fetch asset data for a specified manager, and list possible recipients from a Google Sheet.\\
-  See detailed README for setup and usage instructions.
+### Core DAO Management
+- **[tdg_asset_management](./tdg_asset_management/)** - Manages DAO asset data, including off-chain and on-chain balances, sales, and token buy-back budgets
+- **[tdg_inventory_management](./tdg_inventory_management/)** - Handles inventory movements, warehouse management, and asset tracking across ledgers
+- **[tdg_proposal](./tdg_proposal/)** - Manages proposal workflows and governance processes
+
+### Content & Communication
+- **[tdg_scoring](./tdg_scoring/)** - Processes and scores Telegram and WhatsApp chat logs to assign TDG tokens based on contributions
+- **[agroverse_qr_codes](./agroverse_qr_codes/)** - Manages QR code generation and tracking for agricultural products
+- **[webhooks](./webhooks/)** - Handles webhook integrations for external service communications
+
+### External Services
+- **[agroverse_qr_code_web_service](./agroverse_qr_code_web_service/)** - Standalone web service for QR code operations and currency management
+- **[holistic_hit_list_store_history](./holistic_hit_list_store_history/)** - Read-only web API for the holistic wellness hit list: store autocomplete and interaction history for the DApp human-in-the-loop email workflow
+- **[newsletter_subscriber_sync](./newsletter_subscriber_sync/)** - Daily (time-driven) sync into **Agroverse News Letter Subscribers** from Email Agent Suggestions, Agroverse QR codes, and Hit List rows with Status **Partnered**
 
 ## Getting Started
 
@@ -44,16 +50,26 @@ This repository contains Google Apps Script projects for managing and analyzing 
 
 2. **Navigate to Subfolders**:
 
-   - For asset management, refer to [tdg_asset_management/README.md](./tdg_asset_management/README.md).
-   - For chat log scoring, refer to [tdg_scoring/README.md](./tdg_scoring/README.md).
+   - **Core DAO Management**:
+     - [tdg_asset_management/README.md](./tdg_asset_management/README.md) - Asset management and financial tracking
+     - [tdg_inventory_management/README.md](./tdg_inventory_management/README.md) - Inventory and warehouse management
+     - [tdg_proposal/README.md](./tdg_proposal/README.md) - Proposal and governance workflows
+   
+   - **Content & Communication**:
+     - [tdg_scoring/README.md](./tdg_scoring/README.md) - Chat log scoring and TDG token assignment
+     - [agroverse_qr_codes/README.md](./agroverse_qr_codes/README.md) - QR code management for agricultural products
+     - [webhooks/README.md](./webhooks/README.md) - Webhook integrations
+   
+   - **External Services**:
+     - [agroverse_qr_code_web_service/README.md](./agroverse_qr_code_web_service/README.md) - QR code web service and currency management
 
 3. **Follow Subfolder-Specific Instructions**: Each subfolder contains a detailed `README.md` with setup, configuration, and usage instructions specific to its scripts.
 
 ### Google Apps Script Deployment
 
-- Open the Google Apps Script editor from a Google Sheet or at script.google.com.
-- Copy the relevant `.gs` files from the respective subfolder into your project.
-- Configure API keys and other settings as described in the subfolder's `README`.
+- Prefer **clasp** from **`clasp_mirrors/<scriptId>/`** (see above). Do not rely on copying only from this folder into the editor unless you are bootstrapping a brand-new project.
+- For manual setup: open script.google.com (or the bound script), then align content with the mirror or these reference `.gs` files.
+- Configure API keys and other settings as described in each subfolder’s `README` (use Script Properties in production).
 
 ## Security Considerations
 
