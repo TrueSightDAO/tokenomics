@@ -6,10 +6,10 @@
  */
 
 /**
- * Google Apps Script to handle HTTP GET request for retrieving voting rights and asset information based on a digital signature.
+ * Google Apps Script to handle HTTP GET and POST for retrieving voting rights and asset information based on a digital signature.
  * The total_assets value is calculated as the sum of off-chain assets, USDT vault balance, and AGL investment holdings.
  * Asset values (total_assets, asset_per_circulated_voting_right) are formatted to 5 decimal places.
- * If query parameter full=true, returns full response; otherwise, returns only contributor_name.
+ * If query param (GET) or JSON field full is true, returns full response; otherwise, returns only contributor_name.
  *
  * Deployment URL: https://script.google.com/macros/s/AKfycbygmwRbyqse-dpCYMco0rb93NSgg-Jc1QIw7kUiBM7CZK6jnWnMB5DEjdoX_eCsvVs7/exec
  *
@@ -21,7 +21,9 @@
  * 2. Make an HTTP GET request with the digital signature as a query parameter:
  *    - URL format: <web_app_url>?signature=<publicKeyBase64>&full=true
  *    - Example: https://script.google.com/macros/s/<ID>/exec?signature=MIICIjANBgkqhkiG9w0BAQEFAAOCAg8AMI...&full=true
- * 3. The response will be a JSON object:
+ * 3. Or make an HTTP POST with JSON body: { "signature": "<publicKeyBase64>", "full": true } (full optional; defaults like GET).
+ *    - Example: curl -X POST -H "Content-Type: application/json" -d '{"signature":"...","full":true}' <web_app_url>
+ * 4. The response will be a JSON object:
  *    - If full=true: {
  *        "contributor_name": <string>,
  *        "voting_rights": <value>,
@@ -31,11 +33,11 @@
  *        "usd_provisions_for_cash_out": <number, 5 decimal places>  // USD set aside for cash-outs; limits realistic payout
  *      }
  *    - If full=false or omitted: { "contributor_name": <string> }
- *    - Error: { "error": "No matching signature found" } or { "error": "Signature parameter missing" }
- * 4. Use a tool like curl, Postman, or JavaScript fetch to test:
+ *    - Error: { "error": "No matching signature found" } or missing signature / invalid JSON messages as applicable
+ * 5. Use a tool like curl, Postman, or JavaScript fetch to test:
  *    - curl: curl "<web_app_url>?signature=<publicKeyBase64>&full=true"
  *    - JavaScript: fetch("<web_app_url>?signature=<publicKeyBase64>&full=true").then(res => res.json())
- * 5. To troubleshoot signature lookup:
+ * 6. To troubleshoot signature lookup:
  *    - Open the script editor and run the testSignatureLookup function with a test signature.
  *    - Example: testSignatureLookup("MIICIjANBgkqhkiG9w0BAQEFAAOCAg8AMI...");
  *    - Check the Logs (View > Logs) for the result: { contributorName: "Name" } or { error: "No matching signature found" }
@@ -420,19 +422,20 @@ function testSignatureLookup(testSignature = 'MIICIjANBgkqhkiG9w0BAQEFAAOCAg8AMI
   Logger.log(JSON.stringify(result));
 }
 
-function doGet(e) {
-  // Check for signature parameter
-  const signature = e.parameter.signature;
+/**
+ * @param {string|undefined} signature
+ * @param {boolean} isFullResponse
+ * @param {string} missingSignatureError
+ * @returns {GoogleAppsScript.Content.TextOutput}
+ */
+function respondForSignature(signature, isFullResponse, missingSignatureError) {
   if (!signature) {
     return ContentService.createTextOutput(
-      JSON.stringify({ error: 'Signature parameter missing' })
+      JSON.stringify({ error: missingSignatureError })
     ).setMimeType(ContentService.MimeType.JSON);
   }
 
-  // Open the spreadsheet
   const spreadsheet = SpreadsheetApp.openById(SPREADSHEET_ID);
-
-  // Step 1: Search for signature using findContributorBySignature
   const { contributorName, error } = findContributorBySignature(signature, spreadsheet);
   if (error) {
     return ContentService.createTextOutput(
@@ -440,24 +443,19 @@ function doGet(e) {
     ).setMimeType(ContentService.MimeType.JSON);
   }
 
-  // Check for full=true query parameter
-  const isFullResponse = e.parameter.full === 'true';
-
-  // If full=false or omitted, return only contributor_name
   if (!isFullResponse) {
     return ContentService.createTextOutput(
       JSON.stringify({ contributor_name: contributorName })
     ).setMimeType(ContentService.MimeType.JSON);
   }
 
-  // Step 2: Find voting weight in "Contributors voting weight" Column H (index 7) where Column C (index 2) matches contributorName
   const votingSheet = spreadsheet.getSheetByName(VOTING_SHEET_NAME);
   const votingData = votingSheet.getDataRange().getValues();
   let votingRights = null;
 
-  for (let i = 1; i < votingData.length; i++) { // Skip header row
-    if (votingData[i][2] === contributorName) { // Column C
-      votingRights = votingData[i][7]; // Column H
+  for (let i = 1; i < votingData.length; i++) {
+    if (votingData[i][2] === contributorName) {
+      votingRights = votingData[i][7];
       break;
     }
   }
@@ -468,20 +466,12 @@ function doGet(e) {
     ).setMimeType(ContentService.MimeType.JSON);
   }
 
-  // Step 3: Get voting_rights_circulated from "Ledger history" cell E1
   const ledgerSheet = spreadsheet.getSheetByName(LEDGER_SHEET_NAME);
   const votingRightsCirculated = ledgerSheet.getRange('E1').getValue();
-
-  // Step 4: Calculate total_assets as off-chain assets + USDT vault balance + AGL investment holdings
   const totalAssets = getOffChainAssetValue() + getUSDTBalanceInVault() + getInvestmentHoldingsInAGL();
-
-  // Step 5: Calculate asset_per_circulated_voting_right
   const assetPerCirculatedVotingRight = votingRightsCirculated !== 0 ? totalAssets / votingRightsCirculated : 0;
-
-  // Step 6: Get USD provisions for voting rights cash-out (amount realistically available for payouts)
   const usdProvisionsForCashOut = getUsdProvisionsForCashOut();
 
-  // Return full result with asset values formatted to 5 decimal places
   return ContentService.createTextOutput(
     JSON.stringify({
       contributor_name: contributorName,
@@ -492,4 +482,26 @@ function doGet(e) {
       usd_provisions_for_cash_out: parseFloat(usdProvisionsForCashOut.toFixed(5))
     })
   ).setMimeType(ContentService.MimeType.JSON);
+}
+
+function doGet(e) {
+  const signature = e.parameter.signature;
+  const isFullResponse = e.parameter.full === 'true';
+  return respondForSignature(signature, isFullResponse, 'Signature parameter missing');
+}
+
+/**
+ * POST JSON body: { "signature": "<publicKeyBase64>", "full": true|false } (full optional).
+ */
+function doPost(e) {
+  try {
+    const postData = JSON.parse(e.postData.contents);
+    const signature = postData.signature;
+    const isFullResponse = postData.full === true || postData.full === 'true';
+    return respondForSignature(signature, isFullResponse, 'Signature field missing in JSON payload');
+  } catch (error) {
+    return ContentService.createTextOutput(
+      JSON.stringify({ error: 'Invalid JSON payload or processing error: ' + error.message })
+    ).setMimeType(ContentService.MimeType.JSON);
+  }
 }
