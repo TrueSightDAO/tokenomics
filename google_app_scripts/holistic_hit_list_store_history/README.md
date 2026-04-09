@@ -57,3 +57,13 @@ If the browser blocks the response with a **CORS** error:
 
 - DApp page: `/Applications/dapp/store_interaction_history.html`
 - Conventions: `agentic_ai_context/DAPP_PAGE_CONVENTIONS.md`, `dapp/UX_CONVENTIONS.md`
+
+## Email Agent drafts (optional, same spreadsheet project)
+
+Add **`email_agent_drafts.gs`** to the **container-bound** Apps Script project if you want menu-driven Gmail drafts (mirrors **`market_research/scripts/suggest_*_drafts.py`**):
+
+- **AI: Warm up prospect** — intro + consignment/bulk copy + wholesale PDF (`UrlFetch` to raw GitHub or script property **`BULK_PDF_RAW_URL`**)
+- **Manager Follow-up** — no PDF
+- **Bulk Info Requested** — PDF only
+
+Save → reload the spreadsheet → **Email Agent drafts** menu. Details: **`market_research/HIT_LIST_CREDENTIALS.md`**.
