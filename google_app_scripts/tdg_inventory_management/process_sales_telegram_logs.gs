@@ -35,9 +35,10 @@ const CONTRIBUTORS_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1GE7PUq-U
 const CONTRIBUTORS_SHEET_NAME = 'Contributors contact information';
 const AGROVERSE_QR_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU/edit?gid=472328231#gid=472328231';
 const AGROVERSE_QR_SHEET_NAME = 'Agroverse QR codes';
-/** Main ledger tab: Session ID column C, Tracking column N, Agroverse QR column P */
+/** Main ledger tab: Session ID column C, Shipping Provider column M, Tracking column N, Agroverse QR column P */
 const STRIPE_CHECKOUT_SHEET_NAME = 'Stripe Social Media Checkout ID';
 const STRIPE_COL_SESSION = 3; // C
+const STRIPE_COL_SHIPPING = 13; // M
 const STRIPE_COL_TRACKING = 14; // N
 const STRIPE_COL_QR = 16; // P
 const AGROVERSE_OWNER_EMAIL_COL = 12; // L (1-based for getRange)
@@ -51,7 +52,8 @@ const CONTRIBUTOR_NAME_COL = 4; // Column E (must match Contributors Column H)
 const MESSAGE_COL = 6; // Column G
 const SALES_DATE_COL = 11; // Column L
 
-// Column indices for destination sheet
+// Column indices for destination sheet (QR Code Sales).
+// Column D contributor cell: cash proceeds collector for [SALES EVENT] (who received payment). Column C retains full message including "Sold by:".
 const DEST_MESSAGE_ID_COL = 1; // Column B (for duplicate checking)
 const DEST_QR_CODE_COL = 4; // Column E (for QR code duplicate checking)
 
@@ -254,8 +256,8 @@ function updateAgroverseQrOwnerEmail(qrCode, email) {
   }
 }
 
-/** Match Stripe checkout row by Session ID (column C); set Tracking (N) and QR (P) when provided */
-function updateStripeCheckoutMetadata(sessionId, trackingNumber, qrCode) {
+/** Match Stripe checkout row by Session ID (column C); set Shipping (M), Tracking (N), and QR (P) when provided */
+function updateStripeCheckoutMetadata(sessionId, trackingNumber, qrCode, shippingProvider) {
   if (!sessionId) {
     Logger.log('Stripe checkout update skipped: no Stripe Session ID in payload');
     return false;
@@ -272,13 +274,16 @@ function updateStripeCheckoutMetadata(sessionId, trackingNumber, qrCode) {
     for (let r = lastRow; r >= 2; r--) {
       const cell = sheet.getRange(r, STRIPE_COL_SESSION).getValue();
       if ((cell || '').toString().trim() === want) {
+        if (shippingProvider) {
+          sheet.getRange(r, STRIPE_COL_SHIPPING).setValue(shippingProvider);
+        }
         if (trackingNumber) {
           sheet.getRange(r, STRIPE_COL_TRACKING).setValue(trackingNumber);
         }
         if (qrCode) {
           sheet.getRange(r, STRIPE_COL_QR).setValue(qrCode);
         }
-        Logger.log(`Updated Stripe checkout row ${r} for session ${want} (tracking / column P)`);
+        Logger.log(`Updated Stripe checkout row ${r} for session ${want} (shipping / tracking / column P)`);
         return true;
       }
     }
@@ -291,13 +296,13 @@ function updateStripeCheckoutMetadata(sessionId, trackingNumber, qrCode) {
 }
 
 /** After a verified [SALES EVENT] row is accepted, sync optional DApp fields to the main ledger */
-function applySalesEventLedgerFields(qrCode, parseMethod, ownerEmail, stripeSessionId, trackingNumber) {
+function applySalesEventLedgerFields(qrCode, parseMethod, ownerEmail, stripeSessionId, trackingNumber, shippingProvider) {
   if (parseMethod !== 'SALES_EVENT' || !qrCode) return;
   if (ownerEmail) {
     updateAgroverseQrOwnerEmail(qrCode, ownerEmail);
   }
   if (stripeSessionId) {
-    updateStripeCheckoutMetadata(stripeSessionId, trackingNumber, qrCode);
+    updateStripeCheckoutMetadata(stripeSessionId, trackingNumber, qrCode, shippingProvider);
   }
 }
 
@@ -316,10 +321,16 @@ function parseSalesEvent(message) {
 
     const ownerLine = message.match(/- Owner email:\s*([^\n]+)/i);
     const stripeLine = message.match(/- Stripe Session ID:\s*([^\n]+)/i);
+    const shipProvLine = message.match(/- Shipping Provider:\s*([^\n]+)/i);
     const trackLine = message.match(/- Tracking number:\s*([^\n]+)/i);
+    const soldByLine = message.match(/- Sold by:\s*([^\n]+)/i);
+    const cashProceedsLine = message.match(/- Cash proceeds collected by:\s*([^\n]+)/i);
     const ownerEmail = normalizeSalesEventOptionalField(ownerLine ? ownerLine[1] : '');
     const stripeSessionId = normalizeSalesEventOptionalField(stripeLine ? stripeLine[1] : '');
+    const shippingProvider = normalizeSalesEventOptionalField(shipProvLine ? shipProvLine[1] : '');
     const trackingNumber = normalizeSalesEventOptionalField(trackLine ? trackLine[1] : '');
+    const soldBy = (soldByLine ? soldByLine[1] : '').toString().trim();
+    const cashProceedsCollectedBy = (cashProceedsLine ? cashProceedsLine[1] : '').toString().trim();
     
     if (qrCode && salePrice) {
       Logger.log(`[SALES EVENT] parsed successfully: QR=${qrCode}, Price=${salePrice}`);
@@ -329,7 +340,10 @@ function parseSalesEvent(message) {
         parseMethod: 'SALES_EVENT',
         ownerEmail,
         stripeSessionId,
-        trackingNumber
+        shippingProvider,
+        trackingNumber,
+        soldBy,
+        cashProceedsCollectedBy
       };
     }
     
@@ -340,7 +354,10 @@ function parseSalesEvent(message) {
       parseMethod: 'FAILED',
       ownerEmail: '',
       stripeSessionId: '',
-      trackingNumber: ''
+      shippingProvider: '',
+      trackingNumber: '',
+      soldBy: '',
+      cashProceedsCollectedBy: ''
     };
   } catch (e) {
     Logger.log(`[SALES EVENT] parsing error: ${e.message}`);
@@ -350,7 +367,10 @@ function parseSalesEvent(message) {
       parseMethod: 'ERROR',
       ownerEmail: '',
       stripeSessionId: '',
-      trackingNumber: ''
+      shippingProvider: '',
+      trackingNumber: '',
+      soldBy: '',
+      cashProceedsCollectedBy: ''
     };
   }
 }
@@ -379,7 +399,10 @@ function parseQrCodeEvent(message) {
         parseMethod: 'QR_CODE_EVENT',
         ownerEmail: '',
         stripeSessionId: '',
-        trackingNumber: ''
+        shippingProvider: '',
+        trackingNumber: '',
+        soldBy: '',
+        cashProceedsCollectedBy: ''
       };
     }
     
@@ -390,7 +413,10 @@ function parseQrCodeEvent(message) {
       parseMethod: 'FAILED',
       ownerEmail: '',
       stripeSessionId: '',
-      trackingNumber: ''
+      shippingProvider: '',
+      trackingNumber: '',
+      soldBy: '',
+      cashProceedsCollectedBy: ''
     };
   } catch (e) {
     Logger.log(`[QR CODE EVENT] parsing error: ${e.message}`);
@@ -400,7 +426,10 @@ function parseQrCodeEvent(message) {
       parseMethod: 'ERROR',
       ownerEmail: '',
       stripeSessionId: '',
-      trackingNumber: ''
+      shippingProvider: '',
+      trackingNumber: '',
+      soldBy: '',
+      cashProceedsCollectedBy: ''
     };
   }
 }
@@ -425,7 +454,10 @@ function parseStructuredMessage(message) {
     parseMethod: 'NONE',
     ownerEmail: '',
     stripeSessionId: '',
-    trackingNumber: ''
+    shippingProvider: '',
+    trackingNumber: '',
+    soldBy: '',
+    cashProceedsCollectedBy: ''
   };
 }
 
@@ -442,7 +474,10 @@ function callGrokApi(message) {
         parseMethod: 'GROK_ERROR',
         ownerEmail: '',
         stripeSessionId: '',
-        trackingNumber: ''
+        shippingProvider: '',
+        trackingNumber: '',
+        soldBy: '',
+        cashProceedsCollectedBy: ''
       };
     }
 
@@ -480,7 +515,10 @@ Message: "${message}"`;
       parseMethod: 'GROK_API',
       ownerEmail: '',
       stripeSessionId: '',
-      trackingNumber: ''
+      shippingProvider: '',
+      trackingNumber: '',
+      soldBy: '',
+      cashProceedsCollectedBy: ''
     };
   } catch (e) {
     Logger.log(`Grok API error: ${e.message}`);
@@ -490,7 +528,10 @@ Message: "${message}"`;
       parseMethod: 'GROK_ERROR',
       ownerEmail: '',
       stripeSessionId: '',
-      trackingNumber: ''
+      shippingProvider: '',
+      trackingNumber: '',
+      soldBy: '',
+      cashProceedsCollectedBy: ''
     };
   }
 }
@@ -556,95 +597,91 @@ function parseTelegramChatLogs() {
     
     // Check if message matches any pattern and hasn't been processed
     if (patterns.some(pattern => pattern.test(message)) && !existingMessageIds.includes(telegramMessageId)) {
-      // Initialize contributorName and telegramHandle
-      let contributorName = sourceData[i][CONTRIBUTOR_NAME_COL];
-      let telegramHandle = null;
-      
-      // Check if message is a [SALES EVENT] and extract reporter name
-      if (message.match(/\[SALES EVENT\]/i)) {
-        const reporterMatch = message.match(salesEventReporterPattern);
-        if (reporterMatch && reporterMatch[1]) {
-          contributorName = reporterMatch[1].trim();
-        }
-      }
-      
-      // Validate contributorName against Contributors sheet Column H
-      if (!isValidContributor(contributorName)) {
-        Logger.log(`Skipping row ${i + 1} due to invalid contributor: ${contributorName}`);
-        continue;
-      }
-      
-      // Extract QR code and sale price (structured parsing first, then Grok API fallback)
       const {
         qrCode,
         salePrice,
         parseMethod,
         ownerEmail,
         stripeSessionId,
-        trackingNumber
+        shippingProvider,
+        trackingNumber,
+        soldBy: parsedSoldBy,
+        cashProceedsCollectedBy: parsedCashProceeds
       } = extractQrCodeAndPrice(message);
       Logger.log(`Row ${i + 1}: Parsed using method: ${parseMethod}`);
-      
-      // If valid data returned, prepare row
-      if (qrCode && salePrice) {
-        // Check if QR code already exists
-        if (existingQrCodes.includes(qrCode)) {
-          Logger.log(`Skipping row ${i + 1} due to duplicate QR code: ${qrCode}`);
+
+      if (!qrCode || !salePrice) {
+        continue;
+      }
+
+      if (existingQrCodes.includes(qrCode)) {
+        Logger.log(`Skipping row ${i + 1} due to duplicate QR code: ${qrCode}`);
+        continue;
+      }
+
+      let finalSoldBy;
+      /** Column D in QR Code Sales: cash proceeds collector (for ledger / payout attribution). */
+      let finalCashCollector;
+
+      if (message.match(/\[SALES EVENT\]/i)) {
+        const reporterMatch = message.match(salesEventReporterPattern);
+        const sourceContributor = sourceData[i][CONTRIBUTOR_NAME_COL];
+        const soldByRaw = (parsedSoldBy || '').trim()
+          || (reporterMatch && reporterMatch[1] ? reporterMatch[1].trim() : '')
+          || sourceContributor;
+        const cashRaw = (parsedCashProceeds || '').trim() || soldByRaw;
+        if (!isValidContributor(soldByRaw) || !isValidContributor(cashRaw)) {
+          Logger.log(`Skipping row ${i + 1} due to invalid contributor (sold by: ${soldByRaw}, cash proceeds: ${cashRaw})`);
           continue;
         }
-        
-        // Extract Telegram handle from message (only if not a [SALES EVENT])
-        if (!message.match(/\[SALES EVENT\]/i)) {
-          const handleMatch = message.match(telegramHandlePattern);
-          telegramHandle = handleMatch ? handleMatch[0] : null; // e.g., "@kikiscocoa" or null
+        finalSoldBy = getReporterName(null, soldByRaw);
+        finalCashCollector = getReporterName(null, cashRaw);
+      } else {
+        let contributorName = sourceData[i][CONTRIBUTOR_NAME_COL];
+        let telegramHandle = null;
+        const handleMatch = message.match(telegramHandlePattern);
+        telegramHandle = handleMatch ? handleMatch[0] : null;
+        if (!isValidContributor(contributorName)) {
+          Logger.log(`Skipping row ${i + 1} due to invalid contributor: ${contributorName}`);
+          continue;
         }
-        
-        // Get reporter name from Contributors sheet (or use extracted name for [SALES EVENT])
-        const finalContributorName = getReporterName(telegramHandle, contributorName);
-        
-        // Get sales date from source sheet
-        const salesDate = sourceData[i][SALES_DATE_COL] || '';
-        
-        // Update Agroverse QR codes sheet status to SOLD
-        updateAgroverseQrStatus(qrCode);
-        applySalesEventLedgerFields(qrCode, parseMethod, ownerEmail, stripeSessionId, trackingNumber);
-        
-        // Get value from Agroverse QR codes sheet
-        const agroverseValue = getAgroverseValue(qrCode);
-        
-        // Get inventory type from Agroverse QR codes sheet
-        const inventoryType = getAgroverseInventoryType(qrCode);
-        
-        // Prepare row to append
-        const rowToAppend = [
-          sourceData[i][TELEGRAM_UPDATE_ID_COL], // Column A: Telegram Update ID
-          telegramMessageId, // Column B: Telegram Message ID
-          message, // Column C: Message
-          finalContributorName, // Column D: Contributor Name (from Contributors sheet or fallback)
-          qrCode, // Column E: QR Code
-          salePrice, // Column F: Sale Price
-          agroverseValue, // Column G: Value from Agroverse QR codes Column C
-          salesDate, // Column H: Sales Date from source Column L
-          inventoryType // Column I: Inventory Type from Agroverse QR codes Column I
-        ];
-        
-        // Append the row to the destination sheet
-        destinationSheet.getRange(destinationSheet.getLastRow() + 1, 1, 1, rowToAppend.length).setValues([rowToAppend]);
-        
-        // Update existingQrCodes with the new QR code
-        existingQrCodes.push(qrCode);
-        newEntries++;
-        
-        // Send Telegram notification for the new QR code
-        const chatId = sourceData[i][CHAT_ID_COL] ? sourceData[i][CHAT_ID_COL].toString().trim() : null;
-        if (chatId) {
-          sendQrCodeNotification(qrCode, finalContributorName, chatId);
-        } else {
-          Logger.log(`No chat ID found for row ${i + 1}, skipping notification for QR code ${qrCode}`);
-        }
-        
-        Logger.log(`Added row ${i + 1} with QR code: ${qrCode}`);
+        finalSoldBy = getReporterName(telegramHandle, contributorName);
+        finalCashCollector = finalSoldBy;
       }
+
+      const salesDate = sourceData[i][SALES_DATE_COL] || '';
+
+      updateAgroverseQrStatus(qrCode);
+      applySalesEventLedgerFields(qrCode, parseMethod, ownerEmail, stripeSessionId, trackingNumber, shippingProvider);
+
+      const agroverseValue = getAgroverseValue(qrCode);
+      const inventoryType = getAgroverseInventoryType(qrCode);
+
+      const rowToAppend = [
+        sourceData[i][TELEGRAM_UPDATE_ID_COL],
+        telegramMessageId,
+        message,
+        finalCashCollector,
+        qrCode,
+        salePrice,
+        agroverseValue,
+        salesDate,
+        inventoryType
+      ];
+
+      destinationSheet.getRange(destinationSheet.getLastRow() + 1, 1, 1, rowToAppend.length).setValues([rowToAppend]);
+
+      existingQrCodes.push(qrCode);
+      newEntries++;
+
+      const chatId = sourceData[i][CHAT_ID_COL] ? sourceData[i][CHAT_ID_COL].toString().trim() : null;
+      if (chatId) {
+        sendQrCodeNotification(qrCode, finalSoldBy, chatId);
+      } else {
+        Logger.log(`No chat ID found for row ${i + 1}, skipping notification for QR code ${qrCode}`);
+      }
+
+      Logger.log(`Added row ${i + 1} with QR code: ${qrCode}`);
     }
   }
   
@@ -701,93 +738,88 @@ function processSpecificRow(rowIndex) {
   
   // Check if message matches any pattern and hasn't been processed
   if (patterns.some(pattern => pattern.test(message)) && !existingMessageIds.includes(telegramMessageId)) {
-    // Initialize contributorName and telegramHandle
-    let contributorName = sourceData[0][CONTRIBUTOR_NAME_COL];
-    let telegramHandle = null;
-    
-    // Check if message is a [SALES EVENT] and extract reporter name
-    if (message.match(/\[SALES EVENT\]/i)) {
-      const reporterMatch = message.match(salesEventReporterPattern);
-      if (reporterMatch && reporterMatch[1]) {
-        contributorName = reporterMatch[1].trim();
-      }
-    }
-    
-    // Validate contributorName against Contributors sheet
-    if (!isValidContributor(contributorName)) {
-      Logger.log(`Skipping row ${rowIndex} due to invalid contributor: ${contributorName}`);
-      return;
-    }
-    
-    // Extract QR code and sale price (structured parsing first, then Grok API fallback)
     const {
       qrCode,
       salePrice,
       parseMethod,
       ownerEmail,
       stripeSessionId,
-      trackingNumber
+      shippingProvider,
+      trackingNumber,
+      soldBy: parsedSoldBy,
+      cashProceedsCollectedBy: parsedCashProceeds
     } = extractQrCodeAndPrice(message);
     Logger.log(`Row ${rowIndex}: Parsed using method: ${parseMethod}`);
-    
-    // If valid data returned, prepare row
-    if (qrCode && salePrice) {
-      // Check if QR code already exists
-      if (existingQrCodes.includes(qrCode)) {
-        Logger.log(`Skipping row ${rowIndex} due to duplicate QR code: ${qrCode}`);
+
+    if (!qrCode || !salePrice) {
+      Logger.log(`No valid QR code or sale price found in row ${rowIndex}`);
+      return;
+    }
+
+    if (existingQrCodes.includes(qrCode)) {
+      Logger.log(`Skipping row ${rowIndex} due to duplicate QR code: ${qrCode}`);
+      return;
+    }
+
+    let finalSoldBy;
+    let finalCashCollector;
+
+    if (message.match(/\[SALES EVENT\]/i)) {
+      const reporterMatch = message.match(salesEventReporterPattern);
+      const sourceContributor = sourceData[0][CONTRIBUTOR_NAME_COL];
+      const soldByRaw = (parsedSoldBy || '').trim()
+        || (reporterMatch && reporterMatch[1] ? reporterMatch[1].trim() : '')
+        || sourceContributor;
+      const cashRaw = (parsedCashProceeds || '').trim() || soldByRaw;
+      if (!isValidContributor(soldByRaw) || !isValidContributor(cashRaw)) {
+        Logger.log(`Skipping row ${rowIndex} due to invalid contributor (sold by: ${soldByRaw}, cash proceeds: ${cashRaw})`);
         return;
       }
-      
-      // Extract Telegram handle from message (only if not a [SALES EVENT])
-      if (!message.match(/\[SALES EVENT\]/i)) {
-        const handleMatch = message.match(telegramHandlePattern);
-        telegramHandle = handleMatch ? handleMatch[0] : null; // e.g., "@kikiscocoa" or null
-      }
-      
-      // Get reporter name from Contributors sheet (or use extracted name for [SALES EVENT])
-      const finalContributorName = getReporterName(telegramHandle, contributorName);
-      
-      // Get sales date from source sheet
-      const salesDate = sourceData[0][SALES_DATE_COL] || '';
-      
-      // Update Agroverse QR codes sheet status to SOLD
-      updateAgroverseQrStatus(qrCode);
-      applySalesEventLedgerFields(qrCode, parseMethod, ownerEmail, stripeSessionId, trackingNumber);
-      
-      // Get value from Agroverse QR codes sheet
-      const agroverseValue = getAgroverseValue(qrCode);
-      
-      // Get inventory type from Agroverse QR codes sheet
-      const inventoryType = getAgroverseInventoryType(qrCode);
-      
-      // Prepare row to append
-      const rowToAppend = [
-        sourceData[0][TELEGRAM_UPDATE_ID_COL], // Column A: Telegram Update ID
-        telegramMessageId, // Column B: Telegram Message ID
-        message, // Column C: Message
-        finalContributorName, // Column D: Contributor Name (from Contributors sheet or fallback)
-        qrCode, // Column E: QR Code
-        salePrice, // Column F: Sale Price
-        agroverseValue, // Column G: Value from Agroverse QR codes Column C
-        salesDate, // Column H: Sales Date from source Column L
-        inventoryType // Column I: Inventory Type from Agroverse QR codes Column I
-      ];
-      
-      // Append the row to the destination sheet
-      destinationSheet.getRange(destinationSheet.getLastRow() + 1, 1, 1, rowToAppend.length).setValues([rowToAppend]);
-      
-      // Send Telegram notification for the new QR code
-      const chatId = sourceData[0][CHAT_ID_COL] ? sourceData[0][CHAT_ID_COL].toString().trim() : null;
-      if (chatId) {
-        sendQrCodeNotification(qrCode, finalContributorName, chatId);
-      } else {
-        Logger.log(`No chat ID found for row ${rowIndex}, skipping notification for QR code ${qrCode}`);
-      }
-      
-      Logger.log(`Processed row ${rowIndex} with QR code: ${qrCode}`);
+      finalSoldBy = getReporterName(null, soldByRaw);
+      finalCashCollector = getReporterName(null, cashRaw);
     } else {
-      Logger.log(`No valid QR code or sale price found in row ${rowIndex}`);
+      let contributorName = sourceData[0][CONTRIBUTOR_NAME_COL];
+      let telegramHandle = null;
+      const handleMatch = message.match(telegramHandlePattern);
+      telegramHandle = handleMatch ? handleMatch[0] : null;
+      if (!isValidContributor(contributorName)) {
+        Logger.log(`Skipping row ${rowIndex} due to invalid contributor: ${contributorName}`);
+        return;
+      }
+      finalSoldBy = getReporterName(telegramHandle, contributorName);
+      finalCashCollector = finalSoldBy;
     }
+
+    const salesDate = sourceData[0][SALES_DATE_COL] || '';
+
+    updateAgroverseQrStatus(qrCode);
+    applySalesEventLedgerFields(qrCode, parseMethod, ownerEmail, stripeSessionId, trackingNumber, shippingProvider);
+
+    const agroverseValue = getAgroverseValue(qrCode);
+    const inventoryType = getAgroverseInventoryType(qrCode);
+
+    const rowToAppend = [
+      sourceData[0][TELEGRAM_UPDATE_ID_COL],
+      telegramMessageId,
+      message,
+      finalCashCollector,
+      qrCode,
+      salePrice,
+      agroverseValue,
+      salesDate,
+      inventoryType
+    ];
+
+    destinationSheet.getRange(destinationSheet.getLastRow() + 1, 1, 1, rowToAppend.length).setValues([rowToAppend]);
+
+    const chatId = sourceData[0][CHAT_ID_COL] ? sourceData[0][CHAT_ID_COL].toString().trim() : null;
+    if (chatId) {
+      sendQrCodeNotification(qrCode, finalSoldBy, chatId);
+    } else {
+      Logger.log(`No chat ID found for row ${rowIndex}, skipping notification for QR code ${qrCode}`);
+    }
+
+    Logger.log(`Processed row ${rowIndex} with QR code: ${qrCode}`);
   } else {
     Logger.log(`Row ${rowIndex} skipped: Message does not match patterns or already processed`);
   }
