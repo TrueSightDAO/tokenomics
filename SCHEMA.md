@@ -9,8 +9,8 @@
 ### Sales reporter ↔ Stripe ↔ Agroverse QR linking
 
 - **`Stripe Social Media Checkout ID`**: **Column P — `Agroverse QR code`** (NEW in operations; link Stripe checkout Session ID row to the serialized bag QR). Code treats **C** = Stripe Session ID, **N** = Tracking Number, **P** = Agroverse QR code.
-- **DApp Sales Reporter** (`report_sales.html`) and **`agroverse_qr_codes` web app** (`list_unassigned_stripe_sessions`, `lookup`, etc.) use column **P** to show unassigned sessions and to write **P** + **N** when a `[SALES EVENT]` is processed (`process_sales_telegram_logs.gs` → `updateStripeCheckoutMetadata`).
-- **`QR Code Sales`** tab (Telegram & Submissions spreadsheet): Column **D** is the **cash proceeds collector** for `[SALES EVENT]` submissions when “Cash proceeds collected by” differs from “Sold by”; full message (both lines) remains in column **C**.
+- **DApp Sales Reporter** (`report_sales.html`) and **`agroverse_qr_codes` web app** (`list_unassigned_stripe_sessions`, `lookup`, etc.) use column **P** to show unassigned sessions and to write **P** + **N** (+ **M** shipping provider) when a `[SALES EVENT]` is processed (`process_sales_telegram_logs.gs` → `updateStripeCheckoutMetadata`).
+- **`QR Code Sales`** tab (same workbook as Telegram logs compilation, `gid=1003674539`): Column **D** is the **cash proceeds collector** for `[SALES EVENT]` when “Cash proceeds collected by” differs from “Sold by”; full message stays in **C**. **`process_sales_telegram_logs.gs`** now also writes extracted **`[SALES EVENT]`** fields on each new row: **L** Owner email, **M** Stripe Session ID, **N** Shipping Provider, **O** Tracking Number (columns **J–K** stay empty on ingest for downstream ledger scripts). Row 1 headers **L–O** are created automatically when blank.
 
 ---
 
@@ -306,6 +306,10 @@ See [`python_scripts/schema_validation/README.md`](./python_scripts/schema_valid
 | I | Currency | String | Product sold |
 | J | Status | String | "PROCESSING", "ACCOUNTED", "TOKENIZED", empty |
 | K | Ledger Lines Number | String | Comma-separated row numbers |
+| L | Owner email | String | From **`[SALES EVENT]`** when present (DApp **report_sales** / list flow); empty for legacy rows |
+| M | Stripe Session ID | String | Parsed from same message; aligns with Stripe checkout column C |
+| N | Shipping Provider | String | EasyPost USPS label text (e.g. `GroundAdvantage - USPS`) when submitted |
+| O | Tracking Number | String | Carrier tracking when submitted |
 
 **Used by:**
 - [`process_sales_telegram_logs.gs`](https://github.com/TrueSightDAO/tokenomics/blob/main/google_app_scripts/tdg_inventory_management/process_sales_telegram_logs.gs) - Parses and validates sales from Telegram
