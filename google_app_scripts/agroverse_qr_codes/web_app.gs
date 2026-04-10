@@ -83,7 +83,7 @@ function doOptions(e) {
  * - 'list_all=true' query parameter to return ALL QR codes including SOLD status.
  * - 'list_with_members=true' query parameter to return QR codes with details where column D is NOT 'SOLD'.
  * - 'lookup=true&qr_code=...' returns ledger details plus stripe_session_id and tracking_number when a row
- *   in 'Stripe Social Media Checkout ID' has column P equal to the QR code (Session in C, Tracking in N; newest row wins).
+ *   in 'Stripe Social Media Checkout ID' has column P equal to the QR code (Session in C, Shipping M, Tracking N; newest row wins).
  * - 'list_unassigned_stripe_sessions=true' returns { items: [{ stripe_session_id }] } for rows with Session in C
  *   and column P blank; optional 'for_qr_code' also returns sessions already linked to that QR in P (for DApp prefill).
  *
@@ -241,6 +241,7 @@ function doGet(e) {
             email: email,
             manager_name: managerName,
             stripe_session_id: stripeInfo.stripe_session_id,
+            shipping_provider: stripeInfo.shipping_provider,
             tracking_number: stripeInfo.tracking_number
           });
         }
@@ -315,7 +316,7 @@ function doGet(e) {
  * Returns Session ID (column C) and Tracking Number (column N). If multiple rows match, the bottom-most row wins.
  * @param {GoogleAppsScript.Spreadsheet.Spreadsheet} spreadsheet
  * @param {string} qrCode
- * @return {{stripe_session_id: string, tracking_number: string}}
+ * @return {{stripe_session_id: string, tracking_number: string, shipping_provider: string}}
  */
 /**
  * Stripe sessions where column P is unassigned, optionally including rows already tied to forQrCode (column P match).
@@ -365,7 +366,7 @@ function listUnassignedStripeSessions_(spreadsheet, forQrCodeRaw) {
 }
 
 function lookupStripeCheckoutByQrCode_(spreadsheet, qrCode) {
-  var empty = { stripe_session_id: '', tracking_number: '' };
+  var empty = { stripe_session_id: '', tracking_number: '', shipping_provider: '' };
   if (!qrCode) return empty;
 
   var sheet = spreadsheet.getSheetByName(STRIPE_CHECKOUT_SHEET_NAME);
@@ -375,7 +376,7 @@ function lookupStripeCheckoutByQrCode_(spreadsheet, qrCode) {
   if (lastRow < DATA_START_ROW) return empty;
 
   var wanted = qrCode.toString().trim();
-  // Columns C through P: C=Session, N=Tracking, P=QR code match
+  // Range columns 3..16: idx 0=C session, idx 10=M shipping provider, idx 11=N tracking, idx 13=P QR
   var range = sheet.getRange(DATA_START_ROW, 3, lastRow, 16).getValues();
 
   for (var r = range.length - 1; r >= 0; r--) {
@@ -383,6 +384,7 @@ function lookupStripeCheckoutByQrCode_(spreadsheet, qrCode) {
     if (pVal === wanted) {
       return {
         stripe_session_id: (range[r][0] || '').toString().trim(),
+        shipping_provider: (range[r][10] || '').toString().trim(),
         tracking_number: (range[r][11] || '').toString().trim()
       };
     }

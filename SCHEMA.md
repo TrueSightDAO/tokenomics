@@ -1,8 +1,18 @@
 # TrueSight DAO - Google Sheets Schema Documentation
 
-> **Last Updated:** 2025-12-26
+> **Last Updated:** 2026-04-10
 > 
 > This document provides a consolidated reference for all Google Sheets used across TrueSight DAO's Google Apps Scripts. Use this as a central schema reference when making code changes.
+
+## 📝 Recent Changes (2026-04-10)
+
+### Sales reporter ↔ Stripe ↔ Agroverse QR linking
+
+- **`Stripe Social Media Checkout ID`**: **Column P — `Agroverse QR code`** (NEW in operations; link Stripe checkout Session ID row to the serialized bag QR). Code treats **C** = Stripe Session ID, **N** = Tracking Number, **P** = Agroverse QR code.
+- **DApp Sales Reporter** (`report_sales.html`) and **`agroverse_qr_codes` web app** (`list_unassigned_stripe_sessions`, `lookup`, etc.) use column **P** to show unassigned sessions and to write **P** + **N** when a `[SALES EVENT]` is processed (`process_sales_telegram_logs.gs` → `updateStripeCheckoutMetadata`).
+- **`QR Code Sales`** tab (Telegram & Submissions spreadsheet): Column **D** is the **cash proceeds collector** for `[SALES EVENT]` submissions when “Cash proceeds collected by” differs from “Sold by”; full message (both lines) remains in column **C**.
+
+---
 
 ## 📝 Recent Changes (2025-12-26)
 
@@ -287,8 +297,8 @@ See [`python_scripts/schema_validation/README.md`](./python_scripts/schema_valid
 |--------|------|------|-------------|
 | A | Telegram Update ID | Number | Source Telegram update ID |
 | B | Telegram Message ID | Number | Source message ID |
-| C | Sales Report Log Message | String | Full sale message |
-| D | Reporter Name | String | Person who made the sale |
+| C | Sales Report Log Message | String | Full sale message (includes `[SALES EVENT]` lines: Sold by, Cash proceeds collected by, Stripe, etc.) |
+| D | Reporter Name | String | For **`[SALES EVENT]`** from the DApp: **cash proceeds collector** (who received payment), normalized via Contributors sheet; for other message formats, same as historical “reporter” / seller attribution. “Sold by” remains in column **C** text. |
 | E | QR Code value | String | Scanned QR code |
 | F | Sale Price | Number | Amount of sale |
 | G | AGL Ledger URL | String | URL to ledger |
@@ -1140,9 +1150,11 @@ See [`python_scripts/schema_validation/README.md`](./python_scripts/schema_valid
 | M | Shipping Provider | String | Shipping carrier |
 | N | Tracking Number | String | Package tracking number |
 | O | Tracking Notification Sent | String | Email notification status |
+| P | Agroverse QR code | String | Serialized Agroverse QR id linked to this checkout (same id as `Agroverse QR codes` column A); blank means unassigned |
 
 **Used by:**
 - Stripe order processing and tracking
+- DApp Sales Reporter and `agroverse_qr_codes` web app: list sessions with **P** empty, link **P** and refresh **N** from sale submissions via GAS
 
 ---
 

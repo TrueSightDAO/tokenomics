@@ -21,6 +21,12 @@ const TRACKING_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1qbZZhf-_7xzm
 const TRACKING_SHEET_NAME = 'QR Code Update';
 const DESTINATION_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU/edit?gid=472328231#gid=472328231';
 const DESTINATION_SHEET_NAME = 'Agroverse QR codes';
+/** Same workbook as Agroverse QR codes — Session C, Shipping M, Tracking N, Agroverse QR P */
+const STRIPE_CHECKOUT_SHEET_NAME = 'Stripe Social Media Checkout ID';
+const STRIPE_COL_SESSION = 3;
+const STRIPE_COL_SHIPPING = 13;
+const STRIPE_COL_TRACKING = 14;
+const STRIPE_COL_QR = 16;
 
 // Column indices for source sheet (Telegram Chat Logs)
 const TELEGRAM_UPDATE_ID_COL = 0; // Column A
@@ -40,6 +46,50 @@ const MANAGER_COL_DEST = 20; // Column U (Manager Name)
 
 // Event marker
 const EVENT_MARKER = '[QR CODE UPDATE EVENT]';
+
+/**
+ * "QR Code Update" tracker tab — full header row (A–K). Legacy 8-column sheets get I–K appended on first run.
+ */
+const QR_UPDATE_TRACKING_HEADERS = [
+  'Row Number',
+  'Telegram Update ID',
+  'QR Code',
+  'Status Updated',
+  'Email Updated',
+  'Member Updated',
+  'Processed Timestamp',
+  'Processed By',
+  'Stripe Session ID',
+  'Shipping Provider',
+  'Tracking Number'
+];
+
+/**
+ * Ensures row 1 of the tracking sheet includes Stripe columns (appends I–K if missing).
+ * @param {GoogleAppsScript.Spreadsheet.Sheet} sheet
+ */
+function ensureQrUpdateTrackingHeaders_(sheet) {
+  if (!sheet) return;
+  const lastCol = sheet.getLastColumn();
+  const width = Math.max(lastCol, QR_UPDATE_TRACKING_HEADERS.length);
+  const row1 = sheet.getRange(1, 1, 1, width).getValues()[0];
+  const labels = row1.map((c) => (c || '').toString().trim());
+  const hasStripe = labels.some((h) => h === 'Stripe Session ID');
+  if (hasStripe) return;
+  // If row 1 is empty, write full header row; else append last 3 column titles after existing cells.
+  const allEmpty = labels.every((h) => !h);
+  if (allEmpty && sheet.getLastRow() <= 1) {
+    sheet.getRange(1, 1, 1, QR_UPDATE_TRACKING_HEADERS.length).setValues([QR_UPDATE_TRACKING_HEADERS]);
+    sheet.getRange(1, 1, 1, QR_UPDATE_TRACKING_HEADERS.length).setFontWeight('bold');
+    return;
+  }
+  const stripeTitles = ['Stripe Session ID', 'Shipping Provider', 'Tracking Number'];
+  const appendAt = Math.max(lastCol + 1, 9);
+  // getRange(row, column, numRows, numColumns) — 3rd/4th args are sizes, not end row/column.
+  const nc = stripeTitles.length;
+  sheet.getRange(1, appendAt, 1, nc).setValues([stripeTitles]);
+  sheet.getRange(1, appendAt, 1, nc).setFontWeight('bold');
+}
 
 /**
  * doGet handler for webhook triggers
@@ -95,19 +145,10 @@ function processQrCodeUpdatesFromTelegramChatLogs() {
     // Create tracking sheet if it doesn't exist
     if (!trackingSheet) {
       trackingSheet = trackingSpreadsheet.insertSheet(TRACKING_SHEET_NAME);
-      // Set up header row
-      const headers = [
-        'Row Number',
-        'Telegram Update ID',
-        'QR Code',
-        'Status Updated',
-        'Email Updated',
-        'Member Updated',
-        'Processed Timestamp',
-        'Processed By'
-      ];
-      trackingSheet.getRange(1, 1, 1, headers.length).setValues([headers]);
-      trackingSheet.getRange(1, 1, 1, headers.length).setFontWeight('bold');
+      trackingSheet.getRange(1, 1, 1, QR_UPDATE_TRACKING_HEADERS.length).setValues([QR_UPDATE_TRACKING_HEADERS]);
+      trackingSheet.getRange(1, 1, 1, QR_UPDATE_TRACKING_HEADERS.length).setFontWeight('bold');
+    } else {
+      ensureQrUpdateTrackingHeaders_(trackingSheet);
     }
 
     // Get processed row numbers from tracking sheet
@@ -209,8 +250,20 @@ function processQrCodeUpdatesFromTelegramChatLogs() {
           continue;
         }
 
-        // Update the destination sheet
+        // Update the destination sheet (Stripe first so bad Session ID fails before Agroverse writes)
         let updatesMade = false;
+
+        if (extracted.hasStripeUpdate) {
+          applyStripeCheckoutLinkForQrCode_(
+            destSpreadsheet,
+            extracted.qrCode,
+            extracted.stripeSessionId,
+            extracted.shippingProvider,
+            extracted.trackingNumber
+          );
+          Logger.log(`Row ${rowNumber}: Updated Stripe checkout link for QR code "${extracted.qrCode}"`);
+          updatesMade = true;
+        }
 
         if (extracted.status) {
           // Update status (Column D, index 3)
@@ -240,14 +293,17 @@ function processQrCodeUpdatesFromTelegramChatLogs() {
           // Record in tracking sheet
           const timestamp = new Date();
           const trackingRow = [
-            rowNumber,                                    // Row Number
-            telegramUpdateId,                             // Telegram Update ID
-            extracted.qrCode,                             // QR Code
-            extracted.status || '',                       // Status Updated
-            extracted.email || '',                        // Email Updated
-            extracted.member || '',                       // Member Updated
-            timestamp.toISOString(),                      // Processed Timestamp
-            'QR Code Update Processor'                   // Processed By
+            rowNumber,
+            telegramUpdateId,
+            extracted.qrCode,
+            extracted.status || '',
+            extracted.email || '',
+            extracted.member || '',
+            timestamp.toISOString(),
+            'QR Code Update Processor',
+            extracted.stripeSessionId || '',
+            extracted.shippingProvider || '',
+            extracted.trackingNumber || ''
           ];
           trackingSheet.appendRow(trackingRow);
           
@@ -261,7 +317,8 @@ function processQrCodeUpdatesFromTelegramChatLogs() {
             success: true
           });
         } else {
-          Logger.log(`Row ${rowNumber}: No updates made for QR code "${extracted.qrCode}" (no status, email, or member provided)`);
+          const snip = (message || '').substring(0, 550).replace(/\n/g, ' | ');
+          Logger.log(`Row ${rowNumber}: No updates made for QR "${extracted.qrCode}" (hasStripe=${extracted.hasStripeUpdate}, status=${!!extracted.status}, email=${!!extracted.email}, member=${!!extracted.member}). Snippet: ${snip}`);
           result.skipped++;
         }
 
@@ -295,36 +352,151 @@ function processQrCodeUpdatesFromTelegramChatLogs() {
  * - Associated Member: <member> (optional)
  * - New Status: <status> (optional)
  * - New Email: <email> (optional)
+ * - Stripe Session ID: <session or empty to unlink> (optional block — include all three lines below to apply)
+ * - Shipping Provider: <text> (optional, same block)
+ * - Tracking Number: <text> (optional, same block)
  * - Updated by: <name>
  * - Submission Source: <url>
  * --------
  * 
  * @param {string} message The message text from Telegram Chat Logs
- * @return {Object} Extracted information {qrCode, member, status, email}
+ * @return {Object} Extracted information {qrCode, member, status, email, hasStripeUpdate, stripeSessionId, shippingProvider, trackingNumber}
  */
+function normalizeStripeUpdateField_(raw) {
+  const v = (raw || '').toString().trim();
+  if (/^\(none\)$/i.test(v)) return '';
+  return v;
+}
+
+/**
+ * Normalize Telegram/Sheet message text so line-based regexes match (CRLF, unicode dashes, NBSP).
+ * @param {string} raw
+ * @return {string}
+ */
+function normalizeQrUpdateMessageForParsing_(raw) {
+  let m = (raw || '').toString();
+  m = m.replace(/^\uFEFF/, '');
+  m = m.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  m = m.replace(/[\u2013\u2014\u2212\u2010\u2011]/g, '-');
+  m = m.replace(/\u00A0/g, ' ');
+  // If the row has no real newlines but JSON-style "\\n", expand so Stripe lines match.
+  if (m.indexOf('\n') === -1 && /\\n/.test(m)) {
+    m = m.replace(/\\n/g, '\n');
+  }
+  return m;
+}
+
+/**
+ * True if the payload includes a Stripe Session ID line (Edgar uses "- Stripe Session ID: …").
+ * Allows variable whitespace after the list hyphen and before ":".
+ * @param {string} message
+ * @return {boolean}
+ */
+function messageHasStripeSessionLine_(message) {
+  return /(?:^|\n)\s*-\s*Stripe Session ID\s*:/i.test(message) ||
+    /(?:^|\n)\s*Stripe Session ID\s*:/i.test(message);
+}
+
+/**
+ * Normalize Stripe Checkout Session IDs for row lookup. Sheet cells may contain only `cs_live_…`,
+ * or a formula/URL where the id is embedded; strict string equality often fails otherwise.
+ * @param {string} raw
+ * @return {string} Canonical id or trimmed original if no match.
+ */
+function canonicalStripeSessionId_(raw) {
+  const s = (raw || '').toString().trim().replace(/^['"]+|['"]+$/g, '');
+  if (!s) return '';
+  const m = s.match(/\b(cs_(?:live|test)_[A-Za-z0-9_]+)/);
+  if (m) return m[1];
+  return s;
+}
+
+/**
+ * Link or update Stripe checkout row (by Session ID) for this QR: sets M, N, P.
+ * If session id empty: clears column P on all rows that reference this QR (unlink).
+ * @param {GoogleAppsScript.Spreadsheet.Spreadsheet} spreadsheet
+ * @param {string} qrCode
+ * @param {string} sessionId
+ * @param {string} shippingProvider
+ * @param {string} trackingNumber
+ */
+function applyStripeCheckoutLinkForQrCode_(spreadsheet, qrCode, sessionId, shippingProvider, trackingNumber) {
+  const sheet = spreadsheet.getSheetByName(STRIPE_CHECKOUT_SHEET_NAME);
+  if (!sheet) {
+    throw new Error(`Sheet not found: ${STRIPE_CHECKOUT_SHEET_NAME}`);
+  }
+  const qr = (qrCode || '').toString().trim();
+  const sessRaw = (sessionId || '').toString().trim();
+  const sess = canonicalStripeSessionId_(sessRaw);
+  const ship = (shippingProvider || '').toString().trim();
+  const track = (trackingNumber || '').toString().trim();
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) {
+    if (sess) throw new Error('Stripe sheet has no data rows');
+    return;
+  }
+
+  if (!sess) {
+    for (let r = lastRow; r >= 2; r--) {
+      const pVal = (sheet.getRange(r, STRIPE_COL_QR).getValue() || '').toString().trim();
+      if (pVal === qr) {
+        sheet.getRange(r, STRIPE_COL_QR).setValue('');
+      }
+    }
+    return;
+  }
+
+  for (let r = lastRow; r >= 2; r--) {
+    const pVal = (sheet.getRange(r, STRIPE_COL_QR).getValue() || '').toString().trim();
+    const cVal = (sheet.getRange(r, STRIPE_COL_SESSION).getValue() || '').toString().trim();
+    const cSess = canonicalStripeSessionId_(cVal);
+    if (pVal === qr && cSess !== sess) {
+      sheet.getRange(r, STRIPE_COL_QR).setValue('');
+    }
+  }
+
+  for (let r = lastRow; r >= 2; r--) {
+    const cVal = (sheet.getRange(r, STRIPE_COL_SESSION).getValue() || '').toString().trim();
+    const cSess = canonicalStripeSessionId_(cVal);
+    if (cSess === sess) {
+      sheet.getRange(r, STRIPE_COL_SHIPPING).setValue(ship);
+      sheet.getRange(r, STRIPE_COL_TRACKING).setValue(track);
+      sheet.getRange(r, STRIPE_COL_QR).setValue(qr);
+      return;
+    }
+  }
+  throw new Error(`Stripe Session ID not found in ${STRIPE_CHECKOUT_SHEET_NAME}: ${sess} (lookup uses canonical cs_live/cs_test id from column C)`);
+}
+
 function extractQrCodeUpdateInfo(message) {
   const result = {
     qrCode: null,
     member: null,
     status: null,
-    email: null
+    email: null,
+    hasStripeUpdate: false,
+    stripeSessionId: null,
+    shippingProvider: null,
+    trackingNumber: null
   };
 
   try {
-    // Extract QR Code
-    const qrCodeMatch = message.match(/- QR Code:\s*([^\n]+)/i);
+    message = normalizeQrUpdateMessageForParsing_(message);
+
+    // Extract QR Code (allow one or more spaces after the list hyphen)
+    const qrCodeMatch = message.match(/-\s+QR Code:\s*([^\n]+)/i);
     if (qrCodeMatch) {
       result.qrCode = qrCodeMatch[1].trim();
     }
 
     // Extract Associated Member (optional)
-    const memberMatch = message.match(/- Associated Member:\s*([^\n]+)/i);
+    const memberMatch = message.match(/-\s+Associated Member:\s*([^\n]+)/i);
     if (memberMatch) {
       result.member = memberMatch[1].trim();
     }
 
       // Extract New Status (optional)
-      const statusMatch = message.match(/- New Status:\s*([^\n]+)/i);
+      const statusMatch = message.match(/-\s+New Status:\s*([^\n]+)/i);
       if (statusMatch) {
         const statusValue = statusMatch[1].trim();
         // Validate status values (preserve original case for statuses with spaces)
@@ -351,9 +523,21 @@ function extractQrCodeUpdateInfo(message) {
       }
 
     // Extract New Email (optional)
-    const emailMatch = message.match(/- New Email:\s*([^\n@]+@[^\n@]+\.[^\n@]+)/i);
+    const emailMatch = message.match(/-\s+New Email:\s*([^\n@]+@[^\n@]+\.[^\n@]+)/i);
     if (emailMatch) {
       result.email = emailMatch[1].trim();
+    }
+
+    // Stripe block: session line is required; shipping/tracking may be omitted in some ingest paths.
+    if (messageHasStripeSessionLine_(message)) {
+      result.hasStripeUpdate = true;
+      const sm = message.match(/(?:^|\n)\s*-\s*Stripe Session ID\s*:\s*([^\n]*)/i) ||
+        message.match(/(?:^|\n)\s*Stripe Session ID\s*:\s*([^\n]*)/i);
+      const hm = message.match(/(?:^|\n)\s*-\s*Shipping Provider\s*:\s*([^\n]*)/i);
+      const tm = message.match(/(?:^|\n)\s*-\s*Tracking Number\s*:\s*([^\n]*)/i);
+      result.stripeSessionId = normalizeStripeUpdateField_(sm ? sm[1] : '');
+      result.shippingProvider = normalizeStripeUpdateField_(hm ? hm[1] : '');
+      result.trackingNumber = normalizeStripeUpdateField_(tm ? tm[1] : '');
     }
 
   } catch (err) {
