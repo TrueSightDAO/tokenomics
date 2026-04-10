@@ -13,12 +13,17 @@
 // ===== Configuration =====
 var SHEET_URL = 'https://docs.google.com/spreadsheets/d/1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU/edit?gid=472328231';
 var QR_CODE_SHEET_NAME = 'Agroverse QR codes';
+var STRIPE_CHECKOUT_SHEET_NAME = 'Stripe Social Media Checkout ID';
+/** Stripe checkout: Session ID column C, Tracking Number column N, Agroverse QR code column P */
 var QR_CODE_PARAM = 'qr_code';
 var EMAIL_ADDRESS_PARAM = 'email_address';
 var LIST_PARAM = 'list';
 var LIST_ALL_PARAM = 'list_all';
 var LIST_WITH_MEMBERS_PARAM = 'list_with_members';
 var LOOKUP_PARAM = 'lookup';
+/** GET list_unassigned_stripe_sessions=true — Stripe Session IDs (column C) where P is blank; optional for_qr_code also includes rows where P equals that QR */
+var LIST_UNASSIGNED_STRIPE_SESSIONS_PARAM = 'list_unassigned_stripe_sessions';
+var FOR_QR_CODE_PARAM = 'for_qr_code';
 var HEADER_ROW = 2;
 var DATA_START_ROW = 2;
 var DEPLOYMENT_URL = 'https://script.google.com/macros/s/AKfycbxigq4-J0izShubqIC5k6Z7fgNRyVJLakfQ34HPuENiSpxuCG-wSq0g-wOAedZzzgaL/exec';
@@ -33,6 +38,29 @@ var DEPLOYMENT_EXAMPLE = 'https://script.google.com/macros/s/AKfycbxigq4-J0izShu
 function createCORSResponse(data) {
   return ContentService.createTextOutput(JSON.stringify(data))
     .setMimeType(ContentService.MimeType.JSON);
+}
+
+/** Web app query helpers — GAS may pass boolean true or string variants */
+function isTruthyQueryParam_(raw) {
+  if (raw === true) return true;
+  if (raw == null || raw === '') return false;
+  if (Object.prototype.toString.call(raw) === '[object Array]') {
+    raw = raw.length ? raw[0] : '';
+  }
+  var s = String(raw).toLowerCase().trim();
+  return s === 'true' || s === '1' || s === 'yes';
+}
+
+function getQueryParam_(e, key) {
+  if (!e) return '';
+  if (e.parameter && e.parameter[key] !== undefined && e.parameter[key] !== null && e.parameter[key] !== '') {
+    return e.parameter[key];
+  }
+  if (e.parameters && e.parameters[key]) {
+    var arr = e.parameters[key];
+    return Object.prototype.toString.call(arr) === '[object Array]' ? arr[0] : arr;
+  }
+  return '';
 }
 
 /**
@@ -54,14 +82,24 @@ function doOptions(e) {
  * - 'list=true' query parameter to return QR codes where column D is NOT 'SOLD' (includes MINTED, CONSIGNMENT, etc.).
  * - 'list_all=true' query parameter to return ALL QR codes including SOLD status.
  * - 'list_with_members=true' query parameter to return QR codes with details where column D is NOT 'SOLD'.
+ * - 'lookup=true&qr_code=...' returns ledger details plus stripe_session_id and tracking_number when a row
+ *   in 'Stripe Social Media Checkout ID' has column P equal to the QR code (Session in C, Tracking in N; newest row wins).
+ * - 'list_unassigned_stripe_sessions=true' returns { items: [{ stripe_session_id }] } for rows with Session in C
+ *   and column P blank; optional 'for_qr_code' also returns sessions already linked to that QR in P (for DApp prefill).
  *
  * @param {Object} e Event object containing parameters.
  * @return {ContentService.TextOutput} JSON response with results or error.
  */
 function doGet(e) {
   try {
-    // Open the spreadsheet and sheet
+    // Open the spreadsheet (several endpoints use multiple tabs)
     var spreadsheet = SpreadsheetApp.openByUrl(SHEET_URL);
+
+    if (isTruthyQueryParam_(getQueryParam_(e, LIST_UNASSIGNED_STRIPE_SESSIONS_PARAM))) {
+      var forQr = getQueryParam_(e, FOR_QR_CODE_PARAM);
+      return listUnassignedStripeSessions_(spreadsheet, forQr);
+    }
+
     var sheet = spreadsheet.getSheetByName(QR_CODE_SHEET_NAME);
     if (!sheet) {
       return createCORSResponse({
@@ -192,7 +230,8 @@ function doGet(e) {
           var status = dataRange[i][3] || ''; // Column D (index 3)
           var email = dataRange[i][11] || ''; // Column L (index 11)
           var managerName = dataRange[i][20] || ''; // Column U (index 20)
-          
+          var stripeInfo = lookupStripeCheckoutByQrCode_(spreadsheet, qrCode);
+
           return createCORSResponse({
             status: 'success',
             qr_code: qrCode,
@@ -200,7 +239,9 @@ function doGet(e) {
             ledger_shortcut: ledgerShortcut,
             qr_status: status,
             email: email,
-            manager_name: managerName
+            manager_name: managerName,
+            stripe_session_id: stripeInfo.stripe_session_id,
+            tracking_number: stripeInfo.tracking_number
           });
         }
       }
@@ -267,4 +308,84 @@ function doGet(e) {
       message: 'Error processing request: ' + error.message
     });
   }
+}
+
+/**
+ * Finds Stripe checkout row where column P matches the Agroverse QR code.
+ * Returns Session ID (column C) and Tracking Number (column N). If multiple rows match, the bottom-most row wins.
+ * @param {GoogleAppsScript.Spreadsheet.Spreadsheet} spreadsheet
+ * @param {string} qrCode
+ * @return {{stripe_session_id: string, tracking_number: string}}
+ */
+/**
+ * Stripe sessions where column P is unassigned, optionally including rows already tied to forQrCode (column P match).
+ * Iterates from bottom so newer sheet rows appear first; dedupes by session id.
+ * @param {GoogleAppsScript.Spreadsheet.Spreadsheet} spreadsheet
+ * @param {string=} forQrCodeRaw
+ * @return {ContentService.TextOutput}
+ */
+function listUnassignedStripeSessions_(spreadsheet, forQrCodeRaw) {
+  var stripeSheet = spreadsheet.getSheetByName(STRIPE_CHECKOUT_SHEET_NAME);
+  if (!stripeSheet) {
+    return createCORSResponse({
+      status: 'error',
+      message: 'Sheet not found: ' + STRIPE_CHECKOUT_SHEET_NAME
+    });
+  }
+
+  var lastRow = stripeSheet.getLastRow();
+  if (lastRow < DATA_START_ROW) {
+    return createCORSResponse({ status: 'success', items: [] });
+  }
+
+  var wantQr = (forQrCodeRaw || '').toString().trim();
+  var range = stripeSheet.getRange(DATA_START_ROW, 3, lastRow, 16).getValues();
+  var seen = {};
+  var items = [];
+
+  for (var r = range.length - 1; r >= 0; r--) {
+    var session = (range[r][0] || '').toString().trim();
+    if (!session) continue;
+
+    var pVal = (range[r][13] || '').toString().trim();
+    var pEmpty = !pVal;
+    var pMatches = wantQr !== '' && pVal === wantQr;
+
+    if (!pEmpty && !pMatches) continue;
+    if (seen[session]) continue;
+
+    seen[session] = true;
+    items.push({ stripe_session_id: session });
+  }
+
+  return createCORSResponse({
+    status: 'success',
+    items: items
+  });
+}
+
+function lookupStripeCheckoutByQrCode_(spreadsheet, qrCode) {
+  var empty = { stripe_session_id: '', tracking_number: '' };
+  if (!qrCode) return empty;
+
+  var sheet = spreadsheet.getSheetByName(STRIPE_CHECKOUT_SHEET_NAME);
+  if (!sheet) return empty;
+
+  var lastRow = sheet.getLastRow();
+  if (lastRow < DATA_START_ROW) return empty;
+
+  var wanted = qrCode.toString().trim();
+  // Columns C through P: C=Session, N=Tracking, P=QR code match
+  var range = sheet.getRange(DATA_START_ROW, 3, lastRow, 16).getValues();
+
+  for (var r = range.length - 1; r >= 0; r--) {
+    var pVal = (range[r][13] || '').toString().trim();
+    if (pVal === wanted) {
+      return {
+        stripe_session_id: (range[r][0] || '').toString().trim(),
+        tracking_number: (range[r][11] || '').toString().trim()
+      };
+    }
+  }
+  return empty;
 }

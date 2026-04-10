@@ -35,6 +35,12 @@ const CONTRIBUTORS_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1GE7PUq-U
 const CONTRIBUTORS_SHEET_NAME = 'Contributors contact information';
 const AGROVERSE_QR_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU/edit?gid=472328231#gid=472328231';
 const AGROVERSE_QR_SHEET_NAME = 'Agroverse QR codes';
+/** Main ledger tab: Session ID column C, Tracking column N, Agroverse QR column P */
+const STRIPE_CHECKOUT_SHEET_NAME = 'Stripe Social Media Checkout ID';
+const STRIPE_COL_SESSION = 3; // C
+const STRIPE_COL_TRACKING = 14; // N
+const STRIPE_COL_QR = 16; // P
+const AGROVERSE_OWNER_EMAIL_COL = 12; // L (1-based for getRange)
 const XAI_API_URL = 'https://api.x.ai/v1/chat/completions';
 
 // Column indices for source sheet
@@ -219,6 +225,82 @@ function updateAgroverseQrStatus(qrCode) {
   }
 }
 
+/** Normalize optional [SALES EVENT] lines; treat blank and "(none)" as empty */
+function normalizeSalesEventOptionalField(raw) {
+  const t = (raw || '').toString().trim();
+  if (!t || /^(\(none\)|none)$/i.test(t)) return '';
+  return t;
+}
+
+/** Update Agroverse QR codes column L (owner email) when the sale payload includes it */
+function updateAgroverseQrOwnerEmail(qrCode, email) {
+  if (!qrCode || !email) return false;
+  try {
+    const agroverseSpreadsheet = SpreadsheetApp.openByUrl(AGROVERSE_QR_SHEET_URL);
+    const agroverseSheet = agroverseSpreadsheet.getSheetByName(AGROVERSE_QR_SHEET_NAME);
+    const agroverseData = agroverseSheet.getDataRange().getValues();
+    for (let i = 1; i < agroverseData.length; i++) {
+      if (agroverseData[i][QR_CODE_COL] === qrCode) {
+        agroverseSheet.getRange(i + 1, AGROVERSE_OWNER_EMAIL_COL).setValue(email);
+        Logger.log(`Updated owner email for QR ${qrCode} in Agroverse QR codes`);
+        return true;
+      }
+    }
+    Logger.log(`QR code ${qrCode} not found for owner email update`);
+    return false;
+  } catch (e) {
+    Logger.log(`Error updating Agroverse owner email: ${e.message}`);
+    return false;
+  }
+}
+
+/** Match Stripe checkout row by Session ID (column C); set Tracking (N) and QR (P) when provided */
+function updateStripeCheckoutMetadata(sessionId, trackingNumber, qrCode) {
+  if (!sessionId) {
+    Logger.log('Stripe checkout update skipped: no Stripe Session ID in payload');
+    return false;
+  }
+  try {
+    const ss = SpreadsheetApp.openByUrl(AGROVERSE_QR_SHEET_URL);
+    const sheet = ss.getSheetByName(STRIPE_CHECKOUT_SHEET_NAME);
+    if (!sheet) {
+      Logger.log(`Sheet not found: ${STRIPE_CHECKOUT_SHEET_NAME}`);
+      return false;
+    }
+    const want = sessionId.toString().trim();
+    const lastRow = sheet.getLastRow();
+    for (let r = lastRow; r >= 2; r--) {
+      const cell = sheet.getRange(r, STRIPE_COL_SESSION).getValue();
+      if ((cell || '').toString().trim() === want) {
+        if (trackingNumber) {
+          sheet.getRange(r, STRIPE_COL_TRACKING).setValue(trackingNumber);
+        }
+        if (qrCode) {
+          sheet.getRange(r, STRIPE_COL_QR).setValue(qrCode);
+        }
+        Logger.log(`Updated Stripe checkout row ${r} for session ${want} (tracking / column P)`);
+        return true;
+      }
+    }
+    Logger.log(`No Stripe row found for session ${want}`);
+    return false;
+  } catch (e) {
+    Logger.log(`Error updating Stripe checkout sheet: ${e.message}`);
+    return false;
+  }
+}
+
+/** After a verified [SALES EVENT] row is accepted, sync optional DApp fields to the main ledger */
+function applySalesEventLedgerFields(qrCode, parseMethod, ownerEmail, stripeSessionId, trackingNumber) {
+  if (parseMethod !== 'SALES_EVENT' || !qrCode) return;
+  if (ownerEmail) {
+    updateAgroverseQrOwnerEmail(qrCode, ownerEmail);
+  }
+  if (stripeSessionId) {
+    updateStripeCheckoutMetadata(stripeSessionId, trackingNumber, qrCode);
+  }
+}
+
 // Function to parse [SALES EVENT] structured format
 function parseSalesEvent(message) {
   try {
@@ -231,17 +313,45 @@ function parseSalesEvent(message) {
     // Extract Sales price - pattern: "- Sales price: $XX" or "- Sales price: XX"
     const priceMatch = message.match(/- Sales price:\s*\$?([0-9]+\.?[0-9]*)/i);
     const salePrice = priceMatch ? parseFloat(priceMatch[1]) : '';
+
+    const ownerLine = message.match(/- Owner email:\s*([^\n]+)/i);
+    const stripeLine = message.match(/- Stripe Session ID:\s*([^\n]+)/i);
+    const trackLine = message.match(/- Tracking number:\s*([^\n]+)/i);
+    const ownerEmail = normalizeSalesEventOptionalField(ownerLine ? ownerLine[1] : '');
+    const stripeSessionId = normalizeSalesEventOptionalField(stripeLine ? stripeLine[1] : '');
+    const trackingNumber = normalizeSalesEventOptionalField(trackLine ? trackLine[1] : '');
     
     if (qrCode && salePrice) {
       Logger.log(`[SALES EVENT] parsed successfully: QR=${qrCode}, Price=${salePrice}`);
-      return { qrCode, salePrice, parseMethod: 'SALES_EVENT' };
+      return {
+        qrCode,
+        salePrice,
+        parseMethod: 'SALES_EVENT',
+        ownerEmail,
+        stripeSessionId,
+        trackingNumber
+      };
     }
     
     Logger.log('[SALES EVENT] parsing failed: missing QR code or price');
-    return { qrCode: '', salePrice: '', parseMethod: 'FAILED' };
+    return {
+      qrCode: '',
+      salePrice: '',
+      parseMethod: 'FAILED',
+      ownerEmail: '',
+      stripeSessionId: '',
+      trackingNumber: ''
+    };
   } catch (e) {
     Logger.log(`[SALES EVENT] parsing error: ${e.message}`);
-    return { qrCode: '', salePrice: '', parseMethod: 'ERROR' };
+    return {
+      qrCode: '',
+      salePrice: '',
+      parseMethod: 'ERROR',
+      ownerEmail: '',
+      stripeSessionId: '',
+      trackingNumber: ''
+    };
   }
 }
 
@@ -263,14 +373,35 @@ function parseQrCodeEvent(message) {
     
     if (qrCode && salePrice) {
       Logger.log(`[QR CODE EVENT] parsed successfully: QR=${qrCode}, Price=${salePrice}`);
-      return { qrCode, salePrice, parseMethod: 'QR_CODE_EVENT' };
+      return {
+        qrCode,
+        salePrice,
+        parseMethod: 'QR_CODE_EVENT',
+        ownerEmail: '',
+        stripeSessionId: '',
+        trackingNumber: ''
+      };
     }
     
     Logger.log('[QR CODE EVENT] parsing failed: missing QR code or price');
-    return { qrCode: '', salePrice: '', parseMethod: 'FAILED' };
+    return {
+      qrCode: '',
+      salePrice: '',
+      parseMethod: 'FAILED',
+      ownerEmail: '',
+      stripeSessionId: '',
+      trackingNumber: ''
+    };
   } catch (e) {
     Logger.log(`[QR CODE EVENT] parsing error: ${e.message}`);
-    return { qrCode: '', salePrice: '', parseMethod: 'ERROR' };
+    return {
+      qrCode: '',
+      salePrice: '',
+      parseMethod: 'ERROR',
+      ownerEmail: '',
+      stripeSessionId: '',
+      trackingNumber: ''
+    };
   }
 }
 
@@ -288,7 +419,14 @@ function parseStructuredMessage(message) {
   
   // Not a recognized structured format
   Logger.log('Message does not match any structured format');
-  return { qrCode: '', salePrice: '', parseMethod: 'NONE' };
+  return {
+    qrCode: '',
+    salePrice: '',
+    parseMethod: 'NONE',
+    ownerEmail: '',
+    stripeSessionId: '',
+    trackingNumber: ''
+  };
 }
 
 // Function to call Grok API to extract QR code and sale price (fallback for unstructured messages)
@@ -298,7 +436,14 @@ function callGrokApi(message) {
     const apiKey = PropertiesService.getScriptProperties().getProperty('XAI_API_KEY');
     if (!apiKey) {
       Logger.log('Error: XAI_API_KEY not set in Script Properties');
-      return { qrCode: '', salePrice: '', parseMethod: 'GROK_ERROR' };
+      return {
+        qrCode: '',
+        salePrice: '',
+        parseMethod: 'GROK_ERROR',
+        ownerEmail: '',
+        stripeSessionId: '',
+        trackingNumber: ''
+      };
     }
 
     const prompt = `Extract the QR code and sale price from the following message. Return a JSON object with "qr_code" and "sale_price" fields. If not found, return empty strings. 
@@ -332,11 +477,21 @@ Message: "${message}"`;
     return {
       qrCode: extractedData.qr_code || '',
       salePrice: extractedData.sale_price ? parseFloat(extractedData.sale_price.replace('$', '')) : '',
-      parseMethod: 'GROK_API'
+      parseMethod: 'GROK_API',
+      ownerEmail: '',
+      stripeSessionId: '',
+      trackingNumber: ''
     };
   } catch (e) {
     Logger.log(`Grok API error: ${e.message}`);
-    return { qrCode: '', salePrice: '', parseMethod: 'GROK_ERROR' };
+    return {
+      qrCode: '',
+      salePrice: '',
+      parseMethod: 'GROK_ERROR',
+      ownerEmail: '',
+      stripeSessionId: '',
+      trackingNumber: ''
+    };
   }
 }
 
@@ -420,7 +575,14 @@ function parseTelegramChatLogs() {
       }
       
       // Extract QR code and sale price (structured parsing first, then Grok API fallback)
-      const { qrCode, salePrice, parseMethod } = extractQrCodeAndPrice(message);
+      const {
+        qrCode,
+        salePrice,
+        parseMethod,
+        ownerEmail,
+        stripeSessionId,
+        trackingNumber
+      } = extractQrCodeAndPrice(message);
       Logger.log(`Row ${i + 1}: Parsed using method: ${parseMethod}`);
       
       // If valid data returned, prepare row
@@ -445,6 +607,7 @@ function parseTelegramChatLogs() {
         
         // Update Agroverse QR codes sheet status to SOLD
         updateAgroverseQrStatus(qrCode);
+        applySalesEventLedgerFields(qrCode, parseMethod, ownerEmail, stripeSessionId, trackingNumber);
         
         // Get value from Agroverse QR codes sheet
         const agroverseValue = getAgroverseValue(qrCode);
@@ -489,8 +652,7 @@ function parseTelegramChatLogs() {
 }
 
 // Function to process a specific row from the source sheet
-function processSpecificRow() {
-  rowIndex = 6751;
+function processSpecificRow(rowIndex) {
   // Get source and destination spreadsheets
   const sourceSpreadsheet = SpreadsheetApp.openByUrl(SOURCE_SHEET_URL);
   const destinationSpreadsheet = SpreadsheetApp.openByUrl(DESTINATION_SHEET_URL);
@@ -558,7 +720,14 @@ function processSpecificRow() {
     }
     
     // Extract QR code and sale price (structured parsing first, then Grok API fallback)
-    const { qrCode, salePrice, parseMethod } = extractQrCodeAndPrice(message);
+    const {
+      qrCode,
+      salePrice,
+      parseMethod,
+      ownerEmail,
+      stripeSessionId,
+      trackingNumber
+    } = extractQrCodeAndPrice(message);
     Logger.log(`Row ${rowIndex}: Parsed using method: ${parseMethod}`);
     
     // If valid data returned, prepare row
@@ -583,6 +752,7 @@ function processSpecificRow() {
       
       // Update Agroverse QR codes sheet status to SOLD
       updateAgroverseQrStatus(qrCode);
+      applySalesEventLedgerFields(qrCode, parseMethod, ownerEmail, stripeSessionId, trackingNumber);
       
       // Get value from Agroverse QR codes sheet
       const agroverseValue = getAgroverseValue(qrCode);
