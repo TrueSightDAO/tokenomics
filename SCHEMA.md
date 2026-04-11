@@ -1,8 +1,19 @@
 # TrueSight DAO - Google Sheets Schema Documentation
 
-> **Last Updated:** 2026-04-10
+> **Last Updated:** 2026-04-11
 > 
 > This document provides a consolidated reference for all Google Sheets used across TrueSight DAO's Google Apps Scripts. Use this as a central schema reference when making code changes.
+
+## 📝 Recent Changes (2026-04-11)
+
+### Holistic wellness Hit List — **Recent Field Agent Location** (DApp + automation)
+
+- **Workbook:** `1eiqZr3LW-qEI6Hmy0Vrur_8flbRwxwA7jXVrbUnHbvc` (same as **Hit List** / **DApp Remarks** in `market_research`).
+- **Tab:** `Recent Field Agent Location` — **`gid=881847228`**. Row 1 headers (canonical): **`Logged At`**, **`Latitude`**, **`Longitude`**, **`Digital Signature`**, **`Location ID`**, **`Status`** (`pending` → Python sets **`pulled`** or **`ignored because already pulled`**).
+- **Write path:** DApp **`stores_nearby.html`** (signed user, throttled) calls **Stores Nearby** GAS web app (`tokenomics/clasp_mirrors/1NpHrKJW…/Code.js`) with **`save_location=true`** on a normal store search `GET`; GAS appends one pending row.
+- **Automation:** **`market_research/scripts/field_agent_location_places_pull.py`** — Places Nearby + dedupe → **Hit List**; GitHub Action **`.github/workflows/field_agent_location_places_pull.yml`**. Docs: **`agentic_ai_context/DAPP_PAGE_CONVENTIONS.md` §14**, **`market_research/HIT_LIST_CREDENTIALS.md`**.
+
+---
 
 ## 📝 Recent Changes (2026-04-10)
 
@@ -147,6 +158,7 @@
 
 **Additional Spreadsheets**
 - [Grok Scored Contributions](#3-grok-scored-contributions-origin)
+- [Holistic wellness Hit List (field agent pipeline)](#4-holistic-wellness-hit-list-stores-nearby--pipeline)
 
 ---
 
@@ -1424,6 +1436,41 @@ function getLedgerConfigsFromWix() {
 - **Registered Contributors** - Registered contributor list
 - **States** - State/status tracking
 - **Initiatives Scoring Rubric** - Scoring guidelines and rubric
+
+---
+
+### 4. Holistic wellness Hit List (Stores Nearby + pipeline)
+**Spreadsheet ID:** `1eiqZr3LW-qEI6Hmy0Vrur_8flbRwxwA7jXVrbUnHbvc`
+
+**URL:** https://docs.google.com/spreadsheets/d/1eiqZr3LW-qEI6Hmy0Vrur_8flbRwxwA7jXVrbUnHbvc/edit
+
+**Purpose:** Physical-store outreach **Hit List** (primary tab **`Hit List`**). This entry documents the **field agent location** extension: contributors on the DApp log a lat/lng ping; automation may append **Research** rows via Google Places.
+
+#### Sheet: `Recent Field Agent Location`
+
+**Sheet URL:** https://docs.google.com/spreadsheets/d/1eiqZr3LW-qEI6Hmy0Vrur_8flbRwxwA7jXVrbUnHbvc/edit?gid=881847228#gid=881847228
+
+**Header row (row 1):**
+
+| Column | Name | Type | Description |
+|--------|------|------|-------------|
+| A | Logged At | DateTime | When GAS recorded the ping |
+| B | Latitude | Number | Agent / device latitude |
+| C | Longitude | Number | Agent / device longitude |
+| D | Digital Signature | String | DApp public key (submitted with `save_location`) |
+| E | Location ID | String | UUID for idempotency / logs |
+| F | Status | String | `pending` (GAS) → `pulled` or `ignored because already pulled` (Python) |
+
+**Written by:**
+
+- **Google Apps Script — Stores Nearby** (`tokenomics/clasp_mirrors/1NpHrKJW8Q4suu6-f5gXQcbjHqUZtGOG-KcIf81M1GG8lDShm5-fLphD2/Code.js`): `doGet` with `save_location=true` + `digital_signature` on the same `GET` as the store search; returns JSON field `field_agent_location`.
+
+**Read / updated by:**
+
+- **`market_research/scripts/field_agent_location_places_pull.py`** — processes pending rows; Places Nearby + Hit List append; updates **Status**; appends automation rows to **DApp Remarks**.
+- **GitHub Actions:** `market_research/.github/workflows/field_agent_location_places_pull.yml` (same secrets pattern as other Hit List jobs: `GOOGLE_CREDENTIALS_JSON`, `GOOGLE_MAPS_API_KEY`).
+
+**DApp:** `dapp/stores_nearby.html` — `localStorage` throttle (~24h per key) and optional `?save_location=true` on the page URL for testing; see **`agentic_ai_context/DAPP_PAGE_CONVENTIONS.md` §14**.
 
 ---
 
