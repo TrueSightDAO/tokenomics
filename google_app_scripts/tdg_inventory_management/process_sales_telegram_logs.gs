@@ -63,9 +63,15 @@ const DEST_SHIPPING_PROVIDER_COL_INDEX = 13; // Column N
 const DEST_CASH_PROCEEDS_COL_INDEX = 14; // Column O — “Cash proceeds collected by” (resolved display name)
 const DEST_SOLD_BY_COL_INDEX = 15; // Column P — “Sold by” (resolved display name)
 const DEST_TRACKING_NUM_COL_INDEX = 16; // Column Q — tracking number (moved from former column O)
+/** Column R — parser / audit remarks (e.g. why a Telegram row was recorded as IGNORED) */
+const DEST_REMARKS_COL_INDEX = 17;
+/** A–I (9) + J–R (9) when appending to QR Code Sales */
+const QR_SALES_APPEND_COL_COUNT = 18;
+/** Column J: ledger scripts use empty J for “pending”; IGNORED = parsed, not a sale (skip Grok on rerun). */
+const STATUS_IGNORED = 'IGNORED';
 
 /**
- * If row 1 columns L–O are empty, set headers for extracted [SALES EVENT] fields (report_sales / dapp).
+ * If row 1 columns L–Q are empty, set headers for extracted [SALES EVENT] fields (report_sales / dapp).
  * @param {GoogleAppsScript.Spreadsheet.Sheet} sheet
  */
 function ensureQrSalesExtractedFieldsHeaders_(sheet) {
@@ -91,21 +97,99 @@ function ensureQrSalesExtractedFieldsHeaders_(sheet) {
   rng.setFontWeight('bold');
 }
 
+/** Column J header when blank (tokenization / parser status). */
+function ensureQrSalesStatusHeader_(sheet) {
+  if (!sheet) return;
+  const col = 10; // J (1-based)
+  const v = sheet.getRange(1, col).getValue();
+  if (v != null && String(v).trim() !== '') return;
+  sheet.getRange(1, col).setValue('Status');
+  sheet.getRange(1, col).setFontWeight('bold');
+}
+
+/** Column R header when blank */
+function ensureQrSalesRemarksHeader_(sheet) {
+  if (!sheet) return;
+  const v = sheet.getRange(1, DEST_REMARKS_COL_INDEX + 1).getValue();
+  if (v != null && String(v).trim() !== '') return;
+  sheet.getRange(1, DEST_REMARKS_COL_INDEX + 1).setValue('Remarks');
+  sheet.getRange(1, DEST_REMARKS_COL_INDEX + 1).setFontWeight('bold');
+}
+
+function ensureQrSalesAppendHeaders_(sheet) {
+  ensureQrSalesExtractedFieldsHeaders_(sheet);
+  ensureQrSalesStatusHeader_(sheet);
+  ensureQrSalesRemarksHeader_(sheet);
+}
+
 /**
- * Columns J–K empty placeholders; L–Q from parsed [SALES EVENT] (empty for legacy / QR CODE EVENT).
- * O = cash proceeds collector, P = sold-by (for downstream ledgers); Q = tracking.
+ * Columns J–R after A–I: J = status (blank for new sales; IGNORED when parser records a non-sale),
+ * K blank, L–Q DApp / attribution, R remarks.
  */
-function buildQrSalesRowExtractedColumns_(ownerEmail, stripeSessionId, shippingProvider, cashProceedsCollectedBy, soldBy, trackingNumber) {
+function buildQrSalesRowTail_(statusJ, ownerEmail, stripeSessionId, shippingProvider, cashProceedsCollectedBy, soldBy, trackingNumber, remarksR) {
   return [
-    '',
+    (statusJ || '').toString(),
     '',
     (ownerEmail || '').toString(),
     (stripeSessionId || '').toString(),
     (shippingProvider || '').toString(),
     (cashProceedsCollectedBy || '').toString(),
     (soldBy || '').toString(),
-    (trackingNumber || '').toString()
+    (trackingNumber || '').toString(),
+    (remarksR || '').toString()
   ];
+}
+
+/** Human-readable remark for QR Code Sales column R when Status = IGNORED */
+function remarkForIgnoredNoSale_(parseMethod) {
+  const m = (parseMethod || '').toString();
+  if (m === 'SKIPPED_DUPLICATE_QR') {
+    return 'IGNORED: QR in message already on QR Code Sales; structured parse had no sale (Grok skipped).';
+  }
+  if (m === 'SKIPPED_DUPLICATE_AFTER_GROK') {
+    return 'IGNORED: Grok returned a QR already on QR Code Sales.';
+  }
+  if (m === 'GROK_API') {
+    return 'IGNORED: Grok did not return a usable QR + price.';
+  }
+  if (m === 'GROK_ERROR') {
+    return 'IGNORED: Grok API error.';
+  }
+  if (m === 'SALES_EVENT' || m === 'FAILED') {
+    return 'IGNORED: [SALES EVENT] present but QR or price missing after parse.';
+  }
+  if (m === 'QR_CODE_EVENT') {
+    return 'IGNORED: [QR CODE EVENT] present but QR or price missing after parse.';
+  }
+  if (m === 'NONE') {
+    return 'IGNORED: Matched keyword filter; no structured sale and no Grok extraction.';
+  }
+  if (m === 'ERROR') {
+    return 'IGNORED: Structured parse error.';
+  }
+  return 'IGNORED: No sale extracted (parseMethod=' + m + ').';
+}
+
+/**
+ * Append a row so Telegram message id (column B) dedupes future runs; Status J = IGNORED; R = remark.
+ */
+function appendIgnoredQrSalesRow_(destinationSheet, telegramUpdateId, telegramMessageId, message, salesDate, remark) {
+  ensureQrSalesAppendHeaders_(destinationSheet);
+  const rowToAppend = [
+    telegramUpdateId,
+    telegramMessageId,
+    message,
+    '',
+    '',
+    '',
+    '',
+    salesDate || '',
+    ''
+  ].concat(buildQrSalesRowTail_(STATUS_IGNORED, '', '', '', '', '', '', remark));
+  if (rowToAppend.length !== QR_SALES_APPEND_COL_COUNT) {
+    throw new Error('appendIgnoredQrSalesRow_: expected ' + QR_SALES_APPEND_COL_COUNT + ' columns, got ' + rowToAppend.length);
+  }
+  destinationSheet.getRange(destinationSheet.getLastRow() + 1, 1, 1, QR_SALES_APPEND_COL_COUNT).setValues([rowToAppend]);
 }
 
 // Column indices for contributors sheet
@@ -739,7 +823,7 @@ function parseTelegramChatLogs() {
   const destinationSpreadsheet = SpreadsheetApp.openByUrl(DESTINATION_SHEET_URL);
   const sourceSheet = sourceSpreadsheet.getSheetByName(SOURCE_SHEET_NAME);
   const destinationSheet = destinationSpreadsheet.getSheetByName(DESTINATION_SHEET_NAME);
-  ensureQrSalesExtractedFieldsHeaders_(destinationSheet);
+  ensureQrSalesAppendHeaders_(destinationSheet);
 
   // Get data from source and destination sheets
   const sourceData = sourceSheet.getDataRange().getValues();
@@ -793,12 +877,30 @@ function parseTelegramChatLogs() {
       Logger.log(`Row ${i + 1}: Parsed using method: ${parseMethod}`);
 
       if (!qrCode || !salePrice) {
+        appendIgnoredQrSalesRow_(
+          destinationSheet,
+          sourceData[i][TELEGRAM_UPDATE_ID_COL],
+          telegramMessageId,
+          message,
+          sourceData[i][SALES_DATE_COL] || '',
+          remarkForIgnoredNoSale_(parseMethod)
+        );
+        existingMessageIds.push(telegramMessageId);
         continue;
       }
 
       const qrNorm = String(qrCode || '').trim();
       if (existingQrLookup[qrNorm]) {
         Logger.log(`Skipping row ${i + 1} due to duplicate QR code: ${qrNorm}`);
+        appendIgnoredQrSalesRow_(
+          destinationSheet,
+          sourceData[i][TELEGRAM_UPDATE_ID_COL],
+          telegramMessageId,
+          message,
+          sourceData[i][SALES_DATE_COL] || '',
+          'IGNORED: Duplicate QR code already on QR Code Sales when this message was processed.'
+        );
+        existingMessageIds.push(telegramMessageId);
         continue;
       }
 
@@ -815,6 +917,15 @@ function parseTelegramChatLogs() {
         const cashRaw = (parsedCashProceeds || '').trim() || soldByRaw;
         if (!isValidContributor(soldByRaw) || !isValidContributor(cashRaw)) {
           Logger.log(`Skipping row ${i + 1} due to invalid contributor (sold by: ${soldByRaw}, cash proceeds: ${cashRaw})`);
+          appendIgnoredQrSalesRow_(
+            destinationSheet,
+            sourceData[i][TELEGRAM_UPDATE_ID_COL],
+            telegramMessageId,
+            message,
+            sourceData[i][SALES_DATE_COL] || '',
+            'IGNORED: [SALES EVENT] with QR/price but sold-by or cash proceeds not in Contributors sheet.'
+          );
+          existingMessageIds.push(telegramMessageId);
           continue;
         }
         finalSoldBy = getReporterName(null, soldByRaw);
@@ -826,6 +937,15 @@ function parseTelegramChatLogs() {
         telegramHandle = handleMatch ? handleMatch[0] : null;
         if (!isValidContributor(contributorName)) {
           Logger.log(`Skipping row ${i + 1} due to invalid contributor: ${contributorName}`);
+          appendIgnoredQrSalesRow_(
+            destinationSheet,
+            sourceData[i][TELEGRAM_UPDATE_ID_COL],
+            telegramMessageId,
+            message,
+            sourceData[i][SALES_DATE_COL] || '',
+            'IGNORED: QR/price parsed but reporter not in Contributors sheet.'
+          );
+          existingMessageIds.push(telegramMessageId);
           continue;
         }
         finalSoldBy = getReporterName(telegramHandle, contributorName);
@@ -850,12 +970,13 @@ function parseTelegramChatLogs() {
         agroverseValue,
         salesDate,
         inventoryType
-      ].concat(buildQrSalesRowExtractedColumns_(ownerEmail, stripeSessionId, shippingProvider, finalCashCollector, finalSoldBy, trackingNumber));
+      ].concat(buildQrSalesRowTail_('', ownerEmail, stripeSessionId, shippingProvider, finalCashCollector, finalSoldBy, trackingNumber, ''));
 
       destinationSheet.getRange(destinationSheet.getLastRow() + 1, 1, 1, rowToAppend.length).setValues([rowToAppend]);
 
       existingQrCodes.push(qrNorm);
       existingQrLookup[qrNorm] = true;
+      existingMessageIds.push(telegramMessageId);
       newEntries++;
 
       const chatId = sourceData[i][CHAT_ID_COL] ? sourceData[i][CHAT_ID_COL].toString().trim() : null;
@@ -879,7 +1000,7 @@ function processSpecificRow(rowIndex) {
   const destinationSpreadsheet = SpreadsheetApp.openByUrl(DESTINATION_SHEET_URL);
   const sourceSheet = sourceSpreadsheet.getSheetByName(SOURCE_SHEET_NAME);
   const destinationSheet = destinationSpreadsheet.getSheetByName(DESTINATION_SHEET_NAME);
-  ensureQrSalesExtractedFieldsHeaders_(destinationSheet);
+  ensureQrSalesAppendHeaders_(destinationSheet);
 
   // Validate rowIndex
   if (rowIndex < 2) {
@@ -941,12 +1062,28 @@ function processSpecificRow(rowIndex) {
 
     if (!qrCode || !salePrice) {
       Logger.log(`No valid QR code or sale price found in row ${rowIndex}`);
+      appendIgnoredQrSalesRow_(
+        destinationSheet,
+        sourceData[0][TELEGRAM_UPDATE_ID_COL],
+        telegramMessageId,
+        message,
+        sourceData[0][SALES_DATE_COL] || '',
+        remarkForIgnoredNoSale_(parseMethod)
+      );
       return;
     }
 
     const qrNorm = String(qrCode || '').trim();
     if (existingQrLookup[qrNorm]) {
       Logger.log(`Skipping row ${rowIndex} due to duplicate QR code: ${qrNorm}`);
+      appendIgnoredQrSalesRow_(
+        destinationSheet,
+        sourceData[0][TELEGRAM_UPDATE_ID_COL],
+        telegramMessageId,
+        message,
+        sourceData[0][SALES_DATE_COL] || '',
+        'IGNORED: Duplicate QR code already on QR Code Sales when this message was processed.'
+      );
       return;
     }
 
@@ -962,6 +1099,14 @@ function processSpecificRow(rowIndex) {
       const cashRaw = (parsedCashProceeds || '').trim() || soldByRaw;
       if (!isValidContributor(soldByRaw) || !isValidContributor(cashRaw)) {
         Logger.log(`Skipping row ${rowIndex} due to invalid contributor (sold by: ${soldByRaw}, cash proceeds: ${cashRaw})`);
+        appendIgnoredQrSalesRow_(
+          destinationSheet,
+          sourceData[0][TELEGRAM_UPDATE_ID_COL],
+          telegramMessageId,
+          message,
+          sourceData[0][SALES_DATE_COL] || '',
+          'IGNORED: [SALES EVENT] with QR/price but sold-by or cash proceeds not in Contributors sheet.'
+        );
         return;
       }
       finalSoldBy = getReporterName(null, soldByRaw);
@@ -973,6 +1118,14 @@ function processSpecificRow(rowIndex) {
       telegramHandle = handleMatch ? handleMatch[0] : null;
       if (!isValidContributor(contributorName)) {
         Logger.log(`Skipping row ${rowIndex} due to invalid contributor: ${contributorName}`);
+        appendIgnoredQrSalesRow_(
+          destinationSheet,
+          sourceData[0][TELEGRAM_UPDATE_ID_COL],
+          telegramMessageId,
+          message,
+          sourceData[0][SALES_DATE_COL] || '',
+          'IGNORED: QR/price parsed but reporter not in Contributors sheet.'
+        );
         return;
       }
       finalSoldBy = getReporterName(telegramHandle, contributorName);
@@ -997,7 +1150,7 @@ function processSpecificRow(rowIndex) {
       agroverseValue,
       salesDate,
       inventoryType
-    ].concat(buildQrSalesRowExtractedColumns_(ownerEmail, stripeSessionId, shippingProvider, finalCashCollector, finalSoldBy, trackingNumber));
+    ].concat(buildQrSalesRowTail_('', ownerEmail, stripeSessionId, shippingProvider, finalCashCollector, finalSoldBy, trackingNumber, ''));
 
     destinationSheet.getRange(destinationSheet.getLastRow() + 1, 1, 1, rowToAppend.length).setValues([rowToAppend]);
 

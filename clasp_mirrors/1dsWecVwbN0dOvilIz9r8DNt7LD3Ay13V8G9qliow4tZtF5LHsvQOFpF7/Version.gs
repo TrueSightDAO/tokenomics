@@ -10,12 +10,13 @@
  */
 
 /** ISO UTC timestamp of the last clasp push for mirrors that include this file */
-var TDG_INVENTORY_LAST_CLASP_PUSH_UTC = '2026-04-12T20:10:00Z';
+var TDG_INVENTORY_LAST_CLASP_PUSH_UTC = '2026-04-12T20:28:12Z';
 
 /**
  * Newest first. Keep lines short; link PRs/commits in git instead of pasting secrets.
  */
 var TDG_INVENTORY_CHANGELOG =
+  '2026-04-12 — process_sales_telegram_logs: append QR Code Sales row with Status=IGNORED + Remarks (col R) when no sale or blocked; 18-col append (J–R); dedupe Telegram id stops repeat Grok.\n' +
   '2026-04-12 — Version.gs: deploy metadata (last clasp push UTC + changelog) added to Parse Telegram, offchain ledger, and managed AGL clasp projects; source in tokenomics google_app_scripts/tdg_inventory_management (dfc39c3).\n' +
   '2026-04-12 — process_sales_telegram_logs: skip Grok when any known QR token appears in message; normalize Unicode dashes/NBSP; normalize Telegram message ids; discard Grok result if QR already on QR Code Sales (tokenomics df9dd4c).\n' +
   '2026-04-12 — process_sales_telegram_logs: first-pass heuristic duplicate skip + extractQrCodeAndPrice(lookup) (tokenomics 8bd3dda).\n' +
