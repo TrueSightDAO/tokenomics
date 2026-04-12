@@ -512,6 +512,55 @@ function parseStructuredMessage(message) {
   };
 }
 
+/** Normalize Telegram message id / sheet cell so 12345 and "12345" dedupe the same row */
+function normalizeTelegramMessageId_(id) {
+  if (id === null || id === undefined) return '';
+  return String(id).trim();
+}
+
+/** Object map: trimmed QR string -> true (built from QR Code Sales column E) */
+function buildQrOnSheetLookup_(codes) {
+  const out = {};
+  if (!codes) return out;
+  for (var i = 0; i < codes.length; i++) {
+    var k = String(codes[i] || '').trim();
+    if (k) out[k] = true;
+  }
+  return out;
+}
+
+/** NBSP and unicode dashes break "- Item:" regex; normalize before structured parse */
+function normalizeMessageForParsing_(message) {
+  if (message == null) return '';
+  return String(message)
+    .replace(/\u00a0/g, ' ')
+    .replace(/[\u2013\u2014\u2212]/g, '-')
+    .replace(/\u2028|\u2029/g, '\n');
+}
+
+/**
+ * Scan whole message for Agroverse-style QR tokens; return first that already exists on QR Code Sales.
+ * Catches legacy bodies where the first heuristic token is not the sold QR.
+ * @param {string} message
+ * @param {Object} qrLookup map from buildQrOnSheetLookup_
+ * @returns {string} matched known QR or ''
+ */
+function findAnyKnownQrInMessage_(message, qrLookup) {
+  if (!message || !qrLookup) return '';
+  const text = String(message);
+  // Tokens like 2024OSCAR_20250812_3, 2025CAPELAVELHA_20250809_10, 2024SJ_20250515_NIBS_3
+  const re = /\b(20\d{2}[A-Za-z0-9][A-Za-z0-9]*(?:_[A-Za-z0-9]+)+)\b/g;
+  var m;
+  var seen = {};
+  while ((m = re.exec(text)) !== null) {
+    var tok = m[1];
+    if (seen[tok]) continue;
+    seen[tok] = true;
+    if (qrLookup[tok]) return tok;
+  }
+  return '';
+}
+
 /**
  * Best-effort QR id from message text (no LLM). Used to skip Grok when that QR is already on QR Code Sales.
  * @param {string} message
@@ -525,7 +574,7 @@ function tryExtractQrCodeForDuplicateCheck_(message) {
   if (match && match[1]) return match[1].trim();
   match = m.match(/\[QR CODE EVENT\]\s*([A-Za-z0-9_]+)/i);
   if (match && match[1]) return match[1].trim();
-  match = m.match(/- Item:\s*([^\n\r]+)/i);
+  match = m.match(/-\s*Item:\s*([^\n\r]+)/i);
   if (match && match[1]) return match[1].trim();
   // Typical Agroverse-style ids, e.g. 2024OSCAR_20260330_37
   match = m.match(/\b(20\d{2}[A-Za-z][A-Za-z0-9]*_\d{8}_[A-Za-z0-9_]+)\b/);
@@ -609,12 +658,14 @@ Message: "${message}"`;
 }
 
 /**
- * @param {string} message
- * @param {string[]=} existingQrCodes optional list from QR Code Sales column E; when a heuristic QR match is in this list, Grok is skipped
+ * @param {string} message raw cell text
+ * @param {Object=} existingQrLookup map trimmed QR -> true from QR Code Sales column E; skips Grok when any known QR appears in the body
  */
-function extractQrCodeAndPrice(message, existingQrCodes) {
-  // Try structured parsing first
-  let result = parseStructuredMessage(message);
+function extractQrCodeAndPrice(message, existingQrLookup) {
+  const normalized = normalizeMessageForParsing_(message);
+
+  // Try structured parsing first (normalized text fixes unicode "-" before "Item:")
+  let result = parseStructuredMessage(normalized);
   
   // If structured parsing succeeded, return result
   if (result.qrCode && result.salePrice) {
@@ -622,10 +673,25 @@ function extractQrCodeAndPrice(message, existingQrCodes) {
     return result;
   }
 
-  // Legacy / partial payloads: avoid Grok if we can already see the QR on QR Code Sales
-  if (existingQrCodes && existingQrCodes.length) {
-    const hintedQr = tryExtractQrCodeForDuplicateCheck_(message);
-    if (hintedQr && existingQrCodes.some(function (q) { return String(q || '').trim() === hintedQr; })) {
+  // Legacy / partial payloads: avoid Grok if any QR token in the body is already on QR Code Sales
+  if (existingQrLookup && Object.keys(existingQrLookup).length) {
+    const anyKnown = findAnyKnownQrInMessage_(normalized, existingQrLookup);
+    if (anyKnown) {
+      Logger.log(`Skipping Grok: message contains QR "${anyKnown}" already on QR Code Sales (structured parse was ${result.parseMethod})`);
+      return {
+        qrCode: '',
+        salePrice: '',
+        parseMethod: 'SKIPPED_DUPLICATE_QR',
+        ownerEmail: '',
+        stripeSessionId: '',
+        shippingProvider: '',
+        trackingNumber: '',
+        soldBy: '',
+        cashProceedsCollectedBy: ''
+      };
+    }
+    const hintedQr = tryExtractQrCodeForDuplicateCheck_(normalized);
+    if (hintedQr && existingQrLookup[hintedQr]) {
       Logger.log(`Skipping Grok: heuristic QR "${hintedQr}" already exists on QR Code Sales (structured parse was ${result.parseMethod})`);
       return {
         qrCode: '',
@@ -643,8 +709,26 @@ function extractQrCodeAndPrice(message, existingQrCodes) {
   
   // Fallback to Grok API for unstructured messages
   Logger.log('Structured parsing failed, falling back to Grok API');
-  result = callGrokApi(message);
-  
+  result = callGrokApi(normalized);
+
+  if (existingQrLookup && result.qrCode) {
+    const qc = String(result.qrCode).trim();
+    if (qc && existingQrLookup[qc]) {
+      Logger.log(`Discarding Grok parse: QR "${qc}" already on QR Code Sales (duplicate; avoided second write)`);
+      return {
+        qrCode: '',
+        salePrice: '',
+        parseMethod: 'SKIPPED_DUPLICATE_AFTER_GROK',
+        ownerEmail: '',
+        stripeSessionId: '',
+        shippingProvider: '',
+        trackingNumber: '',
+        soldBy: '',
+        cashProceedsCollectedBy: ''
+      };
+    }
+  }
+
   return result;
 }
 
@@ -661,11 +745,14 @@ function parseTelegramChatLogs() {
   const sourceData = sourceSheet.getDataRange().getValues();
   const destData = destinationSheet.getDataRange().getValues();
   
-  // Get existing Telegram Message IDs from destination sheet to check for duplicates
-  const existingMessageIds = destData.slice(1).map(row => row[DEST_MESSAGE_ID_COL]); // Column B
+  // Get existing Telegram Message IDs from destination sheet to check for duplicates (string-normalized)
+  const existingMessageIds = destData.slice(1).map(function (row) {
+    return normalizeTelegramMessageId_(row[DEST_MESSAGE_ID_COL]);
+  }); // Column B
   
-  // Initialize existing QR codes from destination sheet
+  // Initialize existing QR codes from destination sheet + O(1) lookup for Grok skip
   let existingQrCodes = destData.slice(1).map(row => row[DEST_QR_CODE_COL]).filter(qr => qr); // Column E, filter out empty
+  let existingQrLookup = buildQrOnSheetLookup_(existingQrCodes);
   
   // Counter for new entries
   let newEntries = 0;
@@ -688,10 +775,10 @@ function parseTelegramChatLogs() {
   // Parse source data, skipping header row
   for (let i = 1; i < sourceData.length; i++) {
     const message = sourceData[i][MESSAGE_COL];
-    const telegramMessageId = sourceData[i][TELEGRAM_MESSAGE_ID_COL];
+    const telegramMessageId = normalizeTelegramMessageId_(sourceData[i][TELEGRAM_MESSAGE_ID_COL]);
     
     // Check if message matches any pattern and hasn't been processed
-    if (patterns.some(pattern => pattern.test(message)) && !existingMessageIds.includes(telegramMessageId)) {
+    if (patterns.some(pattern => pattern.test(message)) && existingMessageIds.indexOf(telegramMessageId) === -1) {
       const {
         qrCode,
         salePrice,
@@ -702,15 +789,16 @@ function parseTelegramChatLogs() {
         trackingNumber,
         soldBy: parsedSoldBy,
         cashProceedsCollectedBy: parsedCashProceeds
-      } = extractQrCodeAndPrice(message, existingQrCodes);
+      } = extractQrCodeAndPrice(message, existingQrLookup);
       Logger.log(`Row ${i + 1}: Parsed using method: ${parseMethod}`);
 
       if (!qrCode || !salePrice) {
         continue;
       }
 
-      if (existingQrCodes.includes(qrCode)) {
-        Logger.log(`Skipping row ${i + 1} due to duplicate QR code: ${qrCode}`);
+      const qrNorm = String(qrCode || '').trim();
+      if (existingQrLookup[qrNorm]) {
+        Logger.log(`Skipping row ${i + 1} due to duplicate QR code: ${qrNorm}`);
         continue;
       }
 
@@ -766,7 +854,8 @@ function parseTelegramChatLogs() {
 
       destinationSheet.getRange(destinationSheet.getLastRow() + 1, 1, 1, rowToAppend.length).setValues([rowToAppend]);
 
-      existingQrCodes.push(qrCode);
+      existingQrCodes.push(qrNorm);
+      existingQrLookup[qrNorm] = true;
       newEntries++;
 
       const chatId = sourceData[i][CHAT_ID_COL] ? sourceData[i][CHAT_ID_COL].toString().trim() : null;
@@ -810,8 +899,11 @@ function processSpecificRow(rowIndex) {
   const destData = destinationSheet.getDataRange().getValues();
   
   // Get existing Telegram Message IDs and QR codes from destination sheet
-  const existingMessageIds = destData.slice(1).map(row => row[DEST_MESSAGE_ID_COL]); // Column B
+  const existingMessageIds = destData.slice(1).map(function (row) {
+    return normalizeTelegramMessageId_(row[DEST_MESSAGE_ID_COL]);
+  }); // Column B
   const existingQrCodes = destData.slice(1).map(row => row[DEST_QR_CODE_COL]).filter(qr => qr); // Column E
+  const existingQrLookup = buildQrOnSheetLookup_(existingQrCodes);
   
   // Simple patterns for initial matching
   const patterns = [
@@ -830,10 +922,10 @@ function processSpecificRow(rowIndex) {
   
   // Process the specific row
   const message = sourceData[0][MESSAGE_COL];
-  const telegramMessageId = sourceData[0][TELEGRAM_MESSAGE_ID_COL];
+  const telegramMessageId = normalizeTelegramMessageId_(sourceData[0][TELEGRAM_MESSAGE_ID_COL]);
   
   // Check if message matches any pattern and hasn't been processed
-  if (patterns.some(pattern => pattern.test(message)) && !existingMessageIds.includes(telegramMessageId)) {
+  if (patterns.some(pattern => pattern.test(message)) && existingMessageIds.indexOf(telegramMessageId) === -1) {
     const {
       qrCode,
       salePrice,
@@ -844,7 +936,7 @@ function processSpecificRow(rowIndex) {
       trackingNumber,
       soldBy: parsedSoldBy,
       cashProceedsCollectedBy: parsedCashProceeds
-    } = extractQrCodeAndPrice(message, existingQrCodes);
+    } = extractQrCodeAndPrice(message, existingQrLookup);
     Logger.log(`Row ${rowIndex}: Parsed using method: ${parseMethod}`);
 
     if (!qrCode || !salePrice) {
@@ -852,8 +944,9 @@ function processSpecificRow(rowIndex) {
       return;
     }
 
-    if (existingQrCodes.includes(qrCode)) {
-      Logger.log(`Skipping row ${rowIndex} due to duplicate QR code: ${qrCode}`);
+    const qrNorm = String(qrCode || '').trim();
+    if (existingQrLookup[qrNorm]) {
+      Logger.log(`Skipping row ${rowIndex} due to duplicate QR code: ${qrNorm}`);
       return;
     }
 
