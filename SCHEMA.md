@@ -1,8 +1,30 @@
 # TrueSight DAO - Google Sheets Schema Documentation
 
-> **Last Updated:** 2026-04-11
+> **Last Updated:** 2026-04-12
 > 
 > This document provides a consolidated reference for all Google Sheets used across TrueSight DAO's Google Apps Scripts. Use this as a central schema reference when making code changes.
+
+## 📝 Recent Changes (2026-04-12)
+
+### **QR Code Sales** — columns **L–R** (Telegram ingest, Stripe append, ledgers)
+
+Canonical layout for **`QR Code Sales`** (workbook `1qbZZ…`, `gid=1003674539`), aligned with `process_sales_telegram_logs.gs`, `sales_update_*_ledger.gs`, and **`sentiment_importer`** `QrCodeCheckController` Stripe rows:
+
+| Column | Header (auto-created when blank) | Role |
+|--------|----------------------------------|------|
+| **L** | Owner email | From `[SALES EVENT]` / DApp when present |
+| **M** | Stripe Session ID | Parsed or Stripe checkout |
+| **N** | Shipping Provider | EasyPost / carrier text when present |
+| **O** | Tracking Number | Carrier tracking |
+| **P** | Sold by | Inventory / “sold-by” line for **managed AGL** ledger scripts (0-based col **15**) |
+| **Q** | Cash Collected By | Cash proceeds line for **offchain** + **managed AGL** ledger scripts (0-based col **16**) |
+| **R** | Remarks | Parser audit (e.g. **IGNORED** reason), Stripe note (`Stripe checkout (online)`), etc. |
+
+- **Column J (`Status`):** Ledger jobs still treat **empty J** as “pending tokenization.” Values include **`PROCESSING`**, **`TOKENIZED`**, **`ACCOUNTED`**, and **`IGNORED`** (Telegram row matched sale heuristics but no sale row was written; **B** = Telegram message id dedupes repeat Grok runs).
+- **Append width:** New rows from GAS / Stripe use **18 columns** (A–I core + J–R tail).
+- **Legacy rows:** Older data may have had cash vs tracking under different **O–Q** positions; normalize manually if needed.
+
+---
 
 ## 📝 Recent Changes (2026-04-11)
 
@@ -21,7 +43,7 @@
 
 - **`Stripe Social Media Checkout ID`**: **Column P — `Agroverse QR code`** (NEW in operations; link Stripe checkout Session ID row to the serialized bag QR). Code treats **C** = Stripe Session ID, **N** = Tracking Number, **P** = Agroverse QR code.
 - **DApp Sales Reporter** (`report_sales.html`) and **`agroverse_qr_codes` web app** (`list_unassigned_stripe_sessions`, `lookup`, etc.) use column **P** to show unassigned sessions and to write **P** + **N** (+ **M** shipping provider) when a `[SALES EVENT]` is processed (`process_sales_telegram_logs.gs` → `updateStripeCheckoutMetadata`).
-- **`QR Code Sales`** tab (same workbook as Telegram logs compilation, `gid=1003674539`): Column **D** is the **cash proceeds collector** for `[SALES EVENT]` when “Cash proceeds collected by” differs from “Sold by”; full message stays in **C**. **`process_sales_telegram_logs.gs`** now also writes extracted **`[SALES EVENT]`** fields on each new row: **L** Owner email, **M** Stripe Session ID, **N** Shipping Provider, **O** Tracking Number (columns **J–K** stay empty on ingest for downstream ledger scripts). Row 1 headers **L–O** are created automatically when blank.
+- **`QR Code Sales`** (`gid=1003674539`): See **2026-04-12** changelog above for canonical **L–R** (tracking **O**, sold-by **P**, cash **Q**, remarks **R**). Column **D** remains legacy reporter / cash display name; **`process_sales_telegram_logs.gs`** fills **P**/**Q** from parsed `[SALES EVENT]` lines where applicable.
 
 ---
 
@@ -310,23 +332,27 @@ See [`python_scripts/schema_validation/README.md`](./python_scripts/schema_valid
 | A | Telegram Update ID | Number | Source Telegram update ID |
 | B | Telegram Message ID | Number | Source message ID |
 | C | Sales Report Log Message | String | Full sale message (includes `[SALES EVENT]` lines: Sold by, Cash proceeds collected by, Stripe, etc.) |
-| D | Reporter Name | String | For **`[SALES EVENT]`** from the DApp: **cash proceeds collector** (who received payment), normalized via Contributors sheet; for other message formats, same as historical “reporter” / seller attribution. “Sold by” remains in column **C** text. |
+| D | Reporter Name | String | Legacy “reporter” / display name; **`[SALES EVENT]`** may still spell out sold-by vs cash in **C**; explicit attribution for ledgers is **P** / **Q**. |
 | E | QR Code value | String | Scanned QR code |
 | F | Sale Price | Number | Amount of sale |
 | G | AGL Ledger URL | String | URL to ledger |
 | H | Sales Date | Date | Date of sale (YYYYMMDD) |
 | I | Currency | String | Product sold |
-| J | Status | String | "PROCESSING", "ACCOUNTED", "TOKENIZED", empty |
+| J | Status | String | **`TOKENIZED`**, **`ACCOUNTED`**, **`PROCESSING`**, **`IGNORED`**, or **empty** (empty = pending ledger processing; **`IGNORED`** = parsed Telegram candidate with no sale appended—see **R**) |
 | K | Ledger Lines Number | String | Comma-separated row numbers |
 | L | Owner email | String | From **`[SALES EVENT]`** when present (DApp **report_sales** / list flow); empty for legacy rows |
 | M | Stripe Session ID | String | Parsed from same message; aligns with Stripe checkout column C |
 | N | Shipping Provider | String | EasyPost USPS label text (e.g. `GroundAdvantage - USPS`) when submitted |
 | O | Tracking Number | String | Carrier tracking when submitted |
+| P | Sold by | String | Resolved display name for **inventory** ledger line (`sales_update_*`: 0-based column **15**) |
+| Q | Cash Collected By | String | Resolved display name for **cash proceeds** ledger line (`sales_update_*`: 0-based column **16**) |
+| R | Remarks | String | Parser / Stripe notes (e.g. why **IGNORED**); **`sentiment_importer`** Stripe rows use `Stripe checkout (online)` |
 
 **Used by:**
 - [`process_sales_telegram_logs.gs`](https://github.com/TrueSightDAO/tokenomics/blob/main/google_app_scripts/tdg_inventory_management/process_sales_telegram_logs.gs) - Parses and validates sales from Telegram
 - [`sales_update_managed_agl_ledgers.gs`](https://github.com/TrueSightDAO/tokenomics/blob/main/google_app_scripts/tdg_inventory_management/sales_update_managed_agl_ledgers.gs) - Updates AGL ledgers with sales
 - [`sales_update_main_dao_offchain_ledger.gs`](https://github.com/TrueSightDAO/tokenomics/blob/main/google_app_scripts/tdg_inventory_management/sales_update_main_dao_offchain_ledger.gs) - Updates main DAO ledger
+- [`sentiment_importer` `QrCodeCheckController`](https://github.com/TrueSightDAO/sentiment_importer/blob/master/app/controllers/qr_code_check_controller.rb) - Appends Stripe checkout rows (**18** columns **A–R**)
 
 ---
 
@@ -1495,6 +1521,7 @@ TELEGRAM_FILE_ID_COL = 14     // Column O
 - **PROCESSING** - Currently being processed
 - **PROCESSED** - Successfully processed
 - **ACCOUNTED** - Recorded in final ledger
+- **IGNORED** - `QR Code Sales` column **J**: Telegram sale heuristics matched but no sale row was written (see column **R**); dedupes repeat processing
 - **ACTIVE** - Active/enabled (for signatures, QR codes)
 - **INACTIVE** - Disabled/archived
 - **COMPLETED** - Finished processing
