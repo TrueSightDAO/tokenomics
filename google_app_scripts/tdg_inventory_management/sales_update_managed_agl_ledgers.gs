@@ -38,7 +38,7 @@ const MESSAGE_COL = 2; // Column C
 const CONTRIBUTOR_NAME_COL = 3; // Column D
 const QR_CODE_COL = 4; // Column E
 const SALE_PRICE_COL = 5; // Column F
-const CASH_PROCEEDS_COLLECTOR_COL = 14; // Column O (0-based)
+const CASH_PROCEEDS_COLLECTOR_COL = 16; // Column Q (0-based)
 const SOLD_BY_NAME_COL = 15; // Column P (0-based)
 
 function cashProceedsContributorForLedger_(row) {

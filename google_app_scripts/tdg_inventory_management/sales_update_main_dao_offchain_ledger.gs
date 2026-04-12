@@ -37,8 +37,8 @@ const OFFCHAIN_ROW_NUMS_COL = 10; // Column K
 const MESSAGE_COL = 2; // Column C
 const CONTRIBUTOR_NAME_COL = 3; // Column D
 const SALE_PRICE_COL = 5; // Column F
-/** Populated by process_sales_telegram_logs / Stripe row padding; fall back to Column D when blank */
-const CASH_PROCEEDS_COLLECTOR_COL = 14; // Column O (0-based)
+/** Populated by process_sales_telegram_logs / Stripe; QR Code Sales column Q. Fall back to Column D when blank */
+const CASH_PROCEEDS_COLLECTOR_COL = 16; // Column Q (0-based)
 const SOLD_BY_NAME_COL = 15; // Column P (0-based)
 
 function cashProceedsContributorForLedger_(row) {

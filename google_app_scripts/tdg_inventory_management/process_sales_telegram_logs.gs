@@ -53,17 +53,17 @@ const MESSAGE_COL = 6; // Column G
 const SALES_DATE_COL = 11; // Column L
 
 // Column indices for destination sheet (QR Code Sales).
-// Column D: legacy “reporter / cash” cell (still populated). Columns O–P store explicit cash collector vs sold-by for ledger scripts.
+// Column D: legacy “reporter / cash” cell (still populated). L–R: DApp / shipment / attribution (see header row).
 const DEST_MESSAGE_ID_COL = 1; // Column B (for duplicate checking)
 const DEST_QR_CODE_COL = 4; // Column E (for QR code duplicate checking)
-// A–I: written on ingest; J–K reserved for ledger scripts (Status, Ledger lines); L–Q extracted DApp / attribution fields.
-const DEST_OWNER_EMAIL_COL_INDEX = 11; // Column L (0-based row array index)
+// A–I: written on ingest; J–K reserved for ledger scripts (Status, Ledger lines); L–R extracted fields + remarks.
+const DEST_OWNER_EMAIL_COL_INDEX = 11; // Column L
 const DEST_STRIPE_SESSION_COL_INDEX = 12; // Column M
 const DEST_SHIPPING_PROVIDER_COL_INDEX = 13; // Column N
-const DEST_CASH_PROCEEDS_COL_INDEX = 14; // Column O — “Cash proceeds collected by” (resolved display name)
-const DEST_SOLD_BY_COL_INDEX = 15; // Column P — “Sold by” (resolved display name)
-const DEST_TRACKING_NUM_COL_INDEX = 16; // Column Q — tracking number (moved from former column O)
-/** Column R — parser / audit remarks (e.g. why a Telegram row was recorded as IGNORED) */
+const DEST_TRACKING_NUM_COL_INDEX = 14; // Column O — tracking number
+const DEST_SOLD_BY_COL_INDEX = 15; // Column P — sold by (inventory line for ledger scripts)
+const DEST_CASH_PROCEEDS_COL_INDEX = 16; // Column Q — cash collected by (cash line for ledger scripts)
+/** Column R — remarks (parser audit, Stripe note, etc.) */
 const DEST_REMARKS_COL_INDEX = 17;
 /** A–I (9) + J–R (9) when appending to QR Code Sales */
 const QR_SALES_APPEND_COL_COUNT = 18;
@@ -71,12 +71,12 @@ const QR_SALES_APPEND_COL_COUNT = 18;
 const STATUS_IGNORED = 'IGNORED';
 
 /**
- * If row 1 columns L–Q are empty, set headers for extracted [SALES EVENT] fields (report_sales / dapp).
+ * If row 1 columns L–Q are empty, set headers for extracted [SALES EVENT] fields (report_sales / dapp / Stripe).
  * @param {GoogleAppsScript.Spreadsheet.Sheet} sheet
  */
 function ensureQrSalesExtractedFieldsHeaders_(sheet) {
   if (!sheet) return;
-  const rng = sheet.getRange(1, DEST_OWNER_EMAIL_COL_INDEX + 1, 1, DEST_TRACKING_NUM_COL_INDEX + 1);
+  const rng = sheet.getRange(1, DEST_OWNER_EMAIL_COL_INDEX + 1, 1, DEST_CASH_PROCEEDS_COL_INDEX + 1);
   const existing = rng.getValues()[0];
   var allBlank = true;
   for (var i = 0; i < existing.length; i++) {
@@ -90,9 +90,9 @@ function ensureQrSalesExtractedFieldsHeaders_(sheet) {
     'Owner email',
     'Stripe Session ID',
     'Shipping Provider',
-    'Cash proceeds collected by',
+    'Tracking Number',
     'Sold by',
-    'Tracking Number'
+    'Cash Collected By'
   ]]);
   rng.setFontWeight('bold');
 }
@@ -124,18 +124,18 @@ function ensureQrSalesAppendHeaders_(sheet) {
 
 /**
  * Columns J–R after A–I: J = status (blank for new sales; IGNORED when parser records a non-sale),
- * K blank, L–Q DApp / attribution, R remarks.
+ * K blank, L–Q DApp / attribution (O tracking, P sold by, Q cash), R remarks.
  */
-function buildQrSalesRowTail_(statusJ, ownerEmail, stripeSessionId, shippingProvider, cashProceedsCollectedBy, soldBy, trackingNumber, remarksR) {
+function buildQrSalesRowTail_(statusJ, ownerEmail, stripeSessionId, shippingProvider, trackingNumber, soldBy, cashProceedsCollectedBy, remarksR) {
   return [
     (statusJ || '').toString(),
     '',
     (ownerEmail || '').toString(),
     (stripeSessionId || '').toString(),
     (shippingProvider || '').toString(),
-    (cashProceedsCollectedBy || '').toString(),
-    (soldBy || '').toString(),
     (trackingNumber || '').toString(),
+    (soldBy || '').toString(),
+    (cashProceedsCollectedBy || '').toString(),
     (remarksR || '').toString()
   ];
 }
@@ -970,7 +970,7 @@ function parseTelegramChatLogs() {
         agroverseValue,
         salesDate,
         inventoryType
-      ].concat(buildQrSalesRowTail_('', ownerEmail, stripeSessionId, shippingProvider, finalCashCollector, finalSoldBy, trackingNumber, ''));
+      ].concat(buildQrSalesRowTail_('', ownerEmail, stripeSessionId, shippingProvider, trackingNumber, finalSoldBy, finalCashCollector, ''));
 
       destinationSheet.getRange(destinationSheet.getLastRow() + 1, 1, 1, rowToAppend.length).setValues([rowToAppend]);
 
@@ -1150,7 +1150,7 @@ function processSpecificRow(rowIndex) {
       agroverseValue,
       salesDate,
       inventoryType
-    ].concat(buildQrSalesRowTail_('', ownerEmail, stripeSessionId, shippingProvider, finalCashCollector, finalSoldBy, trackingNumber, ''));
+    ].concat(buildQrSalesRowTail_('', ownerEmail, stripeSessionId, shippingProvider, trackingNumber, finalSoldBy, finalCashCollector, ''));
 
     destinationSheet.getRange(destinationSheet.getLastRow() + 1, 1, 1, rowToAppend.length).setValues([rowToAppend]);
 
