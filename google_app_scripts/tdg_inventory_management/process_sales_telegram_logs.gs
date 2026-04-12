@@ -512,6 +512,27 @@ function parseStructuredMessage(message) {
   };
 }
 
+/**
+ * Best-effort QR id from message text (no LLM). Used to skip Grok when that QR is already on QR Code Sales.
+ * @param {string} message
+ * @returns {string} trimmed code or ''
+ */
+function tryExtractQrCodeForDuplicateCheck_(message) {
+  if (message == null || message === '') return '';
+  const m = String(message);
+  var match;
+  match = m.match(/qr_code=([A-Za-z0-9_]+)/i);
+  if (match && match[1]) return match[1].trim();
+  match = m.match(/\[QR CODE EVENT\]\s*([A-Za-z0-9_]+)/i);
+  if (match && match[1]) return match[1].trim();
+  match = m.match(/- Item:\s*([^\n\r]+)/i);
+  if (match && match[1]) return match[1].trim();
+  // Typical Agroverse-style ids, e.g. 2024OSCAR_20260330_37
+  match = m.match(/\b(20\d{2}[A-Za-z][A-Za-z0-9]*_\d{8}_[A-Za-z0-9_]+)\b/);
+  if (match && match[1]) return match[1].trim();
+  return '';
+}
+
 // Function to call Grok API to extract QR code and sale price (fallback for unstructured messages)
 function callGrokApi(message) {
   try {
@@ -587,8 +608,11 @@ Message: "${message}"`;
   }
 }
 
-// Function to extract QR code and sale price (tries structured parsing first, then Grok API)
-function extractQrCodeAndPrice(message) {
+/**
+ * @param {string} message
+ * @param {string[]=} existingQrCodes optional list from QR Code Sales column E; when a heuristic QR match is in this list, Grok is skipped
+ */
+function extractQrCodeAndPrice(message, existingQrCodes) {
   // Try structured parsing first
   let result = parseStructuredMessage(message);
   
@@ -596,6 +620,25 @@ function extractQrCodeAndPrice(message) {
   if (result.qrCode && result.salePrice) {
     Logger.log(`Message parsed using ${result.parseMethod} method`);
     return result;
+  }
+
+  // Legacy / partial payloads: avoid Grok if we can already see the QR on QR Code Sales
+  if (existingQrCodes && existingQrCodes.length) {
+    const hintedQr = tryExtractQrCodeForDuplicateCheck_(message);
+    if (hintedQr && existingQrCodes.some(function (q) { return String(q || '').trim() === hintedQr; })) {
+      Logger.log(`Skipping Grok: heuristic QR "${hintedQr}" already exists on QR Code Sales (structured parse was ${result.parseMethod})`);
+      return {
+        qrCode: '',
+        salePrice: '',
+        parseMethod: 'SKIPPED_DUPLICATE_QR',
+        ownerEmail: '',
+        stripeSessionId: '',
+        shippingProvider: '',
+        trackingNumber: '',
+        soldBy: '',
+        cashProceedsCollectedBy: ''
+      };
+    }
   }
   
   // Fallback to Grok API for unstructured messages
@@ -659,7 +702,7 @@ function parseTelegramChatLogs() {
         trackingNumber,
         soldBy: parsedSoldBy,
         cashProceedsCollectedBy: parsedCashProceeds
-      } = extractQrCodeAndPrice(message);
+      } = extractQrCodeAndPrice(message, existingQrCodes);
       Logger.log(`Row ${i + 1}: Parsed using method: ${parseMethod}`);
 
       if (!qrCode || !salePrice) {
@@ -801,7 +844,7 @@ function processSpecificRow(rowIndex) {
       trackingNumber,
       soldBy: parsedSoldBy,
       cashProceedsCollectedBy: parsedCashProceeds
-    } = extractQrCodeAndPrice(message);
+    } = extractQrCodeAndPrice(message, existingQrCodes);
     Logger.log(`Row ${rowIndex}: Parsed using method: ${parseMethod}`);
 
     if (!qrCode || !salePrice) {
