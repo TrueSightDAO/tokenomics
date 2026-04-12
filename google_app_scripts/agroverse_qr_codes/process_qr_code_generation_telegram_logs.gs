@@ -35,6 +35,24 @@ const qrCodeGenerationTabName = "QR Code Generation";
 const contributorsSheetId = "1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU";
 const contributorsTabName = "Contributors Digital Signatures";
 
+/** Telegram Chat Logs column P (1-based) = signature verification from `submit_contribution` (0-based index 15) */
+const TELEGRAM_SIGNATURE_VER_COL = 15;
+/** Read A–R so P (and optional Q/R) are present even when row is wide */
+const TELEGRAM_LOG_READ_LAST_COL = 18;
+
+/** Short label for QR Code Generation column L when ingest signature was not `success` */
+const QR_GEN_STATUS_SIG_FAILED = 'NOT PROCESSED — sig verify failed';
+
+function isTelegramSignatureVerificationSuccess_(cell) {
+  return cell != null && String(cell).trim().toLowerCase() === 'success';
+}
+
+/** Long-form notes for QR Code Generation column N */
+function buildSigFailureProcessingNotes_(rawVerification) {
+  const v = rawVerification == null || String(rawVerification).trim() === '' ? '(blank)' : String(rawVerification).trim();
+  return 'Not processed: digital signature verification did not succeed on ingest (Telegram Chat Logs column P = ' + v + '). No QR rows created in Agroverse.';
+}
+
 // Helper: extract currency name from contribution text
 function extractCurrencyName(contributionText) {
   const match = contributionText.match(/- Currency: (.+)$/m);
@@ -150,9 +168,9 @@ function processQRCodeGenerationTelegramLogs() {
       "Currency",                // I
       "Zip File Download URL",   // J
       "Expected Zip File",       // K
-      "Download Location",       // L
-      "Status",                  // M
-      "Processing Notes"         // N
+      "Status",                  // L — short status for filters
+      "Download Location",       // M — from batch request text
+      "Processing Notes"         // N — details (errors, sig failure, etc.)
     ]]);
   }
 
@@ -163,7 +181,7 @@ function processQRCodeGenerationTelegramLogs() {
     Logger.log("No data in Telegram Chat Logs tab");
     return;
   }
-  const dataRange = telegramLogTab.getRange(2, 1, lastRow - 1, 15).getValues();
+  const dataRange = telegramLogTab.getRange(2, 1, lastRow - 1, TELEGRAM_LOG_READ_LAST_COL).getValues();
 
   const contributorsLastRow = contributorsTab.getLastRow();
   const contributorsData = contributorsLastRow > 1 ? contributorsTab.getRange(2, 1, contributorsLastRow - 1, 5).getValues() : [];
@@ -187,6 +205,9 @@ function processQRCodeGenerationTelegramLogs() {
     if (contributionMade && contributionMade.startsWith("[BATCH QR CODE REQUEST]")) {
       Logger.log(contributionMade);
 
+      const sigRaw = row.length > TELEGRAM_SIGNATURE_VER_COL ? row[TELEGRAM_SIGNATURE_VER_COL] : '';
+      const sigOk = isTelegramSignatureVerificationSuccess_(sigRaw);
+
       // Extract data from the contribution text
       const currency = extractCurrencyName(contributionMade);
       const quantity = extractQuantity(contributionMade);
@@ -206,7 +227,10 @@ function processQRCodeGenerationTelegramLogs() {
         }
       });
 
-      // Add to QR Code Generation tab
+      const statusL = sigOk ? 'PENDING' : QR_GEN_STATUS_SIG_FAILED;
+      const notesN = sigOk ? '' : buildSigFailureProcessingNotes_(sigRaw);
+
+      // Add to QR Code Generation tab (always transfer for audit; generation runs only when sigOk)
       qrCodeGenerationTab.appendRow([
         row[0], // A - Telegram Update ID
         row[1], // B - Telegram Chatroom ID
@@ -219,18 +243,27 @@ function processQRCodeGenerationTelegramLogs() {
         currency, // I - Currency
         "", // J - Zip File Download URL (will be filled when completed)
         expectedZipFile, // K - Expected Zip File
-        "PENDING - Queued for QR code generation", // L - Status (includes processing notes)
-        "", // M - Status (empty - moved to Column L)
-        "" // N - Processing Notes (empty)
+        statusL, // L - Status (short)
+        downloadLocation || '', // M - Download Location
+        notesN // N - Processing Notes
       ]);
 
       const qrCodeGenerationRowNumber = qrCodeGenerationTab.getLastRow();
-      sendQRCodeGenerationNotification([
-        row[0], row[1], row[2], row[3], row[4], contributionMade, row[11], 
-        contributorName, currency, quantity, expectedZipFile, downloadLocation, "PENDING"
-      ], qrCodeGenerationRowNumber);
 
-      Logger.log(`Processed QR code generation request: ${currency} x${quantity} for ${contributorName}`);
+      if (sigOk) {
+        sendQRCodeGenerationNotification([
+          row[0], row[1], row[2], row[3], row[4], contributionMade, row[11],
+          contributorName, currency, quantity, expectedZipFile, downloadLocation, 'PENDING'
+        ], qrCodeGenerationRowNumber);
+      } else {
+        Logger.log(`QR batch row recorded but generation skipped: Telegram col P is not success (${sigRaw}). Message ID ${messageId}`);
+      }
+
+      Logger.log(`Processed QR code generation request: ${currency} x${quantity} for ${contributorName} (sigOk=${sigOk})`);
+
+      if (!sigOk) {
+        return;
+      }
 
       // Now actually generate the QR codes in the Agroverse spreadsheet
       try {
@@ -269,7 +302,7 @@ function processQRCodeGenerationTelegramLogs() {
                 Logger.log(`Failed to send email notification: ${emailResult.message}`);
               }
             } else {
-              Logger.log(`No email found for digital signature: ${digitalSignature}`);
+              Logger.log(`No email found for digital signature: ${publicSignature}`);
             }
           } catch (emailError) {
             Logger.log(`Error sending email notification: ${emailError.message}`);
@@ -316,13 +349,13 @@ function updateQRCodeGenerationStatus(messageId, status, processingNotes) {
   for (let i = 0; i < messageIds.length; i++) {
     if (messageIds[i] === messageId) {
       const rowNumber = i + 2; // Convert to spreadsheet row number
-      
-      // Update Status (Column L) with status and processing notes combined
-      const combinedStatus = processingNotes ? `${status} - ${processingNotes}` : status;
-      qrCodeGenerationTab.getRange(rowNumber, 12).setValue(combinedStatus); // Status (Column L)
-      qrCodeGenerationTab.getRange(rowNumber, 13).setValue(""); // Status (Column M) - leave empty
-      qrCodeGenerationTab.getRange(rowNumber, 14).setValue(""); // Processing Notes (Column N) - leave empty
-      
+
+      // L = short status; N = long notes (M = download location, leave unchanged)
+      qrCodeGenerationTab.getRange(rowNumber, 12).setValue(status);
+      if (processingNotes) {
+        qrCodeGenerationTab.getRange(rowNumber, 14).setValue(processingNotes);
+      }
+
       Logger.log(`Updated status for message ID ${messageId} to ${status}`);
       return true;
     }
@@ -907,28 +940,31 @@ function testProcessSpecificRow(rowNumber = 6479) {
       return `Error: Row ${rowNumber} is out of range. Valid range: 2 to ${lastRow}`;
     }
     
-    // Get the specific row data
-    const rowData = telegramLogsTab.getRange(rowNumber, 1, 1, 15).getValues()[0]; // Columns A to O
-    
+    // Get the specific row data (include column P signature verification)
+    const rowData = telegramLogsTab.getRange(rowNumber, 1, 1, TELEGRAM_LOG_READ_LAST_COL).getValues()[0];
+
     Logger.log('Row data: ' + JSON.stringify(rowData));
-    
+
     // Check if this row contains a batch QR code request
     const contributionText = rowData[6] ? rowData[6].toString() : ''; // Column G (Contribution Made)
-    
+
     if (!contributionText.includes('[BATCH QR CODE REQUEST]')) {
       return `Row ${rowNumber} does not contain a batch QR code request. Found: "${contributionText}"`;
     }
-    
+
+    const sigRaw = rowData.length > TELEGRAM_SIGNATURE_VER_COL ? rowData[TELEGRAM_SIGNATURE_VER_COL] : '';
+    const sigOk = isTelegramSignatureVerificationSuccess_(sigRaw);
+
     Logger.log('Found batch QR code request, processing...');
-    
+
     // Extract data from the contribution text
     const currency = extractCurrencyName(contributionText);
     const quantity = extractQuantity(contributionText);
     const expectedZipFile = extractExpectedZipFile(contributionText);
     const downloadLocation = extractDownloadLocation(contributionText);
     const timestamp = extractTimestamp(contributionText);
-    
-    Logger.log(`Extracted data: Currency=${currency}, Quantity=${quantity}, ZipFile=${expectedZipFile}`);
+
+    Logger.log(`Extracted data: Currency=${currency}, Quantity=${quantity}, ZipFile=${expectedZipFile}, sigOk=${sigOk}, colP=${sigRaw}`);
     
     // Now do the FULL EXECUTION - create records, generate QR codes, etc.
     Logger.log('🚀 Starting FULL EXECUTION for this row...');
@@ -954,12 +990,12 @@ function testProcessSpecificRow(rowNumber = 6479) {
           "Currency",                // I
           "Zip File Download URL",   // J
           "Expected Zip File",       // K
-          "Download Location",       // L
-          "Status",                  // M
+          "Status",                  // L
+          "Download Location",       // M
           "Processing Notes"         // N
         ]]);
       }
-      
+
       // Extract contributor information
       const publicSignatureMatch = contributionText.match(/My Digital Signature: ([^\n]+)/);
       const publicSignature = publicSignatureMatch ? publicSignatureMatch[1].trim() : 'N/A';
@@ -991,7 +1027,10 @@ function testProcessSpecificRow(rowNumber = 6479) {
         return `⚠️ Message ID ${messageId} already processed. Record exists at row ${existingRow}. Skipping to prevent duplicate processing.`;
       }
       Logger.log(`✅ Message ID ${messageId} not found in existing records - proceeding with processing`);
-      
+
+      const statusL = sigOk ? 'PENDING' : QR_GEN_STATUS_SIG_FAILED;
+      const notesN = sigOk ? '' : buildSigFailureProcessingNotes_(sigRaw);
+
       // Add to QR Code Generation tab
       qrCodeGenerationTab.appendRow([
         rowData[0], // A - Telegram Update ID
@@ -1005,24 +1044,29 @@ function testProcessSpecificRow(rowNumber = 6479) {
         currency, // I - Currency
         "", // J - Zip File Download URL (will be filled when completed)
         expectedZipFile, // K - Expected Zip File
-        "PENDING - Queued for QR code generation", // L - Status (includes processing notes)
-        "", // M - Status (empty - moved to Column L)
-        "" // N - Processing Notes (empty)
+        statusL, // L - Status (short)
+        downloadLocation || '', // M - Download Location
+        notesN // N - Processing Notes
       ]);
-      
+
       const qrCodeGenerationRowNumber = qrCodeGenerationTab.getLastRow();
       Logger.log(`✅ Record created in QR Code Generation tab at row ${qrCodeGenerationRowNumber}`);
-      
-      // Step 2: Send Telegram notification
-      Logger.log('📱 Step 2: Sending Telegram notification...');
-      sendQRCodeGenerationNotification([
-        rowData[0], rowData[1], rowData[2], messageId, rowData[4], contributionText, rowData[11], 
-        contributorName, currency, quantity, expectedZipFile, downloadLocation, "PENDING"
-      ], qrCodeGenerationRowNumber);
-      
+
+      // Step 2: Send Telegram notification (omit when signature did not verify — sheet row is the audit trail)
+      if (sigOk) {
+        Logger.log('📱 Step 2: Sending Telegram notification...');
+        sendQRCodeGenerationNotification([
+          rowData[0], rowData[1], rowData[2], messageId, rowData[4], contributionText, rowData[11],
+          contributorName, currency, quantity, expectedZipFile, downloadLocation, 'PENDING'
+        ], qrCodeGenerationRowNumber);
+      } else {
+        Logger.log('Step 2 skipped: Telegram signature verification column P is not success.');
+        return `Recorded row ${qrCodeGenerationRowNumber} with status "${statusL}" (Telegram col P = ${sigRaw || '(blank)'}). Agroverse generation skipped.`;
+      }
+
       // Step 3: Generate QR codes in Agroverse spreadsheet
       Logger.log('📊 Step 3: Generating QR codes in Agroverse spreadsheet...');
-              const qrCodeResult = createQRCodeRecordsInAgroverse(currency, quantity, contributorName, messageId, expectedZipFile);
+      const qrCodeResult = createQRCodeRecordsInAgroverse(currency, quantity, contributorName, messageId, expectedZipFile);
       
       if (qrCodeResult.success) {
         // Update status to show QR codes are being generated
@@ -1120,13 +1164,13 @@ function testProcessMultipleRows(startRow, endRow) {
     
     for (let row = startRow; row <= endRow; row++) {
       try {
-        const rowData = telegramLogsTab.getRange(row, 1, 1, 15).getValues()[0];
+        const rowData = telegramLogsTab.getRange(row, 1, 1, TELEGRAM_LOG_READ_LAST_COL).getValues()[0];
         const contributionText = rowData[6] ? rowData[6].toString() : '';
-        
+
         if (contributionText.includes('[BATCH QR CODE REQUEST]')) {
           processedCount++;
           Logger.log(`Processing row ${row}...`);
-          
+
           try {
             // Extract data from the contribution text
             const currency = extractCurrencyName(contributionText);
@@ -1134,8 +1178,10 @@ function testProcessMultipleRows(startRow, endRow) {
             const expectedZipFile = extractExpectedZipFile(contributionText);
             const downloadLocation = extractDownloadLocation(contributionText);
             const timestamp = extractTimestamp(contributionText);
-            
-            results.push(`Row ${row}: SUCCESS - Currency: ${currency}, Quantity: ${quantity}, Zip: ${expectedZipFile}`);
+            const sigRaw = rowData.length > TELEGRAM_SIGNATURE_VER_COL ? rowData[TELEGRAM_SIGNATURE_VER_COL] : '';
+            const sigOk = isTelegramSignatureVerificationSuccess_(sigRaw);
+
+            results.push(`Row ${row}: PARSE_OK - Currency: ${currency}, Quantity: ${quantity}, Zip: ${expectedZipFile}, Telegram_P_sig: ${sigRaw || '(blank)'}, sigOk=${sigOk}`);
             successCount++;
           } catch (error) {
             errorCount++;
