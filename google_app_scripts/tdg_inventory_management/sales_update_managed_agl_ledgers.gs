@@ -38,6 +38,20 @@ const MESSAGE_COL = 2; // Column C
 const CONTRIBUTOR_NAME_COL = 3; // Column D
 const QR_CODE_COL = 4; // Column E
 const SALE_PRICE_COL = 5; // Column F
+const CASH_PROCEEDS_COLLECTOR_COL = 14; // Column O (0-based)
+const SOLD_BY_NAME_COL = 15; // Column P (0-based)
+
+function cashProceedsContributorForLedger_(row) {
+  const v = row[CASH_PROCEEDS_COLLECTOR_COL];
+  if (v != null && String(v).trim() !== '') return String(v).trim();
+  return (row[CONTRIBUTOR_NAME_COL] || '').toString();
+}
+
+function soldByContributorForLedger_(row) {
+  const v = row[SOLD_BY_NAME_COL];
+  if (v != null && String(v).trim() !== '') return String(v).trim();
+  return (row[CONTRIBUTOR_NAME_COL] || '').toString();
+}
 
 function doGet(e) {
   const action = e.parameter?.action;
@@ -287,7 +301,8 @@ function processNonAgl4Transactions() {
       // Get values for transactions
       const salesDate = sourceData[i][SALES_DATE_COL] || '';
       const message = sourceData[i][MESSAGE_COL] || '';
-      const contributorName = sourceData[i][CONTRIBUTOR_NAME_COL] || '';
+      const cashContributorName = cashProceedsContributorForLedger_(sourceData[i]);
+      const inventoryContributorName = soldByContributorForLedger_(sourceData[i]);
       const salePrice = sourceData[i][SALE_PRICE_COL] || 0;
       const inventoryType = sourceData[i][INVENTORY_TYPE_COL] || '';
       const qrCode = sourceData[i][QR_CODE_COL] || '';
@@ -315,7 +330,7 @@ function processNonAgl4Transactions() {
         [
           salesDate, // Column A: Sales Date
           message, // Column B: Value
-          contributorName, // Column C: Contributor
+          inventoryContributorName, // Column C: Contributor (inventory / sold-by)
           -1, // Column D: -1
           inventoryType, // Column E: Inventory Type
           'Assets' // Column F: Assets
@@ -324,7 +339,7 @@ function processNonAgl4Transactions() {
         [
           salesDate, // Column A: Sales Date
           message, // Column B: Value
-          contributorName, // Column C: Contributor
+          cashContributorName, // Column C: Contributor (cash proceeds collector)
           salePrice, // Column D: Sale Price
           'USD', // Column E: USD
           'Assets' // Column F: Assets
@@ -356,7 +371,7 @@ function processNonAgl4Transactions() {
       
       // Send Telegram notification for completed non-agl4 transaction
       if (qrCode) {
-        sendNonAgl4TransactionNotification(qrCode, contributorName, aglContractName, destSheetUrl);
+        sendNonAgl4TransactionNotification(qrCode, cashContributorName, aglContractName, destSheetUrl);
       } else {
         Logger.log(`No QR code found for row ${i + 1}, skipping notification`);
       }

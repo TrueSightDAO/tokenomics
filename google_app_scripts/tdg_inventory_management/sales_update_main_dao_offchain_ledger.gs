@@ -37,6 +37,21 @@ const OFFCHAIN_ROW_NUMS_COL = 10; // Column K
 const MESSAGE_COL = 2; // Column C
 const CONTRIBUTOR_NAME_COL = 3; // Column D
 const SALE_PRICE_COL = 5; // Column F
+/** Populated by process_sales_telegram_logs / Stripe row padding; fall back to Column D when blank */
+const CASH_PROCEEDS_COLLECTOR_COL = 14; // Column O (0-based)
+const SOLD_BY_NAME_COL = 15; // Column P (0-based)
+
+function cashProceedsContributorForLedger_(row) {
+  const v = row[CASH_PROCEEDS_COLLECTOR_COL];
+  if (v != null && String(v).trim() !== '') return String(v).trim();
+  return (row[CONTRIBUTOR_NAME_COL] || '').toString();
+}
+
+function soldByContributorForLedger_(row) {
+  const v = row[SOLD_BY_NAME_COL];
+  if (v != null && String(v).trim() !== '') return String(v).trim();
+  return (row[CONTRIBUTOR_NAME_COL] || '').toString();
+}
 
 function doGet(e) {
   const action = e.parameter?.action;
@@ -126,7 +141,8 @@ function processTokenizedTransactions() {
       const qrCode = sourceData[i][DEST_QR_CODE_COL] || '';
       const salesDate = sourceData[i][SALES_DATE_COL] || '';
       const message = sourceData[i][MESSAGE_COL] || '';
-      const contributorName = sourceData[i][CONTRIBUTOR_NAME_COL] || '';
+      const cashContributorName = cashProceedsContributorForLedger_(sourceData[i]);
+      const inventoryContributorName = soldByContributorForLedger_(sourceData[i]);
       const salePrice = sourceData[i][SALE_PRICE_COL] || 0;
       const inventoryType = sourceData[i][INVENTORY_TYPE_COL] || '';
       
@@ -140,7 +156,7 @@ function processTokenizedTransactions() {
         [
           salesDate, // Column A: Sales Date
           message, // Column B: Message
-          contributorName, // Column C: Contributor Name
+          inventoryContributorName, // Column C: Contributor (inventory / sold-by)
           -1, // Column D: -1
           inventoryType, // Column E: Inventory Type
           '', // Column F: Empty
@@ -150,7 +166,7 @@ function processTokenizedTransactions() {
         [
           salesDate, // Column A: Sales Date
           message, // Column B: Message
-          contributorName, // Column C: Contributor Name
+          cashContributorName, // Column C: Contributor (cash proceeds collector)
           salePrice, // Column D: Sale Price
           'USD', // Column E: USD
           '', // Column F: Empty
@@ -185,7 +201,7 @@ function processTokenizedTransactions() {
       
       // Send Telegram notification for completed transaction
       if (qrCode) {
-        sendTransactionCompletionNotification(qrCode, contributorName);
+        sendTransactionCompletionNotification(qrCode, cashContributorName);
       } else {
         Logger.log(`No QR code found for row ${i + 1}, skipping notification`);
       }
