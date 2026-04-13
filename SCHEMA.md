@@ -383,7 +383,7 @@ See [`python_scripts/schema_validation/README.md`](./python_scripts/schema_valid
 ---
 
 ##### Sheet: `QR Code Generation`
-**Purpose:** Tracks QR code generation requests from Telegram
+**Purpose:** Tracks QR code generation requests from Telegram / DApp batch flow
 
 **Sheet URL:** https://docs.google.com/spreadsheets/d/1qbZZhf-_7xzmDTriaJVWj6OZshyQsFkdsAV8-pyzASQ/edit#gid=1703901725
 
@@ -395,17 +395,20 @@ See [`python_scripts/schema_validation/README.md`](./python_scripts/schema_valid
 | B | Telegram Chatroom ID | Number | Telegram chat ID |
 | C | Telegram Chatroom Name | String | Telegram chatroom name |
 | D | Telegram Message ID | Number | Telegram message ID |
-| E | Contributor Name | String | Requester name |
-| F | Contribution Made | String | Full request message |
-| G | Status date | Date | Date of request (YYYYMMDD) |
-| H | Agroverse QR starting line | Number | Starting line number for QR codes |
-| I | Agroverse QR ending line | Number | Ending line number for QR codes |
-| J | Zip file download URL | String | Google Drive link to ZIP file |
-| K | Zip file name | String | Name of the ZIP file |
-| L | status | String | Processing status |
+| E | Contributor Name | String | Name resolved from **Contributors Digital Signatures** for the signer’s public key |
+| F | Contribution Made | String | Full signed request message |
+| G | Status date | Date | Date of request (from Telegram log) |
+| H | Agroverse QR starting line | Number | First row written in **Agroverse QR codes** for this batch |
+| I | Agroverse QR ending line | Number | Last row written for this batch |
+| J | Zip file download URL | String | Raw download URL when available (`raw.githubusercontent.com/.../batch_files/...`) |
+| K | Zip file name | String | Expected zip basename (matches signed `- Expected Zip File:`) |
+| L | Status | String | Short status: PENDING, PROCESSING, PROCESSED, FAILED, etc. |
+| M | Download Location | String | From signed `- Download Location:`; may mirror raw zip when complete |
+| N | Processing Notes | String | Details, errors, or GitHub commit URL when synced |
+| O | Manager Name | String | From signed `- Manager Name:` (DApp); defaults to **Contributor Name** when omitted |
 
 **Used by:**
-- [`process_qr_code_generation_telegram_logs.gs`](https://github.com/TrueSightDAO/tokenomics/blob/main/google_app_scripts/tdg_inventory_management/process_qr_code_generation_telegram_logs.gs) - Processes QR code generation requests from Telegram
+- [`process_qr_code_generation_telegram_logs.gs`](https://github.com/TrueSightDAO/tokenomics/blob/main/google_app_scripts/agroverse_qr_codes/process_qr_code_generation_telegram_logs.gs) — ingest Telegram → **QR Code Generation** → **Agroverse QR codes**; GitHub zip sync
 
 ---
 
@@ -773,7 +776,7 @@ See [`python_scripts/schema_validation/README.md`](./python_scripts/schema_valid
 | R | Tree Seedling Photo URL | String | Photo URL |
 | S | Product Image | String | Product image URL |
 | T | Price | Number | Price |
-| U | Manager \nName | String | Manager name (note: header contains line break) |
+| U | Manager \nName | String | Manager / operator name for serialized labels; batch generation sets this from signed **Manager Name** (defaults to signer when omitted) |
 | V | Ledger Name | String | Associated ledger name (NEW - added 2025-12-26) |
 
 **Used by:**

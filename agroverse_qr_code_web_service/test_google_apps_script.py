@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Test script for Google Apps Script endpoints
+Test script for Google Apps Script endpoints (batch QR / `qr_code_web_service.gs` deployment).
 """
 
 import requests
