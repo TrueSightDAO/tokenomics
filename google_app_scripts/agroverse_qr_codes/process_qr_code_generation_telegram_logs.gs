@@ -20,14 +20,19 @@ const GITHUB_REPO = 'TrueSightDAO/tokenomics'; // GitHub repository (owner/repo 
 // ===== SPREADSHEET URLs =====
 // These are the actual spreadsheet URLs - usually don't need to change:
 
-const SPREADSHEET_URL = 'https://docs.google.com/spreadsheets/d/1qbZZhf-_7xzmDTriaJVWj6OZshyQsFkdsAV8-pyzASQ/edit?gid=1703901725#gid=1703901725'; // Main spreadsheet URL
+/** Main workbook: Telegram Chat Logs + QR Code Generation (avoid global name clash with qr_code_generator.gs / subscription_notification.gs in multi-file deployments). */
+const QR_GEN_TELEGRAM_MAIN_WORKBOOK_URL = 'https://docs.google.com/spreadsheets/d/1qbZZhf-_7xzmDTriaJVWj6OZshyQsFkdsAV8-pyzASQ/edit?gid=1703901725#gid=1703901725'; // Main spreadsheet URL
 
 //const AGROVERSE_QR_SPREADSHEET_URL = 'https://docs.google.com/spreadsheets/d/1qSi_-VSj7yiJl0Ak-Q3lch-l4mrH37cEw8EmQwS_6a4/edit?gid=472328231#gid=472328231'; // Agroverse QR codes spreadsheet - SANDBOX
 const AGROVERSE_QR_SPREADSHEET_URL = 'https://docs.google.com/spreadsheets/d/1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU/edit?gid=472328231#gid=472328231'; // Agroverse QR codes spreadsheet - PRODUCTION
 
 const CONTRIBUTORS_SIGNATURES_URL = 'https://docs.google.com/spreadsheets/d/1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU/edit?gid=577022511#gid=577022511'; // Contributors Digital Signatures spreadsheet
-const GITHUB_REPO_URL = 'https://github.com/TrueSightDAO/qr_codes/blob/main/'; // GitHub repository URL
+/** Public blob path for single-QR PNGs in qr_codes repo (unique name vs qr_code_generator.gs in multi-file deployments). */
+const QR_GEN_TELEGRAM_GITHUB_BLOB_BASE_URL = 'https://github.com/TrueSightDAO/qr_codes/blob/main/'; // GitHub repository URL
 const ZIP_FILE_DOWNLOAD_BASE_URL = 'https://raw.githubusercontent.com/TrueSightDAO/qr_codes/main/batch_files/'; // Base URL for zip file downloads
+/** Commits that add batch zips land in this repo (not the tokenomics dispatch repo) */
+const QR_CODES_ZIP_GITHUB_REPO = 'TrueSightDAO/qr_codes';
+const QR_CODES_ZIP_BATCH_PREFIX = 'batch_files/';
 
 // Tab names
 const telegramLogTabName = "Telegram Chat Logs";
@@ -51,6 +56,140 @@ function isTelegramSignatureVerificationSuccess_(cell) {
 function buildSigFailureProcessingNotes_(rawVerification) {
   const v = rawVerification == null || String(rawVerification).trim() === '' ? '(blank)' : String(rawVerification).trim();
   return 'Not processed: digital signature verification did not succeed on ingest (Telegram Chat Logs column P = ' + v + '). No QR rows created in Agroverse.';
+}
+
+function normalizeQrGenMessageId_(id) {
+  return id == null ? '' : String(id).trim();
+}
+
+/** Column L still shows PROCESSING (short or legacy combined cell). */
+function isQrGenerationRowProcessingStatus_(cell) {
+  const t = cell == null ? '' : String(cell).trim();
+  return t === 'PROCESSING' || t.indexOf('PROCESSING') === 0;
+}
+
+/** GitHub API: latest commit on main touching `batch_files/{zip}` */
+function fetchLatestQrCodesCommitMetadataForZip_(zipFileName) {
+  const z = (zipFileName || '').toString().trim();
+  if (!z) return null;
+  const relPath = z.indexOf('batch_files/') === 0 ? z : (QR_CODES_ZIP_BATCH_PREFIX + z);
+  const token = getGitHubToken();
+  if (!token) {
+    Logger.log('fetchLatestQrCodesCommitMetadataForZip_: no GITHUB_TOKEN');
+    return null;
+  }
+  const url =
+    'https://api.github.com/repos/' +
+    QR_CODES_ZIP_GITHUB_REPO +
+    '/commits?sha=main&per_page=10&path=' +
+    encodeURIComponent(relPath);
+  const resp = UrlFetchApp.fetch(url, {
+    method: 'get',
+    headers: {
+      Authorization: 'token ' + token,
+      Accept: 'application/vnd.github+json',
+      'User-Agent': 'TrueSightDAO-GAS-QRGen'
+    },
+    muteHttpExceptions: true
+  });
+  const code = resp.getResponseCode();
+  if (code !== 200) {
+    Logger.log('fetchLatestQrCodesCommitMetadataForZip_: HTTP ' + code + ' ' + resp.getContentText().substring(0, 500));
+    return null;
+  }
+  const arr = JSON.parse(resp.getContentText());
+  if (!arr || !arr.length) return null;
+  const c = arr[0];
+  return {
+    sha: c.sha,
+    html_url: c.html_url,
+    message: (c.commit && c.commit.message) ? String(c.commit.message).split('\n')[0] : ''
+  };
+}
+
+function findQrCodeGenerationRowNumberByMessageId_(messageId) {
+  const sheet = SpreadsheetApp.openByUrl(QR_GEN_TELEGRAM_MAIN_WORKBOOK_URL);
+  const tab = sheet.getSheetByName(qrCodeGenerationTabName);
+  if (!tab || tab.getLastRow() < 2) return 0;
+  const lastRow = tab.getLastRow();
+  const ids = tab.getRange(2, 4, lastRow, 1).getValues().flat();
+  const want = normalizeQrGenMessageId_(messageId);
+  for (var i = 0; i < ids.length; i++) {
+    if (normalizeQrGenMessageId_(ids[i]) === want) return i + 2;
+  }
+  return 0;
+}
+
+/**
+ * When GitHub has the zip on main: L=PROCESSED, J=zip download URL (raw), M=download location (raw zip),
+ * N=processing notes (commit URL). K=zip file name unchanged.
+ * @returns {boolean} true if sheet was updated
+ */
+function applyQrGenerationGithubProcessed_(messageId, zipFileName) {
+  const z = (zipFileName || '').toString().trim();
+  if (!messageId || !z) return false;
+  const meta = fetchLatestQrCodesCommitMetadataForZip_(z);
+  if (!meta || !meta.html_url) return false;
+  const rowNum = findQrCodeGenerationRowNumberByMessageId_(messageId);
+  if (!rowNum) return false;
+  const sheet = SpreadsheetApp.openByUrl(QR_GEN_TELEGRAM_MAIN_WORKBOOK_URL);
+  const tab = sheet.getSheetByName(qrCodeGenerationTabName);
+  const baseName = z.indexOf('batch_files/') === 0 ? z.split('/').pop() : z;
+  const rawZip = ZIP_FILE_DOWNLOAD_BASE_URL + baseName;
+  tab.getRange(rowNum, 12).setValue('PROCESSED');
+  tab.getRange(rowNum, 13).setValue(rawZip);
+  tab.getRange(rowNum, 14).setValue(meta.html_url);
+  tab.getRange(rowNum, 10).setValue(rawZip);
+  Logger.log('applyQrGenerationGithubProcessed_: message ' + messageId + ' row ' + rowNum + ' sha ' + meta.sha);
+  return true;
+}
+
+/**
+ * Heal rows stuck in PROCESSING after GitHub Actions finished.
+ * @param {number=} maxScans max data rows to scan from top (default 40)
+ * @returns {number} rows updated
+ */
+function syncProcessingQRCodeGenerationFromGitHub(maxScans) {
+  const cap = maxScans || 40;
+  const sheet = SpreadsheetApp.openByUrl(QR_GEN_TELEGRAM_MAIN_WORKBOOK_URL);
+  const tab = sheet.getSheetByName(qrCodeGenerationTabName);
+  if (!tab || tab.getLastRow() < 2) return 0;
+  const lastRow = tab.getLastRow();
+  const end = Math.min(lastRow, 1 + cap);
+  if (end < 2) return 0;
+  const data = tab.getRange(2, 1, end, 15).getValues();
+  var n = 0;
+  for (var i = 0; i < data.length; i++) {
+    var row = data[i];
+    if (!isQrGenerationRowProcessingStatus_(row[11])) continue;
+    var zip = row[10];
+    var zStr = zip == null ? '' : String(zip).trim();
+    if (!zStr || zStr.toUpperCase() === 'N/A') {
+      zip = extractBatchZipBasenameFromUrl_(row[9]);
+      zStr = zip == null ? '' : String(zip).trim();
+    }
+    if (!zStr || zStr.toUpperCase() === 'N/A') continue;
+    var msg = row[3];
+    if (applyQrGenerationGithubProcessed_(msg, zStr)) n++;
+  }
+  Logger.log('syncProcessingQRCodeGenerationFromGitHub: updated ' + n + ' row(s), scanned up to row ' + end);
+  return n;
+}
+
+/** Basename of the batch zip from a raw.githubusercontent `.../batch_files/...zip` URL, or the trimmed string if already a filename. */
+function extractBatchZipBasenameFromUrl_(urlOrName) {
+  if (urlOrName == null) return '';
+  const s = String(urlOrName).trim();
+  if (!s) return '';
+  const m = s.match(/batch_files\/([^?#]+\.zip)/i);
+  if (m) return m[1];
+  if (/^https?:\/\//i.test(s)) {
+    const parts = s.split('/');
+    let last = parts[parts.length - 1] || '';
+    last = last.split('?')[0].split('#')[0];
+    return last || s;
+  }
+  return s;
 }
 
 // Helper: extract currency name from contribution text
@@ -77,6 +216,12 @@ function extractDownloadLocation(contributionText) {
   return match ? match[1].trim() : 'N/A';
 }
 
+// Helper: extract manager name from signed batch text (DApp); legacy rows omit this line
+function extractManagerName(contributionText) {
+  const match = contributionText.match(/- Manager Name:\s*(.+)$/m);
+  return match ? match[1].trim() : '';
+}
+
 // Helper: extract timestamp from contribution text
 function extractTimestamp(contributionText) {
   const match = contributionText.match(/- Timestamp: (.+)$/m);
@@ -101,13 +246,17 @@ function sendQRCodeGenerationNotification(rowData, qrCodeGenerationRowNumber) {
     `Chatroom ID: ${rowData[1]}\n` +
     `Chatroom Name: ${rowData[2]}\n` +
     `Message ID: ${rowData[3]}\n` +
-    `Contributor Handle: ${rowData[4]}\n` +
-    `Contributor Name: ${rowData[7]}\n` +
-    `Currency: ${rowData[8]}\n` +
-    `Quantity: ${rowData[9]}\n` +
-    `Expected Zip File: ${rowData[10]}\n` +
-    `Download Location: ${rowData[11]}\n` +
-    `Status: ${rowData[12]}\n\n` +
+    `Contributor Name (signer): ${rowData[4]}\n` +
+    `Status date: ${rowData[6]}\n` +
+    `Agroverse QR lines (H/I): ${rowData[7]} – ${rowData[8]}\n` +
+    `Zip download URL: ${rowData[9]}\n` +
+    `Zip file name: ${rowData[10]}\n` +
+    `Status: ${rowData[11]}\n` +
+    `Download Location: ${rowData[12]}\n` +
+    `Processing Notes: ${rowData[13]}\n` +
+    `Manager Name: ${rowData[14]}\n` +
+    `Currency: ${rowData[15]}\n` +
+    `Quantity: ${rowData[16]}\n\n` +
     `Review here: ${outputSheetLink}`;
 
   const payload = {
@@ -141,13 +290,17 @@ function sendQRCodeGenerationNotification(rowData, qrCodeGenerationRowNumber) {
 function getProcessedMessageIds(qrCodeGenerationTab) {
   const lastRow = qrCodeGenerationTab.getLastRow();
   if (lastRow < 2) return [];
-  const messageIds = qrCodeGenerationTab.getRange(2, 4, lastRow - 1, 1).getValues().flat();
+  const messageIds = qrCodeGenerationTab.getRange(2, 4, lastRow, 1).getValues().flat();
   return messageIds.filter(id => id !== "");
 }
 
 // Main processing function
 function processQRCodeGenerationTelegramLogs() {
-  const sheet = SpreadsheetApp.openByUrl(SPREADSHEET_URL);
+  if (typeof getAgroverseQRGenerationDeployInfo === 'function') {
+    var _deploy = getAgroverseQRGenerationDeployInfo();
+    Logger.log('QR Code Generation clasp deploy UTC: ' + _deploy.lastClaspPushUtc);
+  }
+  const sheet = SpreadsheetApp.openByUrl(QR_GEN_TELEGRAM_MAIN_WORKBOOK_URL);
   let telegramLogTab = sheet.getSheetByName(telegramLogTabName);
   let qrCodeGenerationTab = sheet.getSheetByName(qrCodeGenerationTabName);
   const contributorsSheet = SpreadsheetApp.openById(contributorsSheetId);
@@ -156,23 +309,27 @@ function processQRCodeGenerationTelegramLogs() {
   // Create tab if not exists
   if (!qrCodeGenerationTab) {
     qrCodeGenerationTab = sheet.insertSheet(qrCodeGenerationTabName);
-    qrCodeGenerationTab.getRange("A1:N1").setValues([[
-      "Telegram Update ID",      // A
-      "Telegram Chatroom ID",    // B
-      "Telegram Chatroom Name",  // C
-      "Telegram Message ID",     // D
-      "Contributor Handle",      // E
-      "Contribution Made",       // F
-      "Status Date",             // G
-      "Contributor Name",        // H
-      "Currency",                // I
-      "Zip File Download URL",   // J
-      "Expected Zip File",       // K
-      "Status",                  // L — short status for filters
-      "Download Location",       // M — from batch request text
-      "Processing Notes"         // N — details (errors, sig failure, etc.)
+    qrCodeGenerationTab.getRange("A1:O1").setValues([[
+      "Telegram Update ID",
+      "Telegram Chatroom ID",
+      "Telegram Chatroom Name",
+      "Telegram Message ID",
+      "Contributor Name",
+      "Contribution Made",
+      "Status date",
+      "Agroverse QR starting line",
+      "Agroverse QR ending line",
+      "Zip file download URL",
+      "Zip file name",
+      "Status",
+      "Download Location",
+      "Processing Notes",
+      "Manager Name"
     ]]);
   }
+
+  // Heal rows stuck in PROCESSING after GitHub has committed the zip
+  syncProcessingQRCodeGenerationFromGitHub(300);
 
   const processedMessageIds = getProcessedMessageIds(qrCodeGenerationTab);
 
@@ -229,6 +386,8 @@ function processQRCodeGenerationTelegramLogs() {
 
       const statusL = sigOk ? 'PENDING' : QR_GEN_STATUS_SIG_FAILED;
       const notesN = sigOk ? '' : buildSigFailureProcessingNotes_(sigRaw);
+      const managerFromText = extractManagerName(contributionMade);
+      const managerName = managerFromText ? managerFromText : contributorName;
 
       // Add to QR Code Generation tab (always transfer for audit; generation runs only when sigOk)
       qrCodeGenerationTab.appendRow([
@@ -236,24 +395,40 @@ function processQRCodeGenerationTelegramLogs() {
         row[1], // B - Telegram Chatroom ID
         row[2], // C - Telegram Chatroom Name
         row[3], // D - Telegram Message ID
-        row[4], // E - Contributor Handle
+        contributorName, // E - Contributor Name (from signature / Contributors sheet)
         contributionMade, // F - Contribution Made
-        row[11], // G - Status Date
-        contributorName, // H - Contributor Name
-        currency, // I - Currency
-        "", // J - Zip File Download URL (will be filled when completed)
-        expectedZipFile, // K - Expected Zip File
-        statusL, // L - Status (short)
+        row[11], // G - Status date
+        '', // H - Agroverse QR starting line (filled after generation)
+        '', // I - Agroverse QR ending line
+        '', // J - Zip file download URL
+        expectedZipFile, // K - Zip file name
+        statusL, // L - Status
         downloadLocation || '', // M - Download Location
-        notesN // N - Processing Notes
+        notesN, // N - Processing Notes
+        managerName // O - Manager Name
       ]);
 
       const qrCodeGenerationRowNumber = qrCodeGenerationTab.getLastRow();
 
       if (sigOk) {
         sendQRCodeGenerationNotification([
-          row[0], row[1], row[2], row[3], row[4], contributionMade, row[11],
-          contributorName, currency, quantity, expectedZipFile, downloadLocation, 'PENDING'
+          row[0],
+          row[1],
+          row[2],
+          row[3],
+          contributorName,
+          contributionMade,
+          row[11],
+          '',
+          '',
+          '',
+          expectedZipFile,
+          statusL,
+          downloadLocation || '',
+          notesN,
+          managerName,
+          currency,
+          quantity
         ], qrCodeGenerationRowNumber);
       } else {
         Logger.log(`QR batch row recorded but generation skipped: Telegram col P is not success (${sigRaw}). Message ID ${messageId}`);
@@ -268,7 +443,7 @@ function processQRCodeGenerationTelegramLogs() {
       // Now actually generate the QR codes in the Agroverse spreadsheet
       try {
         Logger.log(`Starting QR code generation for ${currency} x${quantity}`);
-        const qrCodeResult = createQRCodeRecordsInAgroverse(currency, quantity, contributorName, messageId, expectedZipFile);
+        const qrCodeResult = createQRCodeRecordsInAgroverse(currency, quantity, contributorName, messageId, expectedZipFile, managerName);
         
         if (qrCodeResult.success) {
           // Update the status to show QR codes are being generated
@@ -277,6 +452,9 @@ function processQRCodeGenerationTelegramLogs() {
           
           // Update the zip file download URL
           updateZipFileDownloadURL(messageId, qrCodeResult.zip_file_url);
+
+          // If the zip is already on GitHub main, set L=PROCESSED, M=raw zip, N=commit URL (otherwise stays PROCESSING until next sync)
+          applyQrGenerationGithubProcessed_(messageId, qrCodeResult.zip_file_name);
           
           // Update the Agroverse QR starting and ending lines
           updateAgroverseQRLines(messageId, qrCodeResult.start_row, qrCodeResult.end_row);
@@ -329,7 +507,7 @@ function processQRCodeGenerationTelegramLogs() {
 
 // Function to update status of processed requests
 function updateQRCodeGenerationStatus(messageId, status, processingNotes) {
-  const sheet = SpreadsheetApp.openByUrl(SPREADSHEET_URL);
+  const sheet = SpreadsheetApp.openByUrl(QR_GEN_TELEGRAM_MAIN_WORKBOOK_URL);
   const qrCodeGenerationTab = sheet.getSheetByName(qrCodeGenerationTabName);
   
   if (!qrCodeGenerationTab) {
@@ -343,11 +521,11 @@ function updateQRCodeGenerationStatus(messageId, status, processingNotes) {
     return false;
   }
 
-  const dataRange = qrCodeGenerationTab.getRange(2, 4, lastRow - 1, 1); // Column D (Message ID)
+  const dataRange = qrCodeGenerationTab.getRange(2, 4, lastRow, 1); // Column D (Message ID)
   const messageIds = dataRange.getValues().flat();
 
   for (let i = 0; i < messageIds.length; i++) {
-    if (messageIds[i] === messageId) {
+    if (normalizeQrGenMessageId_(messageIds[i]) === normalizeQrGenMessageId_(messageId)) {
       const rowNumber = i + 2; // Convert to spreadsheet row number
 
       // L = short status; N = long notes (M = download location, leave unchanged)
@@ -367,7 +545,7 @@ function updateQRCodeGenerationStatus(messageId, status, processingNotes) {
 
 // Function to update zip file download URL
 function updateZipFileDownloadURL(messageId, zipFileDownloadURL) {
-  const sheet = SpreadsheetApp.openByUrl(SPREADSHEET_URL);
+  const sheet = SpreadsheetApp.openByUrl(QR_GEN_TELEGRAM_MAIN_WORKBOOK_URL);
   const qrCodeGenerationTab = sheet.getSheetByName(qrCodeGenerationTabName);
   
   if (!qrCodeGenerationTab) {
@@ -381,11 +559,11 @@ function updateZipFileDownloadURL(messageId, zipFileDownloadURL) {
     return false;
   }
 
-  const dataRange = qrCodeGenerationTab.getRange(2, 4, lastRow - 1, 1); // Column D (Message ID)
+  const dataRange = qrCodeGenerationTab.getRange(2, 4, lastRow, 1); // Column D (Message ID)
   const messageIds = dataRange.getValues().flat();
 
   for (let i = 0; i < messageIds.length; i++) {
-    if (messageIds[i] === messageId) {
+    if (normalizeQrGenMessageId_(messageIds[i]) === normalizeQrGenMessageId_(messageId)) {
       const rowNumber = i + 2; // Convert to spreadsheet row number
       
       // Update Zip File Download URL (Column J)
@@ -402,15 +580,27 @@ function updateZipFileDownloadURL(messageId, zipFileDownloadURL) {
 
 // Function to mark request as completed
 function markQRCodeGenerationCompleted(messageId, zipFileUrl, processingNotes) {
-  const status = "COMPLETED";
-  const notes = `${processingNotes}\nZip file available at: ${zipFileUrl}`;
-  
-  // Update both the status and the zip file download URL
+  const zipHint = extractBatchZipBasenameFromUrl_(zipFileUrl);
+  if (zipHint && applyQrGenerationGithubProcessed_(messageId, zipHint)) {
+    Logger.log('markQRCodeGenerationCompleted: applied GitHub PROCESSED for message ID ' + messageId);
+    return true;
+  }
+  const status = 'PROCESSED';
+  const notes =
+    (processingNotes ? String(processingNotes) + '\n' : '') +
+    'Zip file: ' +
+    (zipFileUrl || '');
   const statusUpdated = updateQRCodeGenerationStatus(messageId, status, notes);
   const urlUpdated = updateZipFileDownloadURL(messageId, zipFileUrl);
-  
+  const rowNum = findQrCodeGenerationRowNumberByMessageId_(messageId);
+  if (rowNum && zipFileUrl) {
+    SpreadsheetApp.openByUrl(QR_GEN_TELEGRAM_MAIN_WORKBOOK_URL)
+      .getSheetByName(qrCodeGenerationTabName)
+      .getRange(rowNum, 13)
+      .setValue(zipFileUrl);
+  }
   if (statusUpdated && urlUpdated) {
-    Logger.log(`Marked QR code generation as completed for message ID ${messageId}`);
+    Logger.log('Marked QR code generation as PROCESSED (no GitHub commit match) for message ID ' + messageId);
     return true;
   }
   return false;
@@ -431,7 +621,7 @@ function markQRCodeGenerationFailed(messageId, errorMessage) {
 // ===== QR Code Generation Functions =====
 
 // Function to create QR code records in Agroverse spreadsheet
-function createQRCodeRecordsInAgroverse(currencyName, quantity, contributorName, messageId, expectedZipFileName) {
+function createQRCodeRecordsInAgroverse(currencyName, quantity, contributorName, messageId, expectedZipFileName, managerName) {
   try {
     const spreadsheet = SpreadsheetApp.openByUrl(AGROVERSE_QR_SPREADSHEET_URL);
     const currenciesSheet = spreadsheet.getSheetByName('Currencies');
@@ -450,20 +640,21 @@ function createQRCodeRecordsInAgroverse(currencyName, quantity, contributorName,
     // Use the zip file name provided by the frontend instead of generating our own
     const zipFileName = expectedZipFileName || generateZipFileName(currencyName, generateBatchId());
     const batchId = generateBatchId();
+    const managerForSheet = (managerName && String(managerName).trim()) ? String(managerName).trim() : contributorName;
     const generatedRows = [];
     const startRow = findLastNonEmptyRowInColumnA(qrCodesSheet) + 1;
     
     // Generate multiple QR codes
     for (let i = 0; i < quantity; i++) {
       const qrCodeValue = generateQRCodeValue(currencyData.year);
-      const newRowData = createQRCodeRow(qrCodeValue, currencyData, batchId, zipFileName, contributorName, messageId);
+      const newRowData = createQRCodeRow(qrCodeValue, currencyData, batchId, zipFileName, contributorName, messageId, managerForSheet);
       const insertRow = startRow + i;
       
       qrCodesSheet.getRange(insertRow, 1, 1, newRowData.length).setValues([newRowData]);
       generatedRows.push({
         qr_code: qrCodeValue,
         row: insertRow,
-        github_url: GITHUB_REPO_URL + qrCodeValue + '.png'
+        github_url: QR_GEN_TELEGRAM_GITHUB_BLOB_BASE_URL + qrCodeValue + '.png'
       });
     }
     
@@ -471,7 +662,7 @@ function createQRCodeRecordsInAgroverse(currencyName, quantity, contributorName,
     SpreadsheetApp.flush();
     
     // Trigger GitHub Actions webhook for batch processing
-    const webhookResult = triggerBatchGitHubWebhook(startRow, startRow + quantity - 1, zipFileName, contributorName, messageId);
+    const webhookResult = triggerBatchGitHubWebhook(startRow, startRow + quantity - 1, zipFileName, contributorName, messageId, managerForSheet);
     
     return {
       success: true,
@@ -580,7 +771,7 @@ function findLastNonEmptyRowInColumnA(sheet) {
 }
 
 // Helper function to create QR code row data
-function createQRCodeRow(qrCodeValue, currencyData, batchId, zipFileName, contributorName, messageId) {
+function createQRCodeRow(qrCodeValue, currencyData, batchId, zipFileName, contributorName, messageId, managerName) {
   const today = new Date();
   const dateStr = Utilities.formatDate(today, Session.getScriptTimeZone(), 'yyyyMMdd');
   
@@ -595,7 +786,7 @@ function createQRCodeRow(qrCodeValue, currencyData, batchId, zipFileName, contri
     currencyData.year, // Column H: Year
     currencyData.product_name, // Column I: Product name
     dateStr, // Column J: Current date
-    GITHUB_REPO_URL + qrCodeValue + '.png', // Column K: GitHub URL
+    QR_GEN_TELEGRAM_GITHUB_BLOB_BASE_URL + qrCodeValue + '.png', // Column K: GitHub URL
     '', // Column L: Email (placeholder)
     '', // Column M: (placeholder)
     '', // Column N: (placeholder)
@@ -605,7 +796,7 @@ function createQRCodeRow(qrCodeValue, currencyData, batchId, zipFileName, contri
     '', // Column R: (placeholder)
     currencyData.product_image, // Column S: Product image from column D
     25, // Column T: Price (default value)
-    contributorName, // Column U: Requester Name (from Contributors Digital Signatures)
+    (managerName && String(managerName).trim()) ? String(managerName).trim() : contributorName, // Column U: Manager Name
     '', // Column V: (empty - no batch ID)
     '', // Column W: (empty - no zip file name)
     '', // Column X: (empty - no requestor email)
@@ -630,7 +821,7 @@ function generateZipFileName(currencyName, batchId) {
 }
 
 // Function to trigger GitHub Actions webhook for batch processing
-function triggerBatchGitHubWebhook(startRow, endRow, zipFileName, contributorName, messageId) {
+function triggerBatchGitHubWebhook(startRow, endRow, zipFileName, contributorName, messageId, managerName) {
   try {
     // GitHub repository configuration
     const githubRepo = GITHUB_REPO;
@@ -651,6 +842,7 @@ function triggerBatchGitHubWebhook(startRow, endRow, zipFileName, contributorNam
         end_row: endRow.toString(),
         zip_file_name: zipFileName,
         contributor_name: contributorName || '',
+        manager_name: (managerName && String(managerName).trim()) ? String(managerName).trim() : (contributorName || ''),
         message_id: messageId || '',
         timestamp: new Date().toISOString()
       }
@@ -875,7 +1067,7 @@ TrueSight DAO QR Code System
 // Function to update Agroverse QR starting and ending lines
 function updateAgroverseQRLines(messageId, startLine, endLine) {
   try {
-    const sheet = SpreadsheetApp.openByUrl(SPREADSHEET_URL);
+    const sheet = SpreadsheetApp.openByUrl(QR_GEN_TELEGRAM_MAIN_WORKBOOK_URL);
     const qrCodeGenerationTab = sheet.getSheetByName(qrCodeGenerationTabName);
     
     if (!qrCodeGenerationTab) {
@@ -890,11 +1082,11 @@ function updateAgroverseQRLines(messageId, startLine, endLine) {
       return false;
     }
     
-    const messageIdColumn = qrCodeGenerationTab.getRange(2, 4, lastRow - 1, 1).getValues(); // Column D (Message ID)
+    const messageIdColumn = qrCodeGenerationTab.getRange(2, 4, lastRow, 1).getValues(); // Column D (Message ID)
     let rowNumber = -1;
     
     for (let i = 0; i < messageIdColumn.length; i++) {
-      if (messageIdColumn[i][0] && messageIdColumn[i][0].toString().trim() === messageId.toString().trim()) {
+      if (normalizeQrGenMessageId_(messageIdColumn[i][0]) === normalizeQrGenMessageId_(messageId)) {
         rowNumber = i + 2; // +2 because we started from row 2 and i is 0-based
         break;
       }
@@ -927,7 +1119,7 @@ function testProcessSpecificRow(rowNumber = 6479) {
   try {
     Logger.log(`=== Testing Processing of Row ${rowNumber} ===`);
     
-    const sheet = SpreadsheetApp.openByUrl(SPREADSHEET_URL);
+    const sheet = SpreadsheetApp.openByUrl(QR_GEN_TELEGRAM_MAIN_WORKBOOK_URL);
     const telegramLogsTab = sheet.getSheetByName(telegramLogTabName);
     
     if (!telegramLogsTab) {
@@ -972,27 +1164,28 @@ function testProcessSpecificRow(rowNumber = 6479) {
     try {
       // Step 1: Create record in QR Code Generation tab
       Logger.log('📊 Step 1: Creating record in QR Code Generation tab...');
-      const sheet = SpreadsheetApp.openByUrl(SPREADSHEET_URL);
+      const sheet = SpreadsheetApp.openByUrl(QR_GEN_TELEGRAM_MAIN_WORKBOOK_URL);
       let qrCodeGenerationTab = sheet.getSheetByName(qrCodeGenerationTabName);
       
       // Create tab if not exists
       if (!qrCodeGenerationTab) {
         qrCodeGenerationTab = sheet.insertSheet(qrCodeGenerationTabName);
-        qrCodeGenerationTab.getRange("A1:N1").setValues([[
-          "Telegram Update ID",      // A
-          "Telegram Chatroom ID",    // B
-          "Telegram Chatroom Name",  // C
-          "Telegram Message ID",     // D
-          "Contributor Handle",      // E
-          "Contribution Made",       // F
-          "Status Date",             // G
-          "Contributor Name",        // H
-          "Currency",                // I
-          "Zip File Download URL",   // J
-          "Expected Zip File",       // K
-          "Status",                  // L
-          "Download Location",       // M
-          "Processing Notes"         // N
+        qrCodeGenerationTab.getRange("A1:O1").setValues([[
+          "Telegram Update ID",
+          "Telegram Chatroom ID",
+          "Telegram Chatroom Name",
+          "Telegram Message ID",
+          "Contributor Name",
+          "Contribution Made",
+          "Status date",
+          "Agroverse QR starting line",
+          "Agroverse QR ending line",
+          "Zip file download URL",
+          "Zip file name",
+          "Status",
+          "Download Location",
+          "Processing Notes",
+          "Manager Name"
         ]]);
       }
 
@@ -1030,23 +1223,26 @@ function testProcessSpecificRow(rowNumber = 6479) {
 
       const statusL = sigOk ? 'PENDING' : QR_GEN_STATUS_SIG_FAILED;
       const notesN = sigOk ? '' : buildSigFailureProcessingNotes_(sigRaw);
+      const managerFromText = extractManagerName(contributionText);
+      const managerName = managerFromText ? managerFromText : contributorName;
 
       // Add to QR Code Generation tab
       qrCodeGenerationTab.appendRow([
-        rowData[0], // A - Telegram Update ID
-        rowData[1], // B - Telegram Chatroom ID
-        rowData[2], // C - Telegram Chatroom Name
-        messageId, // D - Telegram Message ID
-        rowData[4], // E - Contributor Handle
-        contributionText, // F - Contribution Made
-        rowData[11], // G - Status Date
-        contributorName, // H - Contributor Name
-        currency, // I - Currency
-        "", // J - Zip File Download URL (will be filled when completed)
-        expectedZipFile, // K - Expected Zip File
-        statusL, // L - Status (short)
-        downloadLocation || '', // M - Download Location
-        notesN // N - Processing Notes
+        rowData[0],
+        rowData[1],
+        rowData[2],
+        messageId,
+        contributorName,
+        contributionText,
+        rowData[11],
+        '',
+        '',
+        '',
+        expectedZipFile,
+        statusL,
+        downloadLocation || '',
+        notesN,
+        managerName
       ]);
 
       const qrCodeGenerationRowNumber = qrCodeGenerationTab.getLastRow();
@@ -1056,8 +1252,23 @@ function testProcessSpecificRow(rowNumber = 6479) {
       if (sigOk) {
         Logger.log('📱 Step 2: Sending Telegram notification...');
         sendQRCodeGenerationNotification([
-          rowData[0], rowData[1], rowData[2], messageId, rowData[4], contributionText, rowData[11],
-          contributorName, currency, quantity, expectedZipFile, downloadLocation, 'PENDING'
+          rowData[0],
+          rowData[1],
+          rowData[2],
+          messageId,
+          contributorName,
+          contributionText,
+          rowData[11],
+          '',
+          '',
+          '',
+          expectedZipFile,
+          statusL,
+          downloadLocation || '',
+          notesN,
+          managerName,
+          currency,
+          quantity
         ], qrCodeGenerationRowNumber);
       } else {
         Logger.log('Step 2 skipped: Telegram signature verification column P is not success.');
@@ -1066,7 +1277,7 @@ function testProcessSpecificRow(rowNumber = 6479) {
 
       // Step 3: Generate QR codes in Agroverse spreadsheet
       Logger.log('📊 Step 3: Generating QR codes in Agroverse spreadsheet...');
-      const qrCodeResult = createQRCodeRecordsInAgroverse(currency, quantity, contributorName, messageId, expectedZipFile);
+      const qrCodeResult = createQRCodeRecordsInAgroverse(currency, quantity, contributorName, messageId, expectedZipFile, managerName);
       
       if (qrCodeResult.success) {
         // Update status to show QR codes are being generated
@@ -1075,6 +1286,8 @@ function testProcessSpecificRow(rowNumber = 6479) {
         
         // Update the zip file download URL
         updateZipFileDownloadURL(messageId, qrCodeResult.zip_file_url);
+
+        applyQrGenerationGithubProcessed_(messageId, qrCodeResult.zip_file_name);
         
         // Update the Agroverse QR starting and ending lines
         updateAgroverseQRLines(messageId, qrCodeResult.start_row, qrCodeResult.end_row);
@@ -1143,7 +1356,7 @@ function testProcessMultipleRows(startRow, endRow) {
       return 'Error: Invalid row range. Start row must be >= 2 and end row must be >= start row.';
     }
     
-    const sheet = SpreadsheetApp.openByUrl(SPREADSHEET_URL);
+    const sheet = SpreadsheetApp.openByUrl(QR_GEN_TELEGRAM_MAIN_WORKBOOK_URL);
     const telegramLogsTab = sheet.getSheetByName(telegramLogTabName);
     
     if (!telegramLogsTab) {
@@ -1221,7 +1434,7 @@ function testCompleteWorkflow(messageId) {
     Logger.log(`=== Testing Complete Workflow for Message ID ${messageId} ===`);
     
     // First, find the message in the QR Code Generation tab
-    const sheet = SpreadsheetApp.openByUrl(SPREADSHEET_URL);
+    const sheet = SpreadsheetApp.openByUrl(QR_GEN_TELEGRAM_MAIN_WORKBOOK_URL);
     const qrCodeGenerationTab = sheet.getSheetByName(qrCodeGenerationTabName);
     
     if (!qrCodeGenerationTab) {
@@ -1234,11 +1447,11 @@ function testCompleteWorkflow(messageId) {
     }
     
     // Find the row with the matching message ID
-    const messageIdColumn = qrCodeGenerationTab.getRange(2, 4, lastRow - 1, 1).getValues(); // Column D
+    const messageIdColumn = qrCodeGenerationTab.getRange(2, 4, lastRow, 1).getValues(); // Column D
     let rowNumber = -1;
     
     for (let i = 0; i < messageIdColumn.length; i++) {
-      if (messageIdColumn[i][0] && messageIdColumn[i][0].toString().trim() === messageId.toString().trim()) {
+      if (normalizeQrGenMessageId_(messageIdColumn[i][0]) === normalizeQrGenMessageId_(messageId)) {
         rowNumber = i + 2;
         break;
       }
@@ -1253,11 +1466,18 @@ function testCompleteWorkflow(messageId) {
     
     Logger.log('Current row data: ' + JSON.stringify(rowData));
     
-    // Test updating status to completed
-    const statusUpdated = updateQRCodeGenerationStatus(messageId, "COMPLETED", "Test completion");
+    const zipHint = extractBatchZipBasenameFromUrl_(rowData[9] || rowData[10] || '');
+    if (zipHint && applyQrGenerationGithubProcessed_(messageId, zipHint)) {
+      return `Successfully synced GitHub for message ID ${messageId}: L=PROCESSED, J=raw zip URL, M=download location, N=commit URL.`;
+    }
+    const statusUpdated = updateQRCodeGenerationStatus(
+      messageId,
+      'PROCESSED',
+      'Test completion (no matching commit on qr_codes main for zip in J/K yet).'
+    );
     
     if (statusUpdated) {
-      return `Successfully tested workflow for message ID ${messageId}. Status updated to COMPLETED.`;
+      return `Successfully tested workflow for message ID ${messageId}. Status updated to PROCESSED (GitHub commit not linked).`;
     } else {
       return `Failed to update status for message ID ${messageId}`;
     }
@@ -1384,7 +1604,7 @@ function testRowRange(startRow = 100, endRow = 200) {
 // Function to find existing QR Code Generation row
 function findExistingQRCodeGenerationRow(messageId) {
   try {
-    const sheet = SpreadsheetApp.openByUrl(SPREADSHEET_URL);
+    const sheet = SpreadsheetApp.openByUrl(QR_GEN_TELEGRAM_MAIN_WORKBOOK_URL);
     const qrCodeGenerationTab = sheet.getSheetByName(qrCodeGenerationTabName);
     
     if (!qrCodeGenerationTab) {
@@ -1397,11 +1617,11 @@ function findExistingQRCodeGenerationRow(messageId) {
       return null; // No data rows
     }
 
-    const dataRange = qrCodeGenerationTab.getRange(2, 4, lastRow - 1, 1); // Column D (Message ID)
+    const dataRange = qrCodeGenerationTab.getRange(2, 4, lastRow, 1); // Column D (Message ID)
     const messageIds = dataRange.getValues().flat();
 
     for (let i = 0; i < messageIds.length; i++) {
-      if (messageIds[i] === messageId) {
+      if (normalizeQrGenMessageId_(messageIds[i]) === normalizeQrGenMessageId_(messageId)) {
         return i + 2; // Return the actual row number
       }
     }
@@ -1410,5 +1630,32 @@ function findExistingQRCodeGenerationRow(messageId) {
   } catch (error) {
     Logger.log(`Error checking for existing QR Code Generation row: ${error.message}`);
     return null;
+  }
+}
+
+/**
+ * Web app entry for standalone deployments (script project is only this file).
+ * Multi-file deployments that also define doGet should rely on web_app.gs / qr_code_generator.gs for ?action= routing.
+ * Edgar / Sidekiq: GET ?action=processQRCodeGenerationTelegramLogs (same pattern as WebhookTriggerWorker for other ledgers).
+ */
+function doGet(e) {
+  try {
+    const action = e && e.parameter && e.parameter.action != null ? String(e.parameter.action).trim() : '';
+    if (action === 'processQRCodeGenerationTelegramLogs') {
+      processQRCodeGenerationTelegramLogs();
+      return ContentService.createTextOutput(
+        JSON.stringify({ status: 'success', message: 'processQRCodeGenerationTelegramLogs executed' })
+      ).setMimeType(ContentService.MimeType.JSON);
+    }
+    return ContentService.createTextOutput(
+      JSON.stringify({
+        status: 'error',
+        message: 'Unknown or missing action. Use ?action=processQRCodeGenerationTelegramLogs'
+      })
+    ).setMimeType(ContentService.MimeType.JSON);
+  } catch (err) {
+    return ContentService.createTextOutput(
+      JSON.stringify({ status: 'error', message: err && err.message ? err.message : String(err) })
+    ).setMimeType(ContentService.MimeType.JSON);
   }
 }

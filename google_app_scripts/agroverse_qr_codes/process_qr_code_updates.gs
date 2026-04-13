@@ -21,8 +21,8 @@ const TRACKING_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1qbZZhf-_7xzm
 const TRACKING_SHEET_NAME = 'QR Code Update';
 const DESTINATION_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU/edit?gid=472328231#gid=472328231';
 const DESTINATION_SHEET_NAME = 'Agroverse QR codes';
-/** Same workbook as Agroverse QR codes — Session C, Shipping M, Tracking N, Agroverse QR P */
-const STRIPE_CHECKOUT_SHEET_NAME = 'Stripe Social Media Checkout ID';
+/** Stripe checkout tab (same title as web_app.gs; distinct const so multi-file GAS projects do not clash). */
+const QR_CODE_UPDATE_STRIPE_CHECKOUT_TAB = 'Stripe Social Media Checkout ID';
 const STRIPE_COL_SESSION = 3;
 const STRIPE_COL_SHIPPING = 13;
 const STRIPE_COL_TRACKING = 14;
@@ -421,9 +421,9 @@ function canonicalStripeSessionId_(raw) {
  * @param {string} trackingNumber
  */
 function applyStripeCheckoutLinkForQrCode_(spreadsheet, qrCode, sessionId, shippingProvider, trackingNumber) {
-  const sheet = spreadsheet.getSheetByName(STRIPE_CHECKOUT_SHEET_NAME);
+  const sheet = spreadsheet.getSheetByName(QR_CODE_UPDATE_STRIPE_CHECKOUT_TAB);
   if (!sheet) {
-    throw new Error(`Sheet not found: ${STRIPE_CHECKOUT_SHEET_NAME}`);
+    throw new Error(`Sheet not found: ${QR_CODE_UPDATE_STRIPE_CHECKOUT_TAB}`);
   }
   const qr = (qrCode || '').toString().trim();
   const sessRaw = (sessionId || '').toString().trim();
@@ -465,7 +465,7 @@ function applyStripeCheckoutLinkForQrCode_(spreadsheet, qrCode, sessionId, shipp
       return;
     }
   }
-  throw new Error(`Stripe Session ID not found in ${STRIPE_CHECKOUT_SHEET_NAME}: ${sess} (lookup uses canonical cs_live/cs_test id from column C)`);
+  throw new Error(`Stripe Session ID not found in ${QR_CODE_UPDATE_STRIPE_CHECKOUT_TAB}: ${sess} (lookup uses canonical cs_live/cs_test id from column C)`);
 }
 
 function extractQrCodeUpdateInfo(message) {

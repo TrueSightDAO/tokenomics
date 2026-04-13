@@ -17,6 +17,10 @@
  *   node scripts/clone_clasp_mirrors.mjs --skip-clone # only regenerate checklist + manifest
  *
  * Requires: clasp logged in, Apps Script API enabled, network.
+ *
+ * After cloning new mirror folders, run **`node scripts/ensure_clasp_version_gs.mjs`**
+ * so every `clasp_mirrors/<scriptId>/` with `.clasp.json` also has **`Version.gs`**
+ * (see **`clasp_mirrors/README.md`** and **`agentic_ai_context/NOTES_tokenomics.md`**).
  */
 
 import { execSync } from 'child_process';

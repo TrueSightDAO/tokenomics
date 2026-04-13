@@ -14,8 +14,9 @@
  *   If access is too restricted, fetch() from the DApp shows a CORS error (browser gets HTML without
  *   Access-Control-Allow-Origin). This is a deployment setting issue, not a missing JSONP wrapper.
  *
- * DApp consumer: https://truesightdao.github.io/dapp/store_interaction_history.html
- *   (source: dapp/store_interaction_history.html — constant API_BASE_URL must match Deployment URL above after redeploys)
+ * DApp consumers: store_interaction_history.html, stores_by_status.html (same API_BASE_URL / token).
+ *   stores_by_status.html also calls listStatusSummary for a Pipeline-style count overview.
+ *   GitHub Pages: https://truesightdao.github.io/dapp/ — constants must match this deployment URL after redeploys.
  */
 
 // ============================================================================
@@ -42,6 +43,8 @@ var SHEET_EMAIL_SUGGESTIONS = 'Email Agent Suggestions';
 var SUGGEST_LIMIT = 30;
 /** Cap per section to keep getStoreHistory payloads bounded. */
 var MAX_HISTORY_ROWS_PER_SECTION = 200;
+/** Max rows returned by listStoresByFilter (hard cap). */
+var LIST_FILTER_MAX_LIMIT = 500;
 
 function createJsonOutput_(obj) {
   return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON);
@@ -87,6 +90,197 @@ function rowToObj_(headers, row) {
 
 function normalizeKey_(s) {
   return (s || '').toString().trim().toLowerCase();
+}
+
+/**
+ * Repeated query params (e.g. ?status=a&status=b) become arrays on e.parameters in web apps.
+ * Single value is a string.
+ */
+function getParamList_(e, key) {
+  var p = e.parameters[key];
+  if (!p) return [];
+  if (Object.prototype.toString.call(p) === '[object Array]') {
+    var out = [];
+    for (var i = 0; i < p.length; i++) {
+      var s = String(p[i] || '').trim();
+      if (s) out.push(s);
+    }
+    return out;
+  }
+  var single = String(p).trim();
+  if (!single) return [];
+  return [single];
+}
+
+/**
+ * Filter Hit List rows by Status / Shop Type (exact match to sheet cell values).
+ * Empty statusList = no status filter (all). Empty shopTypeList = no shop-type filter (all).
+ */
+function listHitListByFilter_(statusList, shopTypeList, limit, offset) {
+  var ss = SpreadsheetApp.openById(HIT_LIST_SPREADSHEET_ID);
+  var sh = getSheetSafe_(ss, SHEET_HIT_LIST);
+  if (!sh) {
+    return { rows: [], total: 0, offset: offset, limit: limit };
+  }
+
+  var values = sh.getDataRange().getValues();
+  if (values.length < 2) {
+    return { rows: [], total: 0, offset: offset, limit: limit };
+  }
+
+  var headers = values[0];
+
+  var wantStatus = statusList && statusList.length > 0;
+  var wantShopType = shopTypeList && shopTypeList.length > 0;
+
+  var matched = [];
+  var r;
+  for (r = 1; r < values.length; r++) {
+    var row = values[r];
+    var rowObj = rowToObj_(headers, row);
+    var st = (rowObj['Status'] || '').trim();
+    var stt = (rowObj['Shop Type'] || '').trim();
+
+    if (wantStatus) {
+      var ok = false;
+      var si;
+      for (si = 0; si < statusList.length; si++) {
+        if (statusList[si] === st) {
+          ok = true;
+          break;
+        }
+      }
+      if (!ok) continue;
+    }
+    if (wantShopType) {
+      var ok2 = false;
+      var ti;
+      for (ti = 0; ti < shopTypeList.length; ti++) {
+        if (shopTypeList[ti] === stt) {
+          ok2 = true;
+          break;
+        }
+      }
+      if (!ok2) continue;
+    }
+
+    matched.push({
+      store_key: (rowObj['Store Key'] || '').trim(),
+      shop_name: (rowObj['Shop Name'] || '').trim(),
+      status: st,
+      shop_type: stt,
+      city: (rowObj['City'] || '').trim(),
+      state: (rowObj['State'] || '').trim(),
+      email: (rowObj['Email'] || '').trim(),
+      status_updated:
+        (rowObj['Status Updated Date'] || rowObj['Status Updated At'] || rowObj['Status Updated'] || '').trim(),
+      hit_list_row: r + 1,
+    });
+  }
+
+  var total = matched.length;
+  var start = Math.max(0, offset);
+  var lim = Math.min(Math.max(1, limit), LIST_FILTER_MAX_LIMIT);
+  var end = Math.min(start + lim, total);
+  var page = matched.slice(start, end);
+
+  return { rows: page, total: total, offset: start, limit: lim, returned: page.length };
+}
+
+/**
+ * One-pass counts for Pipeline-style overview (mirrors Hit List, not the "Pipeline Dashboard" sheet formulas).
+ * Returns sorted-by-count-desc arrays for quick DApp filtering.
+ */
+function hitListPipelineSummary_() {
+  var ss = SpreadsheetApp.openById(HIT_LIST_SPREADSHEET_ID);
+  var sh = getSheetSafe_(ss, SHEET_HIT_LIST);
+  if (!sh) {
+    return {
+      by_status: [],
+      by_shop_type: [],
+      total_data_rows: 0,
+      blank_status: 0,
+      blank_shop_type: 0,
+    };
+  }
+
+  var values = sh.getDataRange().getValues();
+  if (values.length < 2) {
+    return {
+      by_status: [],
+      by_shop_type: [],
+      total_data_rows: 0,
+      blank_status: 0,
+      blank_shop_type: 0,
+    };
+  }
+
+  var headers = values[0];
+  var hdr = headerMap_(headers);
+  var statusIdx = hdr['Status'];
+  var shopTypeIdx = hdr['Shop Type'];
+  if (statusIdx === undefined && shopTypeIdx === undefined) {
+    return {
+      by_status: [],
+      by_shop_type: [],
+      total_data_rows: values.length - 1,
+      blank_status: 0,
+      blank_shop_type: 0,
+    };
+  }
+
+  var statusCounts = {};
+  var shopCounts = {};
+  var blankSt = 0;
+  var blankShop = 0;
+  var r;
+
+  for (r = 1; r < values.length; r++) {
+    var row = values[r];
+    if (statusIdx !== undefined) {
+      var st = row[statusIdx] !== undefined && row[statusIdx] !== null ? String(row[statusIdx]).trim() : '';
+      if (!st) blankSt++;
+      else statusCounts[st] = (statusCounts[st] || 0) + 1;
+    }
+    if (shopTypeIdx !== undefined) {
+      var stt = row[shopTypeIdx] !== undefined && row[shopTypeIdx] !== null ? String(row[shopTypeIdx]).trim() : '';
+      if (!stt) blankShop++;
+      else shopCounts[stt] = (shopCounts[stt] || 0) + 1;
+    }
+  }
+
+  function toSortedPairs_(map) {
+    var out = [];
+    for (var k in map) {
+      if (Object.prototype.hasOwnProperty.call(map, k)) {
+        out.push({ key: k, count: map[k] });
+      }
+    }
+    out.sort(function (a, b) {
+      return b.count - a.count;
+    });
+    return out;
+  }
+
+  var stPairs = toSortedPairs_(statusCounts);
+  var shPairs = toSortedPairs_(shopCounts);
+
+  var byStatus = [];
+  for (var i = 0; i < stPairs.length; i++) {
+    byStatus.push({ status: stPairs[i].key, count: stPairs[i].count });
+  }
+  var byShop = [];
+  for (var j = 0; j < shPairs.length; j++) {
+    byShop.push({ shop_type: shPairs[j].key, count: shPairs[j].count });
+  }
+
+  return {
+    by_status: byStatus,
+    by_shop_type: byShop,
+    total_data_rows: values.length - 1,
+    blank_status: blankSt,
+    blank_shop_type: blankShop,
+  };
 }
 
 function getSheetSafe_(ss, name) {
@@ -354,6 +548,9 @@ function getStoreHistory_(storeKey, shopName) {
  * Actions:
  *   - suggestStores — e.parameter.q (min length 2); data.suggestions[]: shop_name, store_key, email, hit_list_row
  *   - getStoreHistory — e.parameter.store_key and/or shop; data includes hit_list, dapp_remarks[], email_agent_*[]
+ *   - listStoresByFilter — optional repeated status=, shop_type=; limit (default 200, max 500), offset (default 0).
+ *       Empty status list = all statuses; empty shop_type = all shop types.
+ *   - listStatusSummary — no extra params; data.by_status[] { status, count }, data.by_shop_type[] { shop_type, count }.
  *
  * Auth: e.parameter.token when STORE_HISTORY_API_TOKEN is set (Script Properties).
  */
@@ -382,7 +579,24 @@ function doGet(e) {
       return success_(getStoreHistory_(storeKey, shop));
     }
 
-    return error_('Unknown action. Use suggestStores or getStoreHistory.', 400);
+    if (action === 'listStoresByFilter') {
+      var statusList = getParamList_(e, 'status');
+      var shopTypeList = getParamList_(e, 'shop_type');
+      var limRaw = parseInt((e.parameter.limit || '200').toString(), 10);
+      var offRaw = parseInt((e.parameter.offset || '0').toString(), 10);
+      var lim = isNaN(limRaw) ? 200 : limRaw;
+      var off = isNaN(offRaw) ? 0 : offRaw;
+      return success_(listHitListByFilter_(statusList, shopTypeList, lim, off));
+    }
+
+    if (action === 'listStatusSummary') {
+      return success_(hitListPipelineSummary_());
+    }
+
+    return error_(
+      'Unknown action. Use suggestStores, getStoreHistory, listStoresByFilter, or listStatusSummary.',
+      400
+    );
   } catch (err) {
     return error_(String(err.message || err), 500);
   }

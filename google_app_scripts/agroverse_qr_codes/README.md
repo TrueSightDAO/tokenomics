@@ -62,7 +62,7 @@ This service provides a smart endpoint to verify cacao bags in the supply chain.
 
 ## Architecture
 
-- **Google Apps Script** (`web_app.gs`)
+- **Google Apps Script** (`qr_code_web_service.gs` — includes the former `web_app.gs` ledger/lookup routes)
   - Exposes `doGet(e)` to handle GET requests.
   - Reads `qr_code` from query parameters.
   - Looks up the record in a Google Sheet (`Agroverse QR codes`).
@@ -151,7 +151,7 @@ This service provides a smart endpoint to verify cacao bags in the supply chain.
   ```
 - **Web App URL**:
   - `https://script.google.com/macros/s/AKfycbxigq4-J0izShubqIC5k6Z7fgNRyVJLakfQ34HPuENiSpxuCG-wSq0g-wOAedZzzgaL/exec`
-- - **Google Apps Script** (`web_app.gs`):
+- **Google Apps Script** (`qr_code_web_service.gs`):
   - `SHEET_URL`: URL of the Google Sheet.
     For example:
     https://docs.google.com/spreadsheets/d/1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU/edit?gid=472328231#gid=472328231

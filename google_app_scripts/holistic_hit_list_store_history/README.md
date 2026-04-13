@@ -35,6 +35,8 @@ The script runs under your Google account; it only reads the spreadsheet (no wri
 | `?action=suggestStores&q=partial` | `{ status, data: { suggestions: [{ shop_name, store_key, email, hit_list_row }] } }` — requires `q` length ≥ 2 |
 | `?action=getStoreHistory&store_key=...` | Full payload: `hit_list`, `dapp_remarks`, `email_agent_follow_up`, `email_agent_suggestions` |
 | `?action=getStoreHistory&shop=...` | Same, if `store_key` omitted (exact normalized match on Hit List `Shop Name`) |
+| `?action=listStoresByFilter` | Paginated Hit List rows: `status` and `shop_type` may be repeated (exact cell match). Omit both to return all rows (subject to limit). `limit` (default 200, max 500), `offset` (default 0). Response: `{ rows: [...], total, offset, limit, returned }` where each row includes `store_key`, `shop_name`, `status`, `shop_type`, `city`, `state`, `email`, `status_updated`, `hit_list_row`. |
+| `?action=listStatusSummary` | Pipeline-style counts from **Hit List** (one pass): `by_status[]` `{ status, count }`, `by_shop_type[]` `{ shop_type, count }`, plus `total_data_rows`, `blank_status`, `blank_shop_type`. Used by `stores_by_status.html` for the overview chips. |
 
 Always append `&token=...` when `STORE_HISTORY_API_TOKEN` is set.
 
@@ -55,7 +57,7 @@ If the browser blocks the response with a **CORS** error:
 
 ## Related
 
-- DApp page: `/Applications/dapp/store_interaction_history.html`
+- DApp pages: `/Applications/dapp/store_interaction_history.html`, `/Applications/dapp/stores_by_status.html`
 - Conventions: `agentic_ai_context/DAPP_PAGE_CONVENTIONS.md`, `dapp/UX_CONVENTIONS.md`
 
 ## Email Agent drafts (optional, same spreadsheet project)
