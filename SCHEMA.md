@@ -249,6 +249,8 @@ See [`python_scripts/schema_validation/README.md`](./python_scripts/schema_valid
 | Q | External API call status | String | Status of external API calls |
 | R | External API call response | String | Response from external API |
 
+**Note (DApp / Edgar ingest):** For `POST /dao/submit_contribution`, column **P** is populated by Edgar as `success` / `failed` / `no_signature_format` / `error` (and similar). Downstream processors (for example Agroverse QR generation) treat `success` (case-insensitive) as cryptographically verified at ingest. Email onboarding events (`[EMAIL REGISTERED EVENT]`, `[EMAIL VERIFICATION EVENT]`) follow the same ingest path and column **P** semantics.
+
 **Used by:**
 - [`tdg_expenses_processing.gs`](https://github.com/TrueSightDAO/tokenomics/blob/main/google_app_scripts/tdg_asset_management/tdg_expenses_processing.gs) - Processes expense submissions
 - [`process_sales_telegram_logs.gs`](https://github.com/TrueSightDAO/tokenomics/blob/main/google_app_scripts/tdg_inventory_management/process_sales_telegram_logs.gs) - Processes sales from Telegram
@@ -641,15 +643,23 @@ See [`python_scripts/schema_validation/README.md`](./python_scripts/schema_valid
 | A | Contributor Name | String | Full name of contributor |
 | B | Created \nTime Stamp | String | Format: "YYYY-MM-DD HH:MM:SS" (note: header contains line break) |
 | C | Last Active \nTime Stamp | String | Format: "YYYYMMDD HH:MM:SS" (note: header contains line break) |
-| D | Status | String | "ACTIVE", "INACTIVE", etc. |
-| E | Digital Signature | String | Public key for authentication |
-| F | Contributor Email Address | String | Email address |
+| D | Status | String | `ACTIVE`, `INACTIVE`, `VERIFYING` (email onboarding), etc. |
+| E | Digital Signature | String | Public key for authentication (DApp base64 SPKI) |
+| F | Contributor Email Address | String | Email address (used for email-based onboarding) |
+| G | Verification Key | String | Random single-use key for browser email verification (DApp onboarding; blank for legacy rows) |
+
+**DApp email onboarding (2026-04):**
+
+1. Contributor submits a signed `[EMAIL REGISTERED EVENT]` payload to Edgar (`POST /dao/submit_contribution`). After cryptographic verification succeeds, Edgar appends a **`VERIFYING`** row here (columns **E–G** populated) and triggers a Google Apps Script web app to email a link containing `em` + `vk` query parameters.
+2. Contributor opens the link on the **same browser** that holds the private key and submits a signed `[EMAIL VERIFICATION EVENT]` payload referencing the **`Verification Key`**. Edgar then flips **D** from **`VERIFYING`** → **`ACTIVE`** when the key matches.
 
 **Used by:**
 - [`tdg_expenses_processing.gs`](https://github.com/TrueSightDAO/tokenomics/blob/main/google_app_scripts/tdg_asset_management/tdg_expenses_processing.gs) - Authenticates expense submitters via signature
 - [`process_qr_code_generation_telegram_logs.gs`](https://github.com/TrueSightDAO/tokenomics/blob/main/google_app_scripts/tdg_inventory_management/process_qr_code_generation_telegram_logs.gs) - Authenticates QR generation requests
-- [`register_member_digital_signatures_telegram.gs`](https://github.com/TrueSightDAO/tokenomics/blob/main/google_app_scripts/tdg_proposal/register_member_digital_signatures_telegram.gs) - Registers new signatures from Telegram
-- [`register_member_digital_signatures_email.gs`](https://github.com/TrueSightDAO/tokenomics/blob/main/google_app_scripts/tdg_proposal/register_member_digital_signatures_email.gs) - Registers new signatures from email
+- [`register_member_digital_signatures_telegram.gs`](https://github.com/TrueSightDAO/tokenomics/blob/main/google_app_scripts/tdg_identity_management/register_member_digital_signatures_telegram.gs) - Registers new signatures from Telegram (`processDigitalSignatureEvents` web app)
+- [`register_member_digital_signatures_email.gs`](https://github.com/TrueSightDAO/tokenomics/blob/main/google_app_scripts/tdg_identity_management/register_member_digital_signatures_email.gs) - Registers new signatures from Gmail
+- [`edgar_send_email_verification.gs`](https://github.com/TrueSightDAO/tokenomics/blob/main/google_app_scripts/tdg_identity_management/edgar_send_email_verification.gs) - Web app invoked by **Edgar** to send DApp verification email (script `1m8IZ…`; deploy as admin sender)
+- **Edgar (`sentiment_importer`)** — `DaoEmailRegistrationService` + `Gdrive::ContributorsDigitalSignatures` maintain `VERIFYING` / `ACTIVE` for the DApp `create_signature.html` flow; see `email_verification_from_edgar.gs` for wiring notes.
 
 ---
 
@@ -764,7 +774,7 @@ See [`python_scripts/schema_validation/README.md`](./python_scripts/schema_valid
 | F | state | String | State/region |
 | G | country | String | Country |
 | H | Year | String | Year |
-| I | Currency | String | Product type/currency |
+| I | Currency | String | Canonical inventory / **`Currency`** label; **must match** a row in tab **`Currencies` column A** (same workbook). The sheet often pulls this via **cross-sheet reference** / **`IMPORTRANGE`** so **I** displays the exact **`Currencies`!A** string (required for sales validation and ledger lookups—not arbitrary free text). |
 | J | QR code creation date (YYYYMMDD) | String | Creation date |
 | K | QR code location | String | Storage location URL |
 | L | Owner Email | String | Owner email |

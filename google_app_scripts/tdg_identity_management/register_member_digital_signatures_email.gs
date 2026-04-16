@@ -1,8 +1,22 @@
 /**
  * File: google_app_scripts/tdg_identity_management/register_member_digital_signatures_email.gs
  * Repository: https://github.com/TrueSightDAO/tokenomics
- * 
- * Description: Registers new contributor digital signatures submitted via email.
+ *
+ * Description: Time-based Gmail ingestion for `[DIGITAL SIGNATURE EVENT]` messages (separate
+ * pipeline from Telegram). Runs as **admin@truesight.me** in its own Apps Script project.
+ *
+ * ---------------------------------------------------------------------------
+ * Apps Script project (Gmail ingestion; not Edgar’s default verification webhook)
+ * ---------------------------------------------------------------------------
+ * - Script ID: 1zKgMwd6KJFjoWkRH6OobgFvtVzrXVuEKfxVbgixgnfcp4TZTjrsfNKq0
+ * - Editor URL (opens in the account that owns the project; `/u/N/` may vary):
+ *   https://script.google.com/u/2/home/projects/1zKgMwd6KJFjoWkRH6OobgFvtVzrXVuEKfxVbgixgnfcp4TZTjrsfNKq0/edit
+ * - Web app deployment URL (`/exec`):
+ *   https://script.google.com/macros/s/AKfycbwbtBlxkK0TzwLGnwUNQ_INfvLFvTRli-31r-b51Tnx4c-xlwMoqwT5sKFmfZv5lN6sLQ/exec
+ *
+ * Edgar (`sentiment_importer`) sends verification email via **`edgar_send_email_verification.gs`**
+ * (script `1m8IZ…`, deployment in `sentiment_importer/config/application.rb` by default).
+ * Override `EMAIL_VERIFICATION_GAS_WEBHOOK_URL` only if you point verification at another web app.
  */
 
 /**

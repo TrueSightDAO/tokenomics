@@ -1,8 +1,27 @@
 /**
  * File: google_app_scripts/tdg_identity_management/register_member_digital_signatures_telegram.gs
  * Repository: https://github.com/TrueSightDAO/tokenomics
- * 
+ *
  * Description: Registers new contributor digital signatures submitted via Telegram.
+ * Web app `doGet` action `processDigitalSignatureEvents` scans Telegram Chat Logs and updates
+ * Contributors Digital Signatures (and Telegram notifications). Edgar DApp **verification email**
+ * is handled by a **separate** project: `edgar_send_email_verification.gs` (script `1m8IZ…`).
+ *
+ * ---------------------------------------------------------------------------
+ * Apps Script project (this file + clasp mirror below must stay in sync)
+ * ---------------------------------------------------------------------------
+ * - Script ID: 10NKp8uLMGyfgDv0ByakHVGioOYzvDV7NbHMSBigB2TCVcY7aqYXhbywv
+ * - Editor URL:
+ *   https://script.google.com/home/projects/10NKp8uLMGyfgDv0ByakHVGioOYzvDV7NbHMSBigB2TCVcY7aqYXhbywv/edit
+ * - Web app deployment URL (`/exec`; `action=processDigitalSignatureEvents` only on this project):
+ *   https://script.google.com/macros/s/AKfycbwlh2u-SktykzL6S_qamE2rQVd-G_3uSd3GhJ_8KI5b2e8oVuMYxXA5UfJ-NaigOk60/exec
+ * - Clasp mirror (push from repo): tokenomics/clasp_mirrors/10NKp8uLMGyfgDv0ByakHVGioOYzvDV7NbHMSBigB2TCVcY7aqYXhbywv/
+ *
+ * (Editor links may include `/u/0/`, `/u/1/`, … depending on which Google account is active;
+ * the script ID in the path is stable.)
+ *
+ * See also `register_member_digital_signatures_email.gs` (Gmail ingestion) and
+ * `edgar_send_email_verification.gs` (Edgar → verification email, admin-owned script).
  */
 
 /**
@@ -53,6 +72,35 @@ const CONFIG = {
   }
 };
 
+/** Spreadsheet ID from https://docs.google.com/spreadsheets/d/<ID>/... */
+function extractSpreadsheetIdFromUrl_(url) {
+  const m = String(url || '').match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
+  return m ? m[1] : '';
+}
+
+/** Tab gid from #gid= or &gid= in spreadsheet URL */
+function extractGidFromUrl_(url) {
+  const m = String(url || '').match(/(?:[#&?])gid=(\d+)/);
+  return m ? Number(m[1]) : null;
+}
+
+/**
+ * Prefer exact tab name; if getSheetByName returns null (rename, hidden copy, locale),
+ * resolve by gid from CONFIG (stable).
+ */
+function getSheetByNameOrGid_(spreadsheet, sheetName, fallbackGid) {
+  if (!spreadsheet) return null;
+  const byName = spreadsheet.getSheetByName(sheetName);
+  if (byName) return byName;
+  if (fallbackGid == null || Number.isNaN(Number(fallbackGid))) return null;
+  const want = Number(fallbackGid);
+  const sheets = spreadsheet.getSheets();
+  for (let i = 0; i < sheets.length; i++) {
+    if (sheets[i].getSheetId() === want) return sheets[i];
+  }
+  return null;
+}
+
 function doGet(e) {
   const action = e.parameter?.action;
   if (action === 'processDigitalSignatureEvents') {
@@ -66,9 +114,13 @@ function doGet(e) {
     }
   }
 
-  return ContentService.createTextOutput("ℹ️ No valid action specified");
+  return ContentService.createTextOutput(
+    JSON.stringify({
+      ok: false,
+      error: 'No valid action (use action=processDigitalSignatureEvents on GET).',
+    })
+  ).setMimeType(ContentService.MimeType.JSON);
 }
-
 
 /**
  * Main function to process digital signature events
@@ -98,14 +150,40 @@ function processDigitalSignatureEvents() {
  * Load required sheets and data
  */
 function loadSheets() {
-  const sourceSheet = SpreadsheetApp
-    .openByUrl(CONFIG.SOURCE.URL)
-    .getSheetByName(CONFIG.SOURCE.SHEET_NAME);
-    
-  const signaturesSheet = SpreadsheetApp
-    .openByUrl(CONFIG.SIGNATURES.URL)
-    .getSheetByName(CONFIG.SIGNATURES.SHEET_NAME);
-    
+  const sourceId = extractSpreadsheetIdFromUrl_(CONFIG.SOURCE.URL);
+  const sigId = extractSpreadsheetIdFromUrl_(CONFIG.SIGNATURES.URL);
+  if (!sourceId) throw new Error('CONFIG.SOURCE.URL is missing a spreadsheet id.');
+  if (!sigId) throw new Error('CONFIG.SIGNATURES.URL is missing a spreadsheet id.');
+
+  const sourceSs = SpreadsheetApp.openById(sourceId);
+  const sourceSheet = getSheetByNameOrGid_(
+    sourceSs,
+    CONFIG.SOURCE.SHEET_NAME,
+    extractGidFromUrl_(CONFIG.SOURCE.URL)
+  );
+  if (!sourceSheet) {
+    throw new Error('Telegram Chat Logs tab not found (name="' + CONFIG.SOURCE.SHEET_NAME + '").');
+  }
+
+  const sigSs = SpreadsheetApp.openById(sigId);
+  const signaturesSheet = getSheetByNameOrGid_(
+    sigSs,
+    CONFIG.SIGNATURES.SHEET_NAME,
+    extractGidFromUrl_(CONFIG.SIGNATURES.URL)
+  );
+  if (!signaturesSheet) {
+    const tabList = sigSs
+      .getSheets()
+      .map(s => '"' + s.getName() + '" (gid=' + s.getSheetId() + ')')
+      .join(', ');
+    throw new Error(
+      'Contributors Digital Signatures tab not found (name="' +
+        CONFIG.SIGNATURES.SHEET_NAME +
+        '"). Known tabs: ' +
+        tabList
+    );
+  }
+
   return {
     sourceData: sourceSheet.getDataRange().getValues(),
     signaturesSheet: signaturesSheet
@@ -116,8 +194,13 @@ function loadSheets() {
  * Get existing signatures from registry
  */
 function getExistingSignatures(sheet) {
-  return sheet.getDataRange()
-    .getValues()
+  if (!sheet) {
+    Logger.log('getExistingSignatures: sheet is null/undefined.');
+    return [];
+  }
+  const values = sheet.getDataRange().getValues();
+  if (!values || values.length < 2) return [];
+  return values
     .slice(1) // Skip header
     .map(row => row[CONFIG.SIGNATURES.COLUMNS.SIGNATURE])
     .filter(Boolean);
