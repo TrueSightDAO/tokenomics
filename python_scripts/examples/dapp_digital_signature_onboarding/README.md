@@ -1,6 +1,6 @@
 # Edgar digital signature sheet flow (demo)
 
-This folder is a **read-mostly** Python sketch of how **Edgar** (`sentiment_importer`) and the **Google Sheets** tab **Contributors Digital Signatures** interact during DApp **email onboarding**. It mirrors the Ruby constants and helpers in `Gdrive::ContributorsDigitalSignatures` and the row lifecycle described in tokenomics `SCHEMA.md`.
+This folder is a **read-mostly** Python sketch of how **Edgar** (TrueSight’s contribution server) and the **Google Sheets** tab **Contributors Digital Signatures** interact during DApp **email onboarding**. Production Edgar is **not open source**; this demo is the **public** reference for the sheet column contract and GAS webhook shapes described in tokenomics **`SCHEMA.md`** and **`edgar_send_email_verification.gs`**.
 
 ## Flow (high level)
 
@@ -11,12 +11,9 @@ This folder is a **read-mostly** Python sketch of how **Edgar** (`sentiment_impo
 
 Canonical column layout (header row **1**, 1-based): **A** Contributor Name, **B** Created time stamp, **C** Last Active time stamp, **D** Status, **E** Digital Signature (SPKI base64), **F** Email, **G** Verification Key. See **[SCHEMA.md](../../../SCHEMA.md)** → section **Contributors Digital Signatures**.
 
-## Ruby reference (sentiment_importer / Edgar)
+## Production Edgar (private)
 
-Canonical implementations on **`TrueSightDAO/sentiment_importer`** (`master`):
-
-- [`app/models/gdrive/contributors_digital_signatures.rb`](https://github.com/TrueSightDAO/sentiment_importer/blob/master/app/models/gdrive/contributors_digital_signatures.rb) — sheet constants, `normalize_public_key`, `normalize_verification_key`, `lookup_contributor_name_in_contact_sheet`, `append_pending_row!`, `sheet_rows_matching_email_vk_and_public_key`, `activate_row_verify!`, `activate_pending!`
-- [`app/services/dao_email_registration_service.rb`](https://github.com/TrueSightDAO/sentiment_importer/blob/master/app/services/dao_email_registration_service.rb) — `[EMAIL REGISTERED EVENT]` / `[EMAIL VERIFICATION EVENT]` handling and GAS webhook calls
+The hosted Edgar service implements the same **logical** steps (verify signed payloads, resolve contact-sheet names, append/update **Contributors Digital Signatures**, call the verification-mail web app). Its application code is **not published**; treat this Python script plus **`SCHEMA.md`** as the operator-facing contract.
 
 ## Google Apps Script
 
@@ -27,7 +24,7 @@ Canonical implementations on **`TrueSightDAO/sentiment_importer`** (`master`):
 | Variable | Purpose |
 |----------|---------|
 | `GOOGLE_APPLICATION_CREDENTIALS` | Path to a **service account JSON** key that can read (and optionally append/update) the spreadsheet. |
-| `DEMO_SPREADSHEET_ID` | Optional override of the default spreadsheet id (defaults to the production tokenomics workbook id used in Ruby). |
+| `DEMO_SPREADSHEET_ID` | Optional override of the default spreadsheet id (defaults to the production workbook id documented in `SCHEMA.md`). |
 | `DEMO_ALLOW_SHEET_WRITES` | Must be **`1`** for any **mutating** subcommand that uses `--apply` (`append-pending`, `activate-pending`). If unset or not `1`, those commands refuse to write even with `--apply`. |
 | `EMAIL_VERIFICATION_GAS_WEBHOOK_URL` | Base `/exec` URL for the verification email web app (same as Edgar). Used by `print-gas` / `print-gas --call`. |
 | `EMAIL_VERIFICATION_GAS_SECRET` | Shared secret; must match the Apps Script property `EMAIL_VERIFICATION_SECRET`. Never commit this value. For `print-gas`, the script prints a **redacted** secret by default; set `GAS_PRINT_SECRETS=1` to print the raw secret (discouraged). |
