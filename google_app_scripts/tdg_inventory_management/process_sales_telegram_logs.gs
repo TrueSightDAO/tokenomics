@@ -1,6 +1,8 @@
 /**
  * File: google_app_scripts/tdg_inventory_management/process_sales_telegram_logs.gs
  * Repository: https://github.com/TrueSightDAO/tokenomics
+ * Apps Script editor:
+ * https://script.google.com/home/projects/1dsWecVwbN0dOvilIz9r8DNt7LD3Ay13V8G9qliow4tZtF5LHsvQOFpF7/edit
  * 
  * Description: Parses and validates sales transactions from Telegram, extracts QR code and price information, and prepares them for ledger updates.
  */

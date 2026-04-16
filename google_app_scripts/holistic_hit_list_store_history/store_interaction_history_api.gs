@@ -1,6 +1,8 @@
 /**
  * File: google_app_scripts/holistic_hit_list_store_history/store_interaction_history_api.gs
  * Repository: https://github.com/TrueSightDAO/tokenomics
+ * Apps Script editor:
+ * https://script.google.com/home/projects/14gKJ0VW49RsSn4S03pgxKXy0sp4Z7Z3Wm1Wj8jQiWW5dj1sFuPnp95sh/edit
  *
  * Description: Read-only REST-style GET API for the DApp "Store Interaction History".
  *   Autocomplete against Hit List; return one Hit List row plus matching rows from

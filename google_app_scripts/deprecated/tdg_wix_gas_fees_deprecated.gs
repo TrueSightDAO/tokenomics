@@ -1,4 +1,7 @@
 /**
+ * Apps Script editor:
+ * N/A — deprecated reference only (not bound to a live clasp project).
+ * Index of live projects: tokenomics/clasp_mirrors/PROJECT_INDEX.md
  * DEPRECATED - Wix Gas Fee Management Script
  * 
  * This script was used to set gas fees on Wix platform using LATOKEN exchange prices.

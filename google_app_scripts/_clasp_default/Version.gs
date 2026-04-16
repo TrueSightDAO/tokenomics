@@ -1,4 +1,6 @@
 /**
+ * Apps Script editor:
+ * N/A — template only. Each deployed project has its own scriptId; see tokenomics/clasp_mirrors/PROJECT_INDEX.md
  * @fileoverview Default deploy metadata for tokenomics clasp mirrors that do not
  * use a domain-specific Version.gs (e.g. tdg_inventory_management/Version.gs).
  *

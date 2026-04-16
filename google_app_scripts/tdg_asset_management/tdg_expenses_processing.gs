@@ -1,6 +1,8 @@
 /**
  * File: google_app_scripts/tdg_asset_management/tdg_expenses_processing.gs
  * Repository: https://github.com/TrueSightDAO/tokenomics
+ * Apps Script editor:
+ * https://script.google.com/home/projects/19Wag9x-sjbLVgIsPh2vj90ZG7Rgq2iGaVOomAeAvtg6CdZKJHLZ9AJrC/edit
  * 
  * Description: Processes DAO inventory expense submissions from Telegram Chat Logs, validates them via 
  * digital signatures, scores them into the Scored Expense Submissions sheet, and inserts expense records 

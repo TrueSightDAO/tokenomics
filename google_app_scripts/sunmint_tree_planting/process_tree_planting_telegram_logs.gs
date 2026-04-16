@@ -1,6 +1,8 @@
 /**
  * File: google_app_scripts/sunmint_tree_planting/process_tree_planting_telegram_logs.gs
  * Repository: https://github.com/TrueSightDAO/tokenomics
+ * Apps Script editor:
+ * https://script.google.com/home/projects/1Jp8qNIBCZaRTlmOmbJoJmYnSFyXtQkUHP2Qv5uqKZpt0Ugo-e25nhASF/edit
  * 
  * Description: Google Apps Script for TrueSight DAO automation.
  */

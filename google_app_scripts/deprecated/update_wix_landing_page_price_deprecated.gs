@@ -1,4 +1,7 @@
 /**
+ * Apps Script editor:
+ * N/A — deprecated reference only (not bound to a live clasp project).
+ * Index of live projects: tokenomics/clasp_mirrors/PROJECT_INDEX.md
  * DEPRECATED - Wix Landing Page Price Update Script
  * 
  * This script was used to update TDG exchange rate on Wix landing page using LATOKEN exchange prices.

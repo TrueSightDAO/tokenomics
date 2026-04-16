@@ -1,6 +1,8 @@
 /**
  * File: google_app_scripts/agroverse_notarizations/process_notarization_telegram_logs.gs
  * Repository: https://github.com/TrueSightDAO/tokenomics
+ * Apps Script editor:
+ * https://script.google.com/home/projects/1vC3p_WfKQT-fl5tHZ9-E3aotYon3gQdOiFVLmyVElMqB-hi_FT3rcB8W/edit
  * 
  * Description: Google Apps Script for TrueSight DAO automation.
  */

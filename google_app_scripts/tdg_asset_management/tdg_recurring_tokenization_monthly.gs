@@ -1,6 +1,8 @@
 /**
  * File: google_app_scripts/tdg_asset_management/tdg_recurring_tokenization_monthly.gs
  * Repository: https://github.com/TrueSightDAO/tokenomics
+ * Apps Script editor:
+ * https://script.google.com/home/projects/1LxWu9hOs56JZ6Mbxra3eDv74xjpjgkJQW40xjpQBIHObsqiv1D5jr5fK/edit
  * 
  * Description: Processes monthly recurring token distributions for ongoing contributor payments.
  */

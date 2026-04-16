@@ -1,6 +1,8 @@
 /**
  * File: google_app_scripts/agroverse_site_statistics/agroverse_wix_site_updates.gs
  * Repository: https://github.com/TrueSightDAO/tokenomics
+ * Apps Script editor:
+ * https://script.google.com/home/projects/1Y8sJ22lZuqQYS_kF_3ItMuyfiAzbJ4wRA1xGC_bGx7FPB7uLTvrUObly/edit
  * 
  * Description: Updates Agroverse Wix site statistics and metrics.
  * 

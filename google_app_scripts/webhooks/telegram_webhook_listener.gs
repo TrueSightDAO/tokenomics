@@ -1,6 +1,8 @@
 /**
  * File: google_app_scripts/webhooks/telegram_webhook_listener.gs
  * Repository: https://github.com/TrueSightDAO/tokenomics
+ * Apps Script editor:
+ * https://script.google.com/home/projects/1m2sQONdMGw6HbxIVP0H0JJJ1aYrYLSRRlHb2MIplrDDsKhm8-IwKBntk/edit
  * 
  * Description: Google Apps Script for TrueSight DAO automation.
  */

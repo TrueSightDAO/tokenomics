@@ -1,6 +1,8 @@
 /**
  * File: google_app_scripts/tdg_asset_management/tdg_airdrop_refresher.gs
  * Repository: https://github.com/TrueSightDAO/tokenomics
+ * Apps Script editor:
+ * https://script.google.com/home/projects/177OJC0tVytZfSa6gMldKCqS5LxUZGnV_dT2NJ_FJE1uwvoGHzqC8HbyG/edit
  * 
  * Description: Google Apps Script for TrueSight DAO automation.
  */

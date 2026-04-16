@@ -1,6 +1,9 @@
 /**
  * SeaCoast / Omega freight quotation ingestion (Gmail → Grok → GitHub PR) + Sheet log.
  *
+ * Apps Script editor:
+ * https://script.google.com/home/projects/1gi4YKh2ikLWmp6qEL1A6N3dfF6gQP-jwRPf_hc0N0EvaVU0-1tWu0nxo/edit
+ *
  * Script properties (Project Settings → Script properties):
  * - AGROVERSE_FREIGHT_QUOTATIONS_UPDATE_GITHUB_PAT (repo write + PR)
  * - XAI_API_KEY

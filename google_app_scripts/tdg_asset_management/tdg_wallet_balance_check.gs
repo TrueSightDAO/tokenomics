@@ -1,6 +1,8 @@
 /**
  * File: google_app_scripts/tdg_asset_management/tdg_wallet_balance_check.gs
  * Repository: https://github.com/TrueSightDAO/tokenomics
+ * Apps Script editor:
+ * https://script.google.com/home/projects/1QKqUTyl3_pyDHfVMoRUkzvU75eV6UtizIw5bR5xeDMaLyZGUPzWTz8Et/edit
  * 
  * Description: Google Apps Script for TrueSight DAO automation.
  */

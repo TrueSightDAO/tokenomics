@@ -1,4 +1,6 @@
 /**
+ * Apps Script editor:
+ * https://script.google.com/home/projects/1N6o00N9VtRK_L3e0NQXEsmC6QME1KObZdmdbJgo0Tbgj_7P-ElNL5THn/edit
  * @fileoverview Deploy metadata for the QR Code Generation Apps Script
  * (`processQRCodeGenerationTelegramLogs`, Telegram → Agroverse → GitHub).
  *

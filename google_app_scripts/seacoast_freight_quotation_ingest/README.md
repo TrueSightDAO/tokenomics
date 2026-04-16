@@ -4,6 +4,8 @@ This Apps Script scans Gmail for Omega / SeaCoast quotation emails, logs every m
 Google Sheet tab **`SeaCoast Logistic Email Message Log`**, uses **xAI Grok** to classify and
 extract structured JSON, then opens a **GitHub pull request** against `TrueSightDAO/agroverse-freight-audit`.
 
+**Apps Script editor:** https://script.google.com/home/projects/1gi4YKh2ikLWmp6qEL1A6N3dfF6gQP-jwRPf_hc0N0EvaVU0-1tWu0nxo/edit
+
 ## Script properties
 
 Set these in **Project Settings → Script properties**:

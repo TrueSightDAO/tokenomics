@@ -1,6 +1,8 @@
 /**
  * File: google_app_scripts/agroverse_qr_codes/qr_code_web_service.gs
  * Repository: https://github.com/TrueSightDAO/tokenomics
+ * Apps Script editor:
+ * https://script.google.com/home/projects/1slQVojn5P2wC7l5LdFesFT243afkZ2HQ9no9mciExl574VeOe3Wom2rW/edit
  *
  * Consolidated web service for the batch QR / Agroverse QR HTTP project (clasp script 1slQVojn…).
  * Merges former web_app.gs + qr_code_generator.gs + subscription_notification.gs into one global scope

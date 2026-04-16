@@ -1,6 +1,8 @@
 /**
  * File: google_app_scripts/tdg_proposal/proposal_manager.gs
  * Repository: https://github.com/TrueSightDAO/tokenomics
+ * Apps Script editor:
+ * https://script.google.com/home/projects/1Dh_QQUn8hGGo75RsPpsN-GMn-uFgw-akwyv3uSZgO140J3NfQzsnuu9s/edit
  * 
  * Description: Complete DAO proposal management system including creation, voting, and execution of proposals.
  */

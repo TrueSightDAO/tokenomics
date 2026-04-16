@@ -1,6 +1,8 @@
 /**
  * File: google_app_scripts/tdg_identity_management/email_verification_from_edgar.gs
  * Repository: https://github.com/TrueSightDAO/tokenomics
+ * Apps Script editor:
+ * https://script.google.com/home/projects/1m8IZPs1vFN99cuu-39kbC-OGXggRVtJtXq5rfSB0M1sCQjMdolEUDuGU/edit
  *
  * Summary:
  * - Edgar (`sentiment_importer`) calls a **standalone** Apps Script web app after a verified

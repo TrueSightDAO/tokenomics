@@ -1,6 +1,8 @@
 /**
  * File: google_app_scripts/tdg_asset_management/capital_injection_processing.gs
  * Repository: https://github.com/TrueSightDAO/tokenomics
+ * Apps Script editor:
+ * https://script.google.com/home/projects/1orWgdGckts55owiYOysR_y4sde52T_eUmrtDGAEkb4YV5DlUfJ0JZC5J/edit
  * 
  * Description: Processes capital injection submissions from Telegram, validates them against
  * contributor signatures, and inserts double-entry transactions into appropriate managed AGL

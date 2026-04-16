@@ -1,6 +1,8 @@
 /**
  * File: google_app_scripts/tdg_asset_management/tdg_wix_dashboard.gs
  * Repository: https://github.com/TrueSightDAO/tokenomics
+ * Apps Script editor:
+ * https://script.google.com/home/projects/1rLl94jQ9tDYdRvudnP0prPY5SEjvM07R4gPs6-vRyZEpSJhUqbiE3CZY/edit
  * 
  * Description: Updates Performance Statistics (formerly Wix dashboard metrics) including treasury balance, TDG issuance, and exchange rates.
  * 

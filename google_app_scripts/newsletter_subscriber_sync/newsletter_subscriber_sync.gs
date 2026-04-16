@@ -1,6 +1,8 @@
 /**
  * File: google_app_scripts/newsletter_subscriber_sync/newsletter_subscriber_sync.gs
  * Repository: https://github.com/TrueSightDAO/tokenomics
+ * Apps Script editor:
+ * https://script.google.com/home/projects/1XIz0hs7lH4DgjamUwQZeO4DwVTG8tqKjGElL9XB2StrkPXbHYeETOWBx/edit
  *
  * Description: Consolidates newsletter subscriber emails into the ledger tab
  * "Agroverse News Letter Subscribers" from:

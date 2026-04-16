@@ -1,6 +1,8 @@
 /**
  * File: google_app_scripts/tdg_inventory_management/stripe_sales_sync.gs
  * Repository: https://github.com/TrueSightDAO/tokenomics
+ * Apps Script editor:
+ * https://script.google.com/home/projects/15qbfLN3ZCk-Ee6YNQnLj2OryWN3bWGh4BkqBaADonGQSLGzRyIo5skDR/edit
  * 
  * Description: Fetches Stripe transactions for a specific product and writes sales 
  * and transaction fees directly to the offchain transactions sheet. 

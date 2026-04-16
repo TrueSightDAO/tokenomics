@@ -1,6 +1,8 @@
 /**
  * File: google_app_scripts/tdg_inventory_management/process_movement_telegram_logs.gs
  * Repository: https://github.com/TrueSightDAO/tokenomics
+ * Apps Script editor:
+ * https://script.google.com/home/projects/1wONDeDwZ_fXNapDKpstWrBION3aV3r7NXwq7PCdqbW1LvI5ceaykQNbR/edit
  * 
  * Description: Processes inventory movement requests from Telegram, validates them, and updates both source and destination ledgers.
  * 

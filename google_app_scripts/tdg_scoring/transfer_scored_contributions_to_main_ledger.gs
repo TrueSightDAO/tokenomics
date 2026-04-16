@@ -1,6 +1,8 @@
 /**
  * File: google_app_scripts/tdg_scoring/transfer_scored_contributions_to_main_ledger.gs
  * Repository: https://github.com/TrueSightDAO/tokenomics
+ * Apps Script editor:
+ * https://script.google.com/home/projects/1-ts0WTM8J4nOWdI29I9NJLzPQBGqph3ajSB8d8qrAHINJaZynwxLzPx8/edit
  * 
  * Description: Transfers approved scored contributions from the Grok spreadsheet to the main ledger history.
  */

@@ -1,6 +1,8 @@
 /**
  * File: google_app_scripts/tdg_inventory_management/sales_update_main_dao_offchain_ledger.gs
  * Repository: https://github.com/TrueSightDAO/tokenomics
+ * Apps Script editor:
+ * https://script.google.com/home/projects/1wmgYPwfRDxpiboa8OH-C6Ndovklf8HaJY305n7dhRzs7BmUBQg7fL_sZ/edit
  * 
  * Description: Updates the main DAO offchain ledger with sales revenue transactions.
  * 

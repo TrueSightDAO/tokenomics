@@ -1,6 +1,8 @@
 /**
  * File: google_app_scripts/tdg_identity_management/register_member_digital_signatures_email.gs
  * Repository: https://github.com/TrueSightDAO/tokenomics
+ * Apps Script editor:
+ * https://script.google.com/home/projects/1zKgMwd6KJFjoWkRH6OobgFvtVzrXVuEKfxVbgixgnfcp4TZTjrsfNKq0/edit
  *
  * Description: Time-based Gmail ingestion for `[DIGITAL SIGNATURE EVENT]` messages (separate
  * pipeline from Telegram). Runs as **admin@truesight.me** in its own Apps Script project.
@@ -9,8 +11,7 @@
  * Apps Script project (Gmail ingestion; not Edgar’s default verification webhook)
  * ---------------------------------------------------------------------------
  * - Script ID: 1zKgMwd6KJFjoWkRH6OobgFvtVzrXVuEKfxVbgixgnfcp4TZTjrsfNKq0
- * - Editor URL (opens in the account that owns the project; `/u/N/` may vary):
- *   https://script.google.com/u/2/home/projects/1zKgMwd6KJFjoWkRH6OobgFvtVzrXVuEKfxVbgixgnfcp4TZTjrsfNKq0/edit
+ * - Editor URL: canonical `https://script.google.com/home/projects/.../edit` link in the repository file header above.
  * - Web app deployment URL (`/exec`):
  *   https://script.google.com/macros/s/AKfycbwbtBlxkK0TzwLGnwUNQ_INfvLFvTRli-31r-b51Tnx4c-xlwMoqwT5sKFmfZv5lN6sLQ/exec
  *

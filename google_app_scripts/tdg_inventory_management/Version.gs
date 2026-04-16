@@ -1,4 +1,7 @@
 /**
+ * Apps Script editor:
+ * https://script.google.com/home/projects/1QtK-InsHH6SBtxoxc33-y4vQvuNkbhlkUi_9S1X-AaEgIlSlygM1iZtP/edit
+ * (Inventory automation uses multiple clasp mirrors; primary web app scriptId above.)
  * @fileoverview Deploy metadata for tdg_inventory_management Apps Script projects.
  *
  * After every `clasp push` from a clasp mirror folder:

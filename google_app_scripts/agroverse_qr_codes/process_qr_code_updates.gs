@@ -1,6 +1,8 @@
 /**
  * File: google_app_scripts/agroverse_qr_codes/process_qr_code_updates.gs
  * Repository: https://github.com/TrueSightDAO/tokenomics
+ * Apps Script editor:
+ * https://script.google.com/home/projects/1UrBgqLnnQc6PV4-gMIDh2SYwWu62wTdSrV30xk9q_eVr2UdoxdzXN38v/edit
  * 
  * Description: Processes QR code status and email updates from Telegram Chat Logs.
  * Reads from "Telegram Chat Logs" sheet where Column G contains [QR CODE UPDATE EVENT],

@@ -1,6 +1,8 @@
 /**
  * File: google_app_scripts/agroverse_qr_codes/process_qr_code_generation_telegram_logs.gs
  * Repository: https://github.com/TrueSightDAO/tokenomics
+ * Apps Script editor:
+ * https://script.google.com/home/projects/1N6o00N9VtRK_L3e0NQXEsmC6QME1KObZdmdbJgo0Tbgj_7P-ElNL5THn/edit
  * 
  * Description: Processes QR code generation requests from Telegram and creates batch QR codes with proper tracking.
  */

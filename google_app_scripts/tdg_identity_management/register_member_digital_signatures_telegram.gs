@@ -1,6 +1,8 @@
 /**
  * File: google_app_scripts/tdg_identity_management/register_member_digital_signatures_telegram.gs
  * Repository: https://github.com/TrueSightDAO/tokenomics
+ * Apps Script editor:
+ * https://script.google.com/home/projects/10NKp8uLMGyfgDv0ByakHVGioOYzvDV7NbHMSBigB2TCVcY7aqYXhbywv/edit
  *
  * Description: Registers new contributor digital signatures submitted via Telegram.
  * Web app `doGet` action `processDigitalSignatureEvents` scans Telegram Chat Logs and updates

@@ -1,6 +1,9 @@
 /**
  * File: google_app_scripts/deprecated/update_agroverse_skus_deprecated.gs
  * Repository: https://github.com/TrueSightDAO/tokenomics
+ * Apps Script editor:
+ * N/A — deprecated reference only (not bound to a live clasp project).
+ * Index of live projects: tokenomics/clasp_mirrors/PROJECT_INDEX.md
  *
  * DEPRECATED: Never deployed to Google Apps Script; kept for reference only.
  * Description (historical): Updates the "Agroverse SKUs" Google Sheet with product information from agroverse.shop

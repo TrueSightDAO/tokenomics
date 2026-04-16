@@ -1,6 +1,8 @@
 /**
  * File: google_app_scripts/tdg_inventory_management/sales_update_managed_agl_ledgers.gs
  * Repository: https://github.com/TrueSightDAO/tokenomics
+ * Apps Script editor:
+ * https://script.google.com/home/projects/1duQFfTO0Pj0lC4tPVNmMOhNOS1GvJgzqVxXbsEDu-eqt_64DwxvrOVyl/edit
  * 
  * Description: Updates managed AGL ledgers with sales transactions, inserting both transaction and balance records.
  * 

@@ -1,6 +1,8 @@
 /**
  * File: google_app_scripts/wix_workflows/populate_wix_event.gs
  * Repository: https://github.com/TrueSightDAO/tokenomics
+ * Apps Script editor:
+ * https://script.google.com/home/projects/1_3D4o2RdHdPuu5EHCUwkMQe8sFJBqXWqCiE-wpwME2Gdr6_oTt3VBAVC/edit
  * 
  * Description: Triggers Wix automation workflows by creating events in the Wix Events API.
  */

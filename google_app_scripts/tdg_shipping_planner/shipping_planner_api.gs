@@ -1,6 +1,8 @@
 /**
  * File: google_app_scripts/tdg_shipping_planner/shipping_planner_api.gs
  * Repository: https://github.com/TrueSightDAO/tokenomics
+ * Apps Script editor:
+ * https://script.google.com/home/projects/1Og2g8Q0_SdM9A5mJNO-tq_9r8XMQ00ybBmss4L3tItBAJ01-KdM-w40c/edit
  * 
  * Description: REST API for shipping cost estimation. Provides member inventory lookup,
  * weight calculation, and shipping cost estimation via EasyPost (local) or freight cost

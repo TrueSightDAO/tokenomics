@@ -1,6 +1,8 @@
 /**
  * File: google_app_scripts/tdg_scoring/grok_scoring_for_telegram_and_whatsapp_logs.gs
  * Repository: https://github.com/TrueSightDAO/tokenomics
+ * Apps Script editor:
+ * https://script.google.com/home/projects/1BHAGZd_T1I5mQnqnAFqUJKX2x_N8Uv05n1O2OohRA908Ja8wVwVxaR7K/edit
  * 
  * Description: AI-powered scoring of chat contributions from Telegram and WhatsApp using OpenAI/xAI APIs.
  */

@@ -1,4 +1,6 @@
 /**
+ * Apps Script editor:
+ * https://script.google.com/home/projects/14gKJ0VW49RsSn4S03pgxKXy0sp4Z7Z3Wm1Wj8jQiWW5dj1sFuPnp95sh/edit
  * Email Agent drafts — Hit List → Gmail drafts + Email Agent Suggestions
  *
  * Mirrors the Python workflows in market_research (repo: TrueSightDAO/content_schedule):

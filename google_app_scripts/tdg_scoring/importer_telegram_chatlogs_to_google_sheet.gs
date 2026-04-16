@@ -1,6 +1,8 @@
 /**
  * File: google_app_scripts/tdg_scoring/importer_telegram_chatlogs_to_google_sheet.gs
  * Repository: https://github.com/TrueSightDAO/tokenomics
+ * Apps Script editor:
+ * https://script.google.com/home/projects/1Q5HfGR_AcSYmrKCy5bs-Jo8pdtV-vZJ6Zhv2VCY0HGo2haVoeWMjOCGC/edit
  * 
  * Description: Imports raw Telegram chat messages into Google Sheets for processing by other scripts.
  */
