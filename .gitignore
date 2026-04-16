@@ -33,6 +33,8 @@ clasp_mirrors/**/Version.gs
 # Clasp-generated filenames in thematic folder only — canonical copies live under clasp_mirrors/<scriptId>/
 google_app_scripts/**/Code.js
 google_app_scripts/**/appsscript.json
+# Canonical clasp manifest for freight ingest (scopes only; no secrets)
+!google_app_scripts/seacoast_freight_quotation_ingest/appsscript.json
 google_app_scripts/**/Credentials*.js
 
 # Schema validation output
