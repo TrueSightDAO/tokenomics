@@ -634,6 +634,8 @@ See [`python_scripts/schema_validation/README.md`](./python_scripts/schema_valid
 ##### Sheet: `Contributors Digital Signatures`
 **Purpose:** Active digital signatures for authentication
 
+**Example (Python demo):** [`python_scripts/examples/dapp_digital_signature_onboarding/README.md`](python_scripts/examples/dapp_digital_signature_onboarding/README.md).
+
 **Sheet URL:** https://docs.google.com/spreadsheets/d/1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU/edit#gid=577022511
 
 **Header Row:** 1
