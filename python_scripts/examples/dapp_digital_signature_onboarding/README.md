@@ -13,10 +13,10 @@ Canonical column layout (header row **1**, 1-based): **A** Contributor Name, **B
 
 ## Ruby reference (sentiment_importer / Edgar)
 
-These paths match the implementation on branch `feature/dapp-digital-signature-onboarding` (and `main` when merged):
+Canonical implementations on **`TrueSightDAO/sentiment_importer`** (`master`):
 
-- `app/models/gdrive/contributors_digital_signatures.rb` — sheet constants, `normalize_public_key`, `normalize_verification_key`, `lookup_contributor_name_in_contact_sheet`, `append_pending_row!`, `sheet_rows_matching_email_vk_and_public_key`, `activate_row_verify!`, `activate_pending!`
-- `app/services/dao_email_registration_service.rb` — `[EMAIL REGISTERED EVENT]` / `[EMAIL VERIFICATION EVENT]` handling and GAS webhook calls
+- [`app/models/gdrive/contributors_digital_signatures.rb`](https://github.com/TrueSightDAO/sentiment_importer/blob/master/app/models/gdrive/contributors_digital_signatures.rb) — sheet constants, `normalize_public_key`, `normalize_verification_key`, `lookup_contributor_name_in_contact_sheet`, `append_pending_row!`, `sheet_rows_matching_email_vk_and_public_key`, `activate_row_verify!`, `activate_pending!`
+- [`app/services/dao_email_registration_service.rb`](https://github.com/TrueSightDAO/sentiment_importer/blob/master/app/services/dao_email_registration_service.rb) — `[EMAIL REGISTERED EVENT]` / `[EMAIL VERIFICATION EVENT]` handling and GAS webhook calls
 
 ## Google Apps Script
 
