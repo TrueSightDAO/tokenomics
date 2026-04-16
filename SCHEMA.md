@@ -661,7 +661,7 @@ See [`python_scripts/schema_validation/README.md`](./python_scripts/schema_valid
 - [`register_member_digital_signatures_telegram.gs`](https://github.com/TrueSightDAO/tokenomics/blob/main/google_app_scripts/tdg_identity_management/register_member_digital_signatures_telegram.gs) - Registers new signatures from Telegram (`processDigitalSignatureEvents` web app)
 - [`register_member_digital_signatures_email.gs`](https://github.com/TrueSightDAO/tokenomics/blob/main/google_app_scripts/tdg_identity_management/register_member_digital_signatures_email.gs) - Registers new signatures from Gmail
 - [`edgar_send_email_verification.gs`](https://github.com/TrueSightDAO/tokenomics/blob/main/google_app_scripts/tdg_identity_management/edgar_send_email_verification.gs) - Web app invoked by **Edgar** to send DApp verification email (script `1m8IZ…`; deploy as admin sender)
-- **Edgar (`sentiment_importer`)** — `DaoEmailRegistrationService` + `Gdrive::ContributorsDigitalSignatures` maintain `VERIFYING` / `ACTIVE` for the DApp `create_signature.html` flow; see `email_verification_from_edgar.gs` for wiring notes.
+- **Edgar (production contribution server)** — maintains `VERIFYING` / `ACTIVE` for the DApp `create_signature.html` flow (server code is not open source). Public operator reference: `python_scripts/examples/dapp_digital_signature_onboarding/` in this repo; GAS wiring notes: `email_verification_from_edgar.gs`.
 
 ---
 
