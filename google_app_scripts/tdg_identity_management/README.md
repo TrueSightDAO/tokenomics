@@ -38,6 +38,10 @@ This folder contains scripts for managing digital identities within TrueSight DA
    - Updated Digital Signatures registry (Google Sheet)
    - Telegram notifications
 
+### [`edgar_send_email_verification.gs`](./edgar_send_email_verification.gs)
+
+**Purpose**: Standalone web app for **Edgar → contributor** verification email after DApp `[EMAIL REGISTERED EVENT]` (GET `sendEmailVerification` + POST JSON). Deployed under **admin@truesight.me** so `GmailApp.sendEmail` sends from that account. Separate Apps Script project from the Telegram log processor above.
+
 ## Reference Files
 
 The system interacts with these key Google Sheets:
