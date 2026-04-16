@@ -27,6 +27,9 @@ clasp_mirrors/**/*.js
 # Regenerated on every clasp clone/pull; not needed in git
 clasp_mirrors/**/appsscript.json
 
+# Per-mirror deploy audit stubs: copy from google_app_scripts/* or run scripts/ensure_clasp_version_gs.mjs
+clasp_mirrors/**/Version.gs
+
 # Clasp-generated filenames in thematic folder only — canonical copies live under clasp_mirrors/<scriptId>/
 google_app_scripts/**/Code.js
 google_app_scripts/**/appsscript.json
