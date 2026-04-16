@@ -17,7 +17,7 @@ Set these in **Project Settings → Script properties**:
 - `GITHUB_OWNER` (optional; default `TrueSightDAO`)
 - `GITHUB_REPO` (optional; default `agroverse-freight-audit`)
 - `GMAIL_QUOTE_QUERY` (optional; default Graziela + `newer_than:180d`)
-- `GROK_MODEL` (optional; default `grok-2-latest`)
+- `GROK_MODEL` (optional; default `grok-3`; set explicitly if xAI returns “Model not found” for your account)
 - `GITHUB_AUTO_MERGE` (optional; default `false`)
 - `MAX_MESSAGES_PER_RUN` (optional; default `20`)
 

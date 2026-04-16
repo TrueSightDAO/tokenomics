@@ -12,7 +12,7 @@
  * - GITHUB_OWNER (default: TrueSightDAO)
  * - GITHUB_REPO (default: agroverse-freight-audit)
  * - GMAIL_QUOTE_QUERY (optional; default Graziela + recent)
- * - GROK_MODEL (optional; default grok-2-latest)
+ * - GROK_MODEL (optional; default grok-3 — must match an id returned by xAI for your key)
  * - GITHUB_AUTO_MERGE (optional; default false)
  * - MAX_MESSAGES_PER_RUN (optional; default 20)
  */
@@ -22,7 +22,7 @@ var DEFAULT_LOG_SHEET_NAME = 'SeaCoast Logistic Email Message Log';
 var DEFAULT_GITHUB_OWNER = 'TrueSightDAO';
 var DEFAULT_GITHUB_REPO = 'agroverse-freight-audit';
 var DEFAULT_GMAIL_QUERY = 'from:(Graziela@5cl.rs OR graziela@5cl.rs) newer_than:180d';
-var DEFAULT_GROK_MODEL = 'grok-2-latest';
+var DEFAULT_GROK_MODEL = 'grok-3';
 
 var LABEL_PROCESSED = 'freight/seacoast-processed';
 var LABEL_IGNORED = 'freight/seacoast-ignored';
