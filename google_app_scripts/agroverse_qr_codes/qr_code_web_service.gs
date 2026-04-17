@@ -1679,22 +1679,48 @@ function testSendEmail() {
 }
 
 /**
- * Processes all records with valid email in column L and no sent date in column M
+ * Processes all records with valid email in column L and no sent date in column M.
+ * Groups rows by email address so owners who bought multiple items receive one consolidated email.
  */
 function processBatch() {
   const sheet = SpreadsheetApp.openByUrl(SUBSCRIPTION_NOTIFICATION_WORKBOOK_URL).getSheetByName(SHEET_NAME);
   const data = sheet.getDataRange().getValues();
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  const now = new Date();
 
-  // Iterate through rows, starting at 1 to skip header
+  // Collect all pending rows grouped by email
+  const pendingByEmail = {};
   for (let i = 1; i < data.length; i++) {
-    const email = data[i][EMAIL_COLUMN - 1]; // Column L
-    const notificationDate = data[i][TIMESTAMP_COLUMN - 1]; // Column M
-    const qrCode = data[i][QR_CODE_COLUMN - 1]; // Column A
-
-    // Check if email is valid and no notification date exists
+    const email = String(data[i][EMAIL_COLUMN - 1] || '').trim();
+    const notificationDate = data[i][TIMESTAMP_COLUMN - 1];
+    const qrCode = data[i][QR_CODE_COLUMN - 1];
+    const baseUrl = data[i][1]; // Column B
     if (emailRegex.test(email) && !notificationDate) {
-      sendEmailForQRCode(qrCode);
+      if (!pendingByEmail[email]) pendingByEmail[email] = [];
+      pendingByEmail[email].push({ rowIndex: i, qrCode, baseUrl });
+    }
+  }
+
+  const doc = DocumentApp.openById(GOOGLE_DOC_ID);
+  const subject = doc.getName();
+
+  for (const email in pendingByEmail) {
+    const items = pendingByEmail[email];
+    let body = doc.getBody().getText();
+
+    // Build one tracking link per QR code; join with line break for multiple items
+    const trackingLinksHtml = items
+      .map(item => `<a href="${item.baseUrl}?qr_code=${encodeURIComponent(item.qrCode)}">${item.qrCode}</a>`)
+      .join('<br>');
+
+    body = body.replace('{{TRACKING_LINK}}', trackingLinksHtml);
+    const htmlBody = HtmlService.createHtmlOutput(body.replace(/\n/g, '<br>')).getContent();
+
+    MailApp.sendEmail({ to: email, subject, htmlBody });
+
+    // Stamp column M for every row included in this send
+    for (const item of items) {
+      sheet.getRange(item.rowIndex + 1, TIMESTAMP_COLUMN).setValue(now);
     }
   }
 }
