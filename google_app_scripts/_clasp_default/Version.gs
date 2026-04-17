@@ -13,12 +13,13 @@
  */
 
 /** ISO UTC timestamp of the last clasp push for this mirror */
-var CLASP_MIRROR_LAST_CLASP_PUSH_UTC = '2026-04-15T23:10:00Z';
+var CLASP_MIRROR_LAST_CLASP_PUSH_UTC = '2026-04-17T00:00:00Z';
 
 /**
  * Newest first. Keep lines short; link PRs/commits in git instead of pasting secrets.
  */
 var CLASP_MIRROR_CHANGELOG =
+  '2026-04-17 — Migrate qr_code_web_service to admin@truesight.me project; consolidate processBatch to send one email per owner across multiple QR codes.\n' +
   '2026-04-15 — loadSheets: openById + getSheetByNameOrGid_ fallback (fix undefined signaturesSheet / getDataRange crash).\n' +
   '2026-04-15 — Identity web app: add doPost email verification trigger for DApp email onboarding (Edgar → Gmail).\n' +
   '2026-04-12 — Added default Version.gs for clasp deploy audit trail (tokenomics).\n';
