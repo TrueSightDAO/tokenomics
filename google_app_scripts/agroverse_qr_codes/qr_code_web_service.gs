@@ -35,14 +35,14 @@
 var SHEET_URL = 'https://docs.google.com/spreadsheets/d/1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU/edit?gid=472328231';
 var QR_CODE_SHEET_NAME = 'Agroverse QR codes';
 var STRIPE_CHECKOUT_SHEET_NAME = 'Stripe Social Media Checkout ID';
-/** Stripe checkout: Session ID column C, Tracking Number column N, Agroverse QR code column P */
+/** Stripe checkout: Session ID column C, Shipping Provider column M, Tracking Number column N, Agroverse QR code column P (legacy); primary link is column Z of "Agroverse QR codes" */
 var QR_CODE_PARAM = 'qr_code';
 var EMAIL_ADDRESS_PARAM = 'email_address';
 var LIST_PARAM = 'list';
 var LIST_ALL_PARAM = 'list_all';
 var LIST_WITH_MEMBERS_PARAM = 'list_with_members';
 var LOOKUP_PARAM = 'lookup';
-/** GET list_unassigned_stripe_sessions=true — Stripe Session IDs (column C) where P is blank; optional for_qr_code also includes rows where P equals that QR */
+/** GET list_unassigned_stripe_sessions=true — Stripe Session IDs not yet assigned via column Z of "Agroverse QR codes" (or legacy column P); optional for_qr_code also includes the session already linked to that QR */
 var LIST_UNASSIGNED_STRIPE_SESSIONS_PARAM = 'list_unassigned_stripe_sessions';
 var FOR_QR_CODE_PARAM = 'for_qr_code';
 /** GET list_contributor_names=true — unique names from Contributors Digital Signatures (column A, row has public key in E) for batch QR DApp */
@@ -364,13 +364,35 @@ function listUnassignedStripeSessions_(spreadsheet, forQrCodeRaw) {
     });
   }
 
+  var wantQr = (forQrCodeRaw || '').toString().trim();
+
+  // Build set of session IDs already assigned via column Z of "Agroverse QR codes" (primary)
+  // Also track which session ID belongs to forQrCode (for the prefill case)
+  var assignedSessions = {};
+  var forQrSession = '';
+  var qrSheet = spreadsheet.getSheetByName(QR_CODE_SHEET_NAME);
+  if (qrSheet) {
+    var lastQrRow = qrSheet.getLastRow();
+    if (lastQrRow >= DATA_START_ROW) {
+      var qrRange = qrSheet.getRange(DATA_START_ROW, 1, lastQrRow - DATA_START_ROW + 1, 26).getValues();
+      for (var i = 0; i < qrRange.length; i++) {
+        var sess = (qrRange[i][25] || '').toString().trim(); // Column Z
+        if (sess) {
+          assignedSessions[sess] = true;
+          if (wantQr && (qrRange[i][0] || '').toString().trim() === wantQr) {
+            forQrSession = sess;
+          }
+        }
+      }
+    }
+  }
+
   var lastRow = stripeSheet.getLastRow();
   if (lastRow < DATA_START_ROW) {
     return createCORSResponse({ status: 'success', items: [] });
   }
 
-  var wantQr = (forQrCodeRaw || '').toString().trim();
-  var range = stripeSheet.getRange(DATA_START_ROW, 3, lastRow, 16).getValues();
+  var range = stripeSheet.getRange(DATA_START_ROW, 3, lastRow - DATA_START_ROW + 1, 16).getValues();
   var seen = {};
   var items = [];
 
@@ -378,11 +400,16 @@ function listUnassignedStripeSessions_(spreadsheet, forQrCodeRaw) {
     var session = (range[r][0] || '').toString().trim();
     if (!session) continue;
 
+    // A session is assigned if it appears in column Z of any QR code row (primary)
+    // or in column P of the Stripe sheet (legacy fallback)
     var pVal = (range[r][13] || '').toString().trim();
-    var pEmpty = !pVal;
-    var pMatches = wantQr !== '' && pVal === wantQr;
+    var assignedViaZ = !!assignedSessions[session];
+    var assignedViaP = !!pVal;
+    var assigned = assignedViaZ || assignedViaP;
 
-    if (!pEmpty && !pMatches) continue;
+    // Include if unassigned, OR if this session is already linked to forQrCode (DApp prefill)
+    var isForQr = wantQr !== '' && (session === forQrSession || pVal === wantQr);
+    if (assigned && !isForQr) continue;
     if (seen[session]) continue;
 
     seen[session] = true;
@@ -399,19 +426,48 @@ function lookupStripeCheckoutByQrCode_(spreadsheet, qrCode) {
   var empty = { stripe_session_id: '', tracking_number: '', shipping_provider: '' };
   if (!qrCode) return empty;
 
-  var sheet = spreadsheet.getSheetByName(STRIPE_CHECKOUT_SHEET_NAME);
-  if (!sheet) return empty;
+  var wanted = qrCode.toString().trim();
 
-  var lastRow = sheet.getLastRow();
+  // Primary: read session ID from column Z of "Agroverse QR codes"
+  var sessionId = '';
+  var qrSheet = spreadsheet.getSheetByName(QR_CODE_SHEET_NAME);
+  if (qrSheet) {
+    var lastQrRow = qrSheet.getLastRow();
+    if (lastQrRow >= DATA_START_ROW) {
+      var qrRange = qrSheet.getRange(DATA_START_ROW, 1, lastQrRow - DATA_START_ROW + 1, 26).getValues();
+      for (var i = 0; i < qrRange.length; i++) {
+        if ((qrRange[i][0] || '').toString().trim() === wanted) {
+          sessionId = (qrRange[i][25] || '').toString().trim(); // Column Z (index 25)
+          break;
+        }
+      }
+    }
+  }
+
+  var stripeSheet = spreadsheet.getSheetByName(STRIPE_CHECKOUT_SHEET_NAME);
+  if (!stripeSheet) return empty;
+  var lastRow = stripeSheet.getLastRow();
   if (lastRow < DATA_START_ROW) return empty;
 
-  var wanted = qrCode.toString().trim();
   // Range columns 3..16: idx 0=C session, idx 10=M shipping provider, idx 11=N tracking, idx 13=P QR
-  var range = sheet.getRange(DATA_START_ROW, 3, lastRow, 16).getValues();
+  var range = stripeSheet.getRange(DATA_START_ROW, 3, lastRow - DATA_START_ROW + 1, 16).getValues();
 
+  // Lookup by column Z session ID (primary — supports multi-item sessions)
+  if (sessionId) {
+    for (var r = range.length - 1; r >= 0; r--) {
+      if ((range[r][0] || '').toString().trim() === sessionId) {
+        return {
+          stripe_session_id: (range[r][0] || '').toString().trim(),
+          shipping_provider: (range[r][10] || '').toString().trim(),
+          tracking_number: (range[r][11] || '').toString().trim()
+        };
+      }
+    }
+  }
+
+  // Fallback: legacy lookup by column P (single-item sessions written before column Z)
   for (var r = range.length - 1; r >= 0; r--) {
-    var pVal = (range[r][13] || '').toString().trim();
-    if (pVal === wanted) {
+    if ((range[r][13] || '').toString().trim() === wanted) {
       return {
         stripe_session_id: (range[r][0] || '').toString().trim(),
         shipping_provider: (range[r][10] || '').toString().trim(),

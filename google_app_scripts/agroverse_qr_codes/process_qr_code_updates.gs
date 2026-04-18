@@ -38,13 +38,14 @@ const TELEGRAM_MESSAGE_ID_COL = 3; // Column D
 const CONTRIBUTOR_NAME_COL = 4; // Column E
 const PROJECT_NAME_COL = 5; // Column F
 const MESSAGE_COL = 6; // Column G (Contribution Made)
-const STATUS_COL = 9; // Column J (Status)
+// Note: Column J (Status) of Telegram Chat Logs is owned by the TDG scoring script — do not read/write.
 
 // Column indices for destination sheet (Agroverse QR codes)
 const QR_CODE_COL = 0; // Column A (qr_code)
 const STATUS_COL_DEST = 3; // Column D (status)
 const EMAIL_COL_DEST = 11; // Column L (Owner Email)
 const MANAGER_COL_DEST = 20; // Column U (Manager Name)
+const STRIPE_SESSION_COL_DEST = 25; // Column Z (Stripe Session ID)
 
 // Event marker
 const EVENT_MARKER = '[QR CODE UPDATE EVENT]';
@@ -202,23 +203,16 @@ function processQrCodeUpdatesFromTelegramChatLogs() {
 
       try {
         const message = (row[MESSAGE_COL] || '').toString();
-        const status = (row[STATUS_COL] || '').toString().trim().toUpperCase();
 
         // Skip rows that don't contain the event marker
         if (!message.includes(EVENT_MARKER)) {
           continue;
         }
 
-        // Skip rows that are already processed (check tracking sheet)
+        // Skip rows that are already processed (tracking sheet is the source of truth;
+        // column J of Telegram Chat Logs is owned by the TDG scoring script — do not read/write here).
         if (processedRowNumbers.has(rowNumber) || (telegramUpdateId && processedTelegramUpdateIds.has(telegramUpdateId))) {
           Logger.log(`Row ${rowNumber}: Skipping - already processed in tracking sheet`);
-          result.skipped++;
-          continue;
-        }
-
-        // Also skip rows that are marked as processed in Telegram Chat Logs (backward compatibility)
-        if (status !== '' && status !== 'PENDING' && status !== 'NEW') {
-          Logger.log(`Row ${rowNumber}: Skipping - already processed (status: ${status})`);
           result.skipped++;
           continue;
         }
@@ -263,7 +257,9 @@ function processQrCodeUpdatesFromTelegramChatLogs() {
             extracted.shippingProvider,
             extracted.trackingNumber
           );
-          Logger.log(`Row ${rowNumber}: Updated Stripe checkout link for QR code "${extracted.qrCode}"`);
+          // Write Stripe Session ID to column Z of the QR code row (primary multi-item-safe link)
+          destSheet.getRange(qrCodeRowIndex, STRIPE_SESSION_COL_DEST + 1).setValue(extracted.stripeSessionId || '');
+          Logger.log(`Row ${rowNumber}: Updated Stripe checkout link and column Z for QR code "${extracted.qrCode}"`);
           updatesMade = true;
         }
 
@@ -289,10 +285,8 @@ function processQrCodeUpdatesFromTelegramChatLogs() {
         }
 
         if (updatesMade) {
-          // Mark the source row as processed in Telegram Chat Logs (backward compatibility)
-          sourceSheet.getRange(rowNumber, STATUS_COL + 1).setValue('PROCESSED');
-          
-          // Record in tracking sheet
+          // Record in tracking sheet (do NOT write column J of Telegram Chat Logs —
+          // that column is owned by the TDG scoring script)
           const timestamp = new Date();
           const trackingRow = [
             rowNumber,
@@ -564,5 +558,64 @@ function processQrCodeUpdatesCron() {
     Logger.log(`Cron processing error: ${error.message}`);
     throw error;
   }
+}
+
+/**
+ * One-time patch: backfill Stripe Session ID, Shipping Provider, and Tracking Number
+ * into QR Code Update tracking rows for Telegram rows 8093–8097, which were processed
+ * by an older version of this script before Stripe block support was added.
+ *
+ * Also writes Shipping Provider + Tracking Number into the Stripe Social Media Checkout ID
+ * sheet for each matched QR code. Column P (Agroverse QR code) is written for each, so the
+ * last one processed will remain in column P (schema supports only one QR code per session row).
+ */
+function patchStripeDataForTelegramRows8093To8097() {
+  const STRIPE_SESSION_ID = 'cs_live_a19rmE2BPWhm0dOgFMFJ5gzZfjdgSz5rOKIpqfYy0mcmEjSkQlfvrPyw3y';
+  const SHIPPING_PROVIDER = 'GroundAdvantage - USPS';
+  const TRACKING_NUMBER = '1ZXG9979YW95898126';
+  const TELEGRAM_ROWS = new Set([8093, 8094, 8095, 8096, 8097]);
+
+  const trackingSS = SpreadsheetApp.openByUrl(TRACKING_SHEET_URL);
+  const trackingSheet = trackingSS.getSheetByName(TRACKING_SHEET_NAME);
+  const trackingData = trackingSheet.getDataRange().getValues();
+
+  const destSS = SpreadsheetApp.openByUrl(DESTINATION_SHEET_URL);
+  const destSheet = destSS.getSheetByName(DESTINATION_SHEET_NAME);
+  let patchCount = 0;
+
+  // Build QR code → row index map for "Agroverse QR codes" sheet
+  const destData = destSheet ? destSheet.getDataRange().getValues() : [];
+  const qrRowMap = {};
+  for (let d = 1; d < destData.length; d++) {
+    const qr = (destData[d][QR_CODE_COL] || '').toString().trim();
+    if (qr) qrRowMap[qr] = d + 1; // 1-based sheet row
+  }
+
+  for (let i = 1; i < trackingData.length; i++) {
+    const rowNum = Number(trackingData[i][0]); // Column A: Row Number (Telegram row)
+    if (!TELEGRAM_ROWS.has(rowNum)) continue;
+
+    const sheetRow = i + 1;
+    trackingSheet.getRange(sheetRow, 9).setValue(STRIPE_SESSION_ID);  // col I
+    trackingSheet.getRange(sheetRow, 10).setValue(SHIPPING_PROVIDER); // col J
+    trackingSheet.getRange(sheetRow, 11).setValue(TRACKING_NUMBER);   // col K
+
+    const qrCode = (trackingData[i][2] || '').toString().trim();      // col C
+    if (qrCode) {
+      applyStripeCheckoutLinkForQrCode_(destSS, qrCode, STRIPE_SESSION_ID, SHIPPING_PROVIDER, TRACKING_NUMBER);
+      // Write session ID to column Z of the QR code row in "Agroverse QR codes"
+      const qrSheetRow = qrRowMap[qrCode];
+      if (qrSheetRow && destSheet) {
+        destSheet.getRange(qrSheetRow, STRIPE_SESSION_COL_DEST + 1).setValue(STRIPE_SESSION_ID);
+      }
+      Logger.log(`Patched tracking sheet row ${sheetRow} (Telegram row ${rowNum}, QR: ${qrCode})`);
+    } else {
+      Logger.log(`Patched tracking sheet row ${sheetRow} (Telegram row ${rowNum}) — no QR code in col C`);
+    }
+    patchCount++;
+  }
+
+  SpreadsheetApp.flush();
+  Logger.log(`Patch complete: ${patchCount} tracking row(s) updated.`);
 }
 
