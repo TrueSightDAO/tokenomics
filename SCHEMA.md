@@ -239,7 +239,7 @@ See [`python_scripts/schema_validation/README.md`](./python_scripts/schema_valid
 | G | Contribution Made | String | Full message content or contribution description |
 | H | Rubric classification | String | Classification category |
 | I | TDGs Provisioned | Number | TDG tokens provisioned |
-| J | Status | String | Status of the contribution |
+| J | Status | String | Status of the contribution. **Ownership: TDG scoring script only.** Other Telegram-log consumers (QR code updates, sales, etc.) must NOT read or write this column — they should dedup via their own tracking sheet keyed on (row number, Telegram Update ID). |
 | K | TDGs Issued\n(reviewed by Governor) | String | Issued TDG tokens (note: header contains line break) |
 | L | Status date | Date | Date of message/status (YYYYMMDD) |
 | M | Main Ledger \nLine Number | Number | Reference to main ledger (note: header contains line break) |
@@ -790,11 +790,13 @@ See [`python_scripts/schema_validation/README.md`](./python_scripts/schema_valid
 | T | Price | Number | Price |
 | U | Manager \nName | String | Manager / operator name for serialized labels; batch generation sets this from signed **Manager Name** (defaults to signer when omitted) |
 | V | Ledger Name | String | Associated ledger name (NEW - added 2025-12-26) |
+| Z | Stripe Session ID | String | **PRIMARY link** to `Stripe Social Media Checkout ID` column C for this purchase. Multi-item-safe: one Stripe session → many QR codes, so the FK lives on the "many" side (each QR row). Written by `process_qr_code_updates.gs` on `[QR CODE UPDATE EVENT]` with a Stripe block. Preferred over legacy `Stripe Social Media Checkout ID` column P for lookups. |
 
 **Used by:**
 - [`process_sales_telegram_logs.gs`](https://github.com/TrueSightDAO/tokenomics/blob/main/google_app_scripts/tdg_inventory_management/process_sales_telegram_logs.gs) - Validates QR codes during sales processing
 - [`web_app.gs`](https://github.com/TrueSightDAO/tokenomics/blob/main/google_app_scripts/tdg_inventory_management/web_app.gs) - API for QR code queries and management
 - [`process_qr_code_generation_telegram_logs.gs`](https://github.com/TrueSightDAO/tokenomics/blob/main/google_app_scripts/tdg_inventory_management/process_qr_code_generation_telegram_logs.gs) - Creates and registers new QR codes
+- [`process_qr_code_updates.gs`](https://github.com/TrueSightDAO/tokenomics/blob/main/google_app_scripts/agroverse_qr_codes/process_qr_code_updates.gs) - Writes column Z (Stripe Session ID) on `[QR CODE UPDATE EVENT]`; uses `QR Code Update` tracking tab (gid=408450426) for dedup — does **not** read/write column J of `Telegram Chat Logs`
 
 ---
 
@@ -1207,7 +1209,7 @@ See [`python_scripts/schema_validation/README.md`](./python_scripts/schema_valid
 | M | Shipping Provider | String | Shipping carrier |
 | N | Tracking Number | String | Package tracking number |
 | O | Tracking Notification Sent | String | Email notification status |
-| P | Agroverse QR code | String | Serialized Agroverse QR id linked to this checkout (same id as `Agroverse QR codes` column A); blank means unassigned |
+| P | Agroverse QR code | String | **Legacy / single-item only.** Serialized Agroverse QR id linked to this checkout. Cannot represent multi-item sessions (single cell, single QR). Superseded by **`Agroverse QR codes` column Z** (`Stripe Session ID`), which puts the FK on the many-side. Still written for backward compat; lookups should prefer column Z and fall back to P. |
 
 **Used by:**
 - Stripe order processing and tracking
