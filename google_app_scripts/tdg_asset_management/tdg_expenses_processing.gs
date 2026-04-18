@@ -955,40 +955,42 @@ function parseAndProcessTelegramLogs() {
     Logger.log(`Total rows in source sheet: ${sourceData.length - 1} (excluding header)`);
     
     for (let i = 1; i < sourceData.length; i++) {
-      // Check if row date is within the last 30 days
+      // Cheap filter 1: message must contain the expense event marker (short-circuits >99% of rows)
+      const message = sourceData[i][MESSAGE_COL];
+      if (!message || !expensePattern.test(message)) continue;
+
+      // Cheap filter 2: 30-day date window
       const rowDateStr = sourceData[i][SALES_DATE_COL];
       const rowDate = parseDateFromYYYYMMDD(rowDateStr);
-      
       if (!rowDate) {
         skippedNoDate++;
-        continue; // Skip rows without valid dates
-      }
-      
-      if (rowDate < cutoffDate) {
-        skippedOldEntries++;
-        continue; // Skip rows older than 30 days
-      }
-      const message = sourceData[i][MESSAGE_COL];
-      
-      const expenseDetails = extractExpenseDetails(message);
-      Logger.log(message);
-      Logger.log(expenseDetails);
-      if (!expenseDetails) {
-        Logger.log(`Skipping row ${i + 1} due to invalid expense details`);
         continue;
       }
-      
+      if (rowDate < cutoffDate) {
+        skippedOldEntries++;
+        continue;
+      }
+
+      // Expensive path starts here — only runs on candidate rows
+      const expenseDetails = extractExpenseDetails(message);
+      if (!expenseDetails) {
+        Logger.log(`Row ${i + 1}: skipping — extractExpenseDetails returned null`);
+        continue;
+      }
+
       const hashKey = generateHashKey(
         sourceData[i][TELEGRAM_MESSAGE_ID_COL],
         expenseDetails.daoMemberName,
         sourceData[i][SALES_DATE_COL]
       );
-      
-      Logger.log(message + " \npattern match: " + expensePattern.test(message) + " \nprocessed: " + existingHashKeys.includes(hashKey));
-      Logger.log("To process: " + (expensePattern.test(message) && !existingHashKeys.includes(hashKey)));
-      
-      if (expensePattern.test(message) && !existingHashKeys.includes(hashKey)) {
-        Logger.log("Line 148: new line detected");
+
+      if (existingHashKeys.includes(hashKey)) {
+        // Already scored — dedup via hashKey from Scored Expense Submissions
+        continue;
+      }
+
+      Logger.log(`Row ${i + 1}: new expense event detected (hash=${hashKey})`);
+      {
         
         // Get reporter name from digital signature
         let reporterName = null;
