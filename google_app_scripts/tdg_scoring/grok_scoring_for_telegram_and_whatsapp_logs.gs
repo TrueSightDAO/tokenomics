@@ -11,9 +11,36 @@
 
 // Flag to ignore chatlogs before this date (YYYYMMDD format)
 // - Messages with dates earlier than this will be skipped during processing.
-// - Format: "YYYYMMDD" (e.g., "20241213" means December 13, 2024).
-// - Adjust this to filter out old data you don’t want to process.
-const IGNORE_BEFORE_DATE = "20250316";
+// - Computed dynamically as the equinox/solstice two events before the most recent one,
+//   giving a rolling ~6-month scoring window.
+// - Equinoxes/solstices approximated as Mar 20, Jun 21, Sep 22, Dec 21 (±1–2 days year-to-year;
+//   sub-week precision is irrelevant for a multi-month filter window).
+const IGNORE_BEFORE_DATE = computeIgnoreBeforeDate_();
+
+/**
+ * Returns YYYYMMDD for the equinox/solstice two events before the most recent past event.
+ * Example: if today is 2026-04-18, the most recent event is Mar 20 2026; two ago is Sep 22 2025.
+ * @return {string}
+ */
+function computeIgnoreBeforeDate_() {
+  const today = new Date();
+  const year = today.getFullYear();
+  // Anchor dates for current and previous two years (enough headroom for "two ago")
+  const events = [];
+  for (let y = year - 2; y <= year; y++) {
+    events.push(new Date(y, 2, 20));  // Mar 20 — spring equinox
+    events.push(new Date(y, 5, 21));  // Jun 21 — summer solstice
+    events.push(new Date(y, 8, 22));  // Sep 22 — fall equinox
+    events.push(new Date(y, 11, 21)); // Dec 21 — winter solstice
+  }
+  const past = events.filter(d => d <= today).sort((a, b) => b - a);
+  // Fallback to 1 year ago if something's off (shouldn't happen — 3 years of events always has >=2)
+  const target = past[2] || new Date(today.getFullYear() - 1, today.getMonth(), today.getDate());
+  const yyyy = target.getFullYear();
+  const mm = String(target.getMonth() + 1).padStart(2, '0');
+  const dd = String(target.getDate()).padStart(2, '0');
+  return `${yyyy}${mm}${dd}`;
+}
 
 // List of DAO-specific event strings to skip during message processing
 // - Messages containing these strings will be ignored to avoid errors in TDG scoring
@@ -259,6 +286,30 @@ function doGet(e) {
   return ContentService.createTextOutput("ℹ️ No valid action specified");
 }
 
+/**
+ * Builds a Set of hashes from Scored Chatlogs column K (index 10, 1-based column 11).
+ * Used to distinguish rows that actually got scored (→ "Full Provision Awarded") from rows that were
+ * processed but yielded no records (→ "Successfully Completed") during the column J backfill.
+ * @return {!Set<string>}
+ */
+function buildScoredChatlogsHashSet_() {
+  try {
+    const spreadsheet = SpreadsheetApp.openByUrl(OUTPUT_SHEET_URL);
+    const sheet = spreadsheet.getSheetByName("Scored Chatlogs");
+    if (!sheet) {
+      Logger.log(`buildScoredChatlogsHashSet_: Sheet "Scored Chatlogs" not found; treating as empty.`);
+      return new Set();
+    }
+    const lastRow = sheet.getLastRow();
+    if (lastRow < 2) return new Set();
+    const hashes = sheet.getRange(2, 11, lastRow - 1, 1).getValues();
+    return new Set(hashes.map(r => (r[0] || '').toString().trim()).filter(h => h));
+  } catch (e) {
+    Logger.log(`buildScoredChatlogsHashSet_: Error ${e.message}; treating as empty.`);
+    return new Set();
+  }
+}
+
 // Modified to send notification once per chatId
 function processTelegramChatLogs() {
   if (!XAI_API_KEY) {
@@ -280,19 +331,36 @@ function processTelegramChatLogs() {
 
   Logger.log(`processTelegramChatLogs: Processing Telegram Chat Logs: Found ${data.length - 1} records`);
 
+  // Backfill column J for rows that were processed under an older version of this script
+  // (hash exists in column N but J is still "Pending"). Lookup hash in Scored Chatlogs to decide final state.
+  const scoredHashSet = buildScoredChatlogsHashSet_();
+  let backfilled = 0;
   for (let i = 1; i < data.length; i++) {
-    Logger.log("\n\n\n");
+    const status = data[i][9] ? data[i][9].toString().trim() : "";
+    const hash = data[i][13] ? data[i][13].toString().trim() : "";
+    if (status === "Pending" && hash) {
+      const newStatus = scoredHashSet.has(hash) ? 'Full Provision Awarded' : 'Successfully Completed';
+      telegramSheet.getRange(i + 1, 10).setValue(newStatus);
+      data[i][9] = newStatus; // keep in-memory copy in sync so the main loop filter below sees it
+      backfilled++;
+    }
+  }
+  if (backfilled > 0) {
+    Logger.log(`processTelegramChatLogs: Backfilled column J on ${backfilled} previously-processed row(s)`);
+  }
+
+  for (let i = 1; i < data.length; i++) {
     const row = data[i];
+    const status = row[9] ? row[9].toString().trim() : "";
+    // Primary filter: only process rows still in "Pending" state. This skips both already-scored rows
+    // (backfilled above) and date-filtered rows from prior runs in a single cheap cell read.
+    if (status !== 'Pending') continue;
+
+    Logger.log("\n\n\n");
     const dateStr = row[11] ? row[11].toString().trim() : "";
     const username = row[4] ? row[4].toString() : "Unknown";
     const message = row[6] ? row[6].toString().trim() : "";
-    const existingHash = row[13] ? row[13].toString().trim() : "";
-    Logger.log(`processTelegramChatLogs: row ${i + 1}: Hash ${existingHash}`);
-
-    if (existingHash) {
-      Logger.log(`processTelegramChatLogs: Skipping already processed row ${i + 1}: Hash ${existingHash} found in Telegram Chat Logs`);
-      continue;
-    }
+    Logger.log(`processTelegramChatLogs: row ${i + 1}: processing Pending row`);
 
     const { records, count } = processChatLogEntry({
       message,
@@ -310,6 +378,8 @@ function processTelegramChatLogs() {
       Logger.log(`processTelegramChatLogs: Updated row ${i + 1} Column N with hash after processing`);
       const messageHash = generateUniqueHash(username, message, dateStr);
       telegramSheet.getRange(i + 1, 14).setValue(messageHash);
+      // Column J (Status) — owned by this scoring script; transition from "Pending" to final state
+      telegramSheet.getRange(i + 1, 10).setValue('Full Provision Awarded');
 
       // Collect Telegram handles for notification
       const chatId = getChatIdForRow(row, telegramSheet, i);
@@ -325,6 +395,10 @@ function processTelegramChatLogs() {
     } else {
       Logger.log(`processTelegramChatLogs: Updated row ${i + 1} Column N with hash even though no contributors were found`);
       telegramSheet.getRange(i + 1, 14).setValue(generateUniqueHash(username, message, dateStr));
+      // Mark as Successfully Completed so the J="Pending" filter skips it on future runs.
+      // Covers date-filtered, skip-string, and no-contributor-match cases. The precise reason is derivable
+      // from absence of the hash in Scored Chatlogs.
+      telegramSheet.getRange(i + 1, 10).setValue('Successfully Completed');
     }
   }
 
