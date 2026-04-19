@@ -138,6 +138,7 @@ Canonical layout for **`QR Code Sales`** (workbook `1qbZZ…`, `gid=1003674539`)
 - [SunMint Tree Planting](#sheet-sunmint-tree-planting)
 - [SunMint Registered Farms](#sheet-sunmint-registered-farms)
 - [Document Notarizations](#sheet-document-notarizations)
+- [Currency Creation](#sheet-currency-creation)
 - [States](#sheet-states-telegram)
 
 **Main Ledger & Contributors (1GE7P...)**
@@ -526,6 +527,27 @@ See [`python_scripts/schema_validation/README.md`](./python_scripts/schema_valid
 
 **Used by:**
 - [`process_notarization_telegram_logs.gs`](https://github.com/TrueSightDAO/tokenomics/blob/main/google_app_scripts/agroverse_notarizations/process_notarization_telegram_logs.gs) - Processes document notarizations
+
+---
+
+##### Sheet: `Currency Creation`
+**Purpose:** Processing audit log for the repackaging planner flow. One row per **output Currency** created when a `[REPACKAGING BATCH EVENT]` row from `Telegram Chat Logs` is consumed by the `repackaging-currency-ingest` Apps Script. A single batch of N outputs produces N rows here, keyed `{request_id}#{index}` so each output is independently traceable while still grouped by the parent batch. Dedup for reprocessing is performed by scanning column **B** for `{request_id}` (exact) or `{request_id}#` (prefix).
+
+**Sheet URL:** https://docs.google.com/spreadsheets/d/1qbZZhf-_7xzmDTriaJVWj6OZshyQsFkdsAV8-pyzASQ/edit#gid=2120959876
+
+**Header Row:** 1
+
+| Column | Name | Type | Description |
+|--------|------|------|-------------|
+| A | Created At | String (ISO 8601) | Server-side timestamp when the row was appended. |
+| B | Request Sub-ID | String | `{request_id}#{output_index}` — the parent batch `request_id` (UUID from the DApp) suffixed with the zero-based output index. Used for dedup — the GAS treats a request as processed if any row in column B matches `{request_id}` or starts with `{request_id}#`. |
+| C | Suggested Currency | String | The new Currency string this output created on the Main Ledger `Currencies` tab (column A). Already has the `\| YYYYMMDD` collision-avoidance suffix if needed. |
+| D | Unit Cost (USD) | Number | Per-output USD cost = (batch total input cost ÷ batch total output weight in grams) × this output's per-unit weight in grams. Also written verbatim to `Currencies` column B. |
+| E | Holder | String | `holder_label` or `holder_key` from the DApp payload (typically the Main Ledger manager name). |
+| F | Payload JSON | String | Per-output JSON `{ request_id, output_index, output, holder, totals }` — the exact structured data for that output plus the batch totals. Large base64 proof attachments are stripped (stored only in the composition JSON on GitHub). |
+
+**Used by:**
+- [`agroverse-inventory/gas/repackaging-currency-ingest/Code.gs`](https://github.com/TrueSightDAO/agroverse-inventory/blob/main/gas/repackaging-currency-ingest/Code.gs) - `processBatchData_()` appends rows here from both the `doGet(?action=processRepackagingBatchesFromTelegramChatLogs)` (Edgar-driven) path and the legacy token-authenticated `doPost` path.
 
 ---
 
@@ -1065,9 +1087,13 @@ See [`python_scripts/schema_validation/README.md`](./python_scripts/schema_valid
 | K | Unit Weight (grams) | Number | Weight in grams |
 | L | Unit Weight (ounces) | Number | Weight in ounces |
 | M | SKU Product ID | String | SKU identifier |
+| N | Raw Request Text | String | Plain-text dump of the original repackaging batch request (holder, all inputs with qty/unit/ext, all outputs with label/M/weight/unit-cost/line-total, totals). Populated by the `repackaging-currency-ingest` Apps Script when this Currency was created from a `[REPACKAGING BATCH EVENT]` submission. Configurable via script property `CURRENCIES_RAW_REQUEST_COLUMN` (default 14); set to `0` to disable. |
+| O | Composition JSON | String | Raw GitHub URL for the per-batch composition file (`https://raw.githubusercontent.com/TrueSightDAO/agroverse-inventory/main/currency-compositions/{request_id}.json`). Every Currency row from the same batch shares the same URL — one composition file documents the whole batch of N outputs. Populated by the `repackaging-currency-ingest` Apps Script. Configurable via script property `CURRENCIES_COMPOSITION_JSON_URL_COLUMN` (default 15); set to `0` to disable. If configured to the same column as `CURRENCIES_RAW_REQUEST_COLUMN`, the URL write is skipped (raw text wins). |
 
 **Used by:**
 - Product and pricing management
+- [`tdg_inventory_management/web_app.gs`](https://github.com/TrueSightDAO/tokenomics/blob/main/google_app_scripts/tdg_inventory_management/web_app.gs) — `getCurrenciesUnitCostMap_()` reads column A + column B to enrich AGL `Balance` rows with unit costs (the AGL sheets don't carry cost columns; the main `Currencies` tab is the authoritative catalog). Lookup tries the prefixed name (`[AGLn] <asset>`) first, then falls back to the bare `<asset>`.
+- [`agroverse-inventory/gas/repackaging-currency-ingest/Code.gs`](https://github.com/TrueSightDAO/agroverse-inventory/blob/main/gas/repackaging-currency-ingest/Code.gs) — `appendCurrencyRowsAndSort_()` appends one row per output (col A name, col B USD unit cost, col N raw request text, col O composition JSON URL), then sorts rows 2..last by col A ascending.
 
 ---
 

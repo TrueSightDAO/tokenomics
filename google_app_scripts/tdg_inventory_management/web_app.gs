@@ -242,6 +242,60 @@ function getLedgerConfigsFromSheet() {
   }
 }
 
+// Cache for the Currencies unit-cost map, populated lazily per-execution.
+let _currenciesUnitCostMapCache = null;
+
+/**
+ * Reads the main spreadsheet's "Currencies" tab and returns a map of
+ * currency-string → unit_cost (USD) from column B. Used to enrich AGL
+ * Balance rows where the AGL's own sheet doesn't expose a cost column.
+ *
+ * Empty / non-numeric col B values are skipped.
+ */
+function getCurrenciesUnitCostMap_() {
+  if (_currenciesUnitCostMapCache) return _currenciesUnitCostMapCache;
+  const map = {};
+  try {
+    const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+    const sh = ss.getSheetByName(CURRENCIES_SHEET_NAME);
+    if (!sh) { _currenciesUnitCostMapCache = map; return map; }
+    const lastRow = sh.getLastRow();
+    if (lastRow < 2) { _currenciesUnitCostMapCache = map; return map; }
+    const vals = sh.getRange(2, 1, lastRow - 1, 2).getValues();
+    for (let i = 0; i < vals.length; i++) {
+      const name = vals[i][0];
+      const cost = vals[i][1];
+      if (name == null) continue;
+      const key = String(name).trim();
+      if (!key) continue;
+      if (cost === '' || cost == null) continue;
+      const n = parseFloat(cost);
+      if (!isNaN(n)) map[key] = n;
+    }
+  } catch (e) {
+    Logger.log('getCurrenciesUnitCostMap_ error: ' + e.message);
+  }
+  _currenciesUnitCostMapCache = map;
+  return map;
+}
+
+/**
+ * For an AGL row with prefixed currency "[AGLn] <assetName>", try to resolve
+ * the unit cost from the main Currencies tab.
+ * 1) Prefixed name exact match.
+ * 2) Bare <assetName> fallback (strips the [AGLn] prefix — the Currencies tab
+ *    is the authoritative catalog and may store the canonical un-prefixed
+ *    currency).
+ * Returns null when neither matches.
+ */
+function resolveAglUnitCost_(prefixedName, assetName) {
+  const map = getCurrenciesUnitCostMap_();
+  if (map[prefixedName] != null) return map[prefixedName];
+  const bare = assetName == null ? '' : String(assetName).trim();
+  if (bare && map[bare] != null) return map[bare];
+  return null;
+}
+
 // Augment the result array with assets from external ledgers
 function augmentWithLedgers(managerName, result) {
   const ledgerConfigs = getLedgerConfigsFromSheet();
@@ -269,11 +323,15 @@ function augmentWithLedgers(managerName, result) {
         if (names[i][0] === managerName) {
           const assetName = assets[i][0];
           const quantity = qtys[i][0];
+          const prefixedName = `[${config.ledger_name}] ${assetName}`;
+          const unitCost = resolveAglUnitCost_(prefixedName, assetName);
+          const totalValue = (unitCost != null && typeof quantity === 'number' && !isNaN(quantity))
+            ? quantity * unitCost : null;
           result.push({
-            currency: `[${config.ledger_name}] ${assetName}`,
+            currency: prefixedName,
             amount: quantity,
-            unit_cost: null,
-            total_value: null
+            unit_cost: unitCost,
+            total_value: totalValue
           });
         }
       }
