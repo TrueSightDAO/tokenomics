@@ -57,6 +57,8 @@ const MESSAGE_COL = 6; // Column G (Expense Reported)
 const SALES_DATE_COL = 11; // Column L (Status Date)
 const HASH_KEY_COL = 13; // Column N (Scoring Hash Key)
 const TELEGRAM_FILE_ID_COL = 14; // Column O (Telegram File ID)
+/** Telegram Chat Logs column S (Governor): YES = global ledger authority (Edgar). 0-based index 18. */
+const TELEGRAM_GOVERNOR_COL = 18;
 
 // Column indices for Scored Expense Submissions sheet
 const DEST_UPDATE_ID_COL = 0; // Column A
@@ -72,6 +74,8 @@ const DEST_AMOUNT = 9; // Column J
 const DEST_HASH_KEY_COL = 10; // Column K
 const DEST_TRANSACTION_LINE_COL = 11; // Column L
 const DEST_TARGET_LEDGER_COL = 12; // Column M
+/** Scored Expense Submissions column N — Processing Status (authorized | unauthorized). */
+const DEST_PROCESSING_STATUS_COL = 13; // Column N (0-based)
 
 // Column indices for Contributors sheet
 const TELEGRAM_HANDLE_COL_CONTRIBUTORS = 7; // Column H (Telegram Handle)
@@ -346,6 +350,34 @@ function getLedgerConfigsFromWix() {
  * @return {string|null} return.contributorName - Contributor name if signature is valid and ACTIVE, null otherwise
  * @return {string|null} return.error - Error message if signature not found or not ACTIVE, null if successful
  */
+function normalizeAuthName_(name) {
+  return (name == null ? '' : String(name))
+    .trim()
+    .replace(/\s+/g, ' ')
+    .toLowerCase();
+}
+
+function authNamesMatchForExpense_(a, b) {
+  const na = normalizeAuthName_(a);
+  const nb = normalizeAuthName_(b);
+  return na !== '' && na === nb;
+}
+
+function isTelegramGovernorYesFromRow_(telegramRow) {
+  return String(telegramRow && telegramRow[TELEGRAM_GOVERNOR_COL] != null ? telegramRow[TELEGRAM_GOVERNOR_COL] : '')
+    .trim()
+    .toUpperCase() === 'YES';
+}
+
+/**
+ * Scored Expense column N: authorized if Telegram Governor is YES or reporter matches DAO Member (inventory owner).
+ */
+function computeExpenseProcessingStatus_(telegramRow, reporterName, daoMemberName) {
+  if (isTelegramGovernorYesFromRow_(telegramRow)) return 'authorized';
+  if (authNamesMatchForExpense_(reporterName, daoMemberName)) return 'authorized';
+  return 'unauthorized';
+}
+
 function findContributorByDigitalSignature(digitalSignature) {
   try {
     if (!digitalSignature) {
@@ -373,7 +405,7 @@ function findContributorByDigitalSignature(digitalSignature) {
         Logger.log(`Found contributor: ${contributorName} for signature`);
         
         // Check if status is ACTIVE
-        if (status === 'ACTIVE') {
+        if (String(status || '').trim().toUpperCase() === 'ACTIVE') {
           return { contributorName: contributorName, error: null };
         } else {
           return { 
@@ -660,6 +692,14 @@ function InsertExpenseRecords(scoredRow, rowIndex) {
     Logger.log(`InsertExpenseRecords called for rowIndex ${rowIndex + 1}`);
     Logger.log(`ScoredRow length: ${scoredRow.length}, Column M (index ${DEST_TARGET_LEDGER_COL}): "${scoredRow[DEST_TARGET_LEDGER_COL] || ''}"`);
     Logger.log(`Expense message (Column F): ${scoredRow[DEST_EXPENSE_REPORTED_COL] ? scoredRow[DEST_EXPENSE_REPORTED_COL].substring(0, 100) + '...' : 'empty'}`);
+
+    if (scoredRow.length > DEST_PROCESSING_STATUS_COL) {
+      const proc = String(scoredRow[DEST_PROCESSING_STATUS_COL] || '').trim().toLowerCase();
+      if (proc === 'unauthorized') {
+        Logger.log('InsertExpenseRecords: skipping ledger insert — Column N Processing Status is unauthorized');
+        return null;
+      }
+    }
     
     const expenseDetails = extractExpenseDetails(scoredRow[DEST_EXPENSE_REPORTED_COL]);
     if (!expenseDetails) {
@@ -1065,9 +1105,13 @@ function parseAndProcessTelegramLogs() {
           || (ledgerPrefixMatch ? ledgerPrefixMatch[1] : null)
           || '';
         
+        const processingStatus = computeExpenseProcessingStatus_(sourceData[i], reporterName, expenseDetails.daoMemberName);
+        if (processingStatus === 'unauthorized') {
+          Logger.log(`Row ${i + 1}: Processing Status = unauthorized (reporter is not DAO Member for selected inventory and Governor is not YES)`);
+        }
+
         // Prepare row data for Scored Expense Submissions sheet
-        // Columns: A=Update ID, B=Chat ID, C=Chat Name, D=Message ID, E=Reporter, F=Expense Reported,
-        //          G=Status Date, H=Contributor Name, I=Currency (clean, no ledger), J=Amount, K=Hash Key, L=Ledger Lines, M=Target Ledger
+        // Columns: A=Update ID … M=Target Ledger, N=Processing Status (authorized | unauthorized)
         const rowToAppend = [
           sourceData[i][TELEGRAM_UPDATE_ID_COL], // Column A: Telegram Update ID
           sourceData[i][CHAT_ID_COL], // Column B: Telegram Chatroom ID
@@ -1081,25 +1125,31 @@ function parseAndProcessTelegramLogs() {
           expenseDetails.quantity * -1, // Column J: Amount (negative for expense)
           hashKey, // Column K: Scoring Hash Key (for deduplication)
           '', // Column L: Ledger Lines Number (will be filled after InsertExpenseRecords)
-          targetLedgerForColumnM // Column M: Target Ledger (from form or extracted from inventory type)
+          targetLedgerForColumnM, // Column M: Target Ledger (from form or extracted from inventory type)
+          processingStatus // Column N: Processing Status
         ];
         
         const lastRow = scoredExpenseSheet.getLastRow();
         const scoredRowNumber = lastRow + 1;
         scoredExpenseSheet.getRange(scoredRowNumber, 1, 1, rowToAppend.length).setValues([rowToAppend]);
         
-        Logger.log(`Calling InsertExpenseRecords for row ${scoredRowNumber} with target ledger: ${rowToAppend[DEST_TARGET_LEDGER_COL] || 'not specified'}`);
-        const transactionRowNumber = InsertExpenseRecords(rowToAppend, i);
-        Logger.log(`InsertExpenseRecords returned: ${transactionRowNumber || 'null (failed to insert)'}`);
-        
-        if (transactionRowNumber) {
-          scoredExpenseSheet.getRange(scoredRowNumber, DEST_TRANSACTION_LINE_COL + 1).setValue(transactionRowNumber);
-          Logger.log(`Updated Column L (Ledger Lines Number) with row ${transactionRowNumber}`);
+        let transactionRowNumber = null;
+        if (processingStatus === 'authorized') {
+          Logger.log(`Calling InsertExpenseRecords for row ${scoredRowNumber} with target ledger: ${rowToAppend[DEST_TARGET_LEDGER_COL] || 'not specified'}`);
+          transactionRowNumber = InsertExpenseRecords(rowToAppend, i);
+          Logger.log(`InsertExpenseRecords returned: ${transactionRowNumber || 'null (failed to insert)'}`);
+          
+          if (transactionRowNumber) {
+            scoredExpenseSheet.getRange(scoredRowNumber, DEST_TRANSACTION_LINE_COL + 1).setValue(transactionRowNumber);
+            Logger.log(`Updated Column L (Ledger Lines Number) with row ${transactionRowNumber}`);
+          } else {
+            Logger.log(`Warning: InsertExpenseRecords returned null for row ${scoredRowNumber}. Expense was not inserted into ledger.`);
+          }
+          
+          sendExpenseNotification(rowToAppend, scoredRowNumber, transactionRowNumber);
         } else {
-          Logger.log(`Warning: InsertExpenseRecords returned null for row ${scoredRowNumber}. Expense was not inserted into ledger.`);
+          Logger.log(`Skipping InsertExpenseRecords and notification for row ${scoredRowNumber} (unauthorized)`);
         }
-        
-        sendExpenseNotification(rowToAppend, scoredRowNumber, transactionRowNumber);
         
         existingHashKeys.push(hashKey);
         newEntries++;
@@ -1354,6 +1404,8 @@ function testParseAndProcessRow() {
       Logger.log(`No attached filename or destination for row ${rowNumber}`);
     }
 
+    const processingStatus = computeExpenseProcessingStatus_(sourceData[i], reporterName, expenseDetails.daoMemberName);
+
     // Step 6: Append to scored expense sheet
     const rowToAppend = [
       sourceData[i][TELEGRAM_UPDATE_ID_COL], // Column A: Telegram Update ID
@@ -1368,7 +1420,8 @@ function testParseAndProcessRow() {
       expenseDetails.quantity * -1, // Column J: Amount (negative for expense)
       hashKey, // Column K: Scoring Hash Key
       '', // Column L: Ledger Lines Number (will be filled after insertion)
-      expenseDetails.targetLedger || '' // Column M: Target Ledger (from expense form)
+      expenseDetails.targetLedger || '', // Column M: Target Ledger (from expense form)
+      processingStatus // Column N: Processing Status
     ];
     
     const lastRow = scoredExpenseSheet.getLastRow();
@@ -1378,17 +1431,20 @@ function testParseAndProcessRow() {
     Logger.log(`   Data: ${JSON.stringify(rowToAppend)}`);
 
     // Step 7: Insert into offchain transactions sheet or resolved ledger
-    const transactionRowNumber = InsertExpenseRecords(rowToAppend, i);
-    Logger.log(`Transaction Row Number: ${transactionRowNumber || 'Not recorded'}`);
+    let transactionRowNumber = null;
+    if (processingStatus === 'authorized') {
+      transactionRowNumber = InsertExpenseRecords(rowToAppend, i);
+      Logger.log(`Transaction Row Number: ${transactionRowNumber || 'Not recorded'}`);
 
-    // Update Column L with transaction row number
-    if (transactionRowNumber) {
-      scoredExpenseSheet.getRange(scoredRowNumber, DEST_TRANSACTION_LINE_COL + 1).setValue(transactionRowNumber);
-      Logger.log(`✅ Updated Scored Expense Submissions Column L with transaction row: ${transactionRowNumber}`);
+      if (transactionRowNumber) {
+        scoredExpenseSheet.getRange(scoredRowNumber, DEST_TRANSACTION_LINE_COL + 1).setValue(transactionRowNumber);
+        Logger.log(`✅ Updated Scored Expense Submissions Column L with transaction row: ${transactionRowNumber}`);
+      }
+
+      sendExpenseNotification(rowToAppend, scoredRowNumber, transactionRowNumber);
+    } else {
+      Logger.log('Test: skipped ledger insert — Processing Status unauthorized');
     }
-
-    // Step 8: Send notification
-    sendExpenseNotification(rowToAppend, scoredRowNumber, transactionRowNumber);
 
     // Log test success
     Logger.log(`✅ Test Passed: Successfully processed row ${rowNumber} with hash key: ${hashKey}`);

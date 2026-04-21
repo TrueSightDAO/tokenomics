@@ -1,8 +1,17 @@
 # TrueSight DAO - Google Sheets Schema Documentation
 
-> **Last Updated:** 2026-04-21
+> **Last Updated:** 2026-04-22
 > 
 > This document provides a consolidated reference for all Google Sheets used across TrueSight DAO's Google Apps Scripts. Use this as a central schema reference when making code changes.
+
+## 📝 Recent Changes (2026-04-22)
+
+### **Inventory Movement** / **Scored Expense Submissions** — signer vs manager authorization (GAS)
+
+- **`process_movement_telegram_logs.gs`:** Column **N** (`STATUS`) is **`NEW`** when **Telegram Chat Logs** column **S** (`Governor`) is **`YES`**, or when the **ACTIVE** signer (**Contributors Digital Signatures**) matches **`- Manager Name:`** from the movement payload; otherwise **`unauthorized`**. **`processInventoryMovementToLedgers`** only processes **`NEW`** (skips **`unauthorized`**).
+- **`tdg_expenses_processing.gs`:** **Scored Expense Submissions** column **N** — **`Processing Status`**: **`authorized`** under the same governor rule or when **Reporter Name** (column **E**) matches **DAO Member Name** (column **H**); otherwise **`unauthorized`**. **`InsertExpenseRecords`** does not write to ledgers when column **N** is **`unauthorized`** (row is still appended for audit). Legacy scored rows with only columns **A–M** are treated as authorized when inserted into ledgers by older code paths.
+
+---
 
 ## 📝 Recent Changes (2026-04-21)
 
@@ -297,6 +306,7 @@ See [`python_scripts/schema_validation/README.md`](./python_scripts/schema_valid
 | K | Scoring Hash Key | String | Unique identifier for deduplication |
 | L | Ledger Lines Number | String | Row number in destination ledger |
 | M | Target Ledger | String | Target ledger name (e.g., "AGL15", "AGL10", "offchain"). Set explicitly in expense form or derived from Inventory Type when embedded as `[ledger] currency` |
+| N | Processing Status | String | **`authorized`** — ledger insert allowed; **`unauthorized`** — audit row only (reporter ≠ DAO Member for selected inventory and **Telegram Chat Logs** `Governor` ≠ **YES**). Blank on legacy rows (**A–M** only) = treat as authorized for backward compatibility. |
 
 **Used by:**
 - [`tdg_expenses_processing.gs`](https://github.com/TrueSightDAO/tokenomics/blob/main/google_app_scripts/tdg_asset_management/tdg_expenses_processing.gs) - Inserts scored expenses into ledgers. Reads ledger configurations from "Shipment Ledger Listing" sheet (Column A: name, Column L: URL) instead of Wix API. Processes only rows from the last 30 days to prevent timeouts.
@@ -392,7 +402,7 @@ See [`python_scripts/schema_validation/README.md`](./python_scripts/schema_valid
 | K | AMOUNT | Number | Quantity transferred (note: header is uppercase) |
 | L | LEDGER_NAME | String | Source ledger name (e.g., "AGL#25" or "offchain") (note: header is uppercase with underscore) |
 | M | LEDGER_URL | String | Resolved spreadsheet URL (note: header is uppercase) |
-| N | STATUS | String | "NEW" or "PROCESSED" (note: header is uppercase) |
+| N | STATUS | String | **`NEW`** (authorized — ledger processing), **`unauthorized`** (signer is not warehouse manager and **Telegram Chat Logs** `Governor` ≠ **YES**), **`PROCESSED`**, or **`ERROR:`…** (note: header is uppercase) |
 | O | RECORD ROWS | String | Comma-separated destination row numbers (note: renamed from "Row Numbers") |
 
 **Used by:**
