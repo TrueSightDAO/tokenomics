@@ -656,7 +656,7 @@ See [`python_scripts/schema_validation/README.md`](./python_scripts/schema_valid
 ##### Sheet: `Contributors Digital Signatures`
 **Purpose:** Active digital signatures for authentication
 
-**Example (Python demo):** [`python_scripts/examples/dapp_digital_signature_onboarding/README.md`](python_scripts/examples/dapp_digital_signature_onboarding/README.md).
+**Example (Python demo):** [`TrueSightDAO/dao_client` — `dapp_digital_signature_onboarding/`](https://github.com/TrueSightDAO/dao_client/tree/main/dapp_digital_signature_onboarding).
 
 **Sheet URL:** https://docs.google.com/spreadsheets/d/1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU/edit#gid=577022511
 
@@ -671,6 +671,7 @@ See [`python_scripts/schema_validation/README.md`](./python_scripts/schema_valid
 | E | Digital Signature | String | Public key for authentication (DApp base64 SPKI) |
 | F | Contributor Email Address | String | Email address (used for email-based onboarding) |
 | G | Verification Key | String | Random single-use key for browser email verification (DApp onboarding; blank for legacy rows) |
+| H | Verification Key Consumed | String | Timestamp (`YYYY-MM-DD HH:MM:SS` UTC) when the `Verification Key` was first redeemed. Blank = unredeemed. Presence makes the row immutable to further `[EMAIL VERIFICATION EVENT]` submissions (same-key retries are idempotent; submissions from a different public key are rejected as replay attempts). |
 
 **DApp email onboarding (2026-04):**
 
@@ -683,7 +684,7 @@ See [`python_scripts/schema_validation/README.md`](./python_scripts/schema_valid
 - [`register_member_digital_signatures_telegram.gs`](https://github.com/TrueSightDAO/tokenomics/blob/main/google_app_scripts/tdg_identity_management/register_member_digital_signatures_telegram.gs) - Registers new signatures from Telegram (`processDigitalSignatureEvents` web app)
 - [`register_member_digital_signatures_email.gs`](https://github.com/TrueSightDAO/tokenomics/blob/main/google_app_scripts/tdg_identity_management/register_member_digital_signatures_email.gs) - Registers new signatures from Gmail
 - [`edgar_send_email_verification.gs`](https://github.com/TrueSightDAO/tokenomics/blob/main/google_app_scripts/tdg_identity_management/edgar_send_email_verification.gs) - Web app invoked by **Edgar** to send DApp verification email (script `1m8IZ…`; deploy as admin sender)
-- **Edgar (production contribution server)** — maintains `VERIFYING` / `ACTIVE` for the DApp `create_signature.html` flow (server code is not open source). Public operator reference: `python_scripts/examples/dapp_digital_signature_onboarding/` in this repo; GAS wiring notes: `email_verification_from_edgar.gs`.
+- **Edgar (production contribution server)** — maintains `VERIFYING` / `ACTIVE` for the DApp `create_signature.html` flow (server code is not open source). Public operator reference: [`TrueSightDAO/dao_client` — `dapp_digital_signature_onboarding/`](https://github.com/TrueSightDAO/dao_client/tree/main/dapp_digital_signature_onboarding); GAS wiring notes: `email_verification_from_edgar.gs`.
 
 ---
 
