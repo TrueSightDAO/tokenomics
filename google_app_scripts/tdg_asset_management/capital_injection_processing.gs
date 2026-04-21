@@ -677,13 +677,46 @@ function parseAndProcessCapitalInjectionLogs() {
     }
     
     Logger.log(`\n📊 Parsing complete: ${processedCount} capital injections recorded, ${skippedCount} skipped`);
-    
+
     // Now process the NEW records
     Logger.log(`\n🔄 Processing NEW capital injection records...`);
     processNewCapitalInjections();
-    
+
+    if (processedCount > 0) {
+      notifyTreasuryCachePublisher_('capital_injection');
+    }
+
   } catch (e) {
     Logger.log(`ERROR in parseAndProcessCapitalInjectionLogs: ${e.message}`);
+  }
+}
+
+/**
+ * Fire-and-forget notification to the treasury-cache-publisher web app so it
+ * rebuilds dao_offchain_treasury.json + SNAPSHOT.md. Safety-net cron on the
+ * publisher still runs every 30 min, so a silent skip here just defers the
+ * refresh — it never loses data. Requires TREASURY_CACHE_PUBLISH_SECRET script
+ * property (shared with publisher project 1u4lVtGaO5Gj…).
+ */
+function notifyTreasuryCachePublisher_(trigger) {
+  try {
+    const secret = PropertiesService.getScriptProperties()
+      .getProperty('TREASURY_CACHE_PUBLISH_SECRET');
+    if (!secret) {
+      Logger.log('notifyTreasuryCachePublisher_: TREASURY_CACHE_PUBLISH_SECRET not set; skipping (cron will catch up)');
+      return;
+    }
+    const url = 'https://script.google.com/macros/s/AKfycbyBmjwmFhR8nQ5ZCtdqQwr-OgC5-htdFnMeXOKLD-Z-NWvNpLGvi7nPbMQVvnhrnbSXdQ/exec'
+      + '?action=publish&trigger=' + encodeURIComponent(trigger || 'movement')
+      + '&token=' + encodeURIComponent(secret);
+    const resp = UrlFetchApp.fetch(url, {
+      method: 'get',
+      muteHttpExceptions: true,
+      followRedirects: true
+    });
+    Logger.log(`notifyTreasuryCachePublisher_: HTTP ${resp.getResponseCode()}`);
+  } catch (err) {
+    Logger.log(`notifyTreasuryCachePublisher_: notify failed (non-fatal): ${err}`);
   }
 }
 
