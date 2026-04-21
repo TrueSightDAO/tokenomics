@@ -13,12 +13,13 @@
  */
 
 /** ISO UTC timestamp of the last clasp push for mirrors that include this file */
-var TDG_INVENTORY_LAST_CLASP_PUSH_UTC = '2026-04-12T20:31:26Z';
+var TDG_INVENTORY_LAST_CLASP_PUSH_UTC = '2026-04-21T19:50:00Z';
 
 /**
  * Newest first. Keep lines short; link PRs/commits in git instead of pasting secrets.
  */
 var TDG_INVENTORY_CHANGELOG =
+  '2026-04-21 — process_movement_telegram_logs: notify treasury-cache-publisher after each INVENTORY MOVEMENT batch lands (fire-and-forget; requires TREASURY_CACHE_PUBLISH_SECRET script prop on mirror 1wONDeDwZ_…).\n' +
   '2026-04-12 — QR Code Sales L–R column order: L Owner email, M Stripe Session, N Shipping, O Tracking, P Sold by, Q Cash Collected By, R Remarks; process_sales row tail + ledger scripts + sentiment_importer Stripe append aligned.\n' +
   '2026-04-12 — process_sales_telegram_logs: append QR Code Sales row with Status=IGNORED + Remarks (col R) when no sale or blocked; 18-col append (J–R); dedupe Telegram id stops repeat Grok.\n' +
   '2026-04-12 — Version.gs: deploy metadata (last clasp push UTC + changelog) added to Parse Telegram, offchain ledger, and managed AGL clasp projects; source in tokenomics google_app_scripts/tdg_inventory_management (dfc39c3).\n' +

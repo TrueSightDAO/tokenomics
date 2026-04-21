@@ -908,6 +908,7 @@ function processTelegramChatLogsToInventoryMovement() {
     if (newRows.length > 0) {
       inventorySheet.getRange(inventoryLastRow + 1, 1, newRows.length, 14).setValues(newRows);
       Logger.log(`✅ Immediately inserted ${newRows.length} new records into Inventory Movement sheet`);
+      notifyTreasuryCachePublisher_('movement');
     }
 
     // Log comprehensive execution summary
@@ -1462,5 +1463,37 @@ function checkFileExistsInGitHub(fileUrl) {
   } catch (e) {
     Logger.log(`checkFileExistsInGitHub: Error checking file existence in GitHub: ${e.message}`);
     return false;
+  }
+}
+
+/**
+ * Fire-and-forget notification to the treasury-cache-publisher web app so it
+ * rebuilds dao_offchain_treasury.json + SNAPSHOT.md (TrueSightDAO/treasury-cache)
+ * right after an inventory movement lands. Safety-net cron on the publisher
+ * project still runs every 30 minutes, so silently skipping here (e.g. missing
+ * secret, transient network error) just defers the refresh — it never loses data.
+ *
+ * Requires script property TREASURY_CACHE_PUBLISH_SECRET (shared with the
+ * publisher project 1u4lVtGaO5GjpG0XQo7b8hc3QFAXcsrJKclBead2sDcgvatMdE6dm3mzx).
+ */
+function notifyTreasuryCachePublisher_(trigger) {
+  try {
+    const secret = PropertiesService.getScriptProperties()
+      .getProperty('TREASURY_CACHE_PUBLISH_SECRET');
+    if (!secret) {
+      Logger.log('notifyTreasuryCachePublisher_: TREASURY_CACHE_PUBLISH_SECRET not set; skipping (cron will catch up)');
+      return;
+    }
+    const url = 'https://script.google.com/macros/s/AKfycbyBmjwmFhR8nQ5ZCtdqQwr-OgC5-htdFnMeXOKLD-Z-NWvNpLGvi7nPbMQVvnhrnbSXdQ/exec'
+      + '?action=publish&trigger=' + encodeURIComponent(trigger || 'movement')
+      + '&token=' + encodeURIComponent(secret);
+    const resp = UrlFetchApp.fetch(url, {
+      method: 'get',
+      muteHttpExceptions: true,
+      followRedirects: true
+    });
+    Logger.log(`notifyTreasuryCachePublisher_: HTTP ${resp.getResponseCode()}`);
+  } catch (err) {
+    Logger.log(`notifyTreasuryCachePublisher_: notify failed (non-fatal): ${err}`);
   }
 }
