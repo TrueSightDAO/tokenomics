@@ -1,8 +1,20 @@
 # TrueSight DAO - Google Sheets Schema Documentation
 
-> **Last Updated:** 2026-04-12
+> **Last Updated:** 2026-04-21
 > 
 > This document provides a consolidated reference for all Google Sheets used across TrueSight DAO's Google Apps Scripts. Use this as a central schema reference when making code changes.
+
+## 📝 Recent Changes (2026-04-21)
+
+### **Telegram Chat Logs** — column **S** (`Governor`)
+
+- **Workbook:** TrueSight DAO Telegram & Submissions (`1qbZZhf-_7xzmDTriaJVWj6OZshyQsFkdsAV8-pyzASQ`), tab **`Telegram Chat Logs`** (`gid=0`).
+- **Column S header:** **`Governor`**
+- **Values (Edgar / `sentiment_importer`):** **`YES`** — signer verified and **ACTIVE** **Contributors Digital Signatures** **Contributor Name** matches a value in **Main Ledger** tab **`Governors`** column **A** (case-insensitive). **`NO`** — verified signer not on that list. **Blank** — signature not successful or signer could not be resolved to an **ACTIVE** contributor row.
+- **Operations meaning:** **`YES`** = **global override** for downstream Google Apps Script that processes sales, inventory movement, and expenses from this tab (governors may correct submissions when other members do not update records). **`NO`** / blank = downstream scripts should apply existing signer-vs-inventory scope rules and skip or flag ledger mutations when out of scope.
+- **Implementation:** Edgar appends **19 columns** (**A–S**) on `POST /dao/submit_contribution` and express contribution paths; values are cached server-side from **`Governors`!A2:A** for a short TTL.
+
+---
 
 ## 📝 Recent Changes (2026-04-12)
 
@@ -249,8 +261,11 @@ See [`python_scripts/schema_validation/README.md`](./python_scripts/schema_valid
 | P | Edgar Signature Verification | String | Signature verification status |
 | Q | External API call status | String | Status of external API calls |
 | R | External API call response | String | Response from external API |
+| S | Governor | String | **`YES`** / **`NO`** / blank — signer matched **Main Ledger** tab **`Governors`** column **A** at ingest (`YES` = global ledger authority for downstream sales / inventory / expense parsers). See **Recent Changes (2026-04-21)**. |
 
 **Note (DApp / Edgar ingest):** For `POST /dao/submit_contribution`, column **P** is populated by Edgar as `success` / `failed` / `no_signature_format` / `error` (and similar). Downstream processors (for example Agroverse QR generation) treat `success` (case-insensitive) as cryptographically verified at ingest. Email onboarding events (`[EMAIL REGISTERED EVENT]`, `[EMAIL VERIFICATION EVENT]`) follow the same ingest path and column **P** semantics.
+
+**Note (Governor column S):** Cryptographic verification (**P**) is independent of **Governor** (**S**). **`YES`** uses **ACTIVE** **Contributors Digital Signatures** **Contributor Name** vs **`Governors`!A:A** on the Main Ledger workbook (`1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU`).
 
 **Used by:**
 - [`tdg_expenses_processing.gs`](https://github.com/TrueSightDAO/tokenomics/blob/main/google_app_scripts/tdg_asset_management/tdg_expenses_processing.gs) - Processes expense submissions
