@@ -39,6 +39,82 @@ const CONTRIBUTORS_DATA_START_ROW = 5; // Data starts at row 5 (row 4 is header)
 const SHIPMENT_ID_COL = 0; // Column A - Shipment ID (ledger name)
 const LEDGER_URL_COL = 11; // Column L - Ledger URL
 
+/** Telegram Chat Logs column S (Governor): YES = global ledger authority (Edgar). 0-based index 18. */
+const TELEGRAM_GOVERNOR_COL = 18;
+
+function normalizeAuthName_(name) {
+  return (name == null ? '' : String(name))
+    .trim()
+    .replace(/\s+/g, ' ')
+    .toLowerCase();
+}
+
+function authNamesMatch_(a, b) {
+  const na = normalizeAuthName_(a);
+  const nb = normalizeAuthName_(b);
+  return na !== '' && na === nb;
+}
+
+function isTelegramGovernorYes_(telegramRow) {
+  return String(telegramRow && telegramRow[TELEGRAM_GOVERNOR_COL] != null ? telegramRow[TELEGRAM_GOVERNOR_COL] : '')
+    .trim()
+    .toUpperCase() === 'YES';
+}
+
+/** PEM or raw SPKI between My Digital Signature and Request Transaction ID (DApp submit format). */
+function extractPublicKeyFromSignedContribution_(text) {
+  if (!text || typeof text !== 'string') return null;
+  const sigPattern = /My Digital Signature:\s*([\s\S]*?)(?:\n\s*Request Transaction ID:|This submission was generated using|$)/i;
+  const sigMatch = text.match(sigPattern);
+  return sigMatch ? sigMatch[1].trim() : null;
+}
+
+/**
+ * Looks up ACTIVE contributor display name by digital signature (Main Ledger Contributors Digital Signatures).
+ * @return {{contributorName: string|null, error: string|null}}
+ */
+function findContributorNameByDigitalSignature_(digitalSignature) {
+  try {
+    if (!digitalSignature) {
+      return { contributorName: null, error: 'No digital signature' };
+    }
+    const contributorsSpreadsheet = SpreadsheetApp.openById(OFFCHAIN_SPREADSHEET_ID);
+    const digitalSignaturesSheet = contributorsSpreadsheet.getSheetByName('Contributors Digital Signatures');
+    if (!digitalSignaturesSheet) {
+      return { contributorName: null, error: 'Contributors Digital Signatures sheet not found' };
+    }
+    const signatureData = digitalSignaturesSheet.getDataRange().getValues();
+    for (let i = 1; i < signatureData.length; i++) {
+      const contributorName = signatureData[i][0];
+      const signature = signatureData[i][4];
+      const status = signatureData[i][3];
+      if (signature && String(signature).trim() === String(digitalSignature).trim()) {
+        if (String(status || '').trim().toUpperCase() === 'ACTIVE') {
+          return { contributorName: contributorName, error: null };
+        }
+        return { contributorName: null, error: 'Signature not ACTIVE' };
+      }
+    }
+    return { contributorName: null, error: 'No matching contributor' };
+  } catch (e) {
+    return { contributorName: null, error: e.message };
+  }
+}
+
+/**
+ * Inventory Movement column N (STATUS): NEW if governor or ACTIVE signer matches warehouse manager (- Manager Name:);
+ * unauthorized otherwise (Phase 2 skips non-NEW).
+ */
+function inventoryMovementStatusFromTelegramRow_(telegramRow, contribution, warehouseManagerName) {
+  if (isTelegramGovernorYes_(telegramRow)) return 'NEW';
+  const pk = extractPublicKeyFromSignedContribution_(contribution);
+  if (!pk) return 'unauthorized';
+  const res = findContributorNameByDigitalSignature_(pk);
+  if (!res.contributorName) return 'unauthorized';
+  if (authNamesMatch_(res.contributorName, warehouseManagerName)) return 'NEW';
+  return 'unauthorized';
+}
+
 /**
  * Resolves redirect URLs to get the final URL.
  * First checks "Shipment Ledger Listing" sheet (Column L -> Column AB lookup)
@@ -746,7 +822,7 @@ function processInventoryReport(reportText) {
  * - Inventory Movement Column K: amount extracted from Column G
  * - Inventory Movement Column L: ledger_name extracted from Column G
  * - Inventory Movement Column M: ledger_url extracted from Column G
- * - Inventory Movement Column N: "NEW"
+ * - Inventory Movement Column N: NEW (authorized) or unauthorized (signer ≠ warehouse manager and Telegram S Governor ≠ YES)
  */
 function processTelegramChatLogsToInventoryMovement() {
   try {
@@ -772,8 +848,8 @@ function processTelegramChatLogsToInventoryMovement() {
       Logger.log('No data in Telegram Chat Logs');
       return;
     }
-    // Read up to Column O (15th column) to include file IDs
-    const telegramData = telegramSheet.getRange(1, 1, telegramLastRow, 15).getValues(); // Columns A to O
+    // Read through column S (19) for Edgar Governor flag (YES/NO) on Telegram Chat Logs
+    const telegramData = telegramSheet.getRange(1, 1, telegramLastRow, 19).getValues(); // Columns A–S
 
     // Prepare array to collect new rows for batch insertion
     const newRows = [];
@@ -879,6 +955,11 @@ function processTelegramChatLogsToInventoryMovement() {
           }
         }
 
+        const movementStatus = inventoryMovementStatusFromTelegramRow_(row, contribution, reportResult.sender_name);
+        if (movementStatus === 'unauthorized') {
+          Logger.log(`Update ID ${updateId}: Column N = unauthorized (signer is not warehouse manager and Governor is not YES)`);
+        }
+
         // Create new row for Inventory Movement
         const newRow = [
           row[0], // Column A: Telegram Update ID
@@ -894,7 +975,7 @@ function processTelegramChatLogsToInventoryMovement() {
           reportResult.amount, // Column K: amount
           reportResult.currency_source.ledger_name, // Column L: ledger_name
           reportResult.currency_source.ledger_url, // Column M: ledger_url
-          'NEW' // Column N: Status
+          movementStatus // Column N: NEW | unauthorized
         ];
 
         newRows.push(newRow);
@@ -1072,7 +1153,10 @@ function processInventoryMovementToLedgers() {
       const rowNumber = index + 1;
       const status = row[13]; // Column N: Status
       if (status !== 'NEW') {
-        return; // Skip if status is not NEW
+        if (String(status || '').trim().toLowerCase() === 'unauthorized') {
+          Logger.log(`Skipping row ${rowNumber}: Inventory Movement STATUS is unauthorized (ledger insert blocked)`);
+        }
+        return; // Skip if status is not NEW (includes unauthorized, PROCESSED, ERROR, …)
       }
 
       stats.totalRowsAttempted++;
