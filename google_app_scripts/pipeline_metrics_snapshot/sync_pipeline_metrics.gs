@@ -52,10 +52,19 @@ var STATUS_COL = 4;  // D
 var COUNT_COL = 5;   // E
 var DATA_START_ROW = 2;
 
-// Stages classified as "partnered success" — the north-star metric the oracle
-// cares about most. Keep as a set so funnel label changes elsewhere don't
-// silently break the total.
-var PARTNERED_STATUSES = ['Partnered'];
+// North-star: stages that count as a closed partnership win. Keep as a set
+// so funnel label changes don't silently break the "partnered" total.
+var NORTH_STAR_STATUSES = ['Partnered'];
+
+// Stages surfaced in the summary block above the full funnel breakdown —
+// "where's the action this week". Ordered intentionally (north-star first,
+// then stages close to conversion). A stage not present in the Pipeline
+// Dashboard is quietly skipped so the summary never shows phantom zeroes.
+var HIGHLIGHT_STATUSES = [
+  'Partnered',          // north-star win
+  'Meeting Scheduled',  // one step from Partnered
+  'Shortlisted'         // warm candidates; one personal email away
+];
 
 var TARGET_REPO_OWNER = 'TrueSightDAO';
 var TARGET_REPO = 'ecosystem_change_logs';
@@ -191,10 +200,11 @@ function _readPipelineFunnel_() {
   var rows = [];
   var totalStores = 0;
   var partnered = 0;
-  var partneredSet = {};
-  for (var p = 0; p < PARTNERED_STATUSES.length; p++) {
-    partneredSet[PARTNERED_STATUSES[p]] = true;
+  var northStarSet = {};
+  for (var p = 0; p < NORTH_STAR_STATUSES.length; p++) {
+    northStarSet[NORTH_STAR_STATUSES[p]] = true;
   }
+  var countsByStatus = {};
 
   for (var i = 0; i < values.length; i++) {
     var orderVal = values[i][0];
@@ -212,7 +222,8 @@ function _readPipelineFunnel_() {
 
     rows.push({ order: order, status: status, stores: count });
     totalStores += count;
-    if (partneredSet[status]) partnered += count;
+    if (northStarSet[status]) partnered += count;
+    countsByStatus[status] = count;
   }
 
   // Sort by curated order; rows without an order number trail, stable by position.
@@ -223,10 +234,26 @@ function _readPipelineFunnel_() {
     return a.order - b.order;
   });
 
+  // Resolve highlights in the order declared by HIGHLIGHT_STATUSES. Missing
+  // labels are quietly dropped so a sheet relabel doesn't render phantom zeroes
+  // (they still appear in the full funnel below).
+  var highlights = [];
+  for (var h = 0; h < HIGHLIGHT_STATUSES.length; h++) {
+    var label = HIGHLIGHT_STATUSES[h];
+    if (Object.prototype.hasOwnProperty.call(countsByStatus, label)) {
+      highlights.push({
+        status: label,
+        stores: countsByStatus[label],
+        north_star: Boolean(northStarSet[label])
+      });
+    }
+  }
+
   return {
     rows: rows,
     total_stores: totalStores,
-    partnered: partnered
+    partnered: partnered,
+    highlights: highlights
   };
 }
 
@@ -248,12 +275,18 @@ function _buildArtifacts_(funnel) {
     },
     totals: {
       all_stores: funnel.total_stores,
-      partnered: funnel.partnered
+      partnered: funnel.partnered,
+      highlights: funnel.highlights
     },
     funnel: funnel.rows
   };
 
   var jsonText = JSON.stringify(jsonObj, null, 2) + '\n';
+
+  var northStarSet = {};
+  for (var ns = 0; ns < NORTH_STAR_STATUSES.length; ns++) {
+    northStarSet[NORTH_STAR_STATUSES[ns]] = true;
+  }
 
   // Markdown ordered from highest-signal (closest to conversion) down. The
   // advisory snapshot embeds this verbatim under "## Operator metrics ...".
@@ -266,7 +299,11 @@ function _buildArtifacts_(funnel) {
   mdLines.push('- Generated (UTC): `' + generatedAt + '`');
   mdLines.push('- Source: [Pipeline Dashboard](' + PIPELINE_TAB_URL + ')');
   mdLines.push('- Total stores tracked: **' + funnel.total_stores + '**');
-  mdLines.push('- Partnered (north-star): **' + funnel.partnered + '**');
+  for (var hi = 0; hi < funnel.highlights.length; hi++) {
+    var hl = funnel.highlights[hi];
+    var suffix = hl.north_star ? ' (north-star)' : '';
+    mdLines.push('- ' + hl.status + suffix + ': **' + hl.stores + '**');
+  }
   mdLines.push('');
   mdLines.push('## Funnel by status (curated order)');
   mdLines.push('');
@@ -277,11 +314,9 @@ function _buildArtifacts_(funnel) {
     for (var i = 0; i < funnel.rows.length; i++) {
       var r = funnel.rows[i];
       var orderTag = (r.order === null || r.order === undefined) ? '—' : ('#' + r.order);
-      var isPartnered = false;
-      for (var p = 0; p < PARTNERED_STATUSES.length; p++) {
-        if (PARTNERED_STATUSES[p] === r.status) { isPartnered = true; break; }
-      }
-      var label = isPartnered ? ('**' + r.status + ': ' + r.stores + '**') : (r.status + ': ' + r.stores);
+      var label = northStarSet[r.status]
+        ? ('**' + r.status + ': ' + r.stores + '**')
+        : (r.status + ': ' + r.stores);
       mdLines.push('- ' + label + '  (' + orderTag + ')');
     }
   }

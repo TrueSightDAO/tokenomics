@@ -26,10 +26,14 @@ Pipeline Dashboard tab (curated funnel order in cols C–E):
 ## Outputs
 
 - `metrics/weekly.json` — canonical machine feed. Schema: `generated_at`,
-  `source{workbook_id,tab,gid,url}`, `totals{all_stores,partnered}`,
-  `funnel[]{order,status,stores}`.
+  `source{workbook_id,tab,gid,url}`, `totals{all_stores, partnered,
+  highlights[]{status, stores, north_star}}`, `funnel[]{order, status,
+  stores}`.
 - `metrics/weekly.md` — dropped verbatim under the "## Operator metrics"
-  heading in `ADVISORY_SNAPSHOT.md`.
+  heading in `ADVISORY_SNAPSHOT.md`. Summary block surfaces the stages in
+  `HIGHLIGHT_STATUSES` (currently `Partnered`, `Meeting Scheduled`,
+  `Shortlisted`) above the full funnel breakdown so the oracle gets a fast
+  "where's the action this week" read.
 
 Both land in `TrueSightDAO/ecosystem_change_logs@main` via the GitHub
 Contents API (no git push from GAS).
