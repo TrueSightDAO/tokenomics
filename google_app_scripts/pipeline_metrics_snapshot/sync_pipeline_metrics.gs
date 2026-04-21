@@ -24,13 +24,14 @@
  *   - metrics/weekly.md    — human mirror; embedded verbatim into ADVISORY_SNAPSHOT.md
  *
  * Setup:
- *   1. Create a GAS project, paste this file in, note the script id, add it to the
- *      header comment above.
+ *   1. Deployed project: https://script.google.com/home/projects/11fA8NXSOwKyddXDZmmx3BRCDU1Y38GVidENCj0mujH0pT-AqIoOyaetj/edit
  *   2. Script Properties:
- *      - GITHUB_TOKEN — fine-grained PAT with Contents:Read+Write on
- *        TrueSightDAO/ecosystem_change_logs (classic `repo` scope also works).
+ *      - ORACLE_ADVISORY_PUSH_TOKEN — same fine-grained PAT used by the advisory-snapshot-refresh
+ *        CI secret (Contents: Read+Write on TrueSightDAO/agentic_ai_context and
+ *        TrueSightDAO/ecosystem_change_logs). Reused here so one token covers both publishers
+ *        of the oracle context instead of proliferating PATs.
  *   3. Run `runOneSetup()` once from the editor to grant SpreadsheetApp + UrlFetch
- *      permissions and verify the GitHub token works.
+ *      permissions and verify the push token works.
  *   4. Run `installDailyTrigger()` once to schedule syncPipelineMetrics() daily.
  */
 
@@ -102,7 +103,7 @@ function syncPipelineMetrics() {
  */
 function runOneSetup() {
   var props = PropertiesService.getScriptProperties();
-  var token = (props.getProperty('GITHUB_TOKEN') || '').trim();
+  var token = (props.getProperty('ORACLE_ADVISORY_PUSH_TOKEN') || '').trim();
   var status = {
     now_utc: new Date().toISOString(),
     github_token_present: Boolean(token),
@@ -294,9 +295,9 @@ function _buildArtifacts_(funnel) {
 // ============================================================================
 
 function _requireGithubToken_() {
-  var token = (PropertiesService.getScriptProperties().getProperty('GITHUB_TOKEN') || '').trim();
+  var token = (PropertiesService.getScriptProperties().getProperty('ORACLE_ADVISORY_PUSH_TOKEN') || '').trim();
   if (!token) {
-    throw new Error('Missing script property GITHUB_TOKEN — fine-grained PAT with Contents:Read+Write on ' + TARGET_REPO_OWNER + '/' + TARGET_REPO);
+    throw new Error('Missing script property ORACLE_ADVISORY_PUSH_TOKEN — fine-grained PAT with Contents:Read+Write on ' + TARGET_REPO_OWNER + '/' + TARGET_REPO);
   }
   return token;
 }

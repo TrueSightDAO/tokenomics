@@ -36,15 +36,19 @@ Contents API (no git push from GAS).
 
 ## Setup
 
-1. Create a new Apps Script project, paste `sync_pipeline_metrics.gs` in.
-2. Add the script's editor URL to the file's header comment.
+1. **Deployed project:** <https://script.google.com/home/projects/11fA8NXSOwKyddXDZmmx3BRCDU1Y38GVidENCj0mujH0pT-AqIoOyaetj/edit>
+2. Work locally from the clasp mirror: `clasp_mirrors/11fA8NXSOwKyddXDZmmx3BRCDU1Y38GVidENCj0mujH0pT-AqIoOyaetj/`.
+   After editing `google_app_scripts/pipeline_metrics_snapshot/sync_pipeline_metrics.gs`,
+   copy into the mirror and `clasp push` from the mirror folder.
 3. Project → Script Properties:
-   - `GITHUB_TOKEN` — fine-grained PAT with **Contents: Read and write** on
-     `TrueSightDAO/ecosystem_change_logs` (classic PAT with `repo` scope also
-     works).
-4. From the editor, run `runOneSetup()` once to grant
-   `SpreadsheetApp` + `UrlFetchApp` permissions and confirm the GitHub token
-   works. Check the execution log — all three sections should report `ok:true`.
+   - `ORACLE_ADVISORY_PUSH_TOKEN` — same fine-grained PAT used by the
+     `advisory-snapshot-refresh` CI workflow secret (Contents: Read+Write on
+     `TrueSightDAO/agentic_ai_context` **and**
+     `TrueSightDAO/ecosystem_change_logs`). Reuse the existing token so one
+     PAT covers both publishers of the oracle context instead of a new one.
+4. From the editor, run `runOneSetup()` once to grant `SpreadsheetApp` +
+   `UrlFetchApp` permissions and confirm the push token works. Check the
+   execution log — `sheet_read.ok` and `github_ping.ok` should both be true.
 5. Run `installDailyTrigger()` once to schedule `syncPipelineMetrics()` daily
    at 06:00 (project timezone).
 6. Manually invoke `syncPipelineMetrics()` once to seed both files on the
