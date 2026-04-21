@@ -24,6 +24,7 @@ This repository contains Google Apps Script projects that power the TrueSight DA
 - **[agroverse_qr_code_web_service](./agroverse_qr_code_web_service/)** - Standalone web service for QR code operations and currency management
 - **[holistic_hit_list_store_history](./holistic_hit_list_store_history/)** - Read-only web API for the holistic wellness hit list: store autocomplete and interaction history for the DApp human-in-the-loop email workflow
 - **[newsletter_subscriber_sync](./newsletter_subscriber_sync/)** - Daily (time-driven) sync into **Agroverse News Letter Subscribers** from Email Agent Suggestions, Agroverse QR codes, and Hit List rows with Status **Partnered**
+- **[pipeline_metrics_snapshot](./pipeline_metrics_snapshot/)** - Daily sync of the Pipeline Dashboard funnel into `TrueSightDAO/ecosystem_change_logs` as `metrics/weekly.json` + `metrics/weekly.md` (feeds the "Operator metrics" section of `ADVISORY_SNAPSHOT.md`)
 
 ## Getting Started
 
