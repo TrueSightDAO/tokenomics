@@ -1,8 +1,6 @@
 /**
  * File: google_app_scripts/tdg_identity_management/edgar_send_email_verification.gs
  * Repository: https://github.com/TrueSightDAO/tokenomics
- * Apps Script editor:
- * https://script.google.com/home/projects/1m8IZPs1vFN99cuu-39kbC-OGXggRVtJtXq5rfSB0M1sCQjMdolEUDuGU/edit
  *
  * Summary:
  * - Standalone web app invoked by Edgar (`sentiment_importer`) after a verified
@@ -14,7 +12,8 @@
  * Apps Script project (clasp mirror must stay in sync)
  * ---------------------------------------------------------------------------
  * - Script ID: 1m8IZPs1vFN99cuu-39kbC-OGXggRVtJtXq5rfSB0M1sCQjMdolEUDuGU
- * - Editor URL: canonical `https://script.google.com/home/projects/.../edit` link in the repository file header above.
+ * - Editor URL:
+ *   https://script.google.com/u/2/home/projects/1m8IZPs1vFN99cuu-39kbC-OGXggRVtJtXq5rfSB0M1sCQjMdolEUDuGU/edit
  * - Web app deployment URL (`/exec`; Edgar `EMAIL_VERIFICATION_GAS_WEBHOOK_URL` default in `sentiment_importer`):
  *   https://script.google.com/macros/s/AKfycbxfngGYBYMe1ATyW0U4lLODyAlhUnSUATAsBrNgIvKH6k9ARifG3arSFkB4hjn2h2ID2A/exec
  * - Clasp mirror: tokenomics/clasp_mirrors/1m8IZPs1vFN99cuu-39kbC-OGXggRVtJtXq5rfSB0M1sCQjMdolEUDuGU/
@@ -40,10 +39,19 @@ function doGet(e) {
     });
   }
 
+  if (action === 'refresh_dao_members_cache') {
+    // Edgar → GET ?action=refresh_dao_members_cache&secret=...&force=1
+    // Implementation lives in DaoMembersCache.js.
+    return handleDaoMembersCacheRefreshRequest_({
+      secret: e.parameter.secret,
+      force: e.parameter.force || '',
+    });
+  }
+
   return ContentService.createTextOutput(
     JSON.stringify({
       ok: false,
-      error: 'No valid action (use action=sendEmailVerification on GET, or POST JSON for email verification).',
+      error: 'No valid action (use action=sendEmailVerification or action=refresh_dao_members_cache on GET, or POST JSON for email verification).',
     })
   ).setMimeType(ContentService.MimeType.JSON);
 }
