@@ -39,7 +39,15 @@ const DAO_MEMBERS_CACHE_REPO_OWNER = 'TrueSightDAO';
 const DAO_MEMBERS_CACHE_REPO_NAME = 'treasury-cache';
 const DAO_MEMBERS_CACHE_REPO_PATH = 'dao_members.json';
 const DAO_MEMBERS_CACHE_BRANCH = 'main';
-const DAO_MEMBERS_CACHE_SCHEMA_VERSION = 1;
+const DAO_MEMBERS_CACHE_SCHEMA_VERSION = 2;
+
+// assetVerify web app in tdg_asset_management — source of DAO-wide aggregates
+// (voting_rights_circulated, total_assets, asset_per_circulated_voting_right,
+// usd_provisions_for_cash_out). We call it once per publish with any active
+// signature to avoid duplicating the off-chain + USDT vault + AGL holdings
+// helpers into this project.
+const DAO_MEMBERS_CACHE_ASSET_VERIFY_URL =
+    'https://script.google.com/macros/s/AKfycbygmwRbyqse-dpCYMco0rb93NSgg-Jc1QIw7kUiBM7CZK6jnWnMB5DEjdoX_eCsvVs7/exec';
 
 /**
  * doGet-routed entry (see Code.js).
@@ -173,6 +181,14 @@ function publishDaoMembersCacheToGithub_(opts) {
     };
   });
 
+  // DAO-wide totals. Fetched via assetVerify (which already aggregates
+  // off-chain + USDT vault + AGL holdings) using any active public key as a
+  // probe. Emitted at snapshot root so consumers like dapp/tdg_balance.js can
+  // render USD values without hitting GAS on every page load.
+  const probeKey = (contributors[0] && contributors[0].public_keys[0] &&
+      contributors[0].public_keys[0].public_key) || null;
+  const daoTotals = probeKey ? fetchDaoTotalsViaAssetVerify_(probeKey) : null;
+
   const snapshot = {
     generated_at: new Date().toISOString(),
     schema_version: DAO_MEMBERS_CACHE_SCHEMA_VERSION,
@@ -184,6 +200,7 @@ function publishDaoMembersCacheToGithub_(opts) {
         return sum + c.public_keys.length;
       }, 0),
     },
+    dao_totals: daoTotals,
     contributors: contributors,
   };
 
@@ -271,6 +288,43 @@ function commitJsonToGithub_(args) {
     sha: body.content && body.content.sha,
     commit_url: body.commit && body.commit.html_url,
   };
+}
+
+/**
+ * Fetches DAO-wide aggregates from the assetVerify web app. Returns null on
+ * any error so a degraded snapshot still publishes (dapp falls back to the
+ * GAS path in that case — same as the pre-cache world).
+ */
+function fetchDaoTotalsViaAssetVerify_(anyActivePublicKey) {
+  try {
+    const url = DAO_MEMBERS_CACHE_ASSET_VERIFY_URL +
+        '?signature=' + encodeURIComponent(anyActivePublicKey) + '&full=true';
+    const resp = UrlFetchApp.fetch(url, {
+      method: 'get',
+      muteHttpExceptions: true,
+      followRedirects: true,
+    });
+    if (resp.getResponseCode() !== 200) {
+      Logger.log('assetVerify probe HTTP ' + resp.getResponseCode() + ': ' +
+          resp.getContentText().substring(0, 400));
+      return null;
+    }
+    const body = JSON.parse(resp.getContentText());
+    if (!body || body.error) {
+      Logger.log('assetVerify probe returned error: ' + JSON.stringify(body));
+      return null;
+    }
+    // Keep only DAO-wide fields; drop the probe's per-contributor voting_rights.
+    return {
+      voting_rights_circulated: body.voting_rights_circulated || null,
+      total_assets: body.total_assets || null,
+      asset_per_circulated_voting_right: body.asset_per_circulated_voting_right || null,
+      usd_provisions_for_cash_out: body.usd_provisions_for_cash_out || null,
+    };
+  } catch (err) {
+    Logger.log('fetchDaoTotalsViaAssetVerify_ failed: ' + err);
+    return null;
+  }
 }
 
 function stripVolatileFields_(jsonStr) {
