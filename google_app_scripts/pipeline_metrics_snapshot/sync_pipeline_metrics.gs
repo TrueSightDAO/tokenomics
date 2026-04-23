@@ -20,7 +20,10 @@
  *   oracle benefits from the curated funnel order in cols C–E.
  *
  * Outputs (committed to TrueSightDAO/ecosystem_change_logs main via Contents API):
- *   - metrics/weekly.json  — machine feed (schema described in weekly.md header)
+ *   - metrics/weekly.json  — machine feed (schema described in weekly.md header). Includes
+ *     **outreach_visibility**: Email Agent Follow Up send counts + distinct recipients
+ *     (warmup / follow_up / bulk), and Hit List cohort rollups for warm-up vs follow-up
+ *     pipeline statuses using AU/AV (logged send counts per store).
  *   - metrics/weekly.md    — human mirror; embedded verbatim into ADVISORY_SNAPSHOT.md
  *
  * Setup:
@@ -45,6 +48,18 @@ var PIPELINE_TAB_GID = 1606881029;
 var PIPELINE_TAB_URL =
   'https://docs.google.com/spreadsheets/d/' + HIT_LIST_SPREADSHEET_ID +
   '/edit#gid=' + PIPELINE_TAB_GID;
+
+/** Additional tabs read for oracle / operator email-pipeline visibility. */
+var HIT_LIST_TAB = 'Hit List';
+var EMAIL_AGENT_FOLLOW_UP_TAB = 'Email Agent Follow Up';
+
+/** Hit List Status values used for warm-up vs follow-up cohort summaries. */
+var COHORT_STATUS_WARMUP = 'AI: Warm up prospect';
+var COHORT_STATUSES_FOLLOW_UP_PIPELINE = [
+  'Manager Follow-up',
+  'Bulk Info Requested',
+  'AI: Prospect replied'
+];
 
 // Ordered funnel lives in cols C (order), D (status label), E (store count).
 var ORDER_COL = 3;   // C
@@ -258,12 +273,269 @@ function _readPipelineFunnel_() {
 }
 
 // ============================================================================
+// OUTREACH VISIBILITY (Email Agent Follow Up + Hit List AU / AV)
+// ============================================================================
+
+function _headerMapPipeline_(headerRow) {
+  var map = {};
+  for (var i = 0; i < headerRow.length; i++) {
+    var h = String(headerRow[i] || '').trim();
+    if (h) map[h] = i;
+  }
+  return map;
+}
+
+function _touchCountPipeline_(v) {
+  if (v === '' || v === null || v === undefined) return 0;
+  var n = parseFloat(String(v).trim().replace(/,/g, ''));
+  if (isNaN(n) || n < 0) return 0;
+  return Math.floor(n);
+}
+
+/**
+ * Locate **Warm-up email sent** (AU) and **Follow-up emails sent** (AV) columns (0-based indices).
+ * Mirrors holistic_hit_list_store_history logic.
+ */
+function _findTouchColsPipeline_(hdr, headerRow) {
+  var au = hdr['Warm-up email sent'];
+  var av = hdr['Follow-up emails sent'];
+  var i;
+  var h;
+  if (au === undefined) {
+    for (i = 0; i < headerRow.length; i++) {
+      h = String(headerRow[i] || '')
+        .trim()
+        .toLowerCase();
+      if (h.indexOf('warm') !== -1 && h.indexOf('email') !== -1) {
+        au = i;
+        break;
+      }
+    }
+  }
+  if (av === undefined) {
+    for (i = 0; i < headerRow.length; i++) {
+      h = String(headerRow[i] || '')
+        .trim()
+        .toLowerCase();
+      if (h.indexOf('follow') !== -1 && h.indexOf('email') !== -1) {
+        av = i;
+        break;
+      }
+    }
+  }
+  if (au === undefined && headerRow.length >= 47) au = 46;
+  if (av === undefined && headerRow.length >= 48) av = 47;
+  return { au: au, av: av };
+}
+
+function _makeEmptyCohortAgg_() {
+  return {
+    stores: 0,
+    sum_warmup_sends_au: 0,
+    sum_follow_up_sends_av: 0,
+    warmup_send_depth: { none: 0, once: 0, repeat: 0 },
+    follow_up_send_depth: { none: 0, once: 0, repeat: 0 }
+  };
+}
+
+function _bumpCohortAgg_(agg, au, av) {
+  agg.stores++;
+  agg.sum_warmup_sends_au += au;
+  agg.sum_follow_up_sends_av += av;
+  if (au <= 0) agg.warmup_send_depth.none++;
+  else if (au === 1) agg.warmup_send_depth.once++;
+  else agg.warmup_send_depth.repeat++;
+  if (av <= 0) agg.follow_up_send_depth.none++;
+  else if (av === 1) agg.follow_up_send_depth.once++;
+  else agg.follow_up_send_depth.repeat++;
+}
+
+function _mergeCohortAggs_(dst, src) {
+  dst.stores += src.stores;
+  dst.sum_warmup_sends_au += src.sum_warmup_sends_au;
+  dst.sum_follow_up_sends_av += src.sum_follow_up_sends_av;
+  dst.warmup_send_depth.none += src.warmup_send_depth.none;
+  dst.warmup_send_depth.once += src.warmup_send_depth.once;
+  dst.warmup_send_depth.repeat += src.warmup_send_depth.repeat;
+  dst.follow_up_send_depth.none += src.follow_up_send_depth.none;
+  dst.follow_up_send_depth.once += src.follow_up_send_depth.once;
+  dst.follow_up_send_depth.repeat += src.follow_up_send_depth.repeat;
+}
+
+/**
+ * Logged Gmail **Sent** rows from **Email Agent Follow Up** (`status` = warmup | follow_up | bulk | …).
+ */
+function _readEmailAgentFollowUpLog_() {
+  var base = {
+    ok: false,
+    tab: EMAIL_AGENT_FOLLOW_UP_TAB,
+    sends_logged: { warmup: 0, follow_up: 0, bulk: 0, unknown: 0, total_rows: 0 },
+    distinct_recipients: { warmup: 0, follow_up: 0, bulk: 0, unknown: 0 }
+  };
+
+  var ss = SpreadsheetApp.openById(HIT_LIST_SPREADSHEET_ID);
+  var sh = ss.getSheetByName(EMAIL_AGENT_FOLLOW_UP_TAB);
+  if (!sh) return base;
+
+  var values = sh.getDataRange().getValues();
+  if (values.length < 2) {
+    base.ok = true;
+    return base;
+  }
+
+  var hdr = _headerMapPipeline_(values[0]);
+  var stI = hdr['status'];
+  var emI = hdr['to_email'];
+  if (stI === undefined || emI === undefined) {
+    base.error = 'missing column "status" or "to_email" on Email Agent Follow Up';
+    return base;
+  }
+
+  var setsWarm = {};
+  var setsFu = {};
+  var setsBulk = {};
+  var setsUnk = {};
+
+  var r;
+  for (r = 1; r < values.length; r++) {
+    var row = values[r];
+    var st = String(row[stI] || '').trim().toLowerCase();
+    var em = String(row[emI] || '').trim().toLowerCase();
+
+    base.sends_logged.total_rows++;
+    if (st === 'warmup') base.sends_logged.warmup++;
+    else if (st === 'follow_up') base.sends_logged.follow_up++;
+    else if (st === 'bulk') base.sends_logged.bulk++;
+    else base.sends_logged.unknown++;
+
+    if (!em) continue;
+    if (st === 'warmup') setsWarm[em] = true;
+    else if (st === 'follow_up') setsFu[em] = true;
+    else if (st === 'bulk') setsBulk[em] = true;
+    else setsUnk[em] = true;
+  }
+
+  function countKeys_(obj) {
+    var n = 0;
+    for (var k in obj) {
+      if (Object.prototype.hasOwnProperty.call(obj, k)) n++;
+    }
+    return n;
+  }
+
+  base.distinct_recipients.warmup = countKeys_(setsWarm);
+  base.distinct_recipients.follow_up = countKeys_(setsFu);
+  base.distinct_recipients.bulk = countKeys_(setsBulk);
+  base.distinct_recipients.unknown = countKeys_(setsUnk);
+  base.ok = true;
+  return base;
+}
+
+/**
+ * Per Hit List **Status** cohort: store counts + AU/AV sums and depth buckets (none / once / repeat sends).
+ */
+function _readHitListOutreachDepth_() {
+  var out = {
+    touch_columns_resolved: false,
+    cohorts: {},
+    follow_up_pipeline_combined: null
+  };
+
+  var ss = SpreadsheetApp.openById(HIT_LIST_SPREADSHEET_ID);
+  var sh = ss.getSheetByName(HIT_LIST_TAB);
+  if (!sh) return out;
+
+  var values = sh.getDataRange().getValues();
+  if (values.length < 2) return out;
+
+  var headers = values[0];
+  var hdr = _headerMapPipeline_(headers);
+  var statusIdx = hdr['Status'];
+  if (statusIdx === undefined) return out;
+
+  var touchCols = _findTouchColsPipeline_(hdr, headers);
+  var touchOk = touchCols.au !== undefined && touchCols.av !== undefined;
+  out.touch_columns_resolved = Boolean(touchOk);
+
+  var want = {};
+  want[COHORT_STATUS_WARMUP] = true;
+  for (var wi = 0; wi < COHORT_STATUSES_FOLLOW_UP_PIPELINE.length; wi++) {
+    want[COHORT_STATUSES_FOLLOW_UP_PIPELINE[wi]] = true;
+  }
+
+  for (var k in want) {
+    if (Object.prototype.hasOwnProperty.call(want, k)) {
+      out.cohorts[k] = _makeEmptyCohortAgg_();
+    }
+  }
+
+  var rr;
+  for (rr = 1; rr < values.length; rr++) {
+    var row = values[rr];
+    var st = String(row[statusIdx] || '').trim();
+    if (!want[st]) continue;
+
+    var au = touchOk ? _touchCountPipeline_(row[touchCols.au]) : 0;
+    var av = touchOk ? _touchCountPipeline_(row[touchCols.av]) : 0;
+    _bumpCohortAgg_(out.cohorts[st], au, av);
+  }
+
+  var combined = _makeEmptyCohortAgg_();
+  combined.note =
+    'Union of Hit List rows in statuses: ' + COHORT_STATUSES_FOLLOW_UP_PIPELINE.join(', ');
+  for (var ci = 0; ci < COHORT_STATUSES_FOLLOW_UP_PIPELINE.length; ci++) {
+    var label = COHORT_STATUSES_FOLLOW_UP_PIPELINE[ci];
+    if (out.cohorts[label]) {
+      _mergeCohortAggs_(combined, out.cohorts[label]);
+    }
+  }
+  out.follow_up_pipeline_combined = combined;
+
+  return out;
+}
+
+function _appendCohortMarkdown_(mdLines, title, agg) {
+  if (!agg || !agg.stores) {
+    mdLines.push('- **' + title + '**: _(no rows in this status)_');
+    return;
+  }
+  mdLines.push(
+    '- **' +
+      title +
+      '**: **' +
+      agg.stores +
+      '** stores — sum logged **warmup** sends (AU): **' +
+      agg.sum_warmup_sends_au +
+      '**, sum logged **follow-up** sends (AV): **' +
+      agg.sum_follow_up_sends_av +
+      '**; warmup depth (none / once / ≥2): **' +
+      agg.warmup_send_depth.none +
+      '** / **' +
+      agg.warmup_send_depth.once +
+      '** / **' +
+      agg.warmup_send_depth.repeat +
+      '**; follow-up depth (none / once / ≥2): **' +
+      agg.follow_up_send_depth.none +
+      '** / **' +
+      agg.follow_up_send_depth.once +
+      '** / **' +
+      agg.follow_up_send_depth.repeat +
+      '**'
+  );
+}
+
+// ============================================================================
 // ARTIFACT BUILDERS
 // ============================================================================
 
 function _buildArtifacts_(funnel) {
   var now = new Date();
   var generatedAt = now.toISOString();
+
+  var outreach = {
+    email_agent_follow_up: _readEmailAgentFollowUpLog_(),
+    hit_list: _readHitListOutreachDepth_()
+  };
 
   var jsonObj = {
     generated_at: generatedAt,
@@ -278,7 +550,8 @@ function _buildArtifacts_(funnel) {
       partnered: funnel.partnered,
       highlights: funnel.highlights
     },
-    funnel: funnel.rows
+    funnel: funnel.rows,
+    outreach_visibility: outreach
   };
 
   var jsonText = JSON.stringify(jsonObj, null, 2) + '\n';
@@ -319,6 +592,62 @@ function _buildArtifacts_(funnel) {
         : (r.status + ': ' + r.stores);
       mdLines.push('- ' + label + '  (' + orderTag + ')');
     }
+  }
+
+  mdLines.push('');
+  mdLines.push('## Email outreach visibility (logged sends + Hit List AU/AV)');
+  mdLines.push('');
+
+  var logR = outreach.email_agent_follow_up;
+  if (!logR.ok) {
+    mdLines.push('_(Email Agent Follow Up tab missing or columns incomplete — no log summary.)_');
+    if (logR.error) mdLines.push('- _Error: ' + logR.error + '_');
+  } else {
+    mdLines.push(
+      '- **Email Agent Follow Up** — logged sends: warmup **' +
+        logR.sends_logged.warmup +
+        '**, follow_up **' +
+        logR.sends_logged.follow_up +
+        '**, bulk **' +
+        logR.sends_logged.bulk +
+        '**, unknown **' +
+        logR.sends_logged.unknown +
+        '** (data rows: **' +
+        logR.sends_logged.total_rows +
+        '**)'
+    );
+    mdLines.push(
+      '- Distinct recipient addresses (`to_email`, by log `status`): warmup **' +
+        logR.distinct_recipients.warmup +
+        '**, follow_up **' +
+        logR.distinct_recipients.follow_up +
+        '**, bulk **' +
+        logR.distinct_recipients.bulk +
+        '**, unknown **' +
+        logR.distinct_recipients.unknown +
+        '**'
+    );
+  }
+
+  mdLines.push('');
+  mdLines.push('### Hit List cohorts (stores in stage × AU/AV send counts)');
+  mdLines.push('');
+
+  var hl = outreach.hit_list;
+  if (!hl.touch_columns_resolved) {
+    mdLines.push(
+      '_Warm-up / follow-up **depth** buckets need Hit List columns AU/AV (**Warm-up email sent**, **Follow-up emails sent**). Sums may read as 0 until headers exist._'
+    );
+    mdLines.push('');
+  }
+
+  _appendCohortMarkdown_(mdLines, COHORT_STATUS_WARMUP, hl.cohorts[COHORT_STATUS_WARMUP]);
+  for (var fxi = 0; fxi < COHORT_STATUSES_FOLLOW_UP_PIPELINE.length; fxi++) {
+    var flab = COHORT_STATUSES_FOLLOW_UP_PIPELINE[fxi];
+    _appendCohortMarkdown_(mdLines, flab, hl.cohorts[flab]);
+  }
+  if (hl.follow_up_pipeline_combined && hl.follow_up_pipeline_combined.stores) {
+    _appendCohortMarkdown_(mdLines, 'Follow-up pipeline (combined)', hl.follow_up_pipeline_combined);
   }
 
   mdLines.push('');
