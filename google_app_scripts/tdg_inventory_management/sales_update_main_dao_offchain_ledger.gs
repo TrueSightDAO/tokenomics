@@ -55,20 +55,38 @@ function soldByContributorForLedger_(row) {
   return (row[CONTRIBUTOR_NAME_COL] || '').toString();
 }
 
+/**
+ * Serializes webhook GETs so concurrent runs cannot race while reading/updating "QR Code Sales"
+ * and writing offchain ledger rows.
+ */
 function doGet(e) {
-  const action = e.parameter?.action;
-  if (action === 'processTokenizedTransactions') {
-    try {
-      Logger.log("Webhook triggered: processing Telegram logs");
-      processTokenizedTransactions();
-      return ContentService.createTextOutput("✅ Telegram logs processed");
-    } catch (err) {
-      Logger.log("Error in processTelegramLogs: " + err.message);
-      return ContentService.createTextOutput("❌ Error: " + err.message);
-    }
+  const lock = LockService.getScriptLock();
+  const LOCK_WAIT_MS = 300000;
+
+  if (!lock.tryLock(LOCK_WAIT_MS)) {
+    Logger.log('doGet: script lock not acquired within ' + LOCK_WAIT_MS + 'ms; another processTokenizedTransactions run in progress');
+    return ContentService.createTextOutput(
+      '⏳ busy: another tokenized-sales webhook run is in progress; retry later'
+    );
   }
 
-  return ContentService.createTextOutput("ℹ️ No valid action specified");
+  try {
+    const action = e.parameter?.action;
+    if (action === 'processTokenizedTransactions') {
+      try {
+        Logger.log("Webhook triggered: processing Telegram logs");
+        processTokenizedTransactions();
+        return ContentService.createTextOutput("✅ Telegram logs processed");
+      } catch (err) {
+        Logger.log("Error in processTelegramLogs: " + err.message);
+        return ContentService.createTextOutput("❌ Error: " + err.message);
+      }
+    }
+
+    return ContentService.createTextOutput("ℹ️ No valid action specified");
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 
