@@ -204,36 +204,54 @@ const VALUE_COL = 2; // Column C
 const STATUS_COL = 3; // Column D
 const INVENTORY_TYPE_COL = 8; // Column I
 
+/**
+ * Serializes webhook GETs so concurrent runs cannot race on "QR Code Sales" / Telegram reads.
+ */
 function doGet(e) {
-  const action = e.parameter?.action;
-  if (action === 'parseTelegramChatLogs') {
-    try {
-      Logger.log("Webhook triggered: processing Telegram logs");
-      parseTelegramChatLogs();
-      notifyTreasuryCachePublisher_('process_sales');
-      return ContentService.createTextOutput("✅ Telegram logs processed");
-    } catch (err) {
-      Logger.log("Error in processTelegramLogs: " + err.message);
-      return ContentService.createTextOutput("❌ Error: " + err.message);
-    }
-  } else if (action === 'processSpecificRow') {
-    const rowIndex = parseInt(e.parameter?.rowIndex, 10);
-    if (isNaN(rowIndex) || rowIndex < 2) {
-      Logger.log(`Invalid rowIndex: ${e.parameter?.rowIndex}`);
-      return ContentService.createTextOutput("❌ Error: Invalid or missing rowIndex (must be >= 2)");
-    }
-    try {
-      Logger.log(`Processing specific row: ${rowIndex}`);
-      processSpecificRow(rowIndex);
-      notifyTreasuryCachePublisher_('process_sales');
-      return ContentService.createTextOutput(`✅ Row ${rowIndex} processed`);
-    } catch (err) {
-      Logger.log(`Error processing row ${rowIndex}: ${err.message}`);
-      return ContentService.createTextOutput(`❌ Error processing row ${rowIndex}: ${err.message}`);
-    }
+  const lock = LockService.getScriptLock();
+  const LOCK_WAIT_MS = 300000;
+
+  if (!lock.tryLock(LOCK_WAIT_MS)) {
+    Logger.log('doGet: script lock not acquired within ' + LOCK_WAIT_MS + 'ms; another process_sales run in progress');
+    return ContentService.createTextOutput(
+      '⏳ busy: another process_sales webhook run is in progress; retry later'
+    );
   }
 
-  return ContentService.createTextOutput("ℹ️ No valid action specified");
+  try {
+    const action = e.parameter?.action;
+    if (action === 'parseTelegramChatLogs') {
+      try {
+        Logger.log("Webhook triggered: processing Telegram logs");
+        parseTelegramChatLogs();
+        notifyTreasuryCachePublisher_('process_sales');
+        return ContentService.createTextOutput("✅ Telegram logs processed");
+      } catch (err) {
+        Logger.log("Error in processTelegramLogs: " + err.message);
+        return ContentService.createTextOutput("❌ Error: " + err.message);
+      }
+    }
+    if (action === 'processSpecificRow') {
+      const rowIndex = parseInt(e.parameter?.rowIndex, 10);
+      if (isNaN(rowIndex) || rowIndex < 2) {
+        Logger.log(`Invalid rowIndex: ${e.parameter?.rowIndex}`);
+        return ContentService.createTextOutput("❌ Error: Invalid or missing rowIndex (must be >= 2)");
+      }
+      try {
+        Logger.log(`Processing specific row: ${rowIndex}`);
+        processSpecificRow(rowIndex);
+        notifyTreasuryCachePublisher_('process_sales');
+        return ContentService.createTextOutput(`✅ Row ${rowIndex} processed`);
+      } catch (err) {
+        Logger.log(`Error processing row ${rowIndex}: ${err.message}`);
+        return ContentService.createTextOutput(`❌ Error processing row ${rowIndex}: ${err.message}`);
+      }
+    }
+
+    return ContentService.createTextOutput("ℹ️ No valid action specified");
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 /**
