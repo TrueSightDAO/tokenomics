@@ -31,6 +31,18 @@
  *
  * After a run, open **Executions** (clock icon) → select the run → expand logs to read `[emailVerification] …` lines.
  *
+ * **Who sends Gmail (`From` / sending identity)?**
+ * - **Published web app** (`/exec`, Edgar GET/POST): uses the deployment option **Execute as** (almost always
+ *   **User accessing the web app** vs **Me** per your setup). For Edgar server → GAS, the usual pattern is
+ *   **Execute as: Me** = the Google account that **owns** the script project, so mail matches production
+ *   (e.g. admin@truesight.me).
+ * - **Run from the Apps Script editor** (`TEST_*`, `editorResend*`, `editorDryRun*`): Apps Script runs as
+ *   **the Google account currently signed into the script editor**, not “the script owner” by magic.
+ *   `GmailApp.sendEmail` therefore sends **from that editor account** (subject to its send-as / aliases).
+ *   Editor runs are still useful to validate links and logging; they are **not** a faithful test of the
+ *   production **From** line. To test like production, call the **deployed `/exec`** URL (GET or POST) with
+ *   a valid `secret`, or walk the real DApp → Edgar flow.
+ *
  * This project intentionally does **not** include Telegram log processing; see
  * `register_member_digital_signatures_telegram.gs` (script `10NKp8…`) for `processDigitalSignatureEvents`.
  */
@@ -174,6 +186,11 @@ function TEST_sendVerificationEmail() {
   const secret = PropertiesService.getScriptProperties().getProperty('EMAIL_VERIFICATION_SECRET');
   if (!secret) throw new Error('Script property EMAIL_VERIFICATION_SECRET is not set');
 
+  Logger.log(
+    '[emailVerification] NOTE: editor Run uses Session.getActiveUser().getEmail()=' +
+      Session.getActiveUser().getEmail() +
+      ' — GmailApp.sendEmail sends as this user, not necessarily the web app "Execute as" owner.'
+  );
   logEmailVerification_('TEST_sendVerificationEmail', { note: 'editor test send starting', email: TEST_EMAIL, vk_len: String(TEST_VERIFICATION_KEY).length });
   const out = handleEmailVerificationRequest_({
     secret: secret,
@@ -191,6 +208,12 @@ function TEST_sendVerificationEmail() {
 function editorResendVerificationEmailWithPrompts() {
   const secret = PropertiesService.getScriptProperties().getProperty('EMAIL_VERIFICATION_SECRET');
   if (!secret) throw new Error('Script property EMAIL_VERIFICATION_SECRET is not set');
+
+  Logger.log(
+    '[emailVerification] NOTE: editor Run sends as Session.getActiveUser().getEmail()=' +
+      Session.getActiveUser().getEmail() +
+      ' (see file header "Who sends Gmail?").'
+  );
 
   const email = Browser.inputBox(
     'Resend verification email',
