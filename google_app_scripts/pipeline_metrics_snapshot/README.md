@@ -28,7 +28,16 @@ Pipeline Dashboard tab (curated funnel order in cols C–E):
 - `metrics/weekly.json` — canonical machine feed. Schema: `generated_at`,
   `source{workbook_id,tab,gid,url}`, `totals{all_stores, partnered,
   highlights[]{status, stores, north_star}}`, `funnel[]{order, status,
-  stores}`.
+  stores}`, **`outreach_visibility`**:
+  - `email_agent_follow_up` — rows on **Email Agent Follow Up**: `sends_logged`
+    (`warmup`, `follow_up`, `bulk`, `unknown`, `total_rows`) and
+    `distinct_recipients` per bucket (unique `to_email`).
+  - `hit_list` — **Hit List** cohorts for warm-up and follow-up pipeline statuses:
+    `touch_columns_resolved`, `cohorts` keyed by exact Status string (stores,
+    `sum_warmup_sends_au`, `sum_follow_up_sends_av`, `warmup_send_depth` /
+    `follow_up_send_depth` as `{none, once, repeat}` from AU/AV), plus
+    `follow_up_pipeline_combined` (Manager Follow-up + Bulk Info Requested +
+    AI: Prospect replied) with a `note` field describing the union.
 - `metrics/weekly.md` — dropped verbatim under the "## Operator metrics"
   heading in `ADVISORY_SNAPSHOT.md`. Summary block surfaces the stages in
   `HIGHLIGHT_STATUSES` (currently `Partnered`, `Meeting Scheduled`,

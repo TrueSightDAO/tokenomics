@@ -4,7 +4,7 @@ Google Apps Script web app backing the **Store Interaction History** DApp page. 
 [20251104 - holistic wellness hit list](https://docs.google.com/spreadsheets/d/1eiqZr3LW-qEI6Hmy0Vrur_8flbRwxwA7jXVrbUnHbvc/edit) and returns:
 
 - **Autocomplete** — `Shop Name` / `Store Key` matches from **Hit List**
-- **Full context** — the **Hit List** row for the store plus every row from **DApp Remarks**, **Email Agent Follow Up**, and **Email Agent Suggestions** that matches `store_key`, `to_email` ↔ Hit List `Email`, or `shop_name`. Those three arrays are returned **newest-first** (by `created_at_utc`, `Date Sent`, etc., when available; otherwise sheet order is reversed).
+- **Full context** — the **Hit List** row for the store plus every row from **DApp Remarks**, **Email Agent Follow Up**, and **Email Agent Drafts** that matches `store_key`, `to_email` ↔ Hit List `Email`, or `shop_name`. Those three arrays are returned **newest-first** (by `created_at_utc`, `Date Sent`, etc., when available; otherwise sheet order is reversed).
 
 ## Setup
 
@@ -33,10 +33,10 @@ The script runs under your Google account; it only reads the spreadsheet (no wri
 | Query | Returns |
 |--------|---------|
 | `?action=suggestStores&q=partial` | `{ status, data: { suggestions: [{ shop_name, store_key, email, hit_list_row }] } }` — requires `q` length ≥ 2 |
-| `?action=getStoreHistory&store_key=...` | Full payload: `hit_list`, `dapp_remarks`, `email_agent_follow_up`, `email_agent_suggestions` |
+| `?action=getStoreHistory&store_key=...` | Full payload: `hit_list`, `dapp_remarks`, `email_agent_follow_up`, `email_agent_drafts` |
 | `?action=getStoreHistory&shop=...` | Same, if `store_key` omitted (exact normalized match on Hit List `Shop Name`) |
-| `?action=listStoresByFilter` | Paginated Hit List rows: `status` and `shop_type` may be repeated (exact cell match). Omit both to return all rows (subject to limit). `limit` (default 200, max 500), `offset` (default 0). Response: `{ rows: [...], total, offset, limit, returned }` where each row includes `store_key`, `shop_name`, `status`, `shop_type`, `city`, `state`, `email`, `status_updated`, `hit_list_row`. |
-| `?action=listStatusSummary` | Pipeline-style counts from **Hit List** (one pass): `by_status[]` `{ status, count }`, `by_shop_type[]` `{ shop_type, count }`, plus `total_data_rows`, `blank_status`, `blank_shop_type`. Used by `stores_by_status.html` for the overview chips. |
+| `?action=listStoresByFilter` | Paginated Hit List rows: `status` and `shop_type` may be repeated (exact cell match). Omit both to return all rows (subject to limit). `limit` (default 200, max 500), `offset` (default 0). Response: `{ rows: [...], total, offset, limit, returned }` where each row includes `store_key`, `shop_name`, `status`, `shop_type`, `city`, `state`, `email`, `status_updated`, `hit_list_row`, and when AU/AV columns exist: **`warmup_sent`**, **`followup_sent`** (integer counts from sheet formulas). |
+| `?action=listStatusSummary` | Pipeline-style counts from **Hit List** (one pass): `by_status[]` / `by_shop_type[]` with **`count`**, optional **`warmup`** / **`followup`** each `{ none, once, repeat }` (stores by sends: 0 / 1 / 2+ from columns **Warm-up email sent** / **Follow-up emails sent**), plus `total_data_rows`, `blank_status`, `blank_shop_type`, **`touch_metrics_available`**. Used by `stores_by_status.html`. |
 
 Always append `&token=...` when `STORE_HISTORY_API_TOKEN` is set.
 
