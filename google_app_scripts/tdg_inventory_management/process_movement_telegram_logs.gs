@@ -1389,31 +1389,49 @@ function testProcessInventoryReport() {
  * Supports two actions:
  * - processTelegramChatLogs: Processes Telegram Chat Logs to Inventory Movement, then to Ledgers
  * - processInventoryMovementToLedgers: Processes only Inventory Movement to Ledgers (for retries)
+ *
+ * Uses LockService.getScriptLock() so concurrent GETs (webhooks / schedulers) cannot run
+ * the pipeline at the same time and double-write ledgers.
  */
 function doGet(e) {
   const action = e.parameter?.action;
-  
-  if (action === 'processTelegramChatLogs') {
-    try {
-      Logger.log("Webhook triggered: processing inventory movements from Telegram Chat Logs");
-      processTelegramChatLogs();
-      return ContentService.createTextOutput("✅ Inventory movements processed from Telegram Chat Logs");
-    } catch (err) {
-      Logger.log("Error in processTelegramChatLogs webhook: " + err.message);
-      return ContentService.createTextOutput("❌ Error: " + err.message);
-    }
-  } else if (action === 'processInventoryMovementToLedgers') {
-    try {
-      Logger.log("Webhook triggered: processing Inventory Movement to Ledgers");
-      processInventoryMovementToLedgers();
-      return ContentService.createTextOutput("✅ Inventory Movement processed to Ledgers");
-    } catch (err) {
-      Logger.log("Error in processInventoryMovementToLedgers webhook: " + err.message);
-      return ContentService.createTextOutput("❌ Error: " + err.message);
-    }
+  const lock = LockService.getScriptLock();
+  /** Max ms to wait for another run to finish before returning busy (overlap with long runs). */
+  const LOCK_WAIT_MS = 300000;
+
+  if (!lock.tryLock(LOCK_WAIT_MS)) {
+    Logger.log('doGet: script lock not acquired within ' + LOCK_WAIT_MS + 'ms; another inventory run in progress');
+    return ContentService.createTextOutput(
+      '⏳ busy: another inventory webhook run is in progress; retry later'
+    );
   }
-  
-  return ContentService.createTextOutput("ℹ️ No valid action specified. Use ?action=processTelegramChatLogs or ?action=processInventoryMovementToLedgers");
+
+  try {
+    if (action === 'processTelegramChatLogs') {
+      try {
+        Logger.log("Webhook triggered: processing inventory movements from Telegram Chat Logs");
+        processTelegramChatLogs();
+        return ContentService.createTextOutput("✅ Inventory movements processed from Telegram Chat Logs");
+      } catch (err) {
+        Logger.log("Error in processTelegramChatLogs webhook: " + err.message);
+        return ContentService.createTextOutput("❌ Error: " + err.message);
+      }
+    }
+    if (action === 'processInventoryMovementToLedgers') {
+      try {
+        Logger.log("Webhook triggered: processing Inventory Movement to Ledgers");
+        processInventoryMovementToLedgers();
+        return ContentService.createTextOutput("✅ Inventory Movement processed to Ledgers");
+      } catch (err) {
+        Logger.log("Error in processInventoryMovementToLedgers webhook: " + err.message);
+        return ContentService.createTextOutput("❌ Error: " + err.message);
+      }
+    }
+
+    return ContentService.createTextOutput("ℹ️ No valid action specified. Use ?action=processTelegramChatLogs or ?action=processInventoryMovementToLedgers");
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 /**
