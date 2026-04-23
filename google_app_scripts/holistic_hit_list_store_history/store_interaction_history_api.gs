@@ -48,6 +48,24 @@ var MAX_HISTORY_ROWS_PER_SECTION = 200;
 /** Max rows returned by listStoresByFilter (hard cap). */
 var LIST_FILTER_MAX_LIMIT = 500;
 
+/**
+ * Send-depth buckets for AU / AV (aligned with Pipeline Dashboard columns F:M):
+ * index 0 = 0 sends, 1..6 = exactly that many, 7 = {TOUCH_BUCKET_TAIL_MIN}+ sends.
+ */
+var TOUCH_BUCKET_MAX_EXACT = 6;
+var TOUCH_BUCKET_TAIL_MIN = 7;
+var TOUCH_BUCKET_LEN = 1 + TOUCH_BUCKET_MAX_EXACT + 1;
+
+/** Map raw sent count (AU or AV) to bucket index 0..TOUCH_BUCKET_LEN-1. */
+function hitListTouchBucketIndex_(n) {
+  var x = typeof n === 'number' ? n : parseFloat(String(n || '').trim().replace(/,/g, ''));
+  if (isNaN(x) || x < 0) x = 0;
+  x = Math.floor(x);
+  if (x <= 0) return 0;
+  if (x >= TOUCH_BUCKET_TAIL_MIN) return TOUCH_BUCKET_LEN - 1;
+  return Math.min(x, TOUCH_BUCKET_MAX_EXACT);
+}
+
 function createJsonOutput_(obj) {
   return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON);
 }
@@ -159,33 +177,32 @@ function hitListFindTouchColumns_(hdr, headerRow) {
 }
 
 function hitListMakeEmptyTouchAgg_() {
-  return { count: 0, wu0: 0, wu1: 0, wu2p: 0, fu0: 0, fu1: 0, fu2p: 0 };
+  var wu = [];
+  var fu = [];
+  var i;
+  for (i = 0; i < TOUCH_BUCKET_LEN; i++) {
+    wu.push(0);
+    fu.push(0);
+  }
+  return { count: 0, wu: wu, fu: fu };
 }
 
 function hitListBumpTouchAgg_(agg, wu, fu) {
   agg.count++;
-  if (wu <= 0) agg.wu0++;
-  else if (wu === 1) agg.wu1++;
-  else agg.wu2p++;
-  if (fu <= 0) agg.fu0++;
-  else if (fu === 1) agg.fu1++;
-  else agg.fu2p++;
+  var wi = hitListTouchBucketIndex_(wu);
+  var fi = hitListTouchBucketIndex_(fu);
+  agg.wu[wi]++;
+  agg.fu[fi]++;
 }
 
+/** Eight bucket counts for warm-up (AU); same order as Pipeline Dashboard F:M. */
 function hitListTouchAggToBuckets_(agg) {
-  return {
-    none: agg.wu0,
-    once: agg.wu1,
-    repeat: agg.wu2p,
-  };
+  return agg.wu.slice();
 }
 
+/** Eight bucket counts for follow-up (AV). */
 function hitListTouchAggToBucketsFu_(agg) {
-  return {
-    none: agg.fu0,
-    once: agg.fu1,
-    repeat: agg.fu2p,
-  };
+  return agg.fu.slice();
 }
 
 /**
@@ -208,6 +225,17 @@ function listHitListByFilter_(statusList, shopTypeList, limit, offset) {
 
   var wantStatus = statusList && statusList.length > 0;
   var wantShopType = shopTypeList && shopTypeList.length > 0;
+
+  var wuB = null;
+  var fuB = null;
+  if (warmupBucket !== null && warmupBucket !== undefined) {
+    var t1 = parseInt(warmupBucket, 10);
+    if (!isNaN(t1) && t1 >= 0 && t1 < TOUCH_BUCKET_LEN) wuB = t1;
+  }
+  if (followupBucket !== null && followupBucket !== undefined) {
+    var t2 = parseInt(followupBucket, 10);
+    if (!isNaN(t2) && t2 >= 0 && t2 < TOUCH_BUCKET_LEN) fuB = t2;
+  }
 
   var hdr = headerMap_(headers);
   var touchCols = hitListFindTouchColumns_(hdr, headers);
@@ -246,6 +274,9 @@ function listHitListByFilter_(statusList, shopTypeList, limit, offset) {
     var wu = touchCols.au !== undefined ? hitListTouchCountFromCell_(row[touchCols.au]) : 0;
     var fu = touchCols.av !== undefined ? hitListTouchCountFromCell_(row[touchCols.av]) : 0;
 
+    if (wuB !== null && hitListTouchBucketIndex_(wu) !== wuB) continue;
+    if (fuB !== null && hitListTouchBucketIndex_(fu) !== fuB) continue;
+
     matched.push({
       store_key: (rowObj['Store Key'] || '').trim(),
       shop_name: (rowObj['Shop Name'] || '').trim(),
@@ -273,8 +304,8 @@ function listHitListByFilter_(statusList, shopTypeList, limit, offset) {
 
 /**
  * One-pass counts for Pipeline-style overview (mirrors Hit List, not the "Pipeline Dashboard" sheet formulas).
- * Each bucket includes **warmup** / **followup** sent-touch **stages** from Hit List columns AU / AV
- * (none · exactly one · two or more sends per ``sync_email_agent_followup.py`` / sheet formulas).
+ * Each bucket includes **warmup** / **followup** counts from Hit List columns AU / AV grouped into
+ * eight depth buckets (0 sends, 1…6 sends, then 7+), matching the Pipeline Dashboard.
  */
 function hitListPipelineSummary_() {
   var ss = SpreadsheetApp.openById(HIT_LIST_SPREADSHEET_ID);
@@ -663,11 +694,12 @@ function getStoreHistory_(storeKey, shopName) {
  * Actions:
  *   - suggestStores — e.parameter.q (min length 2); data.suggestions[]: shop_name, store_key, email, hit_list_row
  *   - getStoreHistory — e.parameter.store_key and/or shop; data includes hit_list, dapp_remarks[], email_agent_follow_up[], email_agent_drafts[]
- *   - listStoresByFilter — optional repeated status=, shop_type=; limit (default 200, max 500), offset (default 0).
+ *   - listStoresByFilter — optional repeated status=, shop_type=; optional warmup_bucket=, followup_bucket=
+ *       (each 0..7: send-depth bucket for AU / AV). limit (default 200, max 500), offset (default 0).
  *       Empty status list = all statuses; empty shop_type = all shop types. Each row may include **warmup_sent**,
  *       **followup_sent** (from Hit List AU / AV when present).
  *   - listStatusSummary — no extra params; data.by_status[] / by_shop_type[] include **count** plus optional
- *       **warmup** / **followup** { none, once, repeat } from AU / AV; **touch_metrics_available** when resolved.
+ *       **warmup** / **followup** — each an array of eight integers (bucket counts); **touch_metrics_available** when resolved.
  *
  * Auth: e.parameter.token when STORE_HISTORY_API_TOKEN is set (Script Properties).
  */
@@ -703,7 +735,15 @@ function doGet(e) {
       var offRaw = parseInt((e.parameter.offset || '0').toString(), 10);
       var lim = isNaN(limRaw) ? 200 : limRaw;
       var off = isNaN(offRaw) ? 0 : offRaw;
-      return success_(listHitListByFilter_(statusList, shopTypeList, lim, off));
+      var wbRaw = (e.parameter.warmup_bucket || '').toString().trim();
+      var fbRaw = (e.parameter.followup_bucket || '').toString().trim();
+      var warmupB = wbRaw === '' ? null : parseInt(wbRaw, 10);
+      var followB = fbRaw === '' ? null : parseInt(fbRaw, 10);
+      if (warmupB !== null && isNaN(warmupB)) warmupB = null;
+      if (followB !== null && isNaN(followB)) followB = null;
+      return success_(
+        listHitListByFilter_(statusList, shopTypeList, lim, off, warmupB, followB)
+      );
     }
 
     if (action === 'listStatusSummary') {
