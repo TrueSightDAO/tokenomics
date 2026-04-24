@@ -34,6 +34,7 @@ var STATUS_BULK = 'Bulk Info Requested';
 var LABEL_NAME = 'Email Agent suggestions';
 var PROTOCOL_MANAGER = 'PARTNER_OUTREACH_PROTOCOL v0.1 (Apps Script)';
 var PROTOCOL_BULK = 'BULK_INFO_PDF v0.1 (Apps Script)';
+var DEFAULT_EMAIL_AGENT_TRACKING_BASE_URL = 'https://edgar.truesight.me';
 
 /** Default: PDF committed under market_research → retail_price_list/ on GitHub (repo content_schedule). */
 var DEFAULT_BULK_PDF_RAW_URL =
@@ -110,6 +111,8 @@ function runDraftsForStatus_(hitStatus, attachPdf, protocolVersion) {
   var pending = pendingToEmails_(suggSh);
   var lastSent = lastSentByToEmail_(logSh);
   var now = new Date();
+  var trackingBase =
+    (props.getProperty('EMAIL_AGENT_TRACKING_BASE_URL') || DEFAULT_EMAIL_AGENT_TRACKING_BASE_URL || '').trim();
 
   var targets = loadHitListTargets_(hitSh, hitStatus);
   if (!targets.length) {
@@ -169,11 +172,13 @@ function runDraftsForStatus_(hitStatus, attachPdf, protocolVersion) {
         ? bodyTemplateBulk_(shop, threadExcerpts)
         : bodyTemplateManager_(shop, threadExcerpts);
 
+    var suggestionId = Utilities.getUuid();
+    var htmlBody = withTrackingLogoFooterHtml_(body, trackingBase, suggestionId);
     var draft;
     if (attachPdf && pdfBlob) {
-      draft = GmailApp.createDraft(toAddr, subj, body, { attachments: [pdfBlob] });
+      draft = GmailApp.createDraft(toAddr, subj, body, { attachments: [pdfBlob], htmlBody: htmlBody });
     } else {
-      draft = GmailApp.createDraft(toAddr, subj, body);
+      draft = GmailApp.createDraft(toAddr, subj, body, { htmlBody: htmlBody });
     }
 
     var draftId = '';
@@ -201,7 +206,7 @@ function runDraftsForStatus_(hitStatus, attachPdf, protocolVersion) {
       '. Edit in Gmail before Send.';
 
     var row = [
-      Utilities.getUuid(),
+      suggestionId,
       new Date().toISOString(),
       storeKey,
       shop,
@@ -240,6 +245,32 @@ function fetchWholesalePdfBlob_() {
     );
   }
   return resp.getBlob().setName('Agroverse_wholesale_retail_overview_2026.pdf');
+}
+
+function withTrackingLogoFooterHtml_(plainBody, baseUrl, suggestionId) {
+  var safeBody = escapeHtml_(String(plainBody || '')).replace(/\n/g, '<br>');
+  var tid = encodeURIComponent(String(suggestionId || '').trim());
+  var openUrl = String(baseUrl || '').replace(/\/+$/, '') + '/email_agent/open.gif?tid=' + tid;
+  return (
+    '<div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;font-size:15px;line-height:1.45;">' +
+    safeBody +
+    '</div>' +
+    '<div style="margin-top:18px;padding-top:10px;border-top:1px solid #eee;">' +
+    '<div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;font-size:12px;color:#666;margin-bottom:6px;">Agroverse</div>' +
+    '<img src="' +
+    openUrl +
+    '" alt="Agroverse logo" width="140" style="display:block;border:0;width:140px;height:auto;" />' +
+    '</div>'
+  );
+}
+
+function escapeHtml_(s) {
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 
 function loadHitListTargets_(sheet, wantStatus) {
