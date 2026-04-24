@@ -27,6 +27,7 @@ Options: `--dry-run`, `--skip-clone` (checklist only), `--force-clone` (delete `
 2. Resolve `UNMAPPED` / `BASENAME_ONLY` rows in the TSV by moving or merging reference `.gs` into the right mirror folder (or note that the cloud uses **`Code.js`** while git uses another name — compare contents).
 3. **`Version.gs`:** Every mirror that has **`.clasp.json`** should also contain **`Version.gs`** (git-tracked). Bump **UTC + changelog** in the canonical source before **`clasp push`**. Conventions: **`google_app_scripts/tdg_inventory_management/Version.gs`** (Parse Telegram / sales / ledgers — **`getTdgInventoryDeployInfo()`**), **`google_app_scripts/agroverse_qr_codes/Version.gs`** (QR Code Generation — **`getAgroverseQRGenerationDeployInfo()`**), **`google_app_scripts/_clasp_default/Version.gs`** (everything else — **`getClaspMirrorDeployInfo()`**). After clone, run **`node scripts/ensure_clasp_version_gs.mjs`** from the tokenomics repo root to add missing files. See **`agentic_ai_context/NOTES_tokenomics.md`**.
 4. **`cd clasp_mirrors/<scriptId>`** then **`clasp push`** when that project’s mirror is ready; optionally copy or reconcile changes into **`google_app_scripts/**`** for documentation only.
+5. **“Clasp deploy” (operator shorthand):** If the user only says **clasp deploy**, agents **always** **`clasp push` first**, then **`clasp deploy`**. For **Web Apps** with an existing public URL, prefer **`clasp deploy --deploymentId <existingId>`** (see **`agentic_ai_context/NOTES_tokenomics.md`**) instead of creating a stray second deployment.
 
 ## Security
 
