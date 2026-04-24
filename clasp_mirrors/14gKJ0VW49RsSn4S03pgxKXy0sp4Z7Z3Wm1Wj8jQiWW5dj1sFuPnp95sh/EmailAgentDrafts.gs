@@ -1,5 +1,5 @@
 /**
- * Email Agent drafts — Hit List → Gmail drafts + Email Agent Suggestions
+ * Email Agent drafts — Hit List → Gmail drafts + Email Agent Drafts
  *
  * Mirrors the Python workflows in market_research (repo: TrueSightDAO/content_schedule):
  *   - suggest_manager_followup_drafts.py  → Status "Manager Follow-up" (plain draft, no PDF)
@@ -26,7 +26,7 @@
 var HIT_LIST_SPREADSHEET_ID = '1eiqZr3LW-qEI6Hmy0Vrur_8flbRwxwA7jXVrbUnHbvc';
 var SHEET_HIT_LIST = 'Hit List';
 var SHEET_LOG = 'Email Agent Follow Up';
-var SHEET_SUGG = 'Email Agent Suggestions';
+var SHEET_SUGG = 'Email Agent Drafts';
 
 var STATUS_MANAGER = 'Manager Follow-up';
 var STATUS_BULK = 'Bulk Info Requested';
@@ -56,6 +56,8 @@ var SUGG_HEADERS = [
   'gmail_label',
   'protocol_version',
   'notes',
+  'Open',
+  'Click through',
 ];
 
 /**
@@ -103,7 +105,7 @@ function runDraftsForStatus_(hitStatus, attachPdf, protocolVersion) {
   var hitSh = ss.getSheetByName(SHEET_HIT_LIST);
   var logSh = ss.getSheetByName(SHEET_LOG);
   var suggSh = ss.getSheetByName(SHEET_SUGG);
-  if (!hitSh || !suggSh) throw new Error('Hit List or Email Agent Suggestions sheet missing.');
+  if (!hitSh || !suggSh) throw new Error('Hit List or Email Agent Drafts sheet missing.');
 
   var pending = pendingToEmails_(suggSh);
   var lastSent = lastSentByToEmail_(logSh);
@@ -212,6 +214,8 @@ function runDraftsForStatus_(hitStatus, attachPdf, protocolVersion) {
       LABEL_NAME,
       protocolVersion,
       notes,
+      0,
+      0,
     ];
     suggSh.appendRow(row);
     created++;
