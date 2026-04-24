@@ -208,8 +208,9 @@ function hitListTouchAggToBucketsFu_(agg) {
 /**
  * Filter Hit List rows by Status / Shop Type (exact match to sheet cell values).
  * Empty statusList = no status filter (all). Empty shopTypeList = no shop-type filter (all).
+ * Optional warmupBucket / followupBucket: integers 0..7 or null (see doGet listStoresByFilter).
  */
-function listHitListByFilter_(statusList, shopTypeList, limit, offset) {
+function listHitListByFilter_(statusList, shopTypeList, limit, offset, warmupBucket, followupBucket) {
   var ss = SpreadsheetApp.openById(HIT_LIST_SPREADSHEET_ID);
   var sh = getSheetSafe_(ss, SHEET_HIT_LIST);
   if (!sh) {
