@@ -40,6 +40,7 @@ var SHEET_HIT_LIST = 'Hit List';
 var SHEET_DAPP_REMARKS = 'DApp Remarks';
 var SHEET_EMAIL_FOLLOW_UP = 'Email Agent Follow Up';
 var SHEET_EMAIL_DRAFTS = 'Email Agent Drafts';
+var SHEET_STORES_VISITS_FIELD_REPORTS = 'Stores Visits Field Reports';
 
 /** Max autocomplete results per suggestStores request. */
 var SUGGEST_LIMIT = 30;
@@ -104,6 +105,71 @@ function rowToObj_(headers, row) {
     var key = (headers[i] || '').toString().trim();
     if (!key) continue;
     o[key] = row[i] !== undefined && row[i] !== null ? String(row[i]) : '';
+  }
+  return o;
+}
+
+/**
+ * **Stores Visits Field Reports** rows are keyed by row-1 header text. If columns were inserted/reordered
+ * or legacy headers used (`GitHub Raw URL`, etc.), `github_raw_url` / `github_blob_url` / `github_path`
+ * can read empty while other cells still hold the URLs. Normalize for the DApp / `getStoreHistory`.
+ */
+function normalizeStoresVisitsFieldReportRow_(o) {
+  if (!o || typeof o !== 'object') return o;
+  function s(v) {
+    return (v === undefined || v === null ? '' : String(v)).trim();
+  }
+  var raw = s(o.github_raw_url);
+  var blob = s(o.github_blob_url);
+  var path = s(o.github_path);
+  if (raw || blob) return o;
+
+  var altRaw =
+    s(o['GitHub Raw URL']) ||
+    s(o['Attachment Raw URL']) ||
+    s(o.raw_url) ||
+    s(o['Raw URL']);
+  var altBlob =
+    s(o['GitHub Blob URL']) ||
+    s(o['Attachment GitHub URL']) ||
+    s(o.blob_url) ||
+    s(o['Blob URL']);
+  var altPath = s(o['GitHub Path']) || s(o['github path']) || s(o.attachment_path);
+  if (!raw && altRaw) o.github_raw_url = altRaw;
+  if (!blob && altBlob) o.github_blob_url = altBlob;
+  if (!path && altPath) o.github_path = altPath;
+  raw = s(o.github_raw_url);
+  blob = s(o.github_blob_url);
+
+  if (raw || blob) return o;
+
+  var k;
+  for (k in o) {
+    if (!Object.prototype.hasOwnProperty.call(o, k)) continue;
+    var v = s(o[k]);
+    if (!v || v.indexOf('https://raw.githubusercontent.com/') !== 0) continue;
+    o.github_raw_url = v;
+    raw = v;
+    break;
+  }
+  if (!raw) {
+    for (k in o) {
+      if (!Object.prototype.hasOwnProperty.call(o, k)) continue;
+      var v2 = s(o[k]);
+      if (!v2 || v2.indexOf('https://github.com/') !== 0 || v2.indexOf('/blob/') === -1) continue;
+      o.github_blob_url = v2;
+      break;
+    }
+  }
+  if (!s(o.github_path)) {
+    for (k in o) {
+      if (!Object.prototype.hasOwnProperty.call(o, k)) continue;
+      var p = s(o[k]);
+      if (p.indexOf('store_visits_field_reports/') === 0) {
+        o.github_path = p;
+        break;
+      }
+    }
   }
   return o;
 }
@@ -208,6 +274,7 @@ function hitListTouchAggToBucketsFu_(agg) {
 /**
  * Filter Hit List rows by Status / Shop Type (exact match to sheet cell values).
  * Empty statusList = no status filter (all). Empty shopTypeList = no shop-type filter (all).
+ * DApp status pickers include **Deferred / Revisit later** (non-terminal deferral); filters use the same exact string as the sheet.
  * Optional warmupBucket / followupBucket: integers 0..7 or null (see doGet listStoresByFilter).
  */
 function listHitListByFilter_(statusList, shopTypeList, limit, offset, warmupBucket, followupBucket) {
@@ -451,6 +518,8 @@ function getStoreSuggestions_(q) {
   var shopIdx = hdr['Shop Name'];
   var keyIdx = hdr['Store Key'];
   var emailIdx = hdr['Email'];
+  var statusIdx = hdr['Status'];
+  var shopTypeIdx = hdr['Shop Type'];
   if (shopIdx === undefined) return [];
 
   var needle = normalizeKey_(q);
@@ -462,6 +531,8 @@ function getStoreSuggestions_(q) {
     var shop = row[shopIdx] !== undefined ? String(row[shopIdx]) : '';
     var sk = keyIdx !== undefined && row[keyIdx] !== undefined ? String(row[keyIdx]) : '';
     var em = emailIdx !== undefined && row[emailIdx] !== undefined ? String(row[emailIdx]) : '';
+    var st = statusIdx !== undefined && row[statusIdx] !== undefined ? String(row[statusIdx]) : '';
+    var stype = shopTypeIdx !== undefined && row[shopTypeIdx] !== undefined ? String(row[shopTypeIdx]) : '';
 
     if (!needle) {
       /* empty query: return nothing to avoid huge payloads */
@@ -479,6 +550,8 @@ function getStoreSuggestions_(q) {
       store_key: sk.trim(),
       email: em.trim(),
       hit_list_row: r + 1,
+      status: st.trim(),
+      shop_type: stype.trim(),
     });
   }
 
@@ -551,7 +624,13 @@ function filterRowsForStore_(
     else if (wantEmail && normalizeKey_(em) === wantEmail) ok = true;
     else if (wantShop && normalizeKey_(shp) === wantShop) ok = true;
 
-    if (ok) rows.push(rowToObj_(headers, row));
+    if (ok) {
+      var obj = rowToObj_(headers, row);
+      if (sheetName === SHEET_STORES_VISITS_FIELD_REPORTS) {
+        normalizeStoresVisitsFieldReportRow_(obj);
+      }
+      rows.push(obj);
+    }
   }
 
   return { sheet: sheetName, found: true, rows: rows };
@@ -657,6 +736,7 @@ function getStoreHistory_(storeKey, shopName) {
       dapp_remarks: [],
       email_agent_follow_up: [],
       email_agent_drafts: [],
+      stores_visits_field_reports: [],
       message: 'Store not found for store_key/shop. Pick from suggestions.',
     };
   }
@@ -669,13 +749,16 @@ function getStoreHistory_(storeKey, shopName) {
   var remarks = filterRowsForStore_(SHEET_DAPP_REMARKS, ss, sk, '', shop);
   var follow = filterRowsForStore_(SHEET_EMAIL_FOLLOW_UP, ss, sk, email, shop);
   var sugg = filterRowsForStore_(SHEET_EMAIL_DRAFTS, ss, sk, email, shop);
+  var reports = filterRowsForStore_(SHEET_STORES_VISITS_FIELD_REPORTS, ss, sk, email, shop);
 
   var dappRows = remarks.rows.slice();
   var followRows = follow.rows.slice();
   var suggRows = sugg.rows.slice();
+  var reportRows = reports.rows.slice();
   sortHistoryRowsNewestFirst_(dappRows);
   sortHistoryRowsNewestFirst_(followRows);
   sortHistoryRowsNewestFirst_(suggRows);
+  sortHistoryRowsNewestFirst_(reportRows);
 
   return {
     hit_list_row: hit.row_index,
@@ -686,6 +769,7 @@ function getStoreHistory_(storeKey, shopName) {
     dapp_remarks: dappRows,
     email_agent_follow_up: followRows,
     email_agent_drafts: suggRows,
+    stores_visits_field_reports: reportRows,
   };
 }
 
@@ -693,8 +777,10 @@ function getStoreHistory_(storeKey, shopName) {
  * Web app entrypoint (GET only). JSON body: { status: 'success'|'error', data?: object, message?: string }.
  *
  * Actions:
- *   - suggestStores — e.parameter.q (min length 2); data.suggestions[]: shop_name, store_key, email, hit_list_row
- *   - getStoreHistory — e.parameter.store_key and/or shop; data includes hit_list, dapp_remarks[], email_agent_follow_up[], email_agent_drafts[]
+ *   - suggestStores — e.parameter.q (min length 2); data.suggestions[]: shop_name, store_key, email, hit_list_row,
+ *       status, shop_type (Hit List columns when present)
+ *   - getStoreHistory — e.parameter.store_key and/or shop; data includes hit_list, dapp_remarks[],
+ *       email_agent_follow_up[], email_agent_drafts[], stores_visits_field_reports[]
  *   - listStoresByFilter — optional repeated status=, shop_type=; optional warmup_bucket=, followup_bucket=
  *       (each 0..7: send-depth bucket for AU / AV). limit (default 200, max 500), offset (default 0).
  *       Empty status list = all statuses; empty shop_type = all shop types. Each row may include **warmup_sent**,
