@@ -1085,9 +1085,39 @@ See [`python_scripts/schema_validation/README.md`](./python_scripts/schema_valid
 | U | QR code states | String | QR code status values |
 | V | *(empty)* | - | Reserved column |
 | W | Digital Signature Status | String | Signature status values |
+| X | Inventory Type | String | **Allowed values (operator-defined):** `Cacao Bean`, `Cacao Nib`, `Cacao Mass`, `Packaging Material`, `Retail Ready`. Describes **what the line is** (commodity family / inputs). Canonical **dropdown source** for **`Currencies`!P**. |
+| Y | Unit format | String | **Allowed values:** **`Bulk`**, **`Retail ready`** — **how the SKU is traded / packed**. Canonical **dropdown source** for **`Currencies`!Q**. Replaces legacy **`Sale Type`** column. |
+| Z | Partner Type | String | **Allowed values:** **`Wholesale`**, **`Consignment`**, **`Operator`**, **`Supplier`**, **`Manufacturer`**. Describes the **commercial relationship** with an Agroverse partner. Canonical **dropdown source** for **`Agroverse Partners`!I**. Used by `partners-velocity.json` tooling to pick the right velocity field — **`Consignment`** partners report sales back via **`[SALES EVENT]`** (so `QR Code Sales` rows are accurate sell-through), **`Wholesale`** partners do not report individual sales (only **`Inventory Movement`** restock cadence is reliable). **`Operator` / `Supplier` / `Manufacturer`** are upstream / production roles, not retail stockists. |
 
 **Used by:**
 - All scripts for status validation
+- **`Currencies`** tab — Data validation on **Inventory Type** / **Unit format** (cols **P** / **Q**) by referencing **`States`** cols **X** / **Y**
+- **`Agroverse Partners`** tab — Data validation on **Partner Type** (col **I**) by referencing **`States`** col **Z**
+
+---
+
+##### Sheet: `Agroverse Partners`
+**Purpose:** Maps DAO contributors (`Contributors contact information`) to one or more retail / partner identifiers used by `agroverse-inventory/partners-inventory.json` and downstream velocity tooling.
+
+**Sheet URL:** https://docs.google.com/spreadsheets/d/1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU/edit#gid=1983902109
+
+**Header Row:** 1
+
+| Column | Name | Type | Description |
+|--------|------|------|-------------|
+| A | partner_id | String | Slug-style identifier (e.g. `edge-and-node-house-of-web3`, `go-ask-alice`). **Canonical key** for `agroverse-inventory/partners-inventory.json` and the planned `partners-velocity.json`. |
+| B | display_name | String | Human-readable shop / partner name. |
+| C | location | String | Free-text locale (e.g. `Santa Cruz, California`). |
+| D | status | String | Lifecycle (e.g. `active`, `inactive`). Read by `read_partners_by_contributor` in `market_research/scripts/sync_agroverse_store_inventory.py`. |
+| E | contributor_contact_id | String | Name on `Contributors contact information` that maps this partner to a DAO contributor. **Join key** for matching `QR Code Sales`!P (`Sold by`) and `Inventory Movement`!I (`RECIPIENT NAME`) back to a partner. |
+| F | partner_locations_key | String | (optional) Key in `agroverse_shop/partner_locations.json` if the partner has a public partner page. |
+| G | onboarded_date | Date | (optional) When the partner was added. |
+| H | notes | String | (optional) Operator notes. |
+| I | partner_type | String | One of: **`Wholesale`**, **`Consignment`**, **`Operator`**, **`Supplier`**, **`Manufacturer`**. Validated against **`States`** column **Z**. Determines which velocity field downstream tooling should trust — see **`States`!Z** description and `partners-velocity.json` design in `agentic_ai_context/PARTNER_VELOCITY_PROPOSAL.md`. **Default for retail partners onboarded before 2026-04-27:** treat as `Consignment` (the wholesale-bought retail-pack path was just added on that date; zero `Wholesale`-type partners existed before). |
+
+**Used by:**
+- [`market_research/scripts/sync_agroverse_store_inventory.py`](https://github.com/TrueSightDAO/go_to_market/blob/main/scripts/sync_agroverse_store_inventory.py) — `read_partners_by_contributor` for partner_id ↔ contributor_contact_id mapping; emits `agroverse-inventory/partners-inventory.json`.
+- (Planned) `market_research/scripts/sync_partners_velocity.py` — same join + `partner_type` to emit `agroverse-inventory/partners-velocity.json`.
 
 ---
 
