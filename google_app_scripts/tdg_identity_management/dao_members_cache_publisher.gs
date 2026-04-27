@@ -7,12 +7,24 @@
  *   so `dao_client/cache/contributors.py` can flip from GAS to GitHub-raw.
  * - Contributor-aggregated shape (a contributor can have N active public keys):
  *     {
- *       generated_at, schema_version: 1,
+ *       generated_at, schema_version: 3,
  *       contributors: [
- *         { name, voting_rights, public_keys: [{ public_key, status,
+ *         { name, email, roles, voting_rights, public_keys: [{ public_key, status,
  *           created_at, last_active_at }] }
  *       ]
  *     }
+ *
+ * Schema v3 (current):
+ *   - `email` — first non-empty `Contributor Email Address` (col F) seen across
+ *     the contributor's ACTIVE rows on `Contributors Digital Signatures`. May be
+ *     `null` if no row has an email yet (older legacy contributors).
+ *   - `roles` — string array; always includes "member"; includes "governor" if
+ *     the contributor's name appears on the `Governors` tab (auto-derived 4×/year
+ *     from the trailing 180-day contribution leaderboard).
+ *   These two fields back the dapp permission model: `permissions.js` resolves
+ *   the signed-in RSA → contributor → roles, and gates governor-only UI/actions
+ *   (add-contributor, governor chat, act-on-behalf-of-other) accordingly. The
+ *   email is also used by the dedup pre-flight on the new add-contributor flow.
  *
  * Triggers:
  * - Edgar → doGet(?action=refresh_dao_members_cache&secret=...) on every
@@ -35,11 +47,17 @@ const DAO_MEMBERS_CACHE_SPREADSHEET_ID =
     '1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU';
 const DAO_MEMBERS_CACHE_SIGS_SHEET = 'Contributors Digital Signatures';
 const DAO_MEMBERS_CACHE_VOTING_SHEET = 'Contributors voting weight';
+const DAO_MEMBERS_CACHE_GOVERNORS_SHEET = 'Governors';
+// Governor names live in column A starting at row 11 (rows 1–10 are header /
+// configuration / equinox-rotation copy). The cell list is auto-populated by
+// formulas elsewhere in the workbook based on the trailing contribution
+// leaderboard; we just read the resolved name strings here.
+const DAO_MEMBERS_CACHE_GOVERNORS_FIRST_ROW = 11;
 const DAO_MEMBERS_CACHE_REPO_OWNER = 'TrueSightDAO';
 const DAO_MEMBERS_CACHE_REPO_NAME = 'treasury-cache';
 const DAO_MEMBERS_CACHE_REPO_PATH = 'dao_members.json';
 const DAO_MEMBERS_CACHE_BRANCH = 'main';
-const DAO_MEMBERS_CACHE_SCHEMA_VERSION = 2;
+const DAO_MEMBERS_CACHE_SCHEMA_VERSION = 3;
 
 // assetVerify web app in tdg_asset_management — source of DAO-wide aggregates
 // (voting_rights_circulated, total_assets, asset_per_circulated_voting_right,
@@ -152,15 +170,46 @@ function publishDaoMembersCacheToGithub_(opts) {
     });
   }
 
+  // ----- Governors tab — names of currently-elected governors --------------
+  // Read column A from row 11 to last-row, lowercase, stash in a Set-like map.
+  // The leaderboard is recomputed quarterly (equinoxes / solstices) by the
+  // workbook itself; we just take a snapshot of the current resolved names.
+  const governorsSheet = ss.getSheetByName(DAO_MEMBERS_CACHE_GOVERNORS_SHEET);
+  const governorsByName = {};
+  if (governorsSheet) {
+    const govLastRow = governorsSheet.getLastRow();
+    if (govLastRow >= DAO_MEMBERS_CACHE_GOVERNORS_FIRST_ROW) {
+      const govRows = governorsSheet
+          .getRange(DAO_MEMBERS_CACHE_GOVERNORS_FIRST_ROW, 1,
+                    govLastRow - DAO_MEMBERS_CACHE_GOVERNORS_FIRST_ROW + 1, 1)
+          .getValues();
+      govRows.forEach(function (row) {
+        const name = String(row[0] || '').trim();
+        if (!name) return;
+        governorsByName[name.toLowerCase()] = true;
+      });
+    }
+  } else {
+    Logger.log(
+        'Warning: ' + DAO_MEMBERS_CACHE_GOVERNORS_SHEET + ' tab not found; ' +
+        'all contributors will be emitted with roles=["member"] only.');
+  }
+
   // ----- Aggregate signatures by contributor name --------------------------
+  // Email lives on col F (`Contributor Email Address`); per-key in the sheet
+  // but we hoist the first non-empty email to the contributor record because
+  // the dedup pre-flight on the new add-contributor flow checks "email seen
+  // for any active key of any contributor."
   const byName = {};
   sigsRows.forEach(function (row) {
     const name = String(row[0] || '').trim();
     const status = String(row[3] || '').trim().toUpperCase();
     const publicKey = String(row[4] || '').trim();
+    const email = String(row[5] || '').trim().toLowerCase();
     if (!name || !publicKey || status !== 'ACTIVE') return;
     const key = name.toLowerCase();
-    if (!byName[key]) byName[key] = { name: name, public_keys: [] };
+    if (!byName[key]) byName[key] = { name: name, email: null, public_keys: [] };
+    if (!byName[key].email && email) byName[key].email = email;
     byName[key].public_keys.push({
       public_key: publicKey,
       status: status,
@@ -169,12 +218,16 @@ function publishDaoMembersCacheToGithub_(opts) {
     });
   });
 
-  // ----- Merge voting weight + emit stable-sorted contributors list --------
+  // ----- Merge voting weight + governor flag + emit sorted contributors ----
   const contributors = Object.keys(byName).sort().map(function (k) {
     const entry = byName[k];
     const voting = votingByName[k] || {};
+    const roles = ['member'];
+    if (governorsByName[k]) roles.unshift('governor');
     return {
       name: entry.name,
+      email: entry.email,                                  // may be null
+      roles: roles,                                        // ["governor","member"] or ["member"]
       voting_rights: voting.voting_rights,                 // may be null
       total_voting_power_pct: voting.total_voting_power_pct || null,
       public_keys: entry.public_keys,
@@ -189,6 +242,19 @@ function publishDaoMembersCacheToGithub_(opts) {
       contributors[0].public_keys[0].public_key) || null;
   const daoTotals = probeKey ? fetchDaoTotalsViaAssetVerify_(probeKey) : null;
 
+  // Surface the raw governor snapshot so ops can spot governor-tab names that
+  // don't join cleanly to a contributor (e.g. typos, ledger codes like
+  // "AGL15", or recently-added governors who haven't yet registered a
+  // signature). These names get no roles flag in `contributors[]` because
+  // there's no contributor record to attach to.
+  const matchedGovernorNames = {};
+  contributors.forEach(function (c) {
+    if (c.roles.indexOf('governor') >= 0) matchedGovernorNames[c.name.toLowerCase()] = true;
+  });
+  const unjoinedGovernorNames = Object.keys(governorsByName)
+      .filter(function (k) { return !matchedGovernorNames[k]; })
+      .sort();
+
   const snapshot = {
     generated_at: new Date().toISOString(),
     schema_version: DAO_MEMBERS_CACHE_SCHEMA_VERSION,
@@ -199,16 +265,25 @@ function publishDaoMembersCacheToGithub_(opts) {
       active_public_keys: contributors.reduce(function (sum, c) {
         return sum + c.public_keys.length;
       }, 0),
+      governors: contributors.reduce(function (sum, c) {
+        return sum + (c.roles.indexOf('governor') >= 0 ? 1 : 0);
+      }, 0),
+      contributors_with_email: contributors.reduce(function (sum, c) {
+        return sum + (c.email ? 1 : 0);
+      }, 0),
     },
     dao_totals: daoTotals,
+    unjoined_governor_names: unjoinedGovernorNames,
     contributors: contributors,
   };
 
   const content = JSON.stringify(snapshot, null, 2) + '\n';
   const commitMessage =
       'chore: refresh dao_members.json (' + snapshot.counts.contributors +
-      ' contributors, ' + snapshot.counts.active_public_keys +
-      ' active keys, trigger=' + snapshot.trigger + ')';
+      ' contributors, ' + snapshot.counts.governors + ' governors, ' +
+      snapshot.counts.contributors_with_email + ' with email, ' +
+      snapshot.counts.active_public_keys + ' active keys, trigger=' +
+      snapshot.trigger + ')';
 
   const commit = commitJsonToGithub_({
     token: token,
