@@ -930,34 +930,48 @@ function processTelegramChatLogsToInventoryMovement() {
         // Extract QR code from contribution if present
         const qrCodeMatch = lines.find(line => line.startsWith('- QR Code:'));
         const qrCode = qrCodeMatch ? qrCodeMatch.replace('- QR Code:', '').trim() : null;
-        
-        // Check if recipient exists, if not add them to Contributors sheet
-        if (reportResult.recipient_name && reportResult.recipient_name.trim() !== '') {
-          const exists = recipientExists(reportResult.recipient_name);
-          if (!exists) {
-            const added = addNewRecipient(reportResult.recipient_name);
-            if (added) {
-              Logger.log(`Successfully added new recipient "${reportResult.recipient_name}" to Contributors sheet`);
-            } else {
-              Logger.log(`Warning: Failed to add new recipient "${reportResult.recipient_name}" to Contributors sheet`);
-            }
-          }
-        }
-        
-        // If QR code is provided, update the Manager Name in Agroverse QR codes sheet
-        // The Manager Name should be set to the recipient name, as the recipient is now the holder of the QR code
-        if (qrCode && reportResult.recipient_name) {
-          const updated = updateAgroverseQrManagerName(qrCode, reportResult.recipient_name);
-          if (updated) {
-            Logger.log(`Successfully updated Manager Name for QR code ${qrCode} to ${reportResult.recipient_name} (recipient is now the holder)`);
-          } else {
-            Logger.log(`Warning: Failed to update Manager Name for QR code ${qrCode}`);
-          }
-        }
 
+        // Auth check FIRST. We used to auto-add an unknown recipient to the
+        // Contributors sheet before computing movementStatus, which meant an
+        // 'unauthorized' submission with a fabricated recipient name still
+        // created a ghost contributor row even though Phase 2 skipped the
+        // movement itself. Now both side effects (recipient auto-add + QR
+        // manager-name update) only run when the movement is authorized.
         const movementStatus = inventoryMovementStatusFromTelegramRow_(row, contribution, reportResult.sender_name);
         if (movementStatus === 'unauthorized') {
           Logger.log(`Update ID ${updateId}: Column N = unauthorized (signer is not warehouse manager and Governor is not YES)`);
+          if (reportResult.recipient_name && reportResult.recipient_name.trim() !== '' &&
+              !recipientExists(reportResult.recipient_name)) {
+            Logger.log(
+              `Update ID ${updateId}: Skipped auto-add of new recipient ` +
+              `"${reportResult.recipient_name}" because movement is unauthorized. ` +
+              `A Governor must add the contributor explicitly via the dedicated ` +
+              `add-contributor flow before this recipient can receive inventory.`);
+          }
+        }
+
+        if (movementStatus === 'NEW') {
+          // Authorized movement → perform the contributor + QR side effects.
+          if (reportResult.recipient_name && reportResult.recipient_name.trim() !== '') {
+            const exists = recipientExists(reportResult.recipient_name);
+            if (!exists) {
+              const added = addNewRecipient(reportResult.recipient_name);
+              if (added) {
+                Logger.log(`Successfully added new recipient "${reportResult.recipient_name}" to Contributors sheet`);
+              } else {
+                Logger.log(`Warning: Failed to add new recipient "${reportResult.recipient_name}" to Contributors sheet`);
+              }
+            }
+          }
+
+          if (qrCode && reportResult.recipient_name) {
+            const updated = updateAgroverseQrManagerName(qrCode, reportResult.recipient_name);
+            if (updated) {
+              Logger.log(`Successfully updated Manager Name for QR code ${qrCode} to ${reportResult.recipient_name} (recipient is now the holder)`);
+            } else {
+              Logger.log(`Warning: Failed to update Manager Name for QR code ${qrCode}`);
+            }
+          }
         }
 
         // Create new row for Inventory Movement
