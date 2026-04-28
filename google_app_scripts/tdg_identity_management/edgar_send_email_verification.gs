@@ -78,10 +78,22 @@ function doGet(e) {
     });
   }
 
+  if (action === 'apply_permission_change') {
+    // Edgar → GET ?action=apply_permission_change&secret=...
+    // Implementation lives in DappPermissionChangeHandler.js. Pulls
+    // pending [DAPP PERMISSION CHANGE EVENT] rows from Telegram Chat
+    // Logs, verifies governor, applies change to permissions.json on
+    // treasury-cache, logs to "Dapp Permission Changes" tab.
+    return handleApplyPermissionChangeRequest_({
+      secret: e.parameter.secret,
+      force: e.parameter.force || '',
+    });
+  }
+
   return ContentService.createTextOutput(
     JSON.stringify({
       ok: false,
-      error: 'No valid action (use action=sendEmailVerification or action=refresh_dao_members_cache on GET, or POST JSON for email verification).',
+      error: 'No valid action (use action=sendEmailVerification, action=refresh_dao_members_cache, or action=apply_permission_change on GET, or POST JSON for email verification).',
     })
   ).setMimeType(ContentService.MimeType.JSON);
 }
