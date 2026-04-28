@@ -42,22 +42,26 @@ function computeIgnoreBeforeDate_() {
   return `${yyyy}${mm}${dd}`;
 }
 
-// List of DAO-specific event strings to skip during message processing
-// - Messages containing these strings will be ignored to avoid errors in TDG scoring
-// - Add or remove strings as needed to filter out specific event types
-const SKIP_MESSAGE_STRINGS = [
-  '[DIGITAL SIGNATURE EVENT]',
-  '[VOTING RIGHTS WITHDRAWAL REQUEST]',
-  '[QR CODE EVENT]',
-  '[SALES EVENT]',
-  '[DAO INVENTORY EXPENSE EVENT]',
-  '[INVENTORY MOVEMENT]',
-  '[FARM REGISTRATION]',
-  '[TREE PLANTING EVENT]',
-  '[NOTARIZATION EVENT]',
-  '[STORE ADD EVENT]',
-  '[RETAIL FIELD REPORT EVENT]'
-];
+// Historical denylist (pre-2026-04-28). The scorer now uses an explicit allowlist —
+// see `shouldSkipMessage` below — that admits only messages with a [CONTRIBUTION EVENT]
+// header. This list is retained as documentation of which event types the DAO has
+// explicitly decided do NOT earn TDGs (each has its own dedicated audit log instead),
+// but is no longer consulted at runtime.
+//
+//   [DIGITAL SIGNATURE EVENT]
+//   [VOTING RIGHTS WITHDRAWAL REQUEST]
+//   [QR CODE EVENT]
+//   [SALES EVENT]
+//   [DAO INVENTORY EXPENSE EVENT]
+//   [INVENTORY MOVEMENT]
+//   [FARM REGISTRATION]
+//   [TREE PLANTING EVENT]
+//   [NOTARIZATION EVENT]
+//   [STORE ADD EVENT]
+//   [RETAIL FIELD REPORT EVENT]
+//   [CONTRIBUTOR ADD EVENT]
+//   [EMAIL VERIFICATION EVENT]
+//   [REPACKAGING BATCH EVENT]
 
 // Load API keys and configuration settings from Credentials.gs
 // - setApiKeys(): Stores sensitive API keys in Google Apps Script’s Script Properties for security.
@@ -1508,31 +1512,27 @@ function testUploadFileToGitHub(fileId, destinationUrl, message) {
 
 
 /**
- * Checks if a message contains any DAO-specific event strings that should be skipped.
+ * Allowlist gate: only score messages that contain the canonical [CONTRIBUTION EVENT] header.
+ *
+ * Rationale (2026-04-28 transition): all scoreable submissions now flow through DApp /
+ * dao_client, which always emits [CONTRIBUTION EVENT] for work-time contributions. Other
+ * event types (e.g. [QR CODE EVENT], [STORE ADD EVENT], [RETAIL FIELD REPORT EVENT],
+ * [CONTRIBUTOR ADD EVENT]) have their own dedicated audit logs and never award TDGs, so
+ * they are skipped here regardless of whether they appear on a future denylist.
+ *
+ * Also fixes a substring-matching false-negative the prior denylist had: a legitimate
+ * [CONTRIBUTION EVENT] whose description text happens to mention another bracketed tag
+ * (e.g. "feat(dao): [RETAIL FIELD REPORT EVENT] archive ...") would otherwise be
+ * incorrectly skipped. Allowlist semantics make the precedence explicit.
+ *
  * @param {string} message - The chat log message to check.
- * @returns {boolean} - True if the message contains a string to skip, false otherwise.
+ * @returns {boolean} - True if the message should be skipped (no [CONTRIBUTION EVENT] header).
  */
 function shouldSkipMessage(message) {
-  const messageUpper = message.toUpperCase();
-  // Also convert skip strings to uppercase for case-insensitive matching
-  let shouldSkip = SKIP_MESSAGE_STRINGS.some(skipString => messageUpper.includes(skipString.toUpperCase()));
-  // Belt-and-suspenders: expense reports use "[DAO Inventory Expense Event]" (see dapp report_dao_expenses.html).
-  // Match even if spacing/unicode spaces differ so Grok never writes these to "Scored Chatlogs".
-  if (!shouldSkip && /\[DAO\s+INVENTORY\s+EXPENSE\s+EVENT\]/i.test(message)) {
-    shouldSkip = true;
-    Logger.log(`shouldSkipMessage: Matched DAO Inventory Expense Event via flexible regex`);
+  const messageUpper = (message || '').toUpperCase();
+  if (!messageUpper.includes('[CONTRIBUTION EVENT]')) {
+    Logger.log(`shouldSkipMessage: skipping (no [CONTRIBUTION EVENT] header): ${(message || '').substring(0, 100)}`);
+    return true;
   }
-  
-  if (shouldSkip) {
-    Logger.log(`shouldSkipMessage: Skipping message due to DAO-specific event: ${message.substring(0, 100)}`);
-  } else {
-    Logger.log(`shouldSkipMessage: Message does not match skip patterns. Checking contents...`);
-    SKIP_MESSAGE_STRINGS.forEach(skipString => {
-      if (messageUpper.includes(skipString.toUpperCase())) {
-        Logger.log(`shouldSkipMessage: WARNING - Found skip pattern "${skipString}" but filter failed!`);
-      }
-    });
-  }
-  
-  return shouldSkip;
+  return false;
 }
