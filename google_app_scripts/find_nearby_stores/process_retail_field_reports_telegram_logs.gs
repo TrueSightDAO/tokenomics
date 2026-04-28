@@ -65,6 +65,12 @@ function parseRetailFieldReportText_(text) {
     var line = (lines[i] || '').trim();
     if (!line) continue;
     if (line.indexOf('[RETAIL FIELD REPORT EVENT]') === 0) continue;
+    // Bullet prefix from dao_client's `build_share_text` — `- Label: Value`.
+    // The DApp's older `buildRetailFieldReportText` builds without the bullet,
+    // so we strip defensively to support both clients. (Patched 2026-04-28
+    // when the new dao_client `update_store` module landed and surfaced the
+    // gap — same logic the sibling store-add parser already had.)
+    if (line.charAt(0) === '-') line = line.substring(1).trim();
     var m = line.match(/^([A-Za-z][A-Za-z0-9_\s\/\-]*):\s*(.*)$/);
     if (!m) continue;
     var key = m[1].trim().toLowerCase().replace(/\s+/g, '_');
