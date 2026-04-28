@@ -54,7 +54,9 @@ const SKIP_MESSAGE_STRINGS = [
   '[INVENTORY MOVEMENT]',
   '[FARM REGISTRATION]',
   '[TREE PLANTING EVENT]',
-  '[NOTARIZATION EVENT]'
+  '[NOTARIZATION EVENT]',
+  '[STORE ADD EVENT]',
+  '[RETAIL FIELD REPORT EVENT]'
 ];
 
 // Load API keys and configuration settings from Credentials.gs
