@@ -20,16 +20,23 @@
  * Design / security: see agentic_ai_context/DAPP_PERMISSION_CHANGE_FLOW.md.
  *
  * Triggers:
- * - Edgar → doGet(?action=apply_permission_change&secret=...) after every
- *   successful [DAPP PERMISSION CHANGE EVENT] persist on Telegram Chat Logs.
+ * - Edgar → doGet(?action=apply_permission_change) after every successful
+ *   [DAPP PERMISSION CHANGE EVENT] persist on Telegram Chat Logs. Edgar's
+ *   WebhookTriggerWorker only forwards `action` (no secret), matching the
+ *   convention of every other dispatch handler (processTelegramChatLogs,
+ *   parseAndProcessTelegramLogs, etc.). The Apps Script deployment URL
+ *   itself is the access token (functionally unguessable); real
+ *   authorization is the per-event RSA signature + Governors-tab membership
+ *   check inside applyPendingPermissionChanges_. Even if the URL leaks, an
+ *   attacker can only force-process events that are already on Telegram
+ *   Chat Logs with valid governor signatures, and processing is idempotent
+ *   on Telegram Update IDs.
  * - Manual: applyDapPermissionChangeNow() from the Apps Script editor.
  *
  * Script properties required:
  * - CONTRIBUTORS_CACHE_GITHUB_PAT — already present (used by
  *   dao_members_cache_publisher.gs). Same scope (`contents:write` on
  *   treasury-cache) covers permissions.json.
- * - EMAIL_VERIFICATION_SECRET — already present; used as the doGet
- *   shared secret to keep the endpoint internal.
  */
 
 const PERMISSIONS_TELEGRAM_SPREADSHEET_ID = '1qbZZhf-_7xzmDTriaJVWj6OZshyQsFkdsAV8-pyzASQ';
@@ -78,16 +85,19 @@ function applyDapPermissionChangeNow() {
 
 /**
  * doGet-routed entry. body = { secret, force }.
+ *
+ * NOTE on auth: this handler does NOT gate on `secret`. Edgar's
+ * WebhookTriggerWorker only forwards `action` as a query param (matches
+ * processTelegramChatLogs / parseAndProcessTelegramLogs / etc.) — the
+ * Apps Script deployment URL itself is the access token (functionally
+ * unguessable). Real authorization happens INSIDE applyPendingPermissionChanges_:
+ * each event must be RSA-signed and the signer must be on the Governors
+ * tab. Even if the deployment URL leaks, an attacker can only force-process
+ * events that are already on Telegram Chat Logs with valid governor
+ * signatures, and processing is idempotent on Telegram Update IDs.
  */
 function handleApplyPermissionChangeRequest_(body) {
   try {
-    const expected = PropertiesService.getScriptProperties()
-        .getProperty('EMAIL_VERIFICATION_SECRET');
-    if (!expected || String(body.secret || '') !== String(expected)) {
-      return ContentService
-          .createTextOutput(JSON.stringify({ ok: false, error: 'Unauthorized' }))
-          .setMimeType(ContentService.MimeType.JSON);
-    }
     const result = applyPendingPermissionChanges_({ trigger: 'edgar_webhook' });
     return ContentService
         .createTextOutput(JSON.stringify({ ok: true, ...result }))
