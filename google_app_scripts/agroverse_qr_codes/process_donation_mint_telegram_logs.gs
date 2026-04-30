@@ -86,7 +86,7 @@ var DONATION_PLEDGE_HEADERS = [
   'created_at_utc',
   'telegram_update_id',
   'telegram_message_id',
-  'status',                 // minted | REJECTED_INVALID_CURRENCY | REJECTED_NOT_GOVERNOR | REJECTED_NO_VISUAL_PROOF | REJECTED_INVALID_PROOF_URL | REJECTED_MISSING_QR_ID | error
+  'status',                 // minted | REJECTED_INVALID_CURRENCY | REJECTED_NOT_GOVERNOR | REJECTED_NO_VISUAL_PROOF | REJECTED_INVALID_PROOF_URL | REJECTED_MISSING_QR_ID | REJECTED_QR_CODE_COLLISION | error
   'qr_code',
   'currency',
   'donor_name',
@@ -291,11 +291,45 @@ function validateDonationMintEvent_(fields, fullMessage) {
     });
   }
 
+  // Last gate before minting: refuse to overwrite an existing QR code on
+  // Agroverse QR codes. Even an authorized governor — accidental copy/paste
+  // or a buggy client passing a stale --qr-code override — could otherwise
+  // clobber a cacao-bag row's status / owner / price. Cheapest defense: read
+  // col A and compare. Donation volume is low, the read cost is negligible.
+  if (qrCodeAlreadyExistsOnAgroverseQrCodes_(qrCode)) {
+    return Object.assign({}, base, {
+      ok: false,
+      status: 'REJECTED_QR_CODE_COLLISION',
+      governor_name: gov.signerName,
+      error_message: 'QR code ' + qrCode + ' already exists on Agroverse QR codes — refusing to overwrite. Re-run mint_donation.py without --qr-code to auto-generate a fresh id.'
+    });
+  }
+
   return Object.assign({}, base, {
     ok: true,
     status: 'minted',
     governor_name: gov.signerName
   });
+}
+
+/** Returns true iff `qrCode` is already present in column A of the Agroverse
+ *  QR codes sheet. Used as the last validation gate before appending a new
+ *  donation mint row, so dao_client `--qr-code` overrides (or auto-generated
+ *  IDs that happen to collide — astronomically unlikely with `<prefix>_<date>_<8hex>`,
+ *  but possible) cannot clobber an existing cacao-bag row. */
+function qrCodeAlreadyExistsOnAgroverseQrCodes_(qrCode) {
+  var needle = String(qrCode || '').trim();
+  if (!needle) return false;
+  var ss = SpreadsheetApp.openById(SHEET_URL_TO_ID_(SHEET_URL));
+  var ws = ss.getSheetByName(QR_CODE_SHEET_NAME);
+  if (!ws) return false;
+  var lastRow = ws.getLastRow();
+  if (lastRow < 2) return false;
+  var values = ws.getRange(2, 1, lastRow - 1, 1).getValues();
+  for (var i = 0; i < values.length; i++) {
+    if (String(values[i][0] || '').trim() === needle) return true;
+  }
+  return false;
 }
 
 /**
