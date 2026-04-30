@@ -1,12 +1,12 @@
 /**
  * Daily auto-flip: Hit List rows with Status = "Deferred / Revisit later"
- * AND Follow Up Date <= today get flipped to Status = "Manager Follow-up"
+ * AND Deferred Until <= today get flipped to Status = "Manager Follow-up"
  * with a DApp Remarks row attributing the change to this scheduler.
  *
  * Why: a Deferred row without an automatic resurface mechanism rots — the
  * operator marks "circle back in 6 weeks" and the row sits there indefinitely.
- * The DApp editor (`dapp/store_interaction_history.html`) requires Follow Up
- * Date when Status = Deferred / Revisit later, so every Deferred row carries
+ * The DApp editor (`dapp/store_interaction_history.html`) requires Deferred Until
+ * when Status = Deferred / Revisit later, so every Deferred row carries
  * a date to compare against.
  *
  * Companion DApp validation: TrueSightDAO/dapp#198.
@@ -79,9 +79,12 @@ function processDeferredAutoFlip() {
 
   var idxStatus = headers.indexOf('Status');
   var idxShop = headers.indexOf('Shop Name');
-  var idxFollowUp = headers.indexOf('Follow Up Date');
-  if (idxStatus === -1 || idxShop === -1 || idxFollowUp === -1) {
-    throw new Error('Hit List missing one of: Status / Shop Name / Follow Up Date');
+  var idxDeferredUntil = headers.indexOf('Deferred Until');
+  if (idxStatus === -1 || idxShop === -1 || idxDeferredUntil === -1) {
+    throw new Error(
+      'Hit List missing one of: Status / Shop Name / Deferred Until. ' +
+      '`Deferred Until` was added 2026-04-30 — re-create it on Hit List if missing.'
+    );
   }
   var idxStatusUpdatedBy = headers.indexOf('Status Updated By');
   var idxStatusUpdatedDate = headers.indexOf('Status Updated Date');
@@ -105,14 +108,14 @@ function processDeferredAutoFlip() {
       continue;
     }
 
-    var fuRaw = values[r][idxFollowUp];
-    var fuDate = parseDeferredFollowUpDate_(fuRaw);
-    if (!fuDate) {
-      Logger.log('Skip ' + shopName + ': Deferred row has unparseable Follow Up Date "' + fuRaw + '"');
+    var duRaw = values[r][idxDeferredUntil];
+    var duDate = parseDeferredFollowUpDate_(duRaw);
+    if (!duDate) {
+      Logger.log('Skip ' + shopName + ': Deferred row has unparseable Deferred Until "' + duRaw + '"');
       stats.skipped_no_date++;
       continue;
     }
-    if (fuDate.getTime() > todayStartMs) {
+    if (duDate.getTime() > todayStartMs) {
       stats.skipped_future++;
       continue;
     }
@@ -133,13 +136,13 @@ function processDeferredAutoFlip() {
       }
 
       var remark = 'Auto-resurfaced from "' + DEFERRED_AUTO_FLIP_FROM_STATUS +
-        '" — Follow Up Date ' + Utilities.formatDate(fuDate, Session.getScriptTimeZone(), 'yyyy-MM-dd') +
+        '" — Deferred Until ' + Utilities.formatDate(duDate, Session.getScriptTimeZone(), 'yyyy-MM-dd') +
         ' has arrived; Status flipped to "' + DEFERRED_AUTO_FLIP_TO_STATUS + '".';
       appendDeferredAutoFlipRemark_(ss, shopName, DEFERRED_AUTO_FLIP_TO_STATUS, remark);
 
       stats.flipped++;
-      Logger.log('Flipped: ' + shopName + ' (Follow Up was ' +
-        Utilities.formatDate(fuDate, Session.getScriptTimeZone(), 'yyyy-MM-dd') + ')');
+      Logger.log('Flipped: ' + shopName + ' (Deferred Until was ' +
+        Utilities.formatDate(duDate, Session.getScriptTimeZone(), 'yyyy-MM-dd') + ')');
     } catch (err) {
       Logger.log('Error flipping ' + shopName + ': ' + (err && err.message ? err.message : err));
       stats.errors++;
@@ -152,7 +155,7 @@ function processDeferredAutoFlip() {
 
 
 /**
- * Best-effort parse for the Follow Up Date cell. Sheets returns Date objects
+ * Best-effort parse for the Deferred Until cell. Sheets returns Date objects
  * for date-formatted cells and strings for plain-text cells; both are normalized
  * to a Date at midnight (no time-of-day). Returns null when unparseable.
  *
