@@ -444,8 +444,8 @@ function updateAgroverseQrOwnerEmail(qrCode, email) {
 
 /** Match Stripe checkout row by Session ID (column C); set Shipping (M), Tracking (N), and QR (P) when provided */
 function updateStripeCheckoutMetadata(sessionId, trackingNumber, qrCode, shippingProvider) {
-  if (!sessionId) {
-    Logger.log('Stripe checkout update skipped: no Stripe Session ID in payload');
+  if (!sessionId || !/^cs_(live|test)_/.test(sessionId)) {
+    Logger.log('Stripe checkout update skipped: no valid Stripe Session ID in payload');
     return false;
   }
   try {
