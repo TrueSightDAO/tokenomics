@@ -96,6 +96,7 @@ var DONATION_MINTS_HEADERS = [
   'governor_name',
   'visual_proof_url',
   'agroverse_qr_row',       // row number on Agroverse QR codes when minted
+  'offchain_tx_row',        // row number on offchain transactions for the +1 Pledge entry
   'error_message'
 ];
 
@@ -146,6 +147,7 @@ function appendDonationMintRow_(sheet, params) {
     String(params.governor_name || ''),
     String(params.visual_proof_url || ''),
     params.agroverse_qr_row != null ? String(params.agroverse_qr_row) : '',
+    params.offchain_tx_row != null ? String(params.offchain_tx_row) : '',
     String(params.error_message || '')
   ];
   sheet.appendRow(row);
@@ -299,8 +301,18 @@ function validateDonationMintEvent_(fields, fullMessage) {
 /**
  * Append a fully-formed row to `Agroverse QR codes` for a validated donation mint.
  * Reuses canonical `createQRCodeRow(qrCodeValue, productData)` from qr_code_web_service.gs
- * and then patches the donation-specific overrides (Owner Email = donor email,
- * Price = donation amount, status stays MINTED).
+ * and then patches the donation-specific overrides.
+ *
+ * **Server-locked fields (NOT trusted from client payload — derived here):**
+ *   - col B `landing_page` ← Currencies col E (already via createQRCodeRow / currencyData)
+ *   - col C `ledger`       ← Currencies col F (already via createQRCodeRow / currencyData)
+ *   - col U `Manager Name` ← validated governor display name
+ *   - col V `Ledger Name`  ← parsed from Currencies col F URL (e.g. `…/agl4` → `AGL4`)
+ *
+ * If the dao_client (or any other caller) attempts to set any of these in the
+ * `[DONATION MINT EVENT]` payload, those values are ignored. This is the
+ * integrity boundary — only governors can mint, but even a governor cannot
+ * misroute funds by spoofing `Ledger Name` or the public-facing `landing_page`.
  *
  * Returns the row number that was appended.
  */
@@ -315,15 +327,76 @@ function appendDonationMintToAgroverseQrCodes_(eventData, currencyData) {
   // Donation-specific overrides:
   //   col L (index 11) — Owner Email = donor email at mint time
   //   col T (index 19) — Price = donation amount (createQRCodeRow defaults to 25)
-  //   col U (index 20) — Manager Name = governor's display name
+  //   col U (index 20) — Manager Name = governor's display name (server-validated)
+  //   col V (index 21) — Ledger Name = derived from Currencies `ledger` URL
   if (eventData.donor_email) row[11] = eventData.donor_email;
   var amount = parseFloat(eventData.donation_amount);
   if (!isNaN(amount) && amount > 0) row[19] = amount;
-  // createQRCodeRow's row may be shorter than U; pad to length 21 to fit Manager Name.
-  while (row.length < 21) row.push('');
+  // createQRCodeRow's row may be shorter than V; pad to length 22.
+  while (row.length < 22) row.push('');
   row[20] = eventData.governor_name || '';
+  row[21] = ledgerNameFromCurrencies_(currencyData);
 
   ws.appendRow(row);
+  return ws.getLastRow();
+}
+
+/** Derive the `Ledger Name` (e.g. "AGL4") from the Currencies tab's `ledger` URL.
+ *  Single source of truth: Currencies col F. If the Pledge currency moves to a
+ *  different AGL ledger later, only one cell needs to change.
+ *  Returns '' if the URL doesn't contain an `agl<N>` segment — operator can
+ *  back-fill the cell manually in that edge case. */
+function ledgerNameFromCurrencies_(currencyData) {
+  var url = String(currencyData && currencyData.ledger || '').trim();
+  var m = url.match(/\/(agl\d+)\b/i);
+  return m ? m[1].toUpperCase() : '';
+}
+
+/** Main Ledger / Contributors workbook (same workbook as `Agroverse QR codes`,
+ *  `Currencies`, `Governors`, `Contributors Digital Signatures`). The `offchain
+ *  transactions` tab on this workbook is the canonical double-entry ledger. */
+var DONATION_MINT_OFFCHAIN_TX_SHEET = 'offchain transactions';
+
+/**
+ * Append a `+1 SunMint Tree Planting Pledge - QR Code` row to **offchain
+ * transactions** for a successfully-minted donation, embedding the visual
+ * proof URL in the description. Closes the integrity loop — an auditor
+ * scanning the offchain ledger can trace any +1 Pledge entry back to the
+ * photo of the cash receipt that funded it.
+ *
+ * Schema (header row 4, data starts row 5):
+ *   A: Transaction Date (YYYYMMDD)
+ *   B: Description           ← `[DONATION MINT] {qr_code} — proof: {url}`
+ *   C: Fund Handler          ← validated governor display name
+ *   D: Amount                ← +1 (one Pledge unit minted)
+ *   E: Currency              ← `SunMint Tree Planting Pledge - QR Code`
+ *   F: Ledger Line           ← left blank (auto-populated downstream)
+ *   G: Is Revenue            ← left blank (this is inventory mint, not revenue;
+ *                              the eventual SALES EVENT records the $X cash
+ *                              inflow as revenue via the existing pipeline)
+ *
+ * Returns the row number that was appended.
+ */
+function appendDonationMintOffchainTransaction_(eventData) {
+  var ss = SpreadsheetApp.openById(DONATION_MINT_GOVERNORS_SPREADSHEET_ID);
+  var ws = ss.getSheetByName(DONATION_MINT_OFFCHAIN_TX_SHEET);
+  if (!ws) throw new Error('offchain transactions sheet not found');
+
+  var today = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyyMMdd');
+  var description = '[DONATION MINT] ' + (eventData.qr_code || '') +
+    (eventData.donor_name ? ' — donor: ' + eventData.donor_name : '') +
+    (eventData.donation_amount ? ' (donation: $' + eventData.donation_amount + ')' : '') +
+    ' — proof: ' + (eventData.visual_proof_url || '');
+
+  ws.appendRow([
+    today,                                  // A: Transaction Date
+    description,                            // B: Description (with proof URL)
+    eventData.governor_name || '',          // C: Fund Handler
+    1,                                      // D: Amount (+1 Pledge unit)
+    eventData.currency || '',               // E: Currency
+    '',                                     // F: Ledger Line
+    ''                                      // G: Is Revenue
+  ]);
   return ws.getLastRow();
 }
 
@@ -444,6 +517,24 @@ function processDonationMintsFromTelegramChatLogs() {
 
         var aqrRow = appendDonationMintToAgroverseQrCodes_(eventData, currencyData);
 
+        // Close the integrity loop: log a +1 Pledge entry to offchain transactions
+        // with the visual proof URL embedded in the description so any future
+        // auditor of the offchain ledger can trace each mint back to the photo
+        // of the cash receipt that funded it.
+        var offchainTxRow = '';
+        try {
+          offchainTxRow = appendDonationMintOffchainTransaction_(eventData);
+        } catch (offchainErr) {
+          // Don't fail the whole mint if the ledger write throws — the QR row
+          // is already on Agroverse QR codes, dedup is in place, and the audit
+          // row records the gap so an operator can back-fill manually.
+          Logger.log(
+            'processDonationMintsFromTelegramChatLogs: offchain ledger write failed for ' +
+            eventData.qr_code + ': ' + (offchainErr && (offchainErr.message || offchainErr))
+          );
+          offchainTxRow = 'ERROR: ' + (offchainErr && (offchainErr.message || offchainErr));
+        }
+
         appendDonationMintRow_(dmSheet, {
           telegram_update_id: telegramUpdateId,
           telegram_message_id: telegramMessageId,
@@ -456,7 +547,8 @@ function processDonationMintsFromTelegramChatLogs() {
           submitted_by: eventData.submitted_by,
           governor_name: eventData.governor_name,
           visual_proof_url: eventData.visual_proof_url,
-          agroverse_qr_row: aqrRow
+          agroverse_qr_row: aqrRow,
+          offchain_tx_row: offchainTxRow
         });
         seenUpdateIds[telegramUpdateId] = true;
         minted++;
