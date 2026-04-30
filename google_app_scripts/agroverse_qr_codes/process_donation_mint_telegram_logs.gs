@@ -386,6 +386,56 @@ function ledgerNameFromCurrencies_(currencyData) {
   return m ? m[1].toUpperCase() : '';
 }
 
+/** Inline Currencies-tab lookup, scoped to the donation-mint scanner.
+ *  Avoids a cross-file dependency on `findCurrencyInAgroverse` (which lives
+ *  in `process_qr_code_generation_telegram_logs.gs` in a *different* Apps
+ *  Script project — `1N6o00N…` — than this scanner's deployment target).
+ *
+ *  The function returns the same shape as `findCurrencyInAgroverse` so the
+ *  rest of the donation-mint flow ({ landing_page, ledger, product_name,
+ *  product_image, farm_name, state, country, year }) needs no change.
+ *
+ *  Currencies tab schema (header row 1):
+ *    A: currency name
+ *    B: price in USD (unused here)
+ *    C: serializable (must be TRUE for QR-coded currencies)
+ *    D: product image URL
+ *    E: landing_page (consumer-facing receipt page)
+ *    F: ledger (AGL ledger URL)
+ *    G: farm name (empty for Pledges)
+ *    H: state (empty for Pledges)
+ *    I: country (empty for Pledges)
+ *    J: year (empty for Pledges)
+ */
+function findCurrencyForDonationMint_(currencyName) {
+  var ss = SpreadsheetApp.openById(SHEET_URL_TO_ID_(SHEET_URL));
+  var ws = ss.getSheetByName('Currencies');
+  if (!ws) return null;
+  var lastRow = ws.getLastRow();
+  if (lastRow < 2) return null;
+  var rows = ws.getRange(2, 1, lastRow - 1, 10).getValues();
+  var needle = String(currencyName || '').trim().toLowerCase();
+  if (!needle) return null;
+  for (var i = 0; i < rows.length; i++) {
+    var row = rows[i];
+    var name = String(row[0] || '').trim();
+    var serializable = row[2] === true || String(row[2]).toUpperCase() === 'TRUE';
+    if (!name || !serializable) continue;
+    if (name.toLowerCase() !== needle) continue;
+    return {
+      product_name:  name,
+      product_image: String(row[3] || '').trim(),
+      landing_page:  String(row[4] || '').trim(),
+      ledger:        String(row[5] || '').trim(),
+      farm_name:     String(row[6] || '').trim(),
+      state:         String(row[7] || '').trim(),
+      country:       String(row[8] || '').trim(),
+      year:          String(row[9] || '').trim()
+    };
+  }
+  return null;
+}
+
 /** Main Ledger / Contributors workbook (same workbook as `Agroverse QR codes`,
  *  `Currencies`, `Governors`, `Contributors Digital Signatures`). The `offchain
  *  transactions` tab on this workbook is the canonical double-entry ledger. */
@@ -528,7 +578,7 @@ function processDonationMintsFromTelegramChatLogs() {
       }
 
       try {
-        var currencyData = getCurrencyData(eventData.currency);
+        var currencyData = findCurrencyForDonationMint_(eventData.currency);
         if (!currencyData) {
           appendDonationPledgeRow_(dmSheet, {
             telegram_update_id: telegramUpdateId,
