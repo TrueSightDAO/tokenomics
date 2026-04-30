@@ -1726,6 +1726,7 @@ const TEST_QR_CODE = "2025BF_20250521_PROPANE_1"; // QR code for testing
 const EMAIL_COLUMN = 12; // Column L (1-based index)
 const TIMESTAMP_COLUMN = 13; // Column M (1-based index)
 const QR_CODE_COLUMN = 1; // Column A (1-based index)
+const PROCESS_BATCH_ALERT_RECIPIENT = 'garyjob@agroverse.shop';
 
 /**
  * Tester method to manually test email sending with a sample QR code
@@ -1737,6 +1738,18 @@ function testSendEmail() {
 /**
  * Processes all records with valid email in column L and no sent date in column M.
  * Groups rows by email address so owners who bought multiple items receive one consolidated email.
+ *
+ * Failure handling:
+ *   - Each per-email send is wrapped in try/catch so one user's failure does not abort
+ *     the rest of the batch.
+ *   - After setValue, SpreadsheetApp.flush() forces the write, then we read the cell
+ *     back. If the read returns empty, something silently overwrote the stamp (e.g. an
+ *     ARRAYFORMULA in M1 re-spilling, strict data validation, or a protected-range
+ *     overlay). That counts as a failure for this email — the row will be re-sent next
+ *     run, and we surface the cause now.
+ *   - If any failures occur, an alert email is sent to PROCESS_BATCH_ALERT_RECIPIENT
+ *     and processBatch re-throws at the end so GAS marks the trigger run as failed
+ *     (this also fires the standard "Notify me on trigger failure" email if enabled).
  */
 function processBatch() {
   const sheet = SpreadsheetApp.openByUrl(SUBSCRIPTION_NOTIFICATION_WORKBOOK_URL).getSheetByName(SHEET_NAME);
@@ -1760,6 +1773,10 @@ function processBatch() {
   const doc = DocumentApp.openById(GOOGLE_DOC_ID);
   const subject = doc.getName();
 
+  const failures = [];
+  let sentCount = 0;
+  let stampedCount = 0;
+
   for (const email in pendingByEmail) {
     const items = pendingByEmail[email];
     let body = doc.getBody().getText();
@@ -1772,12 +1789,92 @@ function processBatch() {
     body = body.replace('{{TRACKING_LINK}}', trackingLinksHtml);
     const htmlBody = HtmlService.createHtmlOutput(body.replace(/\n/g, '<br>')).getContent();
 
-    MailApp.sendEmail({ to: email, subject, htmlBody });
+    const rowsForEmail = items.map(item => item.rowIndex + 1);
 
-    // Stamp column M for every row included in this send
-    for (const item of items) {
-      sheet.getRange(item.rowIndex + 1, TIMESTAMP_COLUMN).setValue(now);
+    try {
+      MailApp.sendEmail({ to: email, subject, htmlBody });
+      sentCount += 1;
+
+      // Stamp column M for every row included in this send
+      for (const item of items) {
+        sheet.getRange(item.rowIndex + 1, TIMESTAMP_COLUMN).setValue(now);
+      }
+      // Force the writes to flush before we read them back
+      SpreadsheetApp.flush();
+
+      // Verify each stamp actually persisted. setValue can succeed but the cell
+      // can still come back empty if column M is driven by a formula, has strict
+      // data validation, or sits under a protected range — none of which raise
+      // an exception. This is the most common silent-failure mode.
+      const unstampedRows = [];
+      for (const item of items) {
+        const verify = sheet.getRange(item.rowIndex + 1, TIMESTAMP_COLUMN).getValue();
+        if (!verify) {
+          unstampedRows.push(item.rowIndex + 1);
+        } else {
+          stampedCount += 1;
+        }
+      }
+      if (unstampedRows.length > 0) {
+        throw new Error(
+          'Stamp verification failed for row(s) ' + unstampedRows.join(', ') +
+          '. Column M came back empty after setValue + flush. Likely cause: ' +
+          '(a) ARRAYFORMULA / formula in M1 re-spilling and overwriting the write, ' +
+          '(b) strict data validation on column M rejecting Date input, ' +
+          '(c) protected range on column M restricting this script\'s identity. ' +
+          'Email already sent — these rows will be re-sent next run until M is populated.'
+        );
+      }
+    } catch (e) {
+      const stack = (e && e.stack) ? e.stack : '(no stack)';
+      const msg = 'processBatch failure for ' + email + ' (rows: ' + rowsForEmail.join(', ') + '): ' + e;
+      Logger.log(msg + '\nStack:\n' + stack);
+      failures.push({ email: email, rows: rowsForEmail, error: String(e), stack: stack });
     }
+  }
+
+  Logger.log(
+    'processBatch summary: sent=' + sentCount +
+    ', stamped=' + stampedCount +
+    ', failures=' + failures.length
+  );
+
+  if (failures.length > 0) {
+    sendProcessBatchAlert_(failures, sentCount, stampedCount);
+    throw new Error(
+      'processBatch encountered ' + failures.length + ' failure(s). ' +
+      'See alert email at ' + PROCESS_BATCH_ALERT_RECIPIENT +
+      ' and the Apps Script Executions log for details.'
+    );
+  }
+}
+
+/**
+ * Send a detailed failure report when processBatch hits one or more errors.
+ * Best-effort: a failure to send the alert itself is logged but does not block.
+ */
+function sendProcessBatchAlert_(failures, sentCount, stampedCount) {
+  const summary =
+    'processBatch onboarding email delivery had failures.\n\n' +
+    'Sent successfully:  ' + sentCount + '\n' +
+    'Stamped (col M):    ' + stampedCount + '\n' +
+    'Failed:             ' + failures.length + '\n' +
+    'Sheet:              ' + SUBSCRIPTION_NOTIFICATION_WORKBOOK_URL + '\n\n' +
+    '=== Failures ===\n\n' +
+    failures.map(function(f, idx) {
+      return '#' + (idx + 1) + ' — ' + f.email + ' (rows: ' + f.rows.join(', ') + ')\n' +
+             'Error: ' + f.error + '\n\n' +
+             'Stack:\n' + f.stack;
+    }).join('\n\n---\n\n');
+
+  try {
+    MailApp.sendEmail({
+      to: PROCESS_BATCH_ALERT_RECIPIENT,
+      subject: '[ALERT] processBatch — ' + failures.length + ' onboarding failure(s)',
+      body: summary,
+    });
+  } catch (alertErr) {
+    Logger.log('sendProcessBatchAlert_ failed to deliver: ' + alertErr);
   }
 }
 
