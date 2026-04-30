@@ -12,7 +12,7 @@
  *   webhook to this script (`?action=processDonationMintsFromTelegramChatLogs`).
  *
  *   For each Telegram log row whose **Telegram Update ID** (col A) is not yet
- *   present on the **Donation Mints** dedup-log tab (col B), this scanner
+ *   present on the **Donation Pledge** dedup-log tab (col B), this scanner
  *   enforces three gates before minting a serialized QR code on the Agroverse QR
  *   codes sheet:
  *
@@ -38,7 +38,7 @@
  *
  *   Failures keep the Telegram Chat Logs row in place for audit (Edgar's append
  *   was already idempotent on Telegram Update ID), but write a `REJECTED_*` row
- *   to **Donation Mints** so future runs skip the row, and *do not* create an
+ *   to **Donation Pledge** so future runs skip the row, and *do not* create an
  *   `Agroverse QR codes` row.
  *
  *   The QR code identifier itself is **client-generated** in `mint_donation.py`
@@ -61,8 +61,8 @@ var DONATION_MINT_ALLOWED_CURRENCIES = [
   'SunMint Tree Planting Pledge - QR Code'
 ];
 
-/** Donation Mints dedup tab on the Telegram compilation workbook (sibling to Telegram Chat Logs). */
-var DONATION_MINTS_SHEET = 'Donation Mints';
+/** Donation Pledge dedup tab on the Telegram compilation workbook (sibling to Telegram Chat Logs). */
+var DONATION_PLEDGE_SHEET = 'Donation Pledge';
 
 /** Per-fire scan window. Matches the store-adds scanner. */
 var DONATION_MINT_SCAN_BATCH = 200;
@@ -82,7 +82,7 @@ var DONATION_MINT_TC_UPDATE_ID_COL = 0;
 var DONATION_MINT_TC_MESSAGE_ID_COL = 3;
 var DONATION_MINT_TC_MESSAGE_COL = 6;
 
-var DONATION_MINTS_HEADERS = [
+var DONATION_PLEDGE_HEADERS = [
   'created_at_utc',
   'telegram_update_id',
   'telegram_message_id',
@@ -100,39 +100,39 @@ var DONATION_MINTS_HEADERS = [
   'error_message'
 ];
 
-function ensureDonationMintsSheet_(spreadsheet) {
-  var sheet = spreadsheet.getSheetByName(DONATION_MINTS_SHEET);
+function ensureDonationPledgeSheet_(spreadsheet) {
+  var sheet = spreadsheet.getSheetByName(DONATION_PLEDGE_SHEET);
   if (!sheet) {
-    sheet = spreadsheet.insertSheet(DONATION_MINTS_SHEET);
-    sheet.appendRow(DONATION_MINTS_HEADERS);
+    sheet = spreadsheet.insertSheet(DONATION_PLEDGE_SHEET);
+    sheet.appendRow(DONATION_PLEDGE_HEADERS);
     return sheet;
   }
   var lastRow = sheet.getLastRow();
-  var lastCol = Math.max(sheet.getLastColumn(), DONATION_MINTS_HEADERS.length);
+  var lastCol = Math.max(sheet.getLastColumn(), DONATION_PLEDGE_HEADERS.length);
   var firstRow = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
   var row1Blank = firstRow.every(function (cell) {
     return String(cell || '').trim() === '';
   });
   if (lastRow === 0 || row1Blank) {
-    sheet.getRange(1, 1, 1, DONATION_MINTS_HEADERS.length).setValues([DONATION_MINTS_HEADERS]);
+    sheet.getRange(1, 1, 1, DONATION_PLEDGE_HEADERS.length).setValues([DONATION_PLEDGE_HEADERS]);
     return sheet;
   }
-  var matches = DONATION_MINTS_HEADERS.every(function (h, i) {
+  var matches = DONATION_PLEDGE_HEADERS.every(function (h, i) {
     return String(firstRow[i] || '').trim() === h;
   });
   if (matches) return sheet;
   if (lastRow <= 1) {
-    sheet.getRange(1, 1, 1, DONATION_MINTS_HEADERS.length).setValues([DONATION_MINTS_HEADERS]);
+    sheet.getRange(1, 1, 1, DONATION_PLEDGE_HEADERS.length).setValues([DONATION_PLEDGE_HEADERS]);
     return sheet;
   }
   throw new Error(
-    'Sheet "' + DONATION_MINTS_SHEET + '" row 1 must be exactly: ' +
-    DONATION_MINTS_HEADERS.join(', ') +
+    'Sheet "' + DONATION_PLEDGE_SHEET + '" row 1 must be exactly: ' +
+    DONATION_PLEDGE_HEADERS.join(', ') +
     '. Fix row 1 in the spreadsheet, or move existing data so row 1 can be replaced.'
   );
 }
 
-function appendDonationMintRow_(sheet, params) {
+function appendDonationPledgeRow_(sheet, params) {
   var row = [
     new Date().toISOString(),
     String(params.telegram_update_id || ''),
@@ -411,7 +411,7 @@ function SHEET_URL_TO_ID_(url) {
  * `[DONATION MINT EVENT]` submission, plus a safety-net cron for retries.
  *
  * Idempotent: dedup is keyed on Telegram Update ID (col A on Telegram Chat
- * Logs, col B on Donation Mints). Re-runs over the same Telegram rows skip
+ * Logs, col B on Donation Pledge). Re-runs over the same Telegram rows skip
  * already-recorded update ids. Serialized via `LockService.getScriptLock()`.
  */
 function processDonationMintsFromTelegramChatLogs() {
@@ -426,7 +426,7 @@ function processDonationMintsFromTelegramChatLogs() {
     if (!tcSheet) {
       throw new Error('Telegram Chat Logs sheet not found');
     }
-    var dmSheet = ensureDonationMintsSheet_(telegramSpreadsheet);
+    var dmSheet = ensureDonationPledgeSheet_(telegramSpreadsheet);
 
     var dmValues = dmSheet.getDataRange().getValues();
     var seenUpdateIds = {};
@@ -458,7 +458,7 @@ function processDonationMintsFromTelegramChatLogs() {
       if (!telegramUpdateId) {
         var rowSubstituteKey = 'NO_UPDATE_ID_ROW_' + (startRow + i);
         if (seenUpdateIds[rowSubstituteKey]) continue;
-        appendDonationMintRow_(dmSheet, {
+        appendDonationPledgeRow_(dmSheet, {
           telegram_update_id: rowSubstituteKey,
           telegram_message_id: telegramMessageId,
           status: 'REJECTED_NO_TELEGRAM_UPDATE_ID',
@@ -474,7 +474,7 @@ function processDonationMintsFromTelegramChatLogs() {
       var eventData = validateDonationMintEvent_(fields, message);
 
       if (!eventData.ok) {
-        appendDonationMintRow_(dmSheet, {
+        appendDonationPledgeRow_(dmSheet, {
           telegram_update_id: telegramUpdateId,
           telegram_message_id: telegramMessageId,
           status: eventData.status,
@@ -496,7 +496,7 @@ function processDonationMintsFromTelegramChatLogs() {
       try {
         var currencyData = getCurrencyData(eventData.currency);
         if (!currencyData) {
-          appendDonationMintRow_(dmSheet, {
+          appendDonationPledgeRow_(dmSheet, {
             telegram_update_id: telegramUpdateId,
             telegram_message_id: telegramMessageId,
             status: 'error',
@@ -535,7 +535,7 @@ function processDonationMintsFromTelegramChatLogs() {
           offchainTxRow = 'ERROR: ' + (offchainErr && (offchainErr.message || offchainErr));
         }
 
-        appendDonationMintRow_(dmSheet, {
+        appendDonationPledgeRow_(dmSheet, {
           telegram_update_id: telegramUpdateId,
           telegram_message_id: telegramMessageId,
           status: 'minted',
@@ -553,7 +553,7 @@ function processDonationMintsFromTelegramChatLogs() {
         seenUpdateIds[telegramUpdateId] = true;
         minted++;
       } catch (rowErr) {
-        appendDonationMintRow_(dmSheet, {
+        appendDonationPledgeRow_(dmSheet, {
           telegram_update_id: telegramUpdateId,
           telegram_message_id: telegramMessageId,
           status: 'error',
