@@ -19,6 +19,7 @@ var CLASP_MIRROR_LAST_CLASP_PUSH_UTC = '2026-04-28T19:00:00Z';
  * Newest first. Keep lines short; link PRs/commits in git instead of pasting secrets.
  */
 var CLASP_MIRROR_CHANGELOG =
+  '2026-04-29 — qr_code_web_service.listUnassignedStripeSessions_: include shipping_provider (col M) and tracking_number (col N) per item so the DApp update_qr_code page can prefill those fields when an operator picks a session, without a second round trip.\n' +
   '2026-04-29 — qr_code_web_service.processBatch: per-email try/catch + SpreadsheetApp.flush() + read-back verification of column M; alert email to garyjob@agroverse.shop on any failure; re-throw at end so the trigger run is logged as failed (catches the silent-overwrite case where setValue succeeds but the cell stays empty due to ARRAYFORMULA / data validation / protected range on column M).\n' +
   '2026-04-28 — find_nearby_stores: fix applyHitListAuAvFormulasToRow_ getRange args (was treating 4th arg as endCol; now correctly numRows=1, numCols=2). Caused "data has 1 but range has 526" on every addNewStore + retail-field-report status update. Hit List row still landed because appendRow runs first; only the AU/AV formula write threw.\n' +
   '2026-04-28 — find_nearby_stores: parseRetailFieldReportText_ now strips leading `- ` bullet so dao_client `update_store` payloads (`- Label: Value`) parse the same as the DApp page (`Label: Value`). Same logic the sibling store-add parser already had.\n' +
