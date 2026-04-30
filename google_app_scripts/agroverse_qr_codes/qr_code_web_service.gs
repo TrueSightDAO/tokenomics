@@ -109,8 +109,10 @@ function doOptionsWebLedger_(e) {
  * - 'list_with_members=true' query parameter to return QR codes with details where column D is NOT 'SOLD'.
  * - 'lookup=true&qr_code=...' returns ledger details plus stripe_session_id and tracking_number when a row
  *   in 'Stripe Social Media Checkout ID' has column P equal to the QR code (Session in C, Shipping M, Tracking N; newest row wins).
- * - 'list_unassigned_stripe_sessions=true' returns { items: [{ stripe_session_id }] } for rows with Session in C
- *   and column P blank; optional 'for_qr_code' also returns sessions already linked to that QR in P (for DApp prefill).
+ * - 'list_unassigned_stripe_sessions=true' returns { items: [{ stripe_session_id, shipping_provider, tracking_number }] }
+ *   for rows with Session in C and column P blank; optional 'for_qr_code' also returns sessions already linked to that
+ *   QR in P (for DApp prefill). shipping_provider (col M) and tracking_number (col N) are included so the DApp /
+ *   dao_client can prefill those fields when an operator picks a session, without a second round trip.
  * - 'list_contributor_names=true' returns { status, names: string[] } from **Contributors Digital Signatures** (batch QR manager dropdown).
  *
  * @param {Object} e Event object containing parameters.
@@ -413,7 +415,14 @@ function listUnassignedStripeSessions_(spreadsheet, forQrCodeRaw) {
     if (seen[session]) continue;
 
     seen[session] = true;
-    items.push({ stripe_session_id: session });
+    // Include shipping_provider (col M = idx 10) and tracking_number (col N
+    // = idx 11) per item so the DApp / dao_client can prefill those fields
+    // when an operator picks a session, without an extra round trip.
+    items.push({
+      stripe_session_id: session,
+      shipping_provider: (range[r][10] || '').toString().trim(),
+      tracking_number: (range[r][11] || '').toString().trim(),
+    });
   }
 
   return createCORSResponse({
