@@ -299,8 +299,18 @@ function validateDonationMintEvent_(fields, fullMessage) {
 /**
  * Append a fully-formed row to `Agroverse QR codes` for a validated donation mint.
  * Reuses canonical `createQRCodeRow(qrCodeValue, productData)` from qr_code_web_service.gs
- * and then patches the donation-specific overrides (Owner Email = donor email,
- * Price = donation amount, status stays MINTED).
+ * and then patches the donation-specific overrides.
+ *
+ * **Server-locked fields (NOT trusted from client payload — derived here):**
+ *   - col B `landing_page` ← Currencies col E (already via createQRCodeRow / currencyData)
+ *   - col C `ledger`       ← Currencies col F (already via createQRCodeRow / currencyData)
+ *   - col U `Manager Name` ← validated governor display name
+ *   - col V `Ledger Name`  ← parsed from Currencies col F URL (e.g. `…/agl4` → `AGL4`)
+ *
+ * If the dao_client (or any other caller) attempts to set any of these in the
+ * `[DONATION MINT EVENT]` payload, those values are ignored. This is the
+ * integrity boundary — only governors can mint, but even a governor cannot
+ * misroute funds by spoofing `Ledger Name` or the public-facing `landing_page`.
  *
  * Returns the row number that was appended.
  */
@@ -315,16 +325,29 @@ function appendDonationMintToAgroverseQrCodes_(eventData, currencyData) {
   // Donation-specific overrides:
   //   col L (index 11) — Owner Email = donor email at mint time
   //   col T (index 19) — Price = donation amount (createQRCodeRow defaults to 25)
-  //   col U (index 20) — Manager Name = governor's display name
+  //   col U (index 20) — Manager Name = governor's display name (server-validated)
+  //   col V (index 21) — Ledger Name = derived from Currencies `ledger` URL
   if (eventData.donor_email) row[11] = eventData.donor_email;
   var amount = parseFloat(eventData.donation_amount);
   if (!isNaN(amount) && amount > 0) row[19] = amount;
-  // createQRCodeRow's row may be shorter than U; pad to length 21 to fit Manager Name.
-  while (row.length < 21) row.push('');
+  // createQRCodeRow's row may be shorter than V; pad to length 22.
+  while (row.length < 22) row.push('');
   row[20] = eventData.governor_name || '';
+  row[21] = ledgerNameFromCurrencies_(currencyData);
 
   ws.appendRow(row);
   return ws.getLastRow();
+}
+
+/** Derive the `Ledger Name` (e.g. "AGL4") from the Currencies tab's `ledger` URL.
+ *  Single source of truth: Currencies col F. If the Pledge currency moves to a
+ *  different AGL ledger later, only one cell needs to change.
+ *  Returns '' if the URL doesn't contain an `agl<N>` segment — operator can
+ *  back-fill the cell manually in that edge case. */
+function ledgerNameFromCurrencies_(currencyData) {
+  var url = String(currencyData && currencyData.ledger || '').trim();
+  var m = url.match(/\/(agl\d+)\b/i);
+  return m ? m[1].toUpperCase() : '';
 }
 
 /** Helper — extract spreadsheet ID from the canonical SHEET_URL constant. */
