@@ -1959,8 +1959,17 @@ function forwardProcessQrGenerationTelegramLogs_() {
 function doGet(e) {
   try {
     var actionRaw = getQueryParam_(e, 'action');
-    if (String(actionRaw).trim() === 'processQRCodeGenerationTelegramLogs') {
+    var actionStr = String(actionRaw).trim();
+    if (actionStr === 'processQRCodeGenerationTelegramLogs') {
       return forwardProcessQrGenerationTelegramLogs_();
+    }
+    if (actionStr === 'processDonationMintsFromTelegramChatLogs') {
+      // Triggered by Edgar after a [DONATION MINT EVENT] lands on Telegram Chat Logs.
+      // Validates 3 gates (currency / governor / visual proof) + a collision check,
+      // mints a serialized SunMint Pledge QR on Agroverse QR codes, and writes a
+      // +1 row on offchain transactions with the proof URL embedded in description.
+      // See process_donation_mint_telegram_logs.gs (same Apps Script project).
+      return createCORSResponse(processDonationMintsFromTelegramChatLogs());
     }
     if (shouldRouteToWebLedger_(e)) {
       return doGetWebLedger_(e);
