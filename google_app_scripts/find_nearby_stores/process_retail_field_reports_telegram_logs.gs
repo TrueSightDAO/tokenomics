@@ -203,7 +203,8 @@ function processRetailFieldReportsFromTelegramChatLogs() {
           String(fields.visit_date || ''),
           String(fields.contact_date || ''),
           String(fields.contact_method || ''),
-          updateId
+          updateId,
+          String(fields.deferred_until || '')
         );
 
         // 2. Stores Visits Field Reports A–N — also the dedup record for future runs.
