@@ -505,6 +505,21 @@ function processDonationMintsFromTelegramChatLogs() {
     return { success: false, error: 'busy' };
   }
   try {
+    // Self-installing hourly safety-net cron (idempotent — skips if already installed).
+    // Edgar's webhook fires this on every [DONATION MINT EVENT] submission; the cron
+    // catches anything that slipped through (Edgar offline, webhook timeout, sentiment_importer
+    // restart in progress, etc.) within an hour. Best-effort — if trigger creation fails
+    // (e.g. running inside a webhook execution context with restricted scopes), log and
+    // proceed with the actual scan; next run can retry.
+    try {
+      ensureDonationMintHourlyTriggerInstalled_();
+    } catch (triggerErr) {
+      Logger.log(
+        'ensureDonationMintHourlyTriggerInstalled_: ' +
+        (triggerErr && triggerErr.message ? triggerErr.message : triggerErr) +
+        ' — proceeding with scan; next run can retry.'
+      );
+    }
     var telegramSpreadsheet = SpreadsheetApp.openById('1qbZZhf-_7xzmDTriaJVWj6OZshyQsFkdsAV8-pyzASQ');
     var tcSheet = telegramSpreadsheet.getSheetByName('Telegram Chat Logs');
     if (!tcSheet) {
@@ -680,4 +695,23 @@ function dispatchDonationMintAction_(action) {
     return processDonationMintsFromTelegramChatLogs();
   }
   return null;
+}
+
+/** Hourly safety-net cron — idempotent self-installer.
+ *  Called from `processDonationMintsFromTelegramChatLogs` so the trigger is
+ *  guaranteed to exist after the first scan (whether that first scan came
+ *  from Edgar's webhook, a manual `?action=...` curl, or a previous trigger).
+ *  Re-runs are no-ops thanks to the existence check. */
+function ensureDonationMintHourlyTriggerInstalled_() {
+  var existing = ScriptApp.getProjectTriggers();
+  for (var i = 0; i < existing.length; i++) {
+    if (existing[i].getHandlerFunction() === 'processDonationMintsFromTelegramChatLogs') {
+      return;
+    }
+  }
+  ScriptApp.newTrigger('processDonationMintsFromTelegramChatLogs')
+    .timeBased()
+    .everyHours(1)
+    .create();
+  Logger.log('ensureDonationMintHourlyTriggerInstalled_: installed hourly trigger.');
 }
