@@ -839,8 +839,12 @@ function doGet(e) {
 
     if (action === 'getWarmupReviewQueue') {
       // Read-only triage queue powering dapp/warmup_review.html.
+      // Optional ?label= filters by Gmail label cohort:
+      //   AI/Warm-up   (default — first-touch warm-ups)
+      //   AI/Follow-up (manager follow-ups to replied prospects)
       // Implementation: warmup_review_api.gs (clasp_mirrors/.../WarmupReviewApi.gs).
-      return success_(getWarmupReviewQueue_());
+      var lbl = (e.parameter.label || '').toString();
+      return success_(getWarmupReviewQueue_(lbl));
     }
 
     if (action === 'apply_warmup_send') {
