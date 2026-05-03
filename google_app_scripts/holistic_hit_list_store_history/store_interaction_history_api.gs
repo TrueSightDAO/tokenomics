@@ -837,8 +837,21 @@ function doGet(e) {
       return success_(hitListPipelineSummary_());
     }
 
+    if (action === 'getWarmupReviewQueue') {
+      // Read-only triage queue powering dapp/warmup_review.html.
+      // Implementation: warmup_review_api.gs (clasp_mirrors/.../WarmupReviewApi.gs).
+      return success_(getWarmupReviewQueue_());
+    }
+
+    if (action === 'apply_warmup_send') {
+      // Edgar webhook entry — fires after Edgar persists a [WARMUP SEND EVENT]
+      // to Telegram Chat Logs. Returns its own JSON envelope (avoid double-wrap).
+      // Implementation: warmup_send_handler.gs (clasp_mirrors/.../WarmupSendHandler.gs).
+      return handleApplyWarmupSendRequest_();
+    }
+
     return error_(
-      'Unknown action. Use suggestStores, getStoreHistory, listStoresByFilter, or listStatusSummary.',
+      'Unknown action. Use suggestStores, getStoreHistory, listStoresByFilter, listStatusSummary, getWarmupReviewQueue, or apply_warmup_send.',
       400
     );
   } catch (err) {
