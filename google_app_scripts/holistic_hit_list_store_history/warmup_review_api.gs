@@ -25,29 +25,25 @@
 var WARMUP_DRAFTS_PENDING_STATUS = 'pending_review';
 var WARMUP_DEFAULT_LABEL = 'AI/Warm-up';
 var WARMUP_FOLLOWUP_LABEL = 'AI/Follow-up';
-var WARMUP_ALLOWED_LABELS = [WARMUP_DEFAULT_LABEL, WARMUP_FOLLOWUP_LABEL];
+var WARMUP_PROSPECT_LABEL = 'AI/Prospect Replied';
+var WARMUP_ALLOWED_LABELS = [WARMUP_DEFAULT_LABEL, WARMUP_FOLLOWUP_LABEL, WARMUP_PROSPECT_LABEL];
 var WARMUP_HOSTS_CIRCLES_HEADER = 'Hosts Circles';
 
 /**
- * Read-only triage queue for outbound drafts (warm-ups OR follow-ups).
- * `label` selects which Gmail label / cohort to query — defaults to
- * AI/Warm-up; pass AI/Follow-up to get the manager-follow-up cohort.
- * Unknown values fall back to the default to keep the API forgiving.
+ * Read-only triage queue for all outbound drafts across every cohort.
+ * Returns drafts grouped by label so the DApp can render tabs without
+ * multiple API calls. One bulk read, one GmailApp.getDrafts() call.
  */
-function getWarmupReviewQueue_(label) {
-  var requestedLabel = String(label || '').trim() || WARMUP_DEFAULT_LABEL;
-  if (WARMUP_ALLOWED_LABELS.indexOf(requestedLabel) === -1) {
-    requestedLabel = WARMUP_DEFAULT_LABEL;
-  }
+function getWarmupReviewQueue_(optLabel) {
   var ss = SpreadsheetApp.openById(HIT_LIST_SPREADSHEET_ID);
   var draftsSh = getSheetSafe_(ss, SHEET_EMAIL_DRAFTS);
   if (!draftsSh) {
-    return { drafts: [], counts: { total: 0, with_message_id: 0 }, label: requestedLabel };
+    return emptyQueueResponse_();
   }
 
   var draftsValues = draftsSh.getDataRange().getValues();
   if (draftsValues.length < 2) {
-    return { drafts: [], counts: { total: 0, with_message_id: 0 } };
+    return emptyQueueResponse_();
   }
   var draftsHdr = headerMap_(draftsValues[0]);
   var iStatus = draftsHdr['status'];
@@ -71,39 +67,30 @@ function getWarmupReviewQueue_(label) {
 
   var hitIndex = warmupBuildHitListIndex_(ss);
   var dappCounts = warmupBuildDappRemarksCounts_(ss);
-
-  // Filter out drafts that have already been sent. Three OR'd defenses:
-  //
-  //   1. GmailApp.getDrafts() — most current. If a draft id is no longer
-  //      in the operator's Gmail (sent OR deleted), hide it. Cheap: one
-  //      GmailApp call covers the whole batch.
-  //   2. "Warmup Sends" audit tab — DApp-side sends land here when
-  //      WarmupSendHandler.gs successfully ships a [WARMUP SEND EVENT].
-  //      Catches drafts whose Gmail-side state may not have flipped yet.
-  //   3. "Email Agent Follow Up" tab on the Hit List spreadsheet —
-  //      populated by sync_email_agent_followup.py (cron / manual).
-  //      Catches manual Gmail sends after sync runs. Joins on
-  //      gmail_message_id (stable across the draft → sent label flip).
-  //
-  // Sheet rows stuck at status='pending_review' that look sent on any
-  // of these get hidden. The next suggest_warmup_prospect_drafts.py
-  // cron tick reconciles them to 'discarded' on the source-of-truth
-  // sheet using the operator's local OAuth.
   var liveDraftIds = warmupGetLiveDraftIdSet_();
   var sentDraftIds = warmupReadSentDraftIds_();
   var sentMessageIds = warmupReadSentMessageIds_(ss);
+  var hasLiveDrafts = Object.keys(liveDraftIds).length > 0;
 
-  var pending = [];
-  var withMsgId = 0;
-  var skippedNotInGmail = 0;
-  var skippedSentDApp = 0;
-  var skippedSentManual = 0;
+  // Build full-body lookup from live Gmail drafts (keyed by draft id).
+  var fullBodyByDraftId = hasLiveDrafts ? warmupBuildFullBodyMap_() : {};
+  // Build prospect reply lookup from DApp Remarks (keyed by shop name lower).
+  var prospectReplies = warmupBuildProspectReplyMap_(ss);
+
+  // Group pending drafts by label
+  var byLabel = {};
+  for (var li = 0; li < WARMUP_ALLOWED_LABELS.length; li++) {
+    byLabel[WARMUP_ALLOWED_LABELS[li]] = [];
+  }
+
+  var skipped = { notInGmail: 0, sentDApp: 0, sentManual: 0 };
+
   for (var r = 1; r < draftsValues.length; r++) {
     var row = draftsValues[r];
     var status = (row[iStatus] || '').toString().trim();
     if (status !== WARMUP_DRAFTS_PENDING_STATUS) continue;
     var rowLabel = (row[iLabel] || '').toString().trim();
-    if (rowLabel !== requestedLabel) continue;
+    if (WARMUP_ALLOWED_LABELS.indexOf(rowLabel) === -1) continue;
 
     var em = ((row[iEmail] || '').toString().trim() || '').toLowerCase();
     var shop = (row[iShop] || '').toString().trim();
@@ -115,16 +102,16 @@ function getWarmupReviewQueue_(label) {
     var hitRow = iHitRow === undefined ? '' : (row[iHitRow] || '').toString().trim();
     var createdAt = iCreated === undefined ? '' : (row[iCreated] || '').toString();
 
-    if (draftId && !liveDraftIds[draftId]) {
-      skippedNotInGmail++;
+    if (draftId && hasLiveDrafts && !liveDraftIds[draftId]) {
+      skipped.notInGmail++;
       continue;
     }
     if (draftId && sentDraftIds[draftId]) {
-      skippedSentDApp++;
+      skipped.sentDApp++;
       continue;
     }
     if (msgId && sentMessageIds[msgId]) {
-      skippedSentManual++;
+      skipped.sentManual++;
       continue;
     }
 
@@ -135,9 +122,8 @@ function getWarmupReviewQueue_(label) {
     var cityState = hit ? hit.cityState : '';
     var notes = hit ? hit.notes : '';
     var hasDappHistory = !!dappCounts[shop.toLowerCase()];
-    if (msgId) withMsgId++;
 
-    pending.push({
+    var draftObj = {
       sheet_row: r + 1,
       to_email: em,
       shop_name: shop,
@@ -149,30 +135,44 @@ function getWarmupReviewQueue_(label) {
       has_dapp_history: hasDappHistory,
       subject: subj,
       body_preview: preview,
+      body_full: (draftId && fullBodyByDraftId[draftId]) || '',
+      prospect_reply_body: (rowLabel === WARMUP_PROSPECT_LABEL ? (prospectReplies[shop.toLowerCase()] || '') : ''),
       gmail_draft_id: draftId,
       gmail_message_id: msgId,
       created_at_utc: createdAt,
-    });
+    };
+    byLabel[rowLabel].push(draftObj);
+  }
+
+  var total = 0;
+  var counts = {};
+  for (var li = 0; li < WARMUP_ALLOWED_LABELS.length; li++) {
+    var lbl = WARMUP_ALLOWED_LABELS[li];
+    counts[lbl] = byLabel[lbl].length;
+    total += byLabel[lbl].length;
   }
 
   return {
-    drafts: pending,
-    label: requestedLabel,
-    counts: {
-      total: pending.length,
-      skipped_not_in_gmail: skippedNotInGmail,
-      skipped_sent_via_dapp: skippedSentDApp,
-      skipped_sent_via_gmail: skippedSentManual,
-      with_message_id: withMsgId,
-      live_gmail_drafts: Object.keys(liveDraftIds).length,
-      sent_audit_indexed: Object.keys(sentDraftIds).length,
-      followup_log_indexed: Object.keys(sentMessageIds).length,
-      hit_list_indexed_email: Object.keys(hitIndex.byEmail).length,
-      hit_list_indexed_store: Object.keys(hitIndex.byStoreKey).length,
-      dapp_remarks_indexed: Object.keys(dappCounts).length,
-    },
+    drafts_by_label: byLabel,
+    counts: counts,
+    total_pending: total,
+    skipped: skipped,
+    live_gmail_drafts: Object.keys(liveDraftIds).length,
+    sent_audit_indexed: Object.keys(sentDraftIds).length,
+    followup_log_indexed: Object.keys(sentMessageIds).length,
+    hit_list_indexed_email: Object.keys(hitIndex.byEmail).length,
+    hit_list_indexed_store: Object.keys(hitIndex.byStoreKey).length,
+    dapp_remarks_indexed: Object.keys(dappCounts).length,
     generated_at_utc: new Date().toISOString(),
   };
+}
+
+function emptyQueueResponse_() {
+  var empty = {};
+  for (var li = 0; li < WARMUP_ALLOWED_LABELS.length; li++) {
+    empty[WARMUP_ALLOWED_LABELS[li]] = [];
+  }
+  return { drafts_by_label: empty, counts: {}, total_pending: 0, skipped: {} };
 }
 
 /**
@@ -307,6 +307,71 @@ function warmupBuildDappRemarksCounts_(ss) {
     counts[sn] = (counts[sn] || 0) + 1;
   }
   return counts;
+}
+
+/**
+ * Fetch full plain-text body for every live Gmail draft on the user's
+ * GmailApp scope and build a draft-id → body map. Called once per
+ * getWarmupReviewQueue_ request so the DApp can offer an "Expand full
+ * body" button without extra API roundtrips.
+ */
+function warmupBuildFullBodyMap_() {
+  try {
+    var drafts = GmailApp.getDrafts();
+    var out = {};
+    for (var i = 0; i < drafts.length; i++) {
+      var d = drafts[i];
+      var id = d.getId();
+      if (!id) continue;
+      try {
+        var body = d.getMessage().getPlainBody();
+        out[id] = (body || '').toString();
+      } catch (e2) {
+        // Draft present but message body not readable — leave empty.
+      }
+    }
+    return out;
+  } catch (err) {
+    Logger.log('warmupBuildFullBodyMap_ failed: ' + err);
+    return {};
+  }
+}
+
+/**
+ * Build a shop-name → most-recent-reply-text map from DApp Remarks rows
+ * submitted by the warmup_reply_promotion process. Used by the DApp to
+ * show the prospect's original reply alongside the reply draft.
+ */
+function warmupBuildProspectReplyMap_(ss) {
+  try {
+    var sh = getSheetSafe_(ss, SHEET_DAPP_REMARKS);
+    if (!sh) return {};
+    var values = sh.getDataRange().getValues();
+    if (values.length < 2) return {};
+    var hdr = headerMap_(values[0]);
+    var iShop = hdr['Shop Name'];
+    var iBy = hdr['Submitted By'];
+    var iRemarks = hdr['Remarks'];
+    var iAt = hdr['Submitted At'];
+    if (iShop === undefined || iBy === undefined || iRemarks === undefined) return {};
+
+    // We want the most recent reply per shop. Iterate top-down (oldest
+    // first), overwrite so the last (newest) wins below.
+    var out = {};
+    for (var r = 1; r < values.length; r++) {
+      var by = (values[r][iBy] || '').toString().trim();
+      if (by !== 'warmup_reply_promotion') continue;
+      var sn = (values[r][iShop] || '').toString().trim().toLowerCase();
+      if (!sn) continue;
+      var remarks = (values[r][iRemarks] || '').toString();
+      if (!remarks) continue;
+      out[sn] = remarks;
+    }
+    return out;
+  } catch (err) {
+    Logger.log('warmupBuildProspectReplyMap_ failed: ' + err);
+    return {};
+  }
 }
 
 /**
