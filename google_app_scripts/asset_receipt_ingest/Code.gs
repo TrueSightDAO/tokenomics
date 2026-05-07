@@ -3,26 +3,22 @@
  *
  * Processes [ASSET RECEIPT EVENT] rows from Telegram Chat Logs:
  * 1) Scan Telegram Chat Logs col G for unprocessed [ASSET RECEIPT EVENT] rows
- * 2) For each row, parse Currency, Amount, Description, Fund Handler from text
- * 3) Create a new Currencies row (col A = Currency name, col B = Price in USD / landed unit cost)
- * 4) Sort Currencies tab by col A ascending
- * 5) Create a positive inventory leg on offchain transactions
- *    - Currency = exact Currencies!A string
- *    - Amount = positive (units received)
- *    - Fund Handler = from event
- *    - Description = from event (with PDF/blob URL link)
- * 6) Mark Telegram Chat Log row as processed
+ * 2) Dedup against "Asset Receipts" tab on ops spreadsheet (update_id = key)
+ * 3) Parse Currency, Amount, Description, Fund Handler from text
+ * 4) Create a new Currencies row (col A = Currency name, col B = Price in USD)
+ * 5) Sort Currencies tab by col A ascending
+ * 6) Create a positive inventory leg on offchain transactions
+ * 7) Append audit row to "Asset Receipts" tab (dedup log)
  *
  * Triggered by Edgar's WebhookTriggerWorker with ?action=processAssetReceiptsFromTelegramChatLogs.
- * Deduplication via Telegram Chat Logs col A (update_id) — rows already processed are skipped.
  *
  * Script properties:
  * - AGROVERSE_INVENTORY_PUBLISH_SECRET (required — shared with repackaging)
- * - OFFCHAIN_TRANSACTIONS_PROCESSED_PREFIX (default: DEFAULT_OFFCHAIN_PROCESSED_PREFIX)
  * Optional overrides:
  * - ASSET_RECEIPT_OPS_SPREADSHEET_ID (default 1qbZZhf-…)
  * - ASSET_RECEIPT_MAIN_SPREADSHEET_ID (default 1GE7PUq-…)
  * - SHEET_TELEGRAM_CHAT_LOGS (default Telegram Chat Logs)
+ * - SHEET_ASSET_RECEIPTS (default Asset Receipts)
  * - SHEET_CURRENCIES (default Currencies)
  * - SHEET_OFFCHAIN_TRANSACTIONS (default offchain transactions)
  */
@@ -32,16 +28,16 @@ var SCRIPT_PROP_PUBLISH_SECRET = 'AGROVERSE_INVENTORY_PUBLISH_SECRET';
 var SCRIPT_PROP_OPS_SS = 'ASSET_RECEIPT_OPS_SPREADSHEET_ID';
 var SCRIPT_PROP_MAIN_SS = 'ASSET_RECEIPT_MAIN_SPREADSHEET_ID';
 var SCRIPT_PROP_SHEET_LOGS = 'SHEET_TELEGRAM_CHAT_LOGS';
+var SCRIPT_PROP_SHEET_AUDIT = 'SHEET_ASSET_RECEIPTS';
 var SCRIPT_PROP_SHEET_CUR = 'SHEET_CURRENCIES';
 var SCRIPT_PROP_SHEET_OFFCHAIN = 'SHEET_OFFCHAIN_TRANSACTIONS';
 
 var DEFAULT_OPS_SPREADSHEET_ID = '1qbZZhf-_7xzmDTriaJVWj6OZshyQsFkdsAV8-pyzASQ';
 var DEFAULT_MAIN_SPREADSHEET_ID = '1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU';
 var DEFAULT_SHEET_LOGS = 'Telegram Chat Logs';
+var DEFAULT_SHEET_AUDIT = 'Asset Receipts';
 var DEFAULT_SHEET_CUR = 'Currencies';
 var DEFAULT_SHEET_OFFCHAIN = 'offchain transactions';
-
-var PROCESSED_PREFIX = '[ASSET_RECEIPT_PROCESSED]';
 
 function getProp_(key, fallback) {
   var v = PropertiesService.getScriptProperties().getProperty(key);
@@ -72,6 +68,7 @@ function processAssetReceiptsFromTelegramChatLogs_() {
   var opsSsId = getProp_(SCRIPT_PROP_OPS_SS, DEFAULT_OPS_SPREADSHEET_ID);
   var mainSsId = getProp_(SCRIPT_PROP_MAIN_SS, DEFAULT_MAIN_SPREADSHEET_ID);
   var sheetLogsName = getProp_(SCRIPT_PROP_SHEET_LOGS, DEFAULT_SHEET_LOGS);
+  var sheetAuditName = getProp_(SCRIPT_PROP_SHEET_AUDIT, DEFAULT_SHEET_AUDIT);
   var sheetCurName = getProp_(SCRIPT_PROP_SHEET_CUR, DEFAULT_SHEET_CUR);
   var sheetOffchainName = getProp_(SCRIPT_PROP_SHEET_OFFCHAIN, DEFAULT_SHEET_OFFCHAIN);
 
@@ -80,37 +77,48 @@ function processAssetReceiptsFromTelegramChatLogs_() {
 
   var logsSheet = opsSs.getSheetByName(sheetLogsName);
   if (!logsSheet) {
-    return jsonResponse_({ status: 'error', error: 'Telegram Chat Logs sheet not found: ' + sheetLogsName });
+    return jsonResponse_({ status: 'error', error: 'Sheet not found: ' + sheetLogsName });
+  }
+
+  var auditSheet = opsSs.getSheetByName(sheetAuditName);
+  if (!auditSheet) {
+    // Auto-create the audit tab on first run
+    auditSheet = opsSs.insertSheet(sheetAuditName);
+    auditSheet.appendRow(['Telegram Update ID', 'Processed At (ISO)', 'Currency Name', 'Amount', 'Fund Handler', 'Offchain Row', 'Status']);
+    Logger.log('[AssetReceipt] Created audit tab: ' + sheetAuditName);
   }
 
   var currenciesSheet = mainSs.getSheetByName(sheetCurName);
   if (!currenciesSheet) {
-    return jsonResponse_({ status: 'error', error: 'Currencies sheet not found: ' + sheetCurName });
+    return jsonResponse_({ status: 'error', error: 'Sheet not found: ' + sheetCurName });
   }
 
   var offchainSheet = mainSs.getSheetByName(sheetOffchainName);
   if (!offchainSheet) {
-    return jsonResponse_({ status: 'error', error: 'offchain transactions sheet not found: ' + sheetOffchainName });
+    return jsonResponse_({ status: 'error', error: 'Sheet not found: ' + sheetOffchainName });
   }
+
+  // Load known update_ids from audit tab for dedup
+  var knownIds = loadKnownIds_(auditSheet);
 
   var lastRow = logsSheet.getLastRow();
   if (lastRow < 2) {
     return jsonResponse_({ status: 'ok', message: 'No data rows in Telegram Chat Logs', processed: 0 });
   }
 
-  // Read full sheet in one call
   var logData = logsSheet.getRange(1, 1, lastRow, logsSheet.getLastColumn()).getValues();
   var processed = 0;
   var errors = [];
   var currencyNamesAdded = [];
 
-  // Column G is index 6 (0-indexed). Column A (update_id) is index 0.
   for (var i = 1; i < logData.length; i++) { // skip header
-    var colA = String(logData[i][0] || ''); // update_id
-    var colG = String(logData[i][6] || ''); // signed text
+    var updateId = String(logData[i][0] || '').trim(); // col A = update_id
+    var colG = String(logData[i][6] || ''); // col G = signed text
 
-    // Skip already-processed rows
-    if (colA.indexOf(PROCESSED_PREFIX) === 0) continue;
+    if (!updateId) continue;
+
+    // Dedup: skip if already in audit tab
+    if (knownIds[updateId]) continue;
 
     // Only process [ASSET RECEIPT EVENT]
     if (colG.indexOf('[ASSET RECEIPT EVENT]') === -1) continue;
@@ -119,63 +127,55 @@ function processAssetReceiptsFromTelegramChatLogs_() {
       var fields = parseAssetReceiptFields_(colG);
 
       if (!fields.currency || !fields.amount || !fields.fund_handler) {
-        errors.push('Row ' + (i + 1) + ': Missing required fields (Currency, Amount, Fund Handler)');
+        errors.push('Row ' + (i + 1) + ' (update_id=' + updateId + '): Missing required fields (Currency, Amount, Fund Handler)');
+        // Still log to audit to prevent re-processing
+        auditSheet.appendRow([updateId, new Date().toISOString(), fields.currency || '', fields.amount || '', fields.fund_handler || '', '', 'SKIPPED: missing fields']);
+        knownIds[updateId] = true;
         continue;
       }
 
       var amount = parseFloat(fields.amount);
       if (isNaN(amount) || amount <= 0) {
-        errors.push('Row ' + (i + 1) + ': Invalid Amount: ' + fields.amount);
+        errors.push('Row ' + (i + 1) + ' (update_id=' + updateId + '): Invalid Amount: ' + fields.amount);
+        auditSheet.appendRow([updateId, new Date().toISOString(), fields.currency, fields.amount, fields.fund_handler, '', 'SKIPPED: invalid amount']);
+        knownIds[updateId] = true;
         continue;
       }
 
-      // 1) Add Currencies row: col A = Currency name, col B = Price in USD
       var currencyName = fields.currency.trim();
-      var existingCurrencyRow = findCurrencyRow_(currenciesSheet, currencyName);
 
-      if (!existingCurrencyRow) {
-        // Append new row
+      // 1) Add Currencies row if not already present
+      if (!findCurrencyRow_(currenciesSheet, currencyName)) {
         var currenciesLastRow = currenciesSheet.getLastRow();
-        var newCurRow = currenciesLastRow + 1;
-        currenciesSheet.getRange(newCurRow, 1).setValue(currencyName);
-        currenciesSheet.getRange(newCurRow, 2).setValue(amount); // col B = Price in USD
+        currenciesSheet.getRange(currenciesLastRow + 1, 1).setValue(currencyName);
+        currenciesSheet.getRange(currenciesLastRow + 1, 2).setValue(amount); // col B = Price in USD
         currencyNamesAdded.push(currencyName);
-
-        // 2) Sort Currencies by col A ascending (header in row 1, data rows 2..last)
         sortCurrencies_(currenciesSheet);
-        existingCurrencyRow = findCurrencyRow_(currenciesSheet, currencyName);
-        Logger.log('[AssetReceipt] Added Currencies row for: ' + currencyName + ' at USD ' + amount);
-      } else {
-        Logger.log('[AssetReceipt] Currency already exists: ' + currencyName + ' (row ' + existingCurrencyRow + ')');
+        Logger.log('[AssetReceipt] Added Currencies row: ' + currencyName + ' at USD ' + amount);
       }
 
-      // 3) Add positive inventory leg on offchain transactions
+      // 2) Add positive inventory leg on offchain transactions
       var offchainLastRow = offchainSheet.getLastRow();
       var newOffchainRow = offchainLastRow + 1;
 
-      // Date column (col A)
-      var today = new Date();
-      offchainSheet.getRange(newOffchainRow, 1).setValue(today);
-      // Description column (col B) — include PDF URL link from event description
-      offchainSheet.getRange(newOffchainRow, 2).setValue(fields.description || 'Asset receipt: ' + currencyName);
-      // Fund Handler column (col C)
-      offchainSheet.getRange(newOffchainRow, 3).setValue(fields.fund_handler);
-      // Amount column (col D) — positive integer for inventory received
-      offchainSheet.getRange(newOffchainRow, 4).setValue(1); // 1 unit received
-      // Currency column (col E) — must match Currencies!A exactly
-      offchainSheet.getRange(newOffchainRow, 5).setValue(currencyName);
-      // Is Revenue column (col G) — blank or N for non-revenue
-      offchainSheet.getRange(newOffchainRow, 7).setValue('N');
+      offchainSheet.getRange(newOffchainRow, 1).setValue(new Date());          // A: Date
+      offchainSheet.getRange(newOffchainRow, 2).setValue(fields.description || 'Asset receipt: ' + currencyName); // B: Description
+      offchainSheet.getRange(newOffchainRow, 3).setValue(fields.fund_handler); // C: Fund Handler
+      offchainSheet.getRange(newOffchainRow, 4).setValue(1);                    // D: Amount (1 unit)
+      offchainSheet.getRange(newOffchainRow, 5).setValue(currencyName);         // E: Currency
+      offchainSheet.getRange(newOffchainRow, 7).setValue('N');                  // G: Is Revenue = N
 
-      Logger.log('[AssetReceipt] Added offchain transaction row ' + newOffchainRow + ' for: ' + currencyName);
+      Logger.log('[AssetReceipt] Added offchain row ' + newOffchainRow + ': ' + currencyName + ' under ' + fields.fund_handler);
 
-      // 4) Mark Telegram Chat Log row as processed (prefix col A)
-      logsSheet.getRange(i + 1, 1).setValue(PROCESSED_PREFIX + colA);
+      // 3) Log to audit tab (dedup + audit trail)
+      auditSheet.appendRow([updateId, new Date().toISOString(), currencyName, amount, fields.fund_handler, newOffchainRow, 'OK']);
+      knownIds[updateId] = true;
       processed++;
 
     } catch (err) {
-      errors.push('Row ' + (i + 1) + ': ' + err.message);
-      Logger.log('[AssetReceipt] Error processing row ' + (i + 1) + ': ' + err);
+      errors.push('Row ' + (i + 1) + ' (update_id=' + updateId + '): ' + err.message);
+      auditSheet.appendRow([updateId, new Date().toISOString(), fields.currency || '', fields.amount || '', fields.fund_handler || '', '', 'ERROR: ' + err.message]);
+      knownIds[updateId] = true;
     }
   }
 
@@ -187,48 +187,57 @@ function processAssetReceiptsFromTelegramChatLogs_() {
   });
 }
 
+/**
+ * Load known update_ids from the audit tab into a lookup object.
+ * Column A = update_id. Only "OK" status rows block re-processing.
+ */
+function loadKnownIds_(auditSheet) {
+  var lastRow = auditSheet.getLastRow();
+  var ids = {};
+  if (lastRow < 2) return ids;
+  // Read col A (update_id) and col G (status)
+  var data = auditSheet.getRange(1, 1, lastRow, 7).getValues();
+  for (var i = 1; i < data.length; i++) {
+    var uid = String(data[i][0] || '').trim();
+    if (uid) ids[uid] = true;
+  }
+  return ids;
+}
+
 function parseAssetReceiptFields_(text) {
-  var fields = {
-    currency: null,
-    amount: null,
-    description: null,
-    fund_handler: null
-  };
-
-  // Split before the signature block
+  var fields = { currency: null, amount: null, description: null, fund_handler: null };
   var body = text.split('--------')[0] || text;
-
   var lines = body.split('\n');
+
   for (var i = 0; i < lines.length; i++) {
     var line = lines[i].trim();
     if (!line || line.indexOf('[ASSET RECEIPT EVENT]') !== -1) continue;
 
-    // Match "- Label: value" or "- Label: value" pattern
     var match = line.match(/^-\s*([A-Za-z][A-Za-z0-9_\s()\/-]*):\s*(.*)$/);
     if (!match) continue;
 
     var label = match[1].trim().toLowerCase();
     var value = match[2].trim();
 
-    if (label === 'currency') {
-      fields.currency = value;
-    } else if (label === 'amount') {
-      // Parse number — strip non-numeric except decimal
-      var numMatch = value.match(/[\d.]+/);
-      fields.amount = numMatch ? numMatch[0] : value;
-    } else if (label === 'description') {
-      // Preserve multi-line descriptions
-      fields.description = value;
-      // Check next lines for continuation (indented)
-      while (i + 1 < lines.length && lines[i + 1].match(/^\s{2,}\S/)) {
-        i++;
-        fields.description += '\n' + lines[i].trim();
-      }
-    } else if (label === 'fund handler') {
-      fields.fund_handler = value;
+    switch (label) {
+      case 'currency':
+        fields.currency = value;
+        break;
+      case 'amount':
+        fields.amount = (value.match(/[\d.]+/) || [value])[0];
+        break;
+      case 'description':
+        fields.description = value;
+        while (i + 1 < lines.length && lines[i + 1].match(/^\s{2,}\S/)) {
+          i++;
+          fields.description += '\n' + lines[i].trim();
+        }
+        break;
+      case 'fund handler':
+        fields.fund_handler = value;
+        break;
     }
   }
-
   return fields;
 }
 
@@ -237,9 +246,7 @@ function findCurrencyRow_(currenciesSheet, currencyName) {
   if (lastRow < 2) return null;
   var colA = currenciesSheet.getRange(2, 1, lastRow - 1, 1).getValues();
   for (var i = 0; i < colA.length; i++) {
-    if (String(colA[i][0]).trim() === currencyName) {
-      return i + 2; // 1-indexed row number
-    }
+    if (String(colA[i][0]).trim() === currencyName) return i + 2;
   }
   return null;
 }
@@ -248,8 +255,5 @@ function sortCurrencies_(currenciesSheet) {
   var lastRow = currenciesSheet.getLastRow();
   if (lastRow < 2) return;
   var lastCol = currenciesSheet.getLastColumn();
-  // Sort data rows (2..last) by column A ascending
-  var range = currenciesSheet.getRange(2, 1, lastRow - 1, lastCol);
-  range.sort(1); // column 1 = A, ascending by default
-  Logger.log('[AssetReceipt] Sorted Currencies A→Z (' + (lastRow - 1) + ' data rows)');
+  currenciesSheet.getRange(2, 1, lastRow - 1, lastCol).sort(1);
 }
