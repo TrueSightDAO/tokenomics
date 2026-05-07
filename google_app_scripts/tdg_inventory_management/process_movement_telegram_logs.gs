@@ -101,9 +101,54 @@ function findContributorNameByDigitalSignature_(digitalSignature) {
   }
 }
 
+/** Trusted agent contributor names (autopilot, etc.) that can submit on behalf of governors. */
+const TRUSTED_AGENTS = ['autopilot@agroverse.shop'];
+
+function isTrustedAgent_(contributorName) {
+  return TRUSTED_AGENTS.some(function(agent) {
+    return agent.toLowerCase() === (contributorName || '').toLowerCase();
+  });
+}
+
+/** Extracts the - Approved By: value from an [INVENTORY MOVEMENT] contribution. */
+function extractApprovedBy_(contribution) {
+  if (!contribution || typeof contribution !== 'string') return null;
+  var lines = contribution.split('\n');
+  for (var i = 0; i < lines.length; i++) {
+    var line = lines[i].trim();
+    if (line.startsWith('- Approved By:')) {
+      return line.replace('- Approved By:', '').trim();
+    }
+  }
+  return null;
+}
+
 /**
- * Inventory Movement column N (STATUS): NEW if governor or ACTIVE signer matches warehouse manager (- Manager Name:);
- * unauthorized otherwise (Phase 2 skips non-NEW).
+ * Checks if the Approved By string references a known DAO governor.
+ * Format: "Gary Teh | Key FP: a1b2c3d4 | Session: https://..."
+ */
+function isGovernorApproved_(approvedBy) {
+  if (!approvedBy) return false;
+  var governorName = approvedBy.split('|')[0].trim();
+  if (!governorName) return false;
+  try {
+    var spreadsheet = SpreadsheetApp.openById(OFFCHAIN_SPREADSHEET_ID);
+    var sheet = spreadsheet.getSheetByName('Governors');
+    if (!sheet) return false;
+    var data = sheet.getDataRange().getValues();
+    for (var i = 0; i < data.length; i++) {
+      var name = String(data[i][0] || '').trim();
+      if (name.toLowerCase() === governorName.toLowerCase()) return true;
+    }
+  } catch (e) {
+    Logger.log('Governors lookup failed: ' + e.message);
+  }
+  return false;
+}
+
+/**
+ * Inventory Movement column N (STATUS): NEW if governor or ACTIVE signer matches warehouse manager
+ * or trusted agent submission approved by a governor; unauthorized otherwise (Phase 2 skips non-NEW).
  */
 function inventoryMovementStatusFromTelegramRow_(telegramRow, contribution, warehouseManagerName) {
   if (isTelegramGovernorYes_(telegramRow)) return 'NEW';
@@ -112,6 +157,13 @@ function inventoryMovementStatusFromTelegramRow_(telegramRow, contribution, ware
   const res = findContributorNameByDigitalSignature_(pk);
   if (!res.contributorName) return 'unauthorized';
   if (authNamesMatch_(res.contributorName, warehouseManagerName)) return 'NEW';
+
+  // Agentic trust path: trusted agent (autopilot) + governor-approved
+  if (isTrustedAgent_(res.contributorName)) {
+    const approvedBy = extractApprovedBy_(contribution);
+    if (approvedBy && isGovernorApproved_(approvedBy)) return 'NEW';
+  }
+
   return 'unauthorized';
 }
 
