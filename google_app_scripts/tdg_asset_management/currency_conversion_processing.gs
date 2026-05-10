@@ -12,6 +12,7 @@
  *   [CURRENCY CONVERSION EVENT]
  *   - Ledger: AGL16
  *   - Ledger URL: https://docs.google.com/spreadsheets/d/.../edit
+ *   - Warehouse Manager: Gary Teh
  *   - Source Currency: USD
  *   - Source Amount: 1000.00
  *   - Target Currency: BRL
@@ -26,10 +27,21 @@
  *   My Digital Signature: <pubkey>
  *   Request Transaction ID: <hash>
  *
+ * The Warehouse Manager (whoever holds the source-currency balance and receives
+ * the target-currency balance) is written into Column C (Entity) of BOTH ledger
+ * Transaction rows. Reporter (validated via signature) is preserved on the
+ * Currency Conversion intake sheet for audit; the ledger row Description still
+ * embeds the full signed log message.
+ *
  * Mirrors capital_injection_processing.gs in structure and reuses the same
  * helpers (resolveRedirect, getLedgerConfigsFromWix, findContributorByDigitalSignature,
  * notifyTreasuryCachePublisher_) which are defined in that file. Both scripts
  * are deployed in the same Apps Script project, so those globals are shared.
+ *
+ * Edgar webhook hookup: doGet(?action=parseAndProcessCurrencyConversionLogs) is
+ * defined at the bottom of this file so sentiment_importer's
+ * trigger_immediate_processing branch for [CURRENCY CONVERSION EVENT] can fire
+ * processing in seconds instead of waiting for the 10-min cron.
  */
 
 // ============================================================================
@@ -44,16 +56,17 @@ const CC_TELEGRAM_UPDATE_ID_COL  = 0;   // A
 const CC_TELEGRAM_MESSAGE_ID_COL = 1;   // B
 const CC_LOG_MESSAGE_COL         = 2;   // C
 const CC_REPORTER_NAME_COL       = 3;   // D
-const CC_LEDGER_NAME_COL         = 4;   // E
-const CC_LEDGER_URL_COL          = 5;   // F
-const CC_SOURCE_CURRENCY_COL     = 6;   // G
-const CC_SOURCE_AMOUNT_COL       = 7;   // H
-const CC_TARGET_CURRENCY_COL     = 8;   // I
-const CC_TARGET_AMOUNT_COL       = 9;   // J
-const CC_CONVERSION_DATE_COL     = 10;  // K
-const CC_DESCRIPTION_COL         = 11;  // L
-const CC_STATUS_COL              = 12;  // M
-const CC_LEDGER_LINES_COL        = 13;  // N
+const CC_WAREHOUSE_MANAGER_COL   = 4;   // E  ← Entity for both Tx rows
+const CC_LEDGER_NAME_COL         = 5;   // F
+const CC_LEDGER_URL_COL          = 6;   // G
+const CC_SOURCE_CURRENCY_COL     = 7;   // H
+const CC_SOURCE_AMOUNT_COL       = 8;   // I
+const CC_TARGET_CURRENCY_COL     = 9;   // J
+const CC_TARGET_AMOUNT_COL       = 10;  // K
+const CC_CONVERSION_DATE_COL     = 11;  // L
+const CC_DESCRIPTION_COL         = 12;  // M
+const CC_STATUS_COL              = 13;  // N
+const CC_LEDGER_LINES_COL        = 14;  // O
 
 // ============================================================================
 // PARSING
@@ -66,6 +79,7 @@ function parseCurrencyConversionMessage(message) {
   const details = {
     ledgerName: null,
     ledgerUrl: null,
+    warehouseManager: null,
     sourceCurrency: null,
     sourceAmount: null,
     targetCurrency: null,
@@ -85,6 +99,9 @@ function parseCurrencyConversionMessage(message) {
 
     const ledgerUrlMatch = message.match(/- Ledger URL:\s*([^\n]+)/i);
     if (ledgerUrlMatch) details.ledgerUrl = ledgerUrlMatch[1].trim();
+
+    const warehouseManagerMatch = message.match(/- Warehouse Manager:\s*([^\n]+)/i);
+    if (warehouseManagerMatch) details.warehouseManager = warehouseManagerMatch[1].trim();
 
     const sourceCurrencyMatch = message.match(/- Source Currency:\s*([^\n]+)/i);
     if (sourceCurrencyMatch) details.sourceCurrency = sourceCurrencyMatch[1].trim().toUpperCase();
@@ -158,7 +175,8 @@ function currencyConversionRecordExists(telegramUpdateId, telegramMessageId) {
 }
 
 function insertCurrencyConversionRecord(telegramUpdateId, telegramMessageId, logMessage,
-                                        reporterName, ledgerName, ledgerUrl,
+                                        reporterName, warehouseManager,
+                                        ledgerName, ledgerUrl,
                                         sourceCurrency, sourceAmount,
                                         targetCurrency, targetAmount,
                                         conversionDate, description) {
@@ -179,17 +197,18 @@ function insertCurrencyConversionRecord(telegramUpdateId, telegramMessageId, log
       telegramUpdateId,    // A: Telegram Update ID
       telegramMessageId,   // B: Telegram Message ID
       logMessage,          // C: Currency Conversion Log Message
-      reporterName,        // D: Reporter Name
-      ledgerName,          // E: Ledger Name
-      ledgerUrl,           // F: Ledger URL
-      sourceCurrency,      // G: Source Currency
-      sourceAmount,        // H: Source Amount
-      targetCurrency,      // I: Target Currency
-      targetAmount,        // J: Target Amount
-      conversionDate,      // K: Conversion Date
-      description,         // L: Description
-      'NEW',               // M: Status
-      ''                   // N: Ledger Lines Number (filled after processing)
+      reporterName,        // D: Reporter Name (validated via signature)
+      warehouseManager,    // E: Warehouse Manager (Entity for both Tx rows)
+      ledgerName,          // F: Ledger Name
+      ledgerUrl,           // G: Ledger URL
+      sourceCurrency,      // H: Source Currency
+      sourceAmount,        // I: Source Amount
+      targetCurrency,      // J: Target Currency
+      targetAmount,        // K: Target Amount
+      conversionDate,      // L: Conversion Date
+      description,         // M: Description
+      'NEW',               // N: Status
+      ''                   // O: Ledger Lines Number (filled after processing)
     ];
 
     sheet.appendRow(rowToAppend);
@@ -245,14 +264,15 @@ function processNewCurrencyConversions() {
       const rowNumber = i + 1;
       Logger.log(`\n📝 Processing currency conversion at row ${rowNumber}`);
 
-      const ledgerUrl       = row[CC_LEDGER_URL_COL];
-      const conversionDate  = row[CC_CONVERSION_DATE_COL];
-      const logMessage      = row[CC_LOG_MESSAGE_COL];
-      const reporterName    = row[CC_REPORTER_NAME_COL];
-      const sourceCurrency  = row[CC_SOURCE_CURRENCY_COL];
-      const sourceAmount    = parseFloat(row[CC_SOURCE_AMOUNT_COL]);
-      const targetCurrency  = row[CC_TARGET_CURRENCY_COL];
-      const targetAmount    = parseFloat(row[CC_TARGET_AMOUNT_COL]);
+      const ledgerUrl         = row[CC_LEDGER_URL_COL];
+      const conversionDate    = row[CC_CONVERSION_DATE_COL];
+      const logMessage        = row[CC_LOG_MESSAGE_COL];
+      const reporterName      = row[CC_REPORTER_NAME_COL];
+      const warehouseManager  = (row[CC_WAREHOUSE_MANAGER_COL] || '').toString().trim() || reporterName;
+      const sourceCurrency    = row[CC_SOURCE_CURRENCY_COL];
+      const sourceAmount      = parseFloat(row[CC_SOURCE_AMOUNT_COL]);
+      const targetCurrency    = row[CC_TARGET_CURRENCY_COL];
+      const targetAmount      = parseFloat(row[CC_TARGET_AMOUNT_COL]);
 
       if (!(sourceAmount > 0) || !(targetAmount > 0) || !sourceCurrency || !targetCurrency) {
         Logger.log(`❌ Invalid amounts/currencies on row ${rowNumber}`);
@@ -286,30 +306,32 @@ function processNewCurrencyConversions() {
         }
 
         // Row 1: Source debit (asset reduction → negative amount)
+        // Entity = Warehouse Manager (whose source-currency balance is being debited).
         const debitRow = [
           conversionDate,
           logMessage,
-          reporterName,
+          warehouseManager,
           sourceAmount * -1,
           sourceCurrency,
           'Assets'
         ];
         transactionsSheet.appendRow(debitRow);
         const debitRowNumber = transactionsSheet.getLastRow();
-        Logger.log(`✅ Inserted ${sourceCurrency} debit (${sourceAmount * -1}) at row ${debitRowNumber}`);
+        Logger.log(`✅ Inserted ${sourceCurrency} debit (${sourceAmount * -1}) for ${warehouseManager} at row ${debitRowNumber}`);
 
         // Row 2: Target credit (asset increase → positive amount)
+        // Entity = Warehouse Manager (whose target-currency balance is being credited).
         const creditRow = [
           conversionDate,
           logMessage,
-          reporterName,
+          warehouseManager,
           targetAmount,
           targetCurrency,
           'Assets'
         ];
         transactionsSheet.appendRow(creditRow);
         const creditRowNumber = transactionsSheet.getLastRow();
-        Logger.log(`✅ Inserted ${targetCurrency} credit (+${targetAmount}) at row ${creditRowNumber}`);
+        Logger.log(`✅ Inserted ${targetCurrency} credit (+${targetAmount}) for ${warehouseManager} at row ${creditRowNumber}`);
 
         const ledgerLines = `${debitRowNumber},${creditRowNumber}`;
         sheet.getRange(rowNumber, CC_STATUS_COL + 1).setValue('PROCESSED');
@@ -396,11 +418,16 @@ function parseAndProcessCurrencyConversionLogs() {
         conversionDate = Utilities.formatDate(new Date(statusDate), 'GMT', 'yyyyMMdd');
       }
 
+      // Warehouse Manager is required for new submissions; older messages without
+      // the field fall back to reporterName so we don't drop legacy intake.
+      const warehouseManager = (details.warehouseManager || reporterName || '').trim();
+
       const success = insertCurrencyConversionRecord(
         row[TELEGRAM_UPDATE_ID_COL],
         row[TELEGRAM_MESSAGE_ID_COL],
         message,
         reporterName,
+        warehouseManager,
         details.ledgerName,
         details.ledgerUrl,
         details.sourceCurrency,
@@ -436,6 +463,7 @@ function testParseCurrencyConversionMessage() {
   const testMessage = `[CURRENCY CONVERSION EVENT]
 - Ledger: AGL16
 - Ledger URL: https://docs.google.com/spreadsheets/d/abc123/edit
+- Warehouse Manager: Gary Teh
 - Source Currency: USD
 - Source Amount: 1000.00
 - Target Currency: BRL
@@ -460,6 +488,7 @@ Verify submission here: https://dapp.truesight.me/verify_request.html`;
   Logger.log('=== Parsed Currency Conversion Details ===');
   Logger.log(`Ledger Name: ${details.ledgerName}`);
   Logger.log(`Ledger URL: ${details.ledgerUrl}`);
+  Logger.log(`Warehouse Manager: ${details.warehouseManager}`);
   Logger.log(`Source: ${details.sourceAmount} ${details.sourceCurrency}`);
   Logger.log(`Target: ${details.targetAmount} ${details.targetCurrency}`);
   Logger.log(`Implied Rate: ${details.impliedRate}`);
@@ -474,4 +503,50 @@ Verify submission here: https://dapp.truesight.me/verify_request.html`;
 function testProcessNewCurrencyConversions() {
   Logger.log('=== Testing Process NEW Currency Conversions ===');
   processNewCurrencyConversions();
+}
+
+// ============================================================================
+// EDGAR WEBHOOK ENTRY POINT
+// ============================================================================
+
+/**
+ * doGet — invoked by sentiment_importer's trigger_immediate_processing branch
+ * for [CURRENCY CONVERSION EVENT] submissions, so processing happens in seconds
+ * instead of waiting for the time-driven cron trigger.
+ *
+ * Mirrors the doGet pattern in tdg_expenses_processing.gs (single-action
+ * dispatch). If this Apps Script project later needs to expose other actions,
+ * add `else if (action === ...)` branches.
+ *
+ * Edgar config: sentiment_importer/config/application.rb
+ *   config.currency_conversion_processing_webhook_url
+ *
+ * Trigger URL shape:
+ *   https://script.google.com/macros/s/<deployment>/exec?action=parseAndProcessCurrencyConversionLogs
+ */
+function doGet(e) {
+  const action = (e && e.parameter && e.parameter.action) || '';
+  Logger.log(`doGet called with action: ${action || 'none'}`);
+
+  if (action === 'parseAndProcessCurrencyConversionLogs') {
+    try {
+      Logger.log('Webhook triggered: parseAndProcessCurrencyConversionLogs');
+      parseAndProcessCurrencyConversionLogs();
+      Logger.log('Webhook processing completed successfully');
+      return ContentService
+        .createTextOutput('✅ Currency conversion logs processed successfully. Check execution logs for details.')
+        .setMimeType(ContentService.MimeType.TEXT);
+    } catch (err) {
+      Logger.log(`❌ Error in parseAndProcessCurrencyConversionLogs: ${err.message}`);
+      Logger.log(`Error stack: ${err.stack || 'No stack trace available'}`);
+      return ContentService
+        .createTextOutput('❌ Error: ' + err.message)
+        .setMimeType(ContentService.MimeType.TEXT);
+    }
+  }
+
+  Logger.log(`No valid action specified. Received action: ${action || 'none'}`);
+  return ContentService
+    .createTextOutput('ℹ️ No valid action. Expected: ?action=parseAndProcessCurrencyConversionLogs')
+    .setMimeType(ContentService.MimeType.TEXT);
 }

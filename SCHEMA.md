@@ -361,27 +361,30 @@ See [`python_scripts/schema_validation/README.md`](./python_scripts/schema_valid
 | B | Telegram Message ID | Number | Source message ID |
 | C | Currency Conversion Log Message | String | Full submission message including all details |
 | D | Reporter Name | String | Person who reported (validated via digital signature) |
-| E | Ledger Name | String | Target managed ledger (e.g., "AGL16", "TRIBO_MIRIM_BAHIA") |
-| F | Ledger URL | String | Resolved URL to target managed ledger |
-| G | Source Currency | String | ISO-style code for the currency being spent (e.g. "USD") |
-| H | Source Amount | Number | Positive amount that LEFT the source-currency account (includes any provider fee) |
-| I | Target Currency | String | ISO-style code for the currency received (e.g. "BRL") |
-| J | Target Amount | Number | Positive amount that ARRIVED in the target-currency account |
-| K | Conversion Date | Date | Date funds settled in target account (YYYYMMDD) |
-| L | Description | String | Free-text description (e.g. "Wise transfer USD→BRL to Rendimento for May payout") |
-| M | Status | String | Processing status: "NEW", "PROCESSED", "FAILED" |
-| N | Ledger Lines Number | String | Comma-separated row numbers (e.g., "245,246" for source-debit + target-credit) |
+| E | Warehouse Manager | String | Person whose source-currency balance is debited and target-currency balance is credited; used as `Entity` (col C) for both Tx rows on the target ledger. Defaults to Reporter Name if missing. |
+| F | Ledger Name | String | Target managed ledger (e.g., "AGL16", "TRIBO_MIRIM_BAHIA") |
+| G | Ledger URL | String | Resolved URL to target managed ledger |
+| H | Source Currency | String | ISO-style code for the currency being spent (e.g. "USD") |
+| I | Source Amount | Number | Positive amount that LEFT the source-currency account (includes any provider fee) |
+| J | Target Currency | String | ISO-style code for the currency received (e.g. "BRL") |
+| K | Target Amount | Number | Positive amount that ARRIVED in the target-currency account |
+| L | Conversion Date | Date | Date funds settled in target account (YYYYMMDD) |
+| M | Description | String | Free-text description (e.g. "Wise transfer USD→BRL to Rendimento for May payout") |
+| N | Status | String | Processing status: "NEW", "PROCESSED", "FAILED" |
+| O | Ledger Lines Number | String | Comma-separated row numbers (e.g., "245,246" for source-debit + target-credit) |
 
 **Key Features:**
 - **Double-Entry Accounting:** Each currency conversion creates TWO transactions in the target ledger's `Transactions` tab:
-  1. **Source debit** — `-source_amount` with Type=source_currency, Category="Assets" (asset reduction)
-  2. **Target credit** — `+target_amount` with Type=target_currency, Category="Assets" (asset increase)
-- **Signed-amount convention:** matches `tdg_expenses_processing.gs` (asset reduction = negative amount in column D); `Balance` aggregates remain correct via `SUM(amount) GROUP BY currency`.
+  1. **Source debit** — `-source_amount` with Type=source_currency, Category="Assets", Entity=Warehouse Manager (asset reduction)
+  2. **Target credit** — `+target_amount` with Type=target_currency, Category="Assets", Entity=Warehouse Manager (asset increase)
+- **Warehouse Manager vs Reporter:** Reporter (validated via signature) is who SUBMITTED the event. Warehouse Manager is whose balance ACTUALLY changed. They're often the same person but don't have to be (e.g. Gary submits a conversion that records inflow against a partner's balance). Reporter stays on the intake row for audit; Warehouse Manager is what lands in the ledger Entity column.
+- **Signed-amount convention:** matches `tdg_expenses_processing.gs` (asset reduction = negative amount in column D); `Balance` aggregates remain correct via `SUM(amount) GROUP BY (currency, manager)`.
 - **Fee handling:** any provider fee or FX gain/loss is absorbed silently in the difference between source/target amounts at the receipt's implied rate. Add a third row by hand if explicit fee accounting is needed.
 - **Managed Ledgers Only:** validates `Ledger URL` against the `Shipment Ledger Listing` registry (same source as Capital Injection); offchain main ledger is NOT a valid target.
 - **Digital Signature Required:** no fallback — reporter must have valid ACTIVE digital signature.
 - **Currencies:** must differ; written in upper-case as supplied. Common codes: USD, BRL, EUR, GBP, AUD, SGD, MYR (datalist on the DApp page).
 - **Supporting Documentation:** Wise/Rendimento/bank receipt attached to the submission and uploaded to `TrueSightDAO/.github/assets/` by Edgar.
+- **Edgar immediate trigger:** `sentiment_importer/app/controllers/dao_controller.rb#trigger_immediate_processing` matches `[CURRENCY CONVERSION EVENT]` and fires `?action=parseAndProcessCurrencyConversionLogs` against `config.currency_conversion_processing_webhook_url` so the ledger reflects the conversion in seconds; if the webhook URL isn't set, the GAS time trigger picks it up within ~10 min.
 
 **Used by:**
 - [`currency_conversion_processing.gs`](https://github.com/TrueSightDAO/tokenomics/blob/main/google_app_scripts/tdg_asset_management/currency_conversion_processing.gs) - Parses `[CURRENCY CONVERSION EVENT]` submissions and writes the source-debit + target-credit pair into the target ledger's `Transactions` tab.
