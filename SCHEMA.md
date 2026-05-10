@@ -348,6 +348,48 @@ See [`python_scripts/schema_validation/README.md`](./python_scripts/schema_valid
 
 ---
 
+##### Sheet: `Currency Conversion`
+**Purpose:** Currency-conversion submissions for managed AGL ledgers (e.g. USD→BRL via Wise/Rendimento). Records each conversion as a double-entry pair (source debit + target credit) on the target ledger's `Transactions` tab so multi-currency `Balance` aggregates resolve correctly.
+
+**Sheet URL:** https://docs.google.com/spreadsheets/d/1qbZZhf-_7xzmDTriaJVWj6OZshyQsFkdsAV8-pyzASQ/edit (tab: `Currency Conversion` — created on first run; tab gid not yet assigned)
+
+**Header Row:** 1
+
+| Column | Name | Type | Description |
+|--------|------|------|-------------|
+| A | Telegram Update ID | Number | Source Telegram update ID |
+| B | Telegram Message ID | Number | Source message ID |
+| C | Currency Conversion Log Message | String | Full submission message including all details |
+| D | Reporter Name | String | Person who reported (validated via digital signature) |
+| E | Ledger Name | String | Target managed ledger (e.g., "AGL16", "TRIBO_MIRIM_BAHIA") |
+| F | Ledger URL | String | Resolved URL to target managed ledger |
+| G | Source Currency | String | ISO-style code for the currency being spent (e.g. "USD") |
+| H | Source Amount | Number | Positive amount that LEFT the source-currency account (includes any provider fee) |
+| I | Target Currency | String | ISO-style code for the currency received (e.g. "BRL") |
+| J | Target Amount | Number | Positive amount that ARRIVED in the target-currency account |
+| K | Conversion Date | Date | Date funds settled in target account (YYYYMMDD) |
+| L | Description | String | Free-text description (e.g. "Wise transfer USD→BRL to Rendimento for May payout") |
+| M | Status | String | Processing status: "NEW", "PROCESSED", "FAILED" |
+| N | Ledger Lines Number | String | Comma-separated row numbers (e.g., "245,246" for source-debit + target-credit) |
+
+**Key Features:**
+- **Double-Entry Accounting:** Each currency conversion creates TWO transactions in the target ledger's `Transactions` tab:
+  1. **Source debit** — `-source_amount` with Type=source_currency, Category="Assets" (asset reduction)
+  2. **Target credit** — `+target_amount` with Type=target_currency, Category="Assets" (asset increase)
+- **Signed-amount convention:** matches `tdg_expenses_processing.gs` (asset reduction = negative amount in column D); `Balance` aggregates remain correct via `SUM(amount) GROUP BY currency`.
+- **Fee handling:** any provider fee or FX gain/loss is absorbed silently in the difference between source/target amounts at the receipt's implied rate. Add a third row by hand if explicit fee accounting is needed.
+- **Managed Ledgers Only:** validates `Ledger URL` against the `Shipment Ledger Listing` registry (same source as Capital Injection); offchain main ledger is NOT a valid target.
+- **Digital Signature Required:** no fallback — reporter must have valid ACTIVE digital signature.
+- **Currencies:** must differ; written in upper-case as supplied. Common codes: USD, BRL, EUR, GBP, AUD, SGD, MYR (datalist on the DApp page).
+- **Supporting Documentation:** Wise/Rendimento/bank receipt attached to the submission and uploaded to `TrueSightDAO/.github/assets/` by Edgar.
+
+**Used by:**
+- [`currency_conversion_processing.gs`](https://github.com/TrueSightDAO/tokenomics/blob/main/google_app_scripts/tdg_asset_management/currency_conversion_processing.gs) - Parses `[CURRENCY CONVERSION EVENT]` submissions and writes the source-debit + target-credit pair into the target ledger's `Transactions` tab.
+
+**Front-end:** [`dapp/currency_conversion.html`](https://github.com/TrueSightDAO/dapp/blob/main/currency_conversion.html)
+
+---
+
 ##### Sheet: `QR Code Sales`
 **Purpose:** Sales transactions from QR code scans
 
