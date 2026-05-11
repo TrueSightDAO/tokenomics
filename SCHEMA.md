@@ -1159,6 +1159,7 @@ See [`python_scripts/schema_validation/README.md`](./python_scripts/schema_valid
 | G | notes | String | Free-form operator notes (onboarding context, contact preferences, etc.). |
 | H | last_synced_at | Datetime (ISO 8601) | Auto-updated by `sync_agroverse_store_inventory.py` when the inventory snapshot last ran for this partner. |
 | I | partner_type | String | One of: **`Wholesale`**, **`Consignment`**, **`Operator`**, **`Supplier`**, **`Manufacturer`**. Validated against **`States`** column **Z**. Determines which velocity field downstream tooling should trust — see **`States`!Z** description and `partners-velocity.json` design in `agentic_ai_context/PARTNER_VELOCITY_PROPOSAL.md`. **Default for retail partners onboarded before 2026-04-27:** treat as `Consignment` (the wholesale-bought retail-pack path was added that date; zero `Wholesale`-type partners existed before). **Sheet header reads exactly `partner type`** (with a space) — code that reads it should match case-insensitively. |
+| J | address | String (free‑form) | Partner’s physical ship‑to address as a single line (recommended pattern: `street1, city, STATE ZIP, country`). This is the canonical source for the Restock Recommender’s address lookups. The Shipping Planner API parses this into `{street1, city, state, zip, country}`. If omitted or unparsable, it falls back to the legacy `Partner addresses` sheet. |
 
 **Used by:**
 - [`market_research/scripts/sync_agroverse_store_inventory.py`](https://github.com/TrueSightDAO/go_to_market/blob/main/scripts/sync_agroverse_store_inventory.py) — `read_partners_by_contributor` for partner_id ↔ contributor_contact_id mapping; emits `agroverse-inventory/partners-inventory.json`.
@@ -1820,4 +1821,3 @@ All Wix API requests require these headers:
 
 **Maintained by:** TrueSight DAO Development Team  
 **Questions?** Check the corresponding `.gs` files for implementation details
-
