@@ -104,7 +104,10 @@ function parseCurrencyConversionMessage(message) {
     const ledgerNameMatch = message.match(/- Ledger:\s*([^\n]+)/i);
     if (ledgerNameMatch) details.ledgerName = ledgerNameMatch[1].trim();
 
-    const ledgerUrlMatch = message.match(/- Ledger URL:\s*([^\n]+)/i);
+    // Ledger URL is intentionally empty for offchain (Main Ledger) submissions.
+    // Use [ \t]* (not \s*) so we don't eat the newline, and * (not +) on the
+    // capture so an empty value matches as '' instead of grabbing the next line.
+    const ledgerUrlMatch = message.match(/- Ledger URL:[ \t]*([^\n]*)/i);
     if (ledgerUrlMatch) details.ledgerUrl = ledgerUrlMatch[1].trim();
 
     const warehouseManagerMatch = message.match(/- Warehouse Manager:\s*([^\n]+)/i);
@@ -339,8 +342,18 @@ function processNewCurrencyConversions() {
         var debitRow = managedLedger
           ? [conversionDate, logMessage, warehouseManager, sourceAmount * -1, sourceCurrency, 'Assets']
           : [conversionDate, logMessage, warehouseManager, sourceAmount * -1, sourceCurrency];
+
+        // Capture lastRow BEFORE appending so we can assert appendRow actually
+        // grew the sheet — otherwise we'd silently mark the intake row as
+        // PROCESSED with garbage line numbers (the 2026-05-11 incident: status
+        // PROCESSED, ledger_lines='3297,3297', target sheet untouched).
+        const beforeAppendLastRow = transactionsSheet.getLastRow();
         transactionsSheet.appendRow(debitRow);
+        SpreadsheetApp.flush();
         const debitRowNumber = transactionsSheet.getLastRow();
+        if (debitRowNumber <= beforeAppendLastRow) {
+          throw new Error(`appendRow did not grow ${targetSheetName} — lastRow stayed at ${beforeAppendLastRow}. Possible silent permission failure on ${targetSpreadsheetUrl}.`);
+        }
         Logger.log(`✅ Inserted ${sourceCurrency} debit (${sourceAmount * -1}) for ${warehouseManager} at ${targetSheetName} row ${debitRowNumber}`);
 
         // Row 2: Target credit (asset increase → positive amount).
@@ -348,12 +361,22 @@ function processNewCurrencyConversions() {
           ? [conversionDate, logMessage, warehouseManager, targetAmount, targetCurrency, 'Assets']
           : [conversionDate, logMessage, warehouseManager, targetAmount, targetCurrency];
         transactionsSheet.appendRow(creditRow);
+        SpreadsheetApp.flush();
         const creditRowNumber = transactionsSheet.getLastRow();
+        if (creditRowNumber <= debitRowNumber) {
+          throw new Error(`appendRow did not grow ${targetSheetName} for credit row — lastRow stayed at ${debitRowNumber}.`);
+        }
         Logger.log(`✅ Inserted ${targetCurrency} credit (+${targetAmount}) for ${warehouseManager} at ${targetSheetName} row ${creditRowNumber}`);
 
         const ledgerLines = `${debitRowNumber},${creditRowNumber}`;
         sheet.getRange(rowNumber, CC_STATUS_COL + 1).setValue('PROCESSED');
-        sheet.getRange(rowNumber, CC_LEDGER_LINES_COL + 1).setValue(ledgerLines);
+        // Force the Ledger Lines cell to text format BEFORE writing — otherwise
+        // a value like '3298,3299' gets parsed by Sheets as the number 32983299
+        // (en-US thousands-separator interpretation) and the audit row stops
+        // pointing at recoverable line numbers.
+        sheet.getRange(rowNumber, CC_LEDGER_LINES_COL + 1)
+          .setNumberFormat('@')
+          .setValue(ledgerLines);
 
         Logger.log(`✅ Successfully processed ${managedLedger ? 'managed' : 'offchain'} currency conversion - ${targetSheetName} lines: ${ledgerLines}`);
         processedCount++;
