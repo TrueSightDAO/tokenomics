@@ -1354,7 +1354,7 @@ See [`python_scripts/schema_validation/README.md`](./python_scripts/schema_valid
 
 | Column | Name | Type | Description |
 |--------|------|------|-------------|
-| A | *(empty)* | - | Reserved column |
+| A | Ledger ID | String | Short ledger identifier (e.g. AGL4, SEF1, PP1, TBM). The first row where Column A is empty marks the end of the active list — append new ledgers there. |
 | B | Shipment Date | Date | Shipment date |
 | C | Status | String | Shipment status |
 | D | Description | String | Shipment description |
