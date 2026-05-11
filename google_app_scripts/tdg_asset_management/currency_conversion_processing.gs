@@ -505,6 +505,44 @@ function testProcessNewCurrencyConversions() {
   processNewCurrencyConversions();
 }
 
+
+// ============================================================================
+// TIME-TRIGGER MANAGEMENT (cron fallback alongside Edgar's immediate webhook)
+// ============================================================================
+
+/**
+ * Idempotently install a 10-min time-driven trigger for
+ * parseAndProcessCurrencyConversionLogs. Removes any prior triggers for the
+ * same handler before installing fresh, so repeated calls don't stack.
+ *
+ * Invoke once via doGet(?action=installTimeTrigger) — typically right after
+ * the first deploy, then again after any handler-name change.
+ */
+function installTimeTrigger() {
+  var removed = 0;
+  ScriptApp.getProjectTriggers().forEach(function (t) {
+    if (t.getHandlerFunction() === 'parseAndProcessCurrencyConversionLogs') {
+      ScriptApp.deleteTrigger(t);
+      removed++;
+    }
+  });
+  ScriptApp.newTrigger('parseAndProcessCurrencyConversionLogs')
+    .timeBased()
+    .everyMinutes(10)
+    .create();
+  return { removed_existing: removed, installed: 1, cadence_minutes: 10 };
+}
+
+function listTriggers() {
+  return ScriptApp.getProjectTriggers().map(function (t) {
+    return {
+      handler: t.getHandlerFunction(),
+      eventType: String(t.getEventType()),
+      uniqueId: t.getUniqueId()
+    };
+  });
+}
+
 // ============================================================================
 // EDGAR WEBHOOK ENTRY POINT
 // ============================================================================
@@ -543,6 +581,22 @@ function doGet(e) {
         .createTextOutput('❌ Error: ' + err.message)
         .setMimeType(ContentService.MimeType.TEXT);
     }
+  }
+
+  if (action === 'installTimeTrigger') {
+    try {
+      var result = installTimeTrigger();
+      return ContentService.createTextOutput('\u2705 Trigger installed: ' + JSON.stringify(result))
+        .setMimeType(ContentService.MimeType.TEXT);
+    } catch (err) {
+      return ContentService.createTextOutput('\u274c installTimeTrigger error: ' + err.message)
+        .setMimeType(ContentService.MimeType.TEXT);
+    }
+  }
+
+  if (action === 'listTriggers') {
+    return ContentService.createTextOutput(JSON.stringify(listTriggers(), null, 2))
+      .setMimeType(ContentService.MimeType.TEXT);
   }
 
   Logger.log(`No valid action specified. Received action: ${action || 'none'}`);

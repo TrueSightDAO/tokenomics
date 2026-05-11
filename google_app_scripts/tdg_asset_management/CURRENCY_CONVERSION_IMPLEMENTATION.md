@@ -177,23 +177,55 @@ Both transactions inserted into target ledger's `Transactions` sheet:
 - `testParseCurrencyConversionMessage()`
 - `testProcessNewCurrencyConversions()`
 
+### Trigger management (run once from the Apps Script editor; no underscore so they show up in the Run dropdown)
+- `installTimeTrigger()` — idempotently installs the 10-min time-driven trigger for `parseAndProcessCurrencyConversionLogs`. First run pops the OAuth consent dialog for the `script.scriptapp` scope (in the manifest below).
+- `listTriggers()` — returns the project's active triggers as JSON (handler / eventType / uniqueId). Useful for quick sanity checks without opening the Triggers UI.
+
 ### Edgar Webhook Entry Point
-- `doGet(e)` — dispatches `?action=parseAndProcessCurrencyConversionLogs`. Lets Edgar's `trigger_immediate_processing` branch fire processing in seconds instead of waiting for the 10-min cron.
+- `doGet(e)` — dispatches three actions; the first is what Edgar fires, the other two let you manage the cron from anywhere with the `/exec` URL once the manifest scope has been granted:
+  - `?action=parseAndProcessCurrencyConversionLogs` (Edgar's immediate-trigger path)
+  - `?action=installTimeTrigger`
+  - `?action=listTriggers`
 
 ---
 
-## ⚙️ Deployment Steps (one-time)
+## ⚙️ Deployment Steps (one-time, all done as of 2026-05-10)
 
-1. **Create the intake sheet:** add a new tab named **`Currency Conversion`** to spreadsheet `1qbZZhf-_7xzmDTriaJVWj6OZshyQsFkdsAV8-pyzASQ` with the **15-column** header (A–O) per the schema above.
-2. **Add the script to the existing Apps Script project** that already hosts `capital_injection_processing.gs` (`https://script.google.com/home/projects/1orWgdGckts55owiYOysR_y4sde52T_eUmrtDGAEkb4YV5DlUfJ0JZC5J/edit`). The new file must live in the same project so it can reuse the constants and helpers from the capital-injection script.
-3. **Add a time-driven trigger** for `parseAndProcessCurrencyConversionLogs` (suggested: every 10 minutes, matching Capital Injection's cadence — confirm exact cadence in the Apps Script project's existing trigger list). This stays as the cron fallback even when the Edgar webhook is wired.
-4. **(Optional but recommended) Wire the Edgar immediate-trigger webhook:**
-   a. In the Apps Script editor: **Deploy → New deployment → Web app**, set "Execute as: Me" and "Who has access: Anyone" — copy the resulting `/exec` URL.
-   b. In `sentiment_importer/config/application.rb`: confirm the `config.currency_conversion_processing_webhook_url` block is present (added in `sentiment_importer` PR for this feature). The default reads `ENV['CURRENCY_CONVERSION_WEBHOOK_URL']`; set that env var on Edgar's host (or paste the URL inline) to the `/exec` URL from step (a).
-   c. Restart Edgar via `./deploy.sh` (Edgar does NOT auto-deploy on merge; see `agentic_ai_context/NOTES_sentiment_importer.md`).
-   d. Sanity check: submit a conversion from `dapp/currency_conversion.html`; the ledger should reflect it within seconds (check Edgar logs for `Currency conversion processing (Telegram Chat Logs → Currency Conversion → Managed AGL Transactions)` and the GAS logs for `Webhook triggered: parseAndProcessCurrencyConversionLogs`).
-5. **Verify each managed ledger** that you intend to use has a `Transactions` sheet with the standard 6-column shape (A: Date, B: Description, C: Entity, D: Amount, E: Type/Currency, F: Category). New ledgers (e.g. `TRIBO_MIRIM_BAHIA`) will need this tab created before the processor can write to them.
-6. **Smoke test:** call `testParseCurrencyConversionMessage()` from the Apps Script editor, then submit a real conversion via `dapp/currency_conversion.html` against a sandbox managed ledger and confirm both rows appear in `Transactions` with the Warehouse Manager as the Entity.
+The following are done in production. Re-run any of them when standing up an analogous flow on a new project.
+
+1. **Intake sheet — done.** `Currency Conversion` tab on spreadsheet `1qbZZhf-_7xzmDTriaJVWj6OZshyQsFkdsAV8-pyzASQ` (gid `1286252879`) with the 15-column header (A–O) per the schema above. Created via Sheets API using `market_research/google_credentials.json` (the `agroverse-market-research@get-data-io...` service account; the `tokenomics-schema@...` SA is read-only on this sheet).
+2. **GAS in same Apps Script project as `capital_injection_processing.gs` — done.** Pushed via `clasp push` from `tokenomics/clasp_mirrors/1orWgdGckts55owiYOysR_y4sde52T_eUmrtDGAEkb4YV5DlUfJ0JZC5J/CurrencyConversion.js`. The mirror's `appsscript.json` had to be expanded with a `webapp` block AND `oauthScopes` (see "Manifest" below) — without those, deployment as Web App returns 404 / trigger management hits "permission denied".
+3. **Time-driven trigger — done.** Installed by running the new `installTimeTrigger()` function once from the Apps Script editor (not from the Run-button dropdown if it ends in `_` — Apps Script hides trailing-underscore "private" functions from the editor list). First run pops the OAuth consent dialog for the `script.scriptapp` scope; after grant, the trigger persists. Verify any time with `?action=listTriggers`.
+4. **Edgar immediate-trigger webhook — done.** Web App `/exec` URL is deployment ID `AKfycby8bOb0iEfJh-Io90fK-NQRpC6BlLC66e6MCr3JvyOEi-UDH-TkwYSsdeXKuhkpsU4` (use `clasp deploy -i <id>` to update in place — keeps the URL stable so Edgar config doesn't need re-syncing). On Edgar (`seni_ror_new`), the URL is set via systemd drop-in `/etc/systemd/system/seni_ror.service.d/override.conf`:
+   ```
+   [Service]
+   Environment="CURRENCY_CONVERSION_WEBHOOK_URL=https://script.google.com/macros/s/AKfycby8.../exec"
+   ```
+   followed by `sudo systemctl daemon-reload && sudo systemctl restart seni_ror`. Drop-in over override-the-main-unit is intentional — the AMI-baked unit gets re-pulled on every boot and would otherwise lose this setting.
+5. **Per-managed-ledger Transactions tab.** Each managed ledger that's a valid target (e.g. `TRIBO_MIRIM_BAHIA`) must have a `Transactions` sheet with the standard 6-column shape (A: Date, B: Description, C: Entity, D: Amount, E: Type/Currency, F: Category). The processor will fail-fast on the intake row (Status="FAILED") if the tab is missing.
+6. **Smoke test:** submit a real conversion via `dapp/currency_conversion.html` against a sandbox managed ledger and confirm both rows appear in the target's `Transactions` tab with the **Warehouse Manager** as the Entity.
+
+### Manifest (`appsscript.json` in the clasp mirror — gitignored, lives only in the deployed project)
+
+```json
+{
+  "timeZone": "America/Sao_Paulo",
+  "dependencies": {},
+  "exceptionLogging": "STACKDRIVER",
+  "runtimeVersion": "V8",
+  "oauthScopes": [
+    "https://www.googleapis.com/auth/spreadsheets",
+    "https://www.googleapis.com/auth/script.external_request",
+    "https://www.googleapis.com/auth/script.scriptapp"
+  ],
+  "webapp": {
+    "executeAs": "USER_DEPLOYING",
+    "access": "ANYONE_ANONYMOUS"
+  }
+}
+```
+
+The `script.scriptapp` scope is what gates `installTimeTrigger()` / `listTriggers()`. `script.external_request` covers `notifyTreasuryCachePublisher_`'s outbound `UrlFetchApp.fetch`. `spreadsheets` covers all the sheet reads / writes.
 
 ---
 
@@ -254,10 +286,11 @@ Schema and naming convention live in `agentic_ai_context/MANAGED_LEDGER_EXPLORER
 - [x] Warehouse Manager column (E) added; written to Entity column of both Tx rows
 - [x] doGet(?action=parseAndProcessCurrencyConversionLogs) for Edgar immediate-trigger
 - [x] Edgar branch + config in sentiment_importer for `[CURRENCY CONVERSION EVENT]`
-- [ ] **Pending operator action:** create `Currency Conversion` tab on Telegram & Submissions spreadsheet (15 columns A–O per schema)
-- [ ] **Pending operator action:** paste script into Apps Script project + add time trigger
-- [ ] **Pending operator action:** deploy GAS as Web App + set CURRENCY_CONVERSION_WEBHOOK_URL env on Edgar host + `./deploy.sh`
-- [ ] **Pending operator action:** smoke test against sandbox managed ledger
+- [x] **Done 2026-05-10:** `Currency Conversion` tab created (gid 1286252879) with 15 columns A–O
+- [x] **Done 2026-05-10:** Script pushed via `clasp push` to project `1orWgdGckts...UfJ0JZC5J`
+- [x] **Done 2026-05-10:** Web App deployed (deployment ID `AKfycby8bOb0iEfJh-Io90fK-NQRpC6BlLC66e6MCr3JvyOEi-UDH-TkwYSsdeXKuhkpsU4`); `CURRENCY_CONVERSION_WEBHOOK_URL` set on `seni_ror_new` via systemd drop-in
+- [x] **Done 2026-05-10:** Time trigger installed via `installTimeTrigger()` (verified via `?action=listTriggers` — handler `parseAndProcessCurrencyConversionLogs`, eventType `CLOCK`)
+- [ ] **Pending operator action:** smoke test against a real managed ledger by submitting from `dapp/currency_conversion.html`
 
 ---
 
