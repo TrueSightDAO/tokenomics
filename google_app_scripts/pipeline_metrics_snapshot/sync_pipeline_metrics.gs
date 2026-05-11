@@ -287,6 +287,21 @@ function _headerMapPipeline_(headerRow) {
 
 function _touchCountPipeline_(v) {
   if (v === '' || v === null || v === undefined) return 0;
+  // Hit List columns AU/AV are integer COUNTIFS results, but a stale TIME
+  // number-format leaked from neighbouring weekday-hours columns can survive
+  // on rows appended before that bug was fixed. SpreadsheetApp.getValues()
+  // surfaces TIME-formatted cells as JS Date objects, so parseFloat(String(v))
+  // would silently yield NaN and the count would collapse to 0 — which is how
+  // 32 stores were previously miscounted as "never warmed-up" in
+  // ADVISORY_SNAPSHOT.md. Detect Dates here and recover the underlying serial.
+  if (v instanceof Date) {
+    var ms = v.getTime();
+    if (!isFinite(ms)) return 0;
+    var sheetEpoch = Date.UTC(1899, 11, 30); // Sheets day 0
+    var n = Math.round((ms - sheetEpoch) / 86400000);
+    if (!isFinite(n) || n < 0) return 0;
+    return Math.floor(n);
+  }
   var n = parseFloat(String(v).trim().replace(/,/g, ''));
   if (isNaN(n) || n < 0) return 0;
   return Math.floor(n);
