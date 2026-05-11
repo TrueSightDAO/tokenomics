@@ -16,7 +16,7 @@
  * This provides a direct Stripe API → offchain transactions route for non-QR-code 
  * sales of the target product, bypassing intermediate sheets.
  * 
- * Deployment URL: [To be added after deployment]
+ * Deployment URL: https://script.google.com/macros/s/AKfycbwauCMu-3Es0s4rB7Cr-fsP2JuEnebyPS8W-ecXG6RUi_zhqpLfG71bramoEwtk54drfg/exec
  */
 
 // Load API keys and configuration settings from Credentials.gs
