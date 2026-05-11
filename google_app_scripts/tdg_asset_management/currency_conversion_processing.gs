@@ -51,6 +51,13 @@
 // Sheet name on TELEGRAM_LOGS_URL where parsed currency conversion records land
 const CURRENCY_CONVERSION_SHEET = 'Currency Conversion';
 
+// Main Ledger spreadsheet (same as CONTRIBUTORS_SHEET_URL — has the
+// `offchain transactions` tab where offchain currency-conversion submissions
+// get the double-entry pair). Defined separately so the offchain branch reads
+// clearly. Matches OFFCHAIN_TRANSACTIONS_SHEET_URL in tdg_expenses_processing.gs.
+const OFFCHAIN_LEDGER_URL = 'https://docs.google.com/spreadsheets/d/1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU/edit';
+const OFFCHAIN_TRANSACTIONS_SHEET_NAME = 'offchain transactions';
+
 // Column indices for Currency Conversion sheet (0-based)
 const CC_TELEGRAM_UPDATE_ID_COL  = 0;   // A
 const CC_TELEGRAM_MESSAGE_ID_COL = 1;   // B
@@ -287,57 +294,68 @@ function processNewCurrencyConversions() {
         continue;
       }
 
-      const validation = validateManagedLedger(ledgerUrl, ledgerConfigs);
-      if (!validation.valid) {
-        Logger.log(`❌ Invalid ledger URL: ${ledgerUrl}`);
-        sheet.getRange(rowNumber, CC_STATUS_COL + 1).setValue('FAILED');
-        failedCount++;
-        continue;
+      // Offchain (Main Ledger) submissions have no Ledger URL — ledgerName === 'offchain'.
+      // They land in `offchain transactions` (5 cols: Date | Description | Fund Handler |
+      // Amount | Inventory Type) — same shape `tdg_expenses_processing.gs` uses for
+      // offchain expense rows. No Category column on offchain.
+      var isOffchain = (
+        !ledgerUrl ||
+        (row[CC_LEDGER_NAME_COL] || '').toString().toLowerCase() === 'offchain'
+      );
+
+      var targetSpreadsheetUrl;
+      var targetSheetName;
+      var managedLedger = false;
+
+      if (isOffchain) {
+        targetSpreadsheetUrl = OFFCHAIN_LEDGER_URL;
+        targetSheetName = OFFCHAIN_TRANSACTIONS_SHEET_NAME;
+      } else {
+        const validation = validateManagedLedger(ledgerUrl, ledgerConfigs);
+        if (!validation.valid) {
+          Logger.log(`❌ Invalid ledger URL: ${ledgerUrl}`);
+          sheet.getRange(rowNumber, CC_STATUS_COL + 1).setValue('FAILED');
+          failedCount++;
+          continue;
+        }
+        targetSpreadsheetUrl = ledgerUrl;
+        targetSheetName = 'Transactions';
+        managedLedger = true;
       }
 
       try {
-        const targetSpreadsheet = SpreadsheetApp.openByUrl(ledgerUrl);
-        const transactionsSheet = targetSpreadsheet.getSheetByName('Transactions');
+        const targetSpreadsheet = SpreadsheetApp.openByUrl(targetSpreadsheetUrl);
+        const transactionsSheet = targetSpreadsheet.getSheetByName(targetSheetName);
         if (!transactionsSheet) {
-          Logger.log(`❌ Transactions sheet not found in ledger: ${ledgerUrl}`);
+          Logger.log(`❌ ${targetSheetName} sheet not found in ledger: ${targetSpreadsheetUrl}`);
           sheet.getRange(rowNumber, CC_STATUS_COL + 1).setValue('FAILED');
           failedCount++;
           continue;
         }
 
-        // Row 1: Source debit (asset reduction → negative amount)
-        // Entity = Warehouse Manager (whose source-currency balance is being debited).
-        const debitRow = [
-          conversionDate,
-          logMessage,
-          warehouseManager,
-          sourceAmount * -1,
-          sourceCurrency,
-          'Assets'
-        ];
+        // Row 1: Source debit (asset reduction → negative amount). Managed AGL ledger
+        // Transactions tab has 6 cols (with Category="Assets"); Main Ledger
+        // `offchain transactions` tab has 5 cols (no Category).
+        var debitRow = managedLedger
+          ? [conversionDate, logMessage, warehouseManager, sourceAmount * -1, sourceCurrency, 'Assets']
+          : [conversionDate, logMessage, warehouseManager, sourceAmount * -1, sourceCurrency];
         transactionsSheet.appendRow(debitRow);
         const debitRowNumber = transactionsSheet.getLastRow();
-        Logger.log(`✅ Inserted ${sourceCurrency} debit (${sourceAmount * -1}) for ${warehouseManager} at row ${debitRowNumber}`);
+        Logger.log(`✅ Inserted ${sourceCurrency} debit (${sourceAmount * -1}) for ${warehouseManager} at ${targetSheetName} row ${debitRowNumber}`);
 
-        // Row 2: Target credit (asset increase → positive amount)
-        // Entity = Warehouse Manager (whose target-currency balance is being credited).
-        const creditRow = [
-          conversionDate,
-          logMessage,
-          warehouseManager,
-          targetAmount,
-          targetCurrency,
-          'Assets'
-        ];
+        // Row 2: Target credit (asset increase → positive amount).
+        var creditRow = managedLedger
+          ? [conversionDate, logMessage, warehouseManager, targetAmount, targetCurrency, 'Assets']
+          : [conversionDate, logMessage, warehouseManager, targetAmount, targetCurrency];
         transactionsSheet.appendRow(creditRow);
         const creditRowNumber = transactionsSheet.getLastRow();
-        Logger.log(`✅ Inserted ${targetCurrency} credit (+${targetAmount}) for ${warehouseManager} at row ${creditRowNumber}`);
+        Logger.log(`✅ Inserted ${targetCurrency} credit (+${targetAmount}) for ${warehouseManager} at ${targetSheetName} row ${creditRowNumber}`);
 
         const ledgerLines = `${debitRowNumber},${creditRowNumber}`;
         sheet.getRange(rowNumber, CC_STATUS_COL + 1).setValue('PROCESSED');
         sheet.getRange(rowNumber, CC_LEDGER_LINES_COL + 1).setValue(ledgerLines);
 
-        Logger.log(`✅ Successfully processed currency conversion - Ledger lines: ${ledgerLines}`);
+        Logger.log(`✅ Successfully processed ${managedLedger ? 'managed' : 'offchain'} currency conversion - ${targetSheetName} lines: ${ledgerLines}`);
         processedCount++;
       } catch (e) {
         Logger.log(`❌ Error inserting transactions: ${e.message}`);
@@ -380,7 +398,16 @@ function parseAndProcessCurrencyConversionLogs() {
 
       const details = parseCurrencyConversionMessage(message);
 
-      if (!details.ledgerName || !details.ledgerUrl ||
+      // Ledger URL is required for managed AGL ledgers but optional for offchain
+      // (Main Ledger). The DApp emits ledgerName='offchain' with empty ledgerUrl for
+      // the Main Ledger case; processNewCurrencyConversions branches on this and
+      // routes the pair to `offchain transactions` instead of a managed Transactions tab.
+      var isOffchainSubmission = (
+        (details.ledgerName || '').toString().toLowerCase() === 'offchain'
+      ) || !details.ledgerUrl;
+
+      if (!details.ledgerName ||
+          (!isOffchainSubmission && !details.ledgerUrl) ||
           !details.sourceCurrency || !(details.sourceAmount > 0) ||
           !details.targetCurrency || !(details.targetAmount > 0)) {
         Logger.log(`❌ Skipping: Missing required fields`);

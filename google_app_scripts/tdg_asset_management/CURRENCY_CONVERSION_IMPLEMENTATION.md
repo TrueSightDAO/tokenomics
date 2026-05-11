@@ -29,9 +29,13 @@ The signed-amount convention matches `tdg_expenses_processing.gs` (negative = as
 - **Validates:** against the `Contributors Digital Signatures` sheet (status must be `ACTIVE`)
 - Reuses `findContributorByDigitalSignature()` from `capital_injection_processing.gs`
 
-### 3. Managed Ledgers Only
-- Only processes conversions for managed AGL ledgers (validated against `Shipment Ledger Listing`)
-- Reuses `getLedgerConfigsFromWix()` and `validateManagedLedger()` from `capital_injection_processing.gs`
+### 3. Routing — managed AGL ledger OR offchain Main Ledger
+The DApp picker offers `offchain (Main Ledger)` as a default option in addition to managed AGL ledgers. The GAS branches on whether the parsed `Ledger URL` is empty (or `Ledger Name` = `offchain`):
+
+- **Empty URL → offchain.** Pair lands in the Main Ledger's `offchain transactions` tab (5 cols: Date | Description | Fund Handler | Amount | Inventory Type — no Category column). Same shape `tdg_expenses_processing.gs` uses for offchain expense rows.
+- **Non-empty URL → managed AGL.** Validated via `validateManagedLedger()` against `Shipment Ledger Listing`; pair lands in the matched managed AGL ledger's 6-col `Transactions` tab with `Category="Assets"` on both rows.
+
+Reuses `getLedgerConfigsFromWix()` and `validateManagedLedger()` from `capital_injection_processing.gs` for the managed-ledger path.
 
 ### 4. Fee / FX Loss Handling
 By default, the difference between `source_amount` and `target_amount` (at the receipt's implied rate) silently absorbs any provider fee, FX spread, or rounding. Books stay internally consistent within each currency, but cross-currency equity drift is not booked separately. If you need explicit fee accounting, append a third row by hand against an `Expenses` category.
@@ -232,7 +236,7 @@ The `script.scriptapp` scope is what gates `installTimeTrigger()` / `listTrigger
 ## 🔐 Security
 
 1. **Digital Signature Required:** no processing without valid `ACTIVE` signature.
-2. **Managed Ledgers Only:** validates against `Shipment Ledger Listing` registry.
+2. **Routing:** non-empty `Ledger URL` validated against `Shipment Ledger Listing` (managed AGL); empty URL routes to Main Ledger `offchain transactions` (5 cols, no Category).
 3. **Currencies must differ:** `source !== target` enforced at parse-time and processing-time.
 4. **Audit Trail:** full log message preserved in column C of `Currency Conversion` AND in column B of both ledger transactions.
 
