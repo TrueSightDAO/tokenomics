@@ -336,12 +336,24 @@ function processNewCurrencyConversions() {
           continue;
         }
 
+        // Amounts must be finite numbers — appendRow writes whatever JS type
+        // we hand it, and a string-typed amount in col D breaks SUM
+        // aggregations on the destination ledger (precedent: offchain
+        // transactions row 2811 has col D='50.00000000' typed as text and
+        // silently drops from aggregate formulas). Explicit Number() coercion
+        // + finiteness check catches NaN from a malformed audit row.
+        const debitAmount = Number(sourceAmount) * -1;
+        const creditAmount = Number(targetAmount);
+        if (!Number.isFinite(debitAmount) || !Number.isFinite(creditAmount)) {
+          throw new Error(`Non-numeric amount on intake row ${rowNumber}: source=${row[CC_SOURCE_AMOUNT_COL]}, target=${row[CC_TARGET_AMOUNT_COL]}`);
+        }
+
         // Row 1: Source debit (asset reduction → negative amount). Managed AGL ledger
         // Transactions tab has 6 cols (with Category="Assets"); Main Ledger
         // `offchain transactions` tab has 5 cols (no Category).
         var debitRow = managedLedger
-          ? [conversionDate, logMessage, warehouseManager, sourceAmount * -1, sourceCurrency, 'Assets']
-          : [conversionDate, logMessage, warehouseManager, sourceAmount * -1, sourceCurrency];
+          ? [conversionDate, logMessage, warehouseManager, debitAmount, sourceCurrency, 'Assets']
+          : [conversionDate, logMessage, warehouseManager, debitAmount, sourceCurrency];
 
         // Capture lastRow BEFORE appending so we can assert appendRow actually
         // grew the sheet — otherwise we'd silently mark the intake row as
@@ -354,19 +366,23 @@ function processNewCurrencyConversions() {
         if (debitRowNumber <= beforeAppendLastRow) {
           throw new Error(`appendRow did not grow ${targetSheetName} — lastRow stayed at ${beforeAppendLastRow}. Possible silent permission failure on ${targetSpreadsheetUrl}.`);
         }
-        Logger.log(`✅ Inserted ${sourceCurrency} debit (${sourceAmount * -1}) for ${warehouseManager} at ${targetSheetName} row ${debitRowNumber}`);
+        // Pin col D to numeric format so future formula aggregations don't get
+        // tripped up by a stray text-typed cell. Col D = column 4.
+        transactionsSheet.getRange(debitRowNumber, 4).setNumberFormat('0.00000000');
+        Logger.log(`✅ Inserted ${sourceCurrency} debit (${debitAmount}) for ${warehouseManager} at ${targetSheetName} row ${debitRowNumber}`);
 
         // Row 2: Target credit (asset increase → positive amount).
         var creditRow = managedLedger
-          ? [conversionDate, logMessage, warehouseManager, targetAmount, targetCurrency, 'Assets']
-          : [conversionDate, logMessage, warehouseManager, targetAmount, targetCurrency];
+          ? [conversionDate, logMessage, warehouseManager, creditAmount, targetCurrency, 'Assets']
+          : [conversionDate, logMessage, warehouseManager, creditAmount, targetCurrency];
         transactionsSheet.appendRow(creditRow);
         SpreadsheetApp.flush();
         const creditRowNumber = transactionsSheet.getLastRow();
         if (creditRowNumber <= debitRowNumber) {
           throw new Error(`appendRow did not grow ${targetSheetName} for credit row — lastRow stayed at ${debitRowNumber}.`);
         }
-        Logger.log(`✅ Inserted ${targetCurrency} credit (+${targetAmount}) for ${warehouseManager} at ${targetSheetName} row ${creditRowNumber}`);
+        transactionsSheet.getRange(creditRowNumber, 4).setNumberFormat('0.00000000');
+        Logger.log(`✅ Inserted ${targetCurrency} credit (+${creditAmount}) for ${warehouseManager} at ${targetSheetName} row ${creditRowNumber}`);
 
         const ledgerLines = `${debitRowNumber},${creditRowNumber}`;
         sheet.getRange(rowNumber, CC_STATUS_COL + 1).setValue('PROCESSED');
