@@ -42,6 +42,10 @@ COL_DESCRIPTION = 3
 COL_TRANSACTION_TYPE = 7
 COL_LEDGER_URL = 11
 COL_RESOLVED_URL = 27
+COL_PROGRAM = 28  # AC — program family rollup for truesight.me page topology
+                  # (agroverse / sunmint / fundraiser); higher-level bucket
+                  # than Transaction Type. Backfilled 2026-05-10 via Sheets API
+                  # (14 agroverse, 2 sunmint, 1 fundraiser).
 
 # Column indices in Transactions tab (0-based)
 TX_COL_DATE = 0
@@ -114,6 +118,11 @@ def build_ledger_json(ledger_id, ledger_info, transactions):
         'ledger_name': ledger_id,
         'program_name': ledger_info.get('description', ''),
         'description': ledger_info.get('description', ''),
+        # `program` is the program-family rollup (agroverse / sunmint / fundraiser)
+        # from Shipment Ledger Listing col AC. Lets downstream pages
+        # (truesight.me/fundraisers.html etc.) filter without needing the
+        # underlying Transaction Type taxonomy.
+        'program': ledger_info.get('program', ''),
         'schema_version': 1,
         'generated_at': datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'),
         'source': 'snapshot_managed_ledgers.py',
@@ -152,6 +161,7 @@ def load_ledger_listing(gc):
             'description': (row[COL_DESCRIPTION] if len(row) > COL_DESCRIPTION else '').strip(),
             'ledger_url': (row[COL_LEDGER_URL] if len(row) > COL_LEDGER_URL else '').strip(),
             'resolved_url': resolved_url,
+            'program': (row[COL_PROGRAM] if len(row) > COL_PROGRAM else '').strip().lower(),
         })
 
     return ledgers
@@ -181,6 +191,61 @@ def write_json(ledger_id, data, dry_run=False):
     with open(filepath, 'w') as f:
         json.dump(data, f, indent=2, ensure_ascii=False)
     print(f'  Wrote {filepath} ({len(data["transactions"])} txs)')
+
+
+def write_index(all_ledgers, dry_run=False):
+    """Write the registry index — one fetch lets a consumer (e.g.
+    truesight.me/fundraisers.html, agroverse.html, sunmint.html) discover
+    every active ledger and filter by program without N round-trips.
+
+    Schema:
+      {
+        "schema_version": 1,
+        "generated_at": "<ISO timestamp>",
+        "source": "snapshot_managed_ledgers.py",
+        "ledgers": [
+          {
+            "ledger_id": "TBM",
+            "program": "fundraiser",
+            "status": "ACTIVE",
+            "description": "<from Shipment Ledger Listing col D>",
+            "ledger_url": "<from col L (raw, may be a redirect)>",
+            "snapshot_url": "https://raw.githubusercontent.com/TrueSightDAO/treasury-cache/main/managed-ledgers/TBM.json",
+            "summary": { ... }  // mirrors the per-ledger summary
+          },
+          ...
+        ]
+      }
+    """
+    index_path = os.path.join(OUTPUT_DIR, '_index.json')
+
+    SNAPSHOT_BASE = 'https://raw.githubusercontent.com/TrueSightDAO/treasury-cache/main/managed-ledgers'
+    entries = []
+    for entry in all_ledgers:
+        entries.append({
+            'ledger_id': entry['ledger_id'],
+            'program': entry.get('program', ''),
+            'status': entry.get('status', ''),
+            'description': entry.get('description', ''),
+            'ledger_url': entry.get('ledger_url', ''),
+            'snapshot_url': f"{SNAPSHOT_BASE}/{entry['ledger_id']}.json",
+            'summary': entry.get('summary', {}),
+        })
+
+    payload = {
+        'schema_version': 1,
+        'generated_at': datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'),
+        'source': 'snapshot_managed_ledgers.py',
+        'ledgers': entries,
+    }
+
+    if dry_run:
+        print(f'  [dry-run] Would write {index_path} ({len(entries)} ledgers)')
+        return
+
+    with open(index_path, 'w') as f:
+        json.dump(payload, f, indent=2, ensure_ascii=False)
+    print(f'  Wrote {index_path} ({len(entries)} ledgers)')
 
 
 def git_commit_and_push(dry_run=False):
@@ -227,6 +292,7 @@ def main():
 
     print(f'Found {len(ledgers)} ledgers in Shipment Ledger Listing')
     exported = 0
+    index_entries = []
 
     for ledger in ledgers:
         lid = ledger['id']
@@ -263,10 +329,28 @@ def main():
             write_json(lid, data, dry_run=dry_run)
             exported += 1
 
+            # Track for the registry index — one row per successfully-snapshotted
+            # ledger so consumers can do "GET _index.json | filter program=fundraiser"
+            # without N round-trips.
+            index_entries.append({
+                'ledger_id': lid,
+                'program': ledger.get('program', ''),
+                'status': ledger.get('status', ''),
+                'description': ledger.get('description', ''),
+                'ledger_url': ledger.get('ledger_url', ''),
+                'summary': data.get('summary', {}),
+            })
+
         except Exception as e:
             print(f'  {lid}: ERROR — {e}')
 
     if exported > 0:
+        # Skip --ledger single-runs from index regeneration (would shrink the
+        # index to a single entry and lose the others).
+        if not single_ledger:
+            write_index(index_entries, dry_run=dry_run)
+        else:
+            print(f'  (skipping _index.json regen — single-ledger run for {single_ledger})')
         git_commit_and_push(dry_run=dry_run)
     else:
         print('No ledgers exported.')
