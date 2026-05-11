@@ -37,6 +37,19 @@ const QR_CODE_SALES_SHEET_ID = '1qbZZhf-_7xzmDTriaJVWj6OZshyQsFkdsAV8-pyzASQ'; /
 const QR_CODE_SALES_SHEET_NAME = 'QR Code Sales'; // Sheet name for QR Code Sales
 const STRIPE_CHECKOUT_LOG_SHEET_ID = '1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU'; // Same as SHEET_ID
 const STRIPE_CHECKOUT_LOG_SHEET_NAME = 'Stripe Social Media Checkout ID'; // Meta Checkout log sheet
+const STRIPE_CHECKOUT_ITEMS_COL = 5;  // Column F (0-indexed): Items Purchased
+const STRIPE_CHECKOUT_AMOUNT_COL = 7; // Column H (0-indexed): Amount
+const STRIPE_CHECKOUT_CURRENCY_COL = 8; // Column I (0-indexed): Currency
+const STRIPE_CHECKOUT_TIMESTAMP_COL = 0; // Column A (0-indexed): Timestamp
+const STRIPE_CHECKOUT_CUSTOMER_COL = 1; // Column B (0-indexed): Customer Name
+const STRIPE_CHECKOUT_LEDGER_ROUTED_COL = 15; // Column P (0-indexed): Ledger Routed marker
+
+// Shipment Ledger Listing columns (Main Ledger)
+const SHIPMENT_LEDGER_SHEET_NAME = 'Shipment Ledger Listing';
+const SHIPMENT_LEDGER_ID_COL = 0;    // Column A: Ledger ID
+const SHIPMENT_LEDGER_URL_COL = 11;   // Column L: Ledger URL
+const SHIPMENT_LEDGER_STATUS_COL = 2; // Column C: Status
+const SHIPMENT_LEDGER_RESOLVED_COL = 27; // Column AB: Resolved URL
 // Product IDs to filter Stripe charges (Edgar's market sell-off dashboard SaaS subscriptions)
 const TARGET_PRODUCT_IDS = [
   'prod_K9izwu3PecrVcP',
@@ -415,6 +428,9 @@ function fetchStripeTransactions() {
   Logger.log(`Skipped (duplicates in offchain): ${skippedCount}`);
   Logger.log(`Skipped (already in QR Code Sales or Stripe Checkout Log): ${skippedQrCodeSalesCount}`);
   Logger.log(`Agroverse transactions detected: ${agroverseTransactionsDetected}`);
+
+  // Route [LEDGER_ID] pattern purchases to managed ledgers
+  routeStripeCheckoutPurchasesToLedgers();
 }
 
 // Function to run the script manually or set up a trigger
@@ -445,5 +461,195 @@ function removeTrigger() {
       Logger.log('Trigger removed');
     }
   });
+}
+
+/**
+ * Reads Shipment Ledger Listing and returns ledger configs.
+ * Returns: [{ ledger_id, resolved_url, status }, ...]
+ */
+function getLedgerConfigs() {
+  try {
+    const mainSpreadsheet = SpreadsheetApp.openById(SHEET_ID);
+    const shipmentSheet = mainSpreadsheet.getSheetByName(SHIPMENT_LEDGER_SHEET_NAME);
+    if (!shipmentSheet) {
+      Logger.log(`Error: ${SHIPMENT_LEDGER_SHEET_NAME} sheet not found`);
+      return [];
+    }
+    const rows = shipmentSheet.getDataRange().getValues();
+    if (rows.length <= 1) {
+      Logger.log(`No data in ${SHIPMENT_LEDGER_SHEET_NAME} sheet`);
+      return [];
+    }
+
+    const configs = [];
+    for (let i = 1; i < rows.length; i++) {
+      const ledgerId = (rows[i][SHIPMENT_LEDGER_ID_COL] || '').toString().trim();
+      if (!ledgerId) break; // first empty Ledger ID = end of list
+
+      const resolvedUrl = (rows[i][SHIPMENT_LEDGER_RESOLVED_COL] || '').toString().trim();
+      const status = (rows[i][SHIPMENT_LEDGER_STATUS_COL] || '').toString().trim().toUpperCase();
+      if (!resolvedUrl) continue;
+
+      configs.push({ ledger_id: ledgerId, resolved_url: resolvedUrl, status: status });
+    }
+
+    Logger.log(`Fetched ${configs.length} ledger configs from ${SHIPMENT_LEDGER_SHEET_NAME}`);
+    return configs;
+  } catch (e) {
+    Logger.log(`Error fetching ledger configs: ${e.message}`);
+    return [];
+  }
+}
+
+/**
+ * Extracts spreadsheet ID from a Google Sheets URL.
+ */
+function extractSpreadsheetId(url) {
+  if (!url) return null;
+  const match = url.match(/\/d\/([a-zA-Z0-9_-]+)/);
+  return match ? match[1] : null;
+}
+
+/**
+ * Finds the first empty row in a sheet (after header rows).
+ * For managed ledger Transactions tab: rows 1-3 are header info.
+ */
+function findFirstEmptyRow(sheet, headerRowCount) {
+  const data = sheet.getDataRange().getValues();
+  for (let i = headerRowCount; i < data.length; i++) {
+    const row = data[i];
+    if (!row.some(cell => cell.toString().trim())) {
+      return i + 1; // 1-indexed
+    }
+  }
+  return data.length + 1;
+}
+
+/**
+ * Routes Stripe Checkout purchases with [LEDGER_ID] pattern in Items Purchased
+ * to the corresponding managed ledger's Transactions tab.
+ */
+function routeStripeCheckoutPurchasesToLedgers() {
+  try {
+    const mainSpreadsheet = SpreadsheetApp.openById(STRIPE_CHECKOUT_LOG_SHEET_ID);
+    const checkoutSheet = mainSpreadsheet.getSheetByName(STRIPE_CHECKOUT_LOG_SHEET_NAME);
+    if (!checkoutSheet) {
+      Logger.log(`Warning: ${STRIPE_CHECKOUT_LOG_SHEET_NAME} sheet not found`);
+      return;
+    }
+
+    const ledgerConfigs = getLedgerConfigs();
+    if (ledgerConfigs.length === 0) {
+      Logger.log('No ledger configs found, skipping Stripe→Ledger routing');
+      return;
+    }
+
+    // Build lookup map: Ledger ID → { resolved_url, status }
+    const ledgerMap = {};
+    ledgerConfigs.forEach(c => { ledgerMap[c.ledger_id.toUpperCase()] = c; });
+
+    const rows = checkoutSheet.getDataRange().getValues();
+    const headers = rows[0];
+    let routedCount = 0;
+
+    // Ensure Ledger Routed column header exists
+    if (headers.length <= STRIPE_CHECKOUT_LEDGER_ROUTED_COL || !headers[STRIPE_CHECKOUT_LEDGER_ROUTED_COL]) {
+      checkoutSheet.getRange(1, STRIPE_CHECKOUT_LEDGER_ROUTED_COL + 1).setValue('Ledger Routed');
+      SpreadsheetApp.flush();
+    }
+
+    for (let i = 1; i < rows.length; i++) {
+      const row = rows[i];
+
+      // Skip if already routed
+      const alreadyRouted = (row[STRIPE_CHECKOUT_LEDGER_ROUTED_COL] || '').toString().trim();
+      if (alreadyRouted) continue;
+
+      const itemsPurchased = (row[STRIPE_CHECKOUT_ITEMS_COL] || '').toString().trim();
+      if (!itemsPurchased) continue;
+
+      // Match [LEDGER_ID] prefix pattern: /^\[([A-Z0-9]+)\]/
+      const match = itemsPurchased.match(/^\[([A-Z0-9]+)\]/);
+      if (!match) continue;
+
+      const ledgerId = match[1].toUpperCase();
+      const ledgerConfig = ledgerMap[ledgerId];
+      if (!ledgerConfig) {
+        Logger.log(`Ledger ID "${ledgerId}" found in Items Purchased but not in Shipment Ledger Listing`);
+        continue;
+      }
+
+      if (ledgerConfig.status === 'COMPLETED' || ledgerConfig.status === 'SUSPENDED') {
+        Logger.log(`Ledger ${ledgerId} is ${ledgerConfig.status}, skipping`);
+        continue;
+      }
+
+      // Open the managed ledger spreadsheet
+      const sheetId = extractSpreadsheetId(ledgerConfig.resolved_url);
+      if (!sheetId) {
+        Logger.log(`Could not extract spreadsheet ID from ${ledgerConfig.resolved_url}`);
+        continue;
+      }
+
+      try {
+        const ledgerSpreadsheet = SpreadsheetApp.openById(sheetId);
+        const txSheet = ledgerSpreadsheet.getSheetByName('Transactions');
+        if (!txSheet) {
+          Logger.log(`No Transactions tab in ledger ${ledgerId}`);
+          continue;
+        }
+
+        const timestamp = row[STRIPE_CHECKOUT_TIMESTAMP_COL] || new Date();
+        const customerName = row[STRIPE_CHECKOUT_CUSTOMER_COL] || '';
+        const amount = parseFloat(row[STRIPE_CHECKOUT_AMOUNT_COL]) || 0;
+        const currency = (row[STRIPE_CHECKOUT_CURRENCY_COL] || 'USD').toString().trim().toUpperCase();
+        const dateStr = timestamp instanceof Date
+          ? Utilities.formatDate(timestamp, Session.getScriptTimeZone(), 'yyyyMMdd')
+          : String(timestamp).replace(/[^0-9]/g, '').substring(0, 8);
+
+        const description = itemsPurchased + (customerName ? ' — ' + customerName : '');
+
+        // Find first empty row after header rows (rows 1-3 are header info in managed ledgers)
+        const emptyRow = findFirstEmptyRow(txSheet, 3);
+
+        // Write transaction row: Date, Description, Entity, Amount, Currency, Type
+        txSheet.getRange(emptyRow, 1, 1, 6).setValues([[
+          dateStr,
+          description,
+          customerName || 'Stripe Customer',
+          amount,
+          currency,
+          'Sale'
+        ]]);
+
+        // Mark as routed in Stripe Checkout Log
+        checkoutSheet.getRange(i + 1, STRIPE_CHECKOUT_LEDGER_ROUTED_COL + 1).setValue(ledgerId);
+
+        Logger.log(`Routed: [${ledgerId}] ${itemsPurchased} — $${amount} ${currency} → row ${emptyRow}`);
+        routedCount++;
+      } catch (e) {
+        Logger.log(`Error writing to ledger ${ledgerId}: ${e.message}`);
+      }
+    }
+
+    Logger.log(`routeStripeCheckoutPurchasesToLedgers: routed ${routedCount} purchases`);
+    return routedCount;
+  } catch (e) {
+    Logger.log(`Error in routeStripeCheckoutPurchasesToLedgers: ${e.message}`);
+    return 0;
+  }
+}
+
+/**
+ * doGet — Web app entry point for Edgar Sidekiq trigger.
+ * Called via GET from StripeSalesSyncTriggerWorker.
+ * Immediately runs the full sync pipeline.
+ */
+function doGet(e) {
+  fetchStripeTransactions();
+  return ContentService.createTextOutput(JSON.stringify({
+    status: 'ok',
+    message: 'Stripe sync completed'
+  })).setMimeType(ContentService.MimeType.JSON);
 }
 
