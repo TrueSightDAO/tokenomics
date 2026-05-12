@@ -1181,7 +1181,7 @@ See [`python_scripts/schema_validation/README.md`](./python_scripts/schema_valid
 | B | `Partner ID` | String | Slug from `Agroverse Partners`!A. |
 | C | `Contributor Name` | String | From `Contributors contact information`!A. |
 | D | `Check-in Date` | Date (`YYYY-MM-DD`) | When the check-in happened. |
-| E | `Method` | String | Dropdown: `Text`, `Phone`, `In Person`, `Email`, `Other`. |
+| E | `Method` | String | Dropdown: `Text`, `WhatsApp`, `Instagram`, `Facebook Messenger`, `Phone`, `Email`, `In Person`, `Other`. Canonical source: `States`!AA on Main Ledger. |
 | F | `Stock Status` | String | Dropdown: `Low`, `Out`, `OK`, `Unknown`. |
 | G | `Restock Needed` | String | Dropdown: `Yes`, `No`, `Maybe`. |
 | H | `Restock Quantity` | Number | Integer (nullable). Only meaningful when `Restock Needed = Yes`. |
