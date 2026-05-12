@@ -306,31 +306,44 @@ function listPartnerContributors() {
     const values = sheet.getDataRange().getValues();
     if (values.length < 2) return [];
     const headers = values[0];
-    var partnerIdIdx = -1, contributorIdx = -1, statusIdx = -1, nameIdx = -1;
+    var partnerIdIdx = -1, contributorIdx = -1, statusIdx = -1, nameIdx = -1, locationIdx = -1;
     for (var i = 0; i < headers.length; i++) {
       var h = String(headers[i] || '').trim();
       if (h === 'partner_id') partnerIdIdx = i;
       else if (h === 'contributor_contact_id') contributorIdx = i;
       else if (h === 'status') statusIdx = i;
       else if (h === 'partner_name') nameIdx = i;
+      else if (h === 'location') locationIdx = i;
     }
     if (partnerIdIdx < 0 || contributorIdx < 0) return [];
     var rows = [];
     for (var r = 1; r < values.length; r++) {
       var row = values[r];
-      var pid = String(row[partnerIdIdx] || '').trim();
-      // Skip contributor-only rows (no partner_id) — pop-up vendor / operator entries
-      // have a contributor_contact_id but no retail partnership to check in with.
-      // See Agroverse Partners rows 39-40 (Rune Shields / Gary Teh, Pop-up Vendor).
-      if (!pid) continue;
       var contrib = String(row[contributorIdx] || '').trim();
       if (!contrib) continue;
       var status = statusIdx >= 0 ? String(row[statusIdx] || '').trim().toLowerCase() : '';
       if (statusIdx >= 0 && status && status !== 'active') continue;
+
+      var pid = String(row[partnerIdIdx] || '').trim();
+      var name = nameIdx >= 0 ? String(row[nameIdx] || '').trim() : '';
+      var loc = locationIdx >= 0 ? String(row[locationIdx] || '').trim() : '';
+
+      // Contributor-only rows (no partner_id): operators / pop-up vendors
+      // (e.g., Gary Teh, Rune Shields). Synthesize a stable partner_id so
+      // they appear in the partner-check-in dropdown and the scanner can
+      // append rows for them without violating the non-empty-partner_id
+      // contract. Slug: lowercase, non-alphanumeric → hyphen, trim.
+      if (!pid) {
+        var slug = contrib.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+        if (!slug) continue;
+        pid = 'popup-' + slug;
+        if (!name) name = loc || 'Pop-up Vendor';
+      }
+
       rows.push({
         partner_id: pid,
         contributor: contrib,
-        partner_name: nameIdx >= 0 ? String(row[nameIdx] || '').trim() : ''
+        partner_name: name
       });
     }
     return rows;
