@@ -289,6 +289,55 @@ function listPartnersNeedingAttention() {
   }
 }
 
+/**
+ * List active retail partners + their canonical contributor_contact_id from the
+ * Agroverse Partners sheet. Used by dapp/partner_check_in.html to populate the
+ * Contributor Name dropdown so operators don't free-type the canonical name
+ * (which Edgar would otherwise auto-rename and clear col T — see The Way Home
+ * Shop incident 2026-04-28).
+ *
+ * @return {Array<{partner_id:string, contributor:string, partner_name:string}>}
+ */
+function listPartnerContributors() {
+  try {
+    const ss = SpreadsheetApp.openById(MAIN_SPREADSHEET_ID);
+    const sheet = ss.getSheetByName('Agroverse Partners');
+    if (!sheet) return [];
+    const values = sheet.getDataRange().getValues();
+    if (values.length < 2) return [];
+    const headers = values[0];
+    var partnerIdIdx = -1, contributorIdx = -1, statusIdx = -1, nameIdx = -1;
+    for (var i = 0; i < headers.length; i++) {
+      var h = String(headers[i] || '').trim();
+      if (h === 'partner_id') partnerIdIdx = i;
+      else if (h === 'contributor_contact_id') contributorIdx = i;
+      else if (h === 'status') statusIdx = i;
+      else if (h === 'partner_name') nameIdx = i;
+    }
+    if (partnerIdIdx < 0 || contributorIdx < 0) return [];
+    var rows = [];
+    for (var r = 1; r < values.length; r++) {
+      var row = values[r];
+      var pid = String(row[partnerIdIdx] || '').trim();
+      if (!pid) continue;
+      var contrib = String(row[contributorIdx] || '').trim();
+      if (!contrib) continue;
+      var status = statusIdx >= 0 ? String(row[statusIdx] || '').trim().toLowerCase() : '';
+      // Skip non-active partners (active rows are the only ones we'd check in with).
+      if (statusIdx >= 0 && status && status !== 'active') continue;
+      rows.push({
+        partner_id: pid,
+        contributor: contrib,
+        partner_name: nameIdx >= 0 ? String(row[nameIdx] || '').trim() : ''
+      });
+    }
+    return rows;
+  } catch (err) {
+    Logger.log('listPartnerContributors error: ' + err);
+    return [];
+  }
+}
+
 // ============================================================================
 // INVENTORY DATA FUNCTIONS
 // ============================================================================
@@ -1345,9 +1394,15 @@ function doGet(e) {
       const rows = listPartnersNeedingAttention();
       return createSuccessResponse({ partners: rows });
     }
-    
+
+    // List active retail partners + canonical contributor name (Agroverse Partners!E)
+    if (action === 'list_partner_contributors') {
+      const rows = listPartnerContributors();
+      return createSuccessResponse({ partners: rows });
+    }
+
     // Default: return available actions
-    return createErrorResponse('Invalid or missing action parameter. Available actions: list_managers, get_inventory, get_partner_check_ins, list_partners_needing_attention, calculate_shipping');
+    return createErrorResponse('Invalid or missing action parameter. Available actions: list_managers, get_inventory, get_partner_check_ins, list_partners_needing_attention, list_partner_contributors, calculate_shipping');
     
   } catch (error) {
     Logger.log('Error in doGet: ' + error.message);
