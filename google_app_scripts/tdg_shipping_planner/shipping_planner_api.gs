@@ -75,6 +75,7 @@ const FREIGHT_WEIGHT_TIERS = [200, 300, 500, 750, 1000];
 // Restock recommender: optional sheets in main spreadsheet
 const PARTNER_ADDRESSES_SHEET_NAME = 'Partner addresses';
 const PARTNER_SALES_SHEET_NAME = 'Partner sales';
+const PARTNER_CHECK_INS_SHEET_NAME = 'Partner Check-ins';
 const RESTOCK_QUANTITIES = [6, 12, 18, 24, 36, 48];
 const DEFAULT_MONTHLY_SALES = 4;
 const TARGET_WEEKS_MIN = 4;
@@ -155,6 +156,137 @@ function createSuccessResponse(data) {
     status: 'success',
     data: data
   });
+}
+
+// ============================================================================
+// PARTNER CHECK-IN FUNCTIONS
+// ============================================================================
+
+/**
+ * Read check-in history for a partner from the Partner Check-ins tab.
+ * @param {string} partnerId
+ * @return {Array<Object>}
+ */
+function getPartnerCheckIns(partnerId) {
+  try {
+    const ss = SpreadsheetApp.openById(MAIN_SPREADSHEET_ID);
+    const sheet = ss.getSheetByName(PARTNER_CHECK_INS_SHEET_NAME);
+    if (!sheet) return [];
+    const values = sheet.getDataRange().getValues();
+    if (values.length < 2) return [];
+    const headers = values[0];
+    var partnerIdIdx = -1;
+    var checkInDateIdx = -1;
+    var methodIdx = -1;
+    var stockStatusIdx = -1;
+    var restockNeededIdx = -1;
+    var restockSkuIdx = -1;
+    var restockQuantityIdx = -1;
+    var nextCheckInIdx = -1;
+    var notesIdx = -1;
+    var submittedAtIdx = -1;
+    for (var i = 0; i < headers.length; i++) {
+      var h = String(headers[i] || '').trim();
+      if (h === 'Partner ID') partnerIdIdx = i;
+      else if (h === 'Check-in Date') checkInDateIdx = i;
+      else if (h === 'Method') methodIdx = i;
+      else if (h === 'Stock Status') stockStatusIdx = i;
+      else if (h === 'Restock Needed') restockNeededIdx = i;
+      else if (h === 'Restock SKU') restockSkuIdx = i;
+      else if (h === 'Restock Quantity') restockQuantityIdx = i;
+      else if (h === 'Next Check-in Date') nextCheckInIdx = i;
+      else if (h === 'Notes') notesIdx = i;
+      else if (h === 'Submitted At') submittedAtIdx = i;
+    }
+    if (partnerIdIdx < 0) return [];
+    var rows = [];
+    for (var r = 1; r < values.length; r++) {
+      var row = values[r];
+      if (String(row[partnerIdIdx] || '').trim() !== partnerId) continue;
+      rows.push({
+        submitted_at: submittedAtIdx >= 0 ? String(row[submittedAtIdx] || '') : '',
+        check_in_date: checkInDateIdx >= 0 ? String(row[checkInDateIdx] || '') : '',
+        method: methodIdx >= 0 ? String(row[methodIdx] || '') : '',
+        stock_status: stockStatusIdx >= 0 ? String(row[stockStatusIdx] || '') : '',
+        restock_needed: restockNeededIdx >= 0 ? String(row[restockNeededIdx] || '') : '',
+        restock_sku: restockSkuIdx >= 0 ? String(row[restockSkuIdx] || '') : '',
+        restock_quantity: restockQuantityIdx >= 0 ? String(row[restockQuantityIdx] || '') : '',
+        next_check_in_date: nextCheckInIdx >= 0 ? String(row[nextCheckInIdx] || '') : '',
+        notes: notesIdx >= 0 ? String(row[notesIdx] || '') : ''
+      });
+    }
+    // Sort by check-in date descending
+    rows.sort(function(a, b) {
+      var da = a.check_in_date ? new Date(a.check_in_date).getTime() : 0;
+      var db = b.check_in_date ? new Date(b.check_in_date).getTime() : 0;
+      return db - da;
+    });
+    return rows.slice(0, 50);
+  } catch (err) {
+    Logger.log('getPartnerCheckIns error: ' + err);
+    return [];
+  }
+}
+
+/**
+ * List partners whose next check-in date is overdue or within 3 days.
+ * @return {Array<Object>}
+ */
+function listPartnersNeedingAttention() {
+  try {
+    const ss = SpreadsheetApp.openById(MAIN_SPREADSHEET_ID);
+    const sheet = ss.getSheetByName(PARTNER_CHECK_INS_SHEET_NAME);
+    if (!sheet) return [];
+    const values = sheet.getDataRange().getValues();
+    if (values.length < 2) return [];
+    const headers = values[0];
+    var partnerIdIdx = -1;
+    var nextCheckInIdx = -1;
+    var checkInDateIdx = -1;
+    for (var i = 0; i < headers.length; i++) {
+      var h = String(headers[i] || '').trim();
+      if (h === 'Partner ID') partnerIdIdx = i;
+      else if (h === 'Next Check-in Date') nextCheckInIdx = i;
+      else if (h === 'Check-in Date') checkInDateIdx = i;
+    }
+    if (partnerIdIdx < 0) return [];
+    var latestByPartner = {};
+    for (var r = 1; r < values.length; r++) {
+      var row = values[r];
+      var pid = String(row[partnerIdIdx] || '').trim();
+      if (!pid) continue;
+      var nextDate = nextCheckInIdx >= 0 ? String(row[nextCheckInIdx] || '').trim() : '';
+      var checkDate = checkInDateIdx >= 0 ? String(row[checkInDateIdx] || '').trim() : '';
+      if (!latestByPartner[pid] || (checkDate && checkDate > latestByPartner[pid].check_in_date)) {
+        latestByPartner[pid] = { partner_id: pid, next_check_in_date: nextDate, check_in_date: checkDate };
+      }
+    }
+    var today = new Date();
+    today.setHours(0, 0, 0, 0);
+    var cutoff = new Date(today);
+    cutoff.setDate(cutoff.getDate() + 3);
+    var result = [];
+    for (var pid in latestByPartner) {
+      if (!Object.prototype.hasOwnProperty.call(latestByPartner, pid)) continue;
+      var entry = latestByPartner[pid];
+      if (!entry.next_check_in_date) continue;
+      var d = new Date(entry.next_check_in_date);
+      if (isNaN(d.getTime())) continue;
+      d.setHours(0, 0, 0, 0);
+      if (d <= cutoff) {
+        result.push({
+          partner_id: pid,
+          next_check_in_date: entry.next_check_in_date,
+          days_overdue: Math.floor((today - d) / 86400000)
+        });
+      }
+    }
+    result.sort(function(a, b) { return a.days_overdue - b.days_overdue; });
+    return result;
+  } catch (err) {
+    Logger.log('listPartnersNeedingAttention error: ' + err);
+    return [];
+  }
 }
 
 // ============================================================================
@@ -1198,8 +1330,24 @@ function doGet(e) {
       });
     }
     
+    // Get partner check-in history
+    if (action === 'get_partner_check_ins') {
+      const partnerId = (e.parameter.partner_id || '').toString().trim();
+      if (!partnerId) {
+        return createErrorResponse('Missing partner_id parameter');
+      }
+      const rows = getPartnerCheckIns(partnerId);
+      return createSuccessResponse({ partner_id: partnerId, check_ins: rows });
+    }
+    
+    // List partners needing attention (overdue next check-in)
+    if (action === 'list_partners_needing_attention') {
+      const rows = listPartnersNeedingAttention();
+      return createSuccessResponse({ partners: rows });
+    }
+    
     // Default: return available actions
-    return createErrorResponse('Invalid or missing action parameter. Available actions: list_managers, get_inventory, calculate_shipping');
+    return createErrorResponse('Invalid or missing action parameter. Available actions: list_managers, get_inventory, get_partner_check_ins, list_partners_needing_attention, calculate_shipping');
     
   } catch (error) {
     Logger.log('Error in doGet: ' + error.message);
