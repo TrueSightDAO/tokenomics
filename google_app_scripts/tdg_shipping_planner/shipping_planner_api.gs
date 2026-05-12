@@ -163,6 +163,22 @@ function createSuccessResponse(data) {
 // ============================================================================
 
 /**
+ * Normalize a date cell to YYYY-MM-DD. Sheets returns Date objects for
+ * date-typed cells (manual UI entry) and strings for cells appended by the
+ * scanner (`appendRow('2026-05-12')`). Without this normalization, the same
+ * column returns two formats and the UI shows JS Date.toString() ("Fri May 15
+ * 2026 00:00:00 GMT-0700 (Mountain Standard Time)") for some rows.
+ */
+function partnerCheckInIsoDate_(val) {
+  if (val === null || val === undefined || val === '') return '';
+  if (val instanceof Date) {
+    if (isNaN(val.getTime())) return '';
+    return Utilities.formatDate(val, Session.getScriptTimeZone(), 'yyyy-MM-dd');
+  }
+  return String(val).trim();
+}
+
+/**
  * Read check-in history for a partner from the Partner Check-ins tab.
  * @param {string} partnerId
  * @return {Array<Object>}
@@ -205,13 +221,13 @@ function getPartnerCheckIns(partnerId) {
       if (String(row[partnerIdIdx] || '').trim() !== partnerId) continue;
       rows.push({
         submitted_at: submittedAtIdx >= 0 ? String(row[submittedAtIdx] || '') : '',
-        check_in_date: checkInDateIdx >= 0 ? String(row[checkInDateIdx] || '') : '',
+        check_in_date: checkInDateIdx >= 0 ? partnerCheckInIsoDate_(row[checkInDateIdx]) : '',
         method: methodIdx >= 0 ? String(row[methodIdx] || '') : '',
         stock_status: stockStatusIdx >= 0 ? String(row[stockStatusIdx] || '') : '',
         restock_needed: restockNeededIdx >= 0 ? String(row[restockNeededIdx] || '') : '',
         restock_sku: restockSkuIdx >= 0 ? String(row[restockSkuIdx] || '') : '',
         restock_quantity: restockQuantityIdx >= 0 ? String(row[restockQuantityIdx] || '') : '',
-        next_check_in_date: nextCheckInIdx >= 0 ? String(row[nextCheckInIdx] || '') : '',
+        next_check_in_date: nextCheckInIdx >= 0 ? partnerCheckInIsoDate_(row[nextCheckInIdx]) : '',
         notes: notesIdx >= 0 ? String(row[notesIdx] || '') : ''
       });
     }
@@ -243,22 +259,30 @@ function listPartnersNeedingAttention() {
     var partnerIdIdx = -1;
     var nextCheckInIdx = -1;
     var checkInDateIdx = -1;
+    var submittedAtIdx = -1;
     for (var i = 0; i < headers.length; i++) {
       var h = String(headers[i] || '').trim();
       if (h === 'Partner ID') partnerIdIdx = i;
       else if (h === 'Next Check-in Date') nextCheckInIdx = i;
       else if (h === 'Check-in Date') checkInDateIdx = i;
+      else if (h === 'Submitted At') submittedAtIdx = i;
     }
     if (partnerIdIdx < 0) return [];
+    // Pick latest entry per partner by SUBMITTED_AT (ISO 8601 — lexicographic = chronological).
+    // check_in_date is operator-supplied and can be backdated for backfill; submitted_at is the
+    // canonical "when was this the operator's current intent" timestamp. Without this fix, a
+    // backdated check-in submitted later than an undated one would lose to the older one's
+    // forward-looking next_check_in_date and reappear in the Follow-up-due bucket forever.
     var latestByPartner = {};
     for (var r = 1; r < values.length; r++) {
       var row = values[r];
       var pid = String(row[partnerIdIdx] || '').trim();
       if (!pid) continue;
-      var nextDate = nextCheckInIdx >= 0 ? String(row[nextCheckInIdx] || '').trim() : '';
-      var checkDate = checkInDateIdx >= 0 ? String(row[checkInDateIdx] || '').trim() : '';
-      if (!latestByPartner[pid] || (checkDate && checkDate > latestByPartner[pid].check_in_date)) {
-        latestByPartner[pid] = { partner_id: pid, next_check_in_date: nextDate, check_in_date: checkDate };
+      var nextDate = nextCheckInIdx >= 0 ? partnerCheckInIsoDate_(row[nextCheckInIdx]) : '';
+      var checkDate = checkInDateIdx >= 0 ? partnerCheckInIsoDate_(row[checkInDateIdx]) : '';
+      var submittedAt = submittedAtIdx >= 0 ? String(row[submittedAtIdx] || '').trim() : '';
+      if (!latestByPartner[pid] || (submittedAt && submittedAt > latestByPartner[pid].submitted_at)) {
+        latestByPartner[pid] = { partner_id: pid, next_check_in_date: nextDate, check_in_date: checkDate, submitted_at: submittedAt };
       }
     }
     var today = new Date();
