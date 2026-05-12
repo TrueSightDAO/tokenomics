@@ -1168,6 +1168,37 @@ See [`python_scripts/schema_validation/README.md`](./python_scripts/schema_valid
 
 ---
 
+##### Sheet: `Partner Check-ins`
+**Purpose:** Signed audit trail of periodic check-ins with Agroverse retail partners. Each row is one `[PARTNER CHECK-IN EVENT]` submitted via the DApp (`partner_check_in.html`) or CLI (`dao_client check_in_partner`), verified by Edgar, and appended by the GAS scanner `processPartnerCheckInsFromTelegramChatLogs`.
+
+**Sheet URL:** https://docs.google.com/spreadsheets/d/1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU/edit
+
+**Header Row:** 1
+
+| Column | Name | Type | Description |
+|--------|------|------|-------------|
+| A | `Submitted At` | ISO 8601 datetime | When the scanner appended the row. |
+| B | `Partner ID` | String | Slug from `Agroverse Partners`!A. |
+| C | `Contributor Name` | String | From `Contributors contact information`!A. |
+| D | `Check-in Date` | Date (`YYYY-MM-DD`) | When the check-in happened. |
+| E | `Method` | String | Dropdown: `Text`, `Phone`, `In Person`, `Email`, `Other`. |
+| F | `Stock Status` | String | Dropdown: `Low`, `Out`, `OK`, `Unknown`. |
+| G | `Restock Needed` | String | Dropdown: `Yes`, `No`, `Maybe`. |
+| H | `Restock Quantity` | Number | Integer (nullable). Only meaningful when `Restock Needed = Yes`. |
+| I | `Next Check-in Date` | Date (`YYYY-MM-DD`) | Operator's scheduled follow-up (nullable). |
+| J | `Notes` | String | Free-form remark, capped at 2000 chars by scanner. |
+| K | `Update ID` | String | `PCI_…` — dedup key. Unique per event (scanner-enforced). |
+| L | `Digital Signature` | String | Public key (first 64 chars) of the signer. |
+| M | `Submitted By` | String | Resolved contributor name from signature lookup. |
+| N | `Restock SKU` | String | SKU slug the partner asked to restock (e.g. `8-ounce-organic-cacao-nibs`), drawn from `partners-velocity.json` items. `Other` if the partner asked for a SKU they don't currently carry — disambiguate in `Notes`. Only meaningful when `Restock Needed = Yes`. Nullable. |
+
+**Used by:**
+- [`dapp/partner_check_in.html`](https://github.com/TrueSightDAO/dapp/blob/main/partner_check_in.html) — reads history via Shipping Planner `?action=get_partner_check_ins`.
+- [`tokenomics/google_app_scripts/tdg_shipping_planner/shipping_planner_api.gs`](https://github.com/TrueSightDAO/tokenomics/blob/main/google_app_scripts/tdg_shipping_planner/shipping_planner_api.gs) — `getPartnerCheckIns` and `listPartnersNeedingAttention` helpers.
+- [`tokenomics/google_app_scripts/find_nearby_stores/process_partner_check_in_telegram_logs.gs`](https://github.com/TrueSightDAO/tokenomics/blob/main/google_app_scripts/find_nearby_stores/process_partner_check_in_telegram_logs.gs) — scanner that writes rows here.
+
+---
+
 ##### Sheet: `Currencies`
 **Purpose:** Master list of currencies and product metadata
 
