@@ -319,11 +319,13 @@ function listPartnerContributors() {
     for (var r = 1; r < values.length; r++) {
       var row = values[r];
       var pid = String(row[partnerIdIdx] || '').trim();
+      // Skip contributor-only rows (no partner_id) — pop-up vendor / operator entries
+      // have a contributor_contact_id but no retail partnership to check in with.
+      // See Agroverse Partners rows 39-40 (Rune Shields / Gary Teh, Pop-up Vendor).
       if (!pid) continue;
       var contrib = String(row[contributorIdx] || '').trim();
       if (!contrib) continue;
       var status = statusIdx >= 0 ? String(row[statusIdx] || '').trim().toLowerCase() : '';
-      // Skip non-active partners (active rows are the only ones we'd check in with).
       if (statusIdx >= 0 && status && status !== 'active') continue;
       rows.push({
         partner_id: pid,

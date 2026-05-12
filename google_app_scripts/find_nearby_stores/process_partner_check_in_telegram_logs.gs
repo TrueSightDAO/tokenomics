@@ -52,7 +52,11 @@ function parsePartnerCheckInText_(text) {
     if (line.charAt(0) === '-') line = line.substring(1).trim();
     var m = line.match(/^([A-Za-z][A-Za-z0-9_\s\/\-]*):\s*(.*)$/);
     if (!m) continue;
-    var key = m[1].trim().toLowerCase().replace(/\s+/g, '_');
+    // Normalize BOTH whitespace AND hyphens to underscores so "Check-in Date"
+    // → "check_in_date" (matches fields.check_in_date lookups below). Without
+    // the hyphen replacement, the key was "check-in_date" and the lookup
+    // silently returned undefined — Kelly Springer 2026-05-12 ground-truth.
+    var key = m[1].trim().toLowerCase().replace(/[\s\-]+/g, '_');
     result[key] = m[2].trim();
   }
   return result;
