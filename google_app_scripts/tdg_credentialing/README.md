@@ -10,7 +10,7 @@ This script needs a **GitHub Personal Access Token** with `contents:write` scope
 
 1. Push this folder to its Apps Script project (clasp).
 2. In the Apps Script editor: **Project Settings → Script Properties → Add property**:
-   - Name: `GITHUB_TOKEN`
+   - Name: `TRUESIGHT_CREDENTIALING_PAT`
    - Value: `ghp_…` (a fine-grained PAT with `Contents: read & write` on `TrueSightDAO/lineage-credentials`)
 3. Deploy the script as a Web App (executes as: USER_DEPLOYING, who has access: Anyone).
 4. From the live deployment URL run `?action=installTimeTrigger` once to install the 10-min cron fallback.

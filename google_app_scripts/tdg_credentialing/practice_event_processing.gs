@@ -27,7 +27,7 @@
  *      is only ever set to PROCESSED after the commit succeeds.
  *
  * Required Script Property:
- *   GITHUB_TOKEN — a PAT with 'contents:write' on TrueSightDAO/lineage-credentials.
+ *   TRUESIGHT_CREDENTIALING_PAT — a PAT with 'contents:write' on TrueSightDAO/lineage-credentials.
  *                  Set via Apps Script project → Project Settings → Script Properties.
  *
  * Edgar config (sentiment_importer/config/application.rb):
@@ -210,9 +210,9 @@ function setIntakeRowStatus(sheet, rowNumber, status, commitSha, commitUrl) {
 // ============================================================================
 
 function getGithubToken() {
-  var token = PropertiesService.getScriptProperties().getProperty('GITHUB_TOKEN');
+  var token = PropertiesService.getScriptProperties().getProperty('TRUESIGHT_CREDENTIALING_PAT');
   if (!token) {
-    throw new Error('GITHUB_TOKEN script property is not set. Add a PAT with contents:write on TrueSightDAO/lineage-credentials.');
+    throw new Error('TRUESIGHT_CREDENTIALING_PAT script property is not set. Add a PAT with contents:write on TrueSightDAO/lineage-credentials.');
   }
   return token;
 }
