@@ -67,12 +67,21 @@ const CRED_INTAKE_HEADERS = [
   'Processed At',                // Q
 ];
 
-// Telegram Chat Logs columns we read (matches the layout the other processors use).
-// Column indices are 0-based — getValues() rows are 0-indexed arrays.
+// Telegram Chat Logs columns we read. Layout matches the canonical
+// constants used in tdg_asset_management/capital_injection_processing.gs:
+//   col 0  Update ID
+//   col 1  Chatroom ID
+//   col 2  Chatroom Name
+//   col 3  Message ID
+//   col 4  Reporter / Contributor Name
+//   col 5  (reserved)
+//   col 6  Message body  ← we were reading col 2 here, which is the chatroom
+//                          name ("Edgar Direct"), so [PRACTICE EVENT] never
+//                          matched and processing silently no-op'd.
 const TCL_UPDATE_ID_COL  = 0;
-const TCL_MESSAGE_ID_COL = 1;
-const TCL_MESSAGE_COL    = 2;
-const TCL_REPORTER_COL   = 3;
+const TCL_MESSAGE_ID_COL = 3;
+const TCL_MESSAGE_COL    = 6;
+const TCL_REPORTER_COL   = 4;
 
 // Lineage-credentials repo coordinates.
 const LC_OWNER = 'TrueSightDAO';
