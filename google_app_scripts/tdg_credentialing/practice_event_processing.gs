@@ -1,6 +1,23 @@
 /**
  * practice_event_processing.gs — Edgar event processor for [PRACTICE EVENT]
  *
+ * Apps Script project:
+ *   https://script.google.com/home/projects/1Dj3-m_ejxYJ4UQK2zNadnqNHJIvPQfj-VYvH9_Gnap6MYRmOJhK3B0VR/edit
+ *   (script ID: 1Dj3-m_ejxYJ4UQK2zNadnqNHJIvPQfj-VYvH9_Gnap6MYRmOJhK3B0VR)
+ *
+ * Deployments (per `clasp deployments` 2026-05-16):
+ *   @HEAD:      AKfycbzYmzg-mmKDPm6BXzvBZkXWgEy383Fe97TjnFTQHz_e
+ *               (always serves the latest source; preferred for ops actions
+ *               and `clasp push`-driven updates — no re-deploy needed)
+ *   @version 3: AKfycbys7ERYPR6PDGGlpzDXDQPwPzcWAbFUcN_ZKrYEW0p2yg01eFkyBTSs9hCPkgjyy7AXWw
+ *               ("fix telegram chat logs column mapping" — pinned version)
+ *
+ * To push code: `cd $TEMP && clasp clone 1Dj3-m_ejxYJ4UQK2zNadnqNHJIvPQfj-VYvH9_Gnap6MYRmOJhK3B0VR`,
+ * then `cp practice_event_processing.gs $TEMP/Code.js`, then `clasp push`.
+ * The @HEAD deployment immediately reflects the new code.
+ *
+ * Web-app actions: see doGet() at the bottom of this file.
+ *
  * Mirrors the pattern in tdg_asset_management/currency_conversion_processing.gs
  * (which is the most recently hardened of the Edgar GAS processors — see the
  * 2026-05-11 Kirsten incident write-up baked into its defensive guards).
