@@ -469,6 +469,8 @@ function listTriggers() {
  * URL shape:
  *   https://script.google.com/macros/s/<deployment>/exec?action=parseAndProcessCredentialingLogs
  *   https://script.google.com/macros/s/<deployment>/exec?action=installTimeTrigger
+ *   https://script.google.com/macros/s/<deployment>/exec?action=reprocessAllRowsWithEmptyPayload
+ *   https://script.google.com/macros/s/<deployment>/exec?action=reprocessCredentialingRow&row=5
  */
 function doGet(e) {
   var action = (e && e.parameter && e.parameter.action) || '';
@@ -488,7 +490,42 @@ function doGet(e) {
     return ContentService.createTextOutput(JSON.stringify(installTimeTrigger(), null, 2)).setMimeType(ContentService.MimeType.JSON);
   }
 
-  return ContentService.createTextOutput('practice_event_processing.gs — ready. Actions: parseAndProcessCredentialingLogs, installTimeTrigger').setMimeType(ContentService.MimeType.TEXT);
+  // Backfill: re-parse + re-commit every PROCESSED row whose col M (Payload
+  // JSON) is empty. Use after pulling the balanced-brace parser fallback
+  // shipped 2026-05-16. Operator can curl the URL directly OR click it from
+  // a browser tab; returns a JSON summary.
+  if (action === 'reprocessAllRowsWithEmptyPayload') {
+    try {
+      var summary = reprocessAllRowsWithEmptyPayload();
+      return ContentService.createTextOutput(JSON.stringify(summary, null, 2)).setMimeType(ContentService.MimeType.JSON);
+    } catch (err) {
+      Logger.log('❌ reprocessAllRowsWithEmptyPayload error: ' + err.message);
+      return ContentService.createTextOutput(JSON.stringify({ ok: false, error: err.message })).setMimeType(ContentService.MimeType.JSON);
+    }
+  }
+
+  // Backfill a single row by number — useful for spot-fixes (e.g. when a
+  // newer parser bug surfaces and the operator wants to retry just one row).
+  if (action === 'reprocessCredentialingRow') {
+    var rowParam = (e && e.parameter && e.parameter.row) || '';
+    var rowNumber = parseInt(rowParam, 10);
+    if (!rowNumber || rowNumber < 2) {
+      return ContentService.createTextOutput(JSON.stringify({ ok: false, error: 'Missing or invalid &row=N (N must be >= 2)' })).setMimeType(ContentService.MimeType.JSON);
+    }
+    try {
+      var result = reprocessCredentialingRow(rowNumber);
+      return ContentService.createTextOutput(JSON.stringify(result, null, 2)).setMimeType(ContentService.MimeType.JSON);
+    } catch (err) {
+      Logger.log('❌ reprocessCredentialingRow(' + rowNumber + ') error: ' + err.message);
+      return ContentService.createTextOutput(JSON.stringify({ ok: false, rowNumber: rowNumber, error: err.message })).setMimeType(ContentService.MimeType.JSON);
+    }
+  }
+
+  return ContentService.createTextOutput(
+    'practice_event_processing.gs — ready. Actions: ' +
+    'parseAndProcessCredentialingLogs, installTimeTrigger, ' +
+    'reprocessAllRowsWithEmptyPayload, reprocessCredentialingRow&row=N'
+  ).setMimeType(ContentService.MimeType.TEXT);
 }
 
 // ============================================================================
