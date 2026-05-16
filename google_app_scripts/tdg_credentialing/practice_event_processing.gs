@@ -303,20 +303,37 @@ function buildEventFilename(capturedAt, requestTransactionId) {
 function commitPracticeEvent(program, slug, filename, content) {
   var path = 'programs/' + program + '/' + slug + '/practice/' + filename;
   var url = LC_CONTENTS_API_FMT.replace('{path}', path);
+  var headers = {
+    Authorization: 'Bearer ' + getGithubToken(),
+    Accept: 'application/vnd.github+json',
+    'User-Agent': 'tdg-credentialing-processing/1.0',
+    'X-GitHub-Api-Version': '2022-11-28',
+  };
+
+  // If the file already exists, GitHub requires its blob sha on PUT. Look it
+  // up first so re-commits (e.g. backfill) overwrite cleanly instead of 422-ing.
+  var existingSha = null;
+  var head = UrlFetchApp.fetch(url + '?ref=' + encodeURIComponent(LC_BRANCH), {
+    method: 'get',
+    headers: headers,
+    muteHttpExceptions: true,
+  });
+  var headCode = head.getResponseCode();
+  if (headCode >= 200 && headCode < 300) {
+    try { existingSha = JSON.parse(head.getContentText()).sha || null; } catch (e) { existingSha = null; }
+  }
+
   var body = {
     message: 'practice event: ' + program + ' ' + slug + ' ' + filename,
     branch: LC_BRANCH,
     content: Utilities.base64Encode(content),
   };
+  if (existingSha) body.sha = existingSha;
+
   var resp = UrlFetchApp.fetch(url, {
     method: 'put',
     contentType: 'application/json',
-    headers: {
-      Authorization: 'Bearer ' + getGithubToken(),
-      Accept: 'application/vnd.github+json',
-      'User-Agent': 'tdg-credentialing-processing/1.0',
-      'X-GitHub-Api-Version': '2022-11-28',
-    },
+    headers: headers,
     payload: JSON.stringify(body),
     muteHttpExceptions: true,
   });
@@ -513,7 +530,8 @@ function doGet(e) {
   // a browser tab; returns a JSON summary.
   if (action === 'reprocessAllRowsWithEmptyPayload') {
     try {
-      var summary = reprocessAllRowsWithEmptyPayload();
+      var force = String((e && e.parameter && e.parameter.force) || '') === '1';
+      var summary = reprocessAllRowsWithEmptyPayload({ force: force });
       return ContentService.createTextOutput(JSON.stringify(summary, null, 2)).setMimeType(ContentService.MimeType.JSON);
     } catch (err) {
       Logger.log('❌ reprocessAllRowsWithEmptyPayload error: ' + err.message);
@@ -615,7 +633,9 @@ function reprocessCredentialingRow(rowNumber) {
  * this once after pulling the parser fix to retroactively fill in missed
  * payloads from any pre-fix events.
  */
-function reprocessAllRowsWithEmptyPayload() {
+function reprocessAllRowsWithEmptyPayload(opts) {
+  opts = opts || {};
+  var force = opts.force === true;
   var intake = getIntakeSheet();
   if (!intake) throw new Error('Credentialing Events sheet not found');
   var lastRow = intake.getLastRow();
@@ -627,20 +647,35 @@ function reprocessAllRowsWithEmptyPayload() {
   var statusColIdx = CRED_INTAKE_HEADERS.indexOf('Status');
 
   var reprocessed = 0, skipped = 0, errors = 0;
+  var reprocessedRows = [], errorDetails = [];
   for (var i = 0; i < values.length; i++) {
     var rowNumber = i + 2;
     var status = String(values[i][statusColIdx] || '');
     var payload = String(values[i][payloadColIdx] || '');
     if (status.indexOf('PROCESSED') !== 0) { skipped++; continue; }
-    if (payload) { skipped++; continue; }
+    if (payload && !force) { skipped++; continue; }
     try {
-      reprocessCredentialingRow(rowNumber);
+      var r = reprocessCredentialingRow(rowNumber);
       reprocessed++;
+      reprocessedRows.push({ row: rowNumber, slug: r && r.slug, payload_len: r && r.payload_len });
     } catch (e) {
       Logger.log('Row ' + rowNumber + ' reprocess error: ' + e.message);
       errors++;
+      var rawMsg = String(values[i][2] || '');
+      errorDetails.push({
+        row: rowNumber,
+        error: String(e && e.message || e),
+        raw_message_len: rawMsg.length,
+        raw_message_preview: rawMsg.slice(0, 200),
+      });
     }
   }
   Logger.log('🔁 Backfill done: reprocessed=' + reprocessed + ' skipped=' + skipped + ' errors=' + errors);
-  return { reprocessed: reprocessed, skipped: skipped, errors: errors };
+  return {
+    reprocessed: reprocessed,
+    skipped: skipped,
+    errors: errors,
+    reprocessedRows: reprocessedRows,
+    errorDetails: errorDetails,
+  };
 }
