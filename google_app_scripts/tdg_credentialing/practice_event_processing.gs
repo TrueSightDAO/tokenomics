@@ -110,11 +110,51 @@ function parsePracticeEvent(message) {
     return m ? m[1].trim() : '';
   }
 
-  // Payload JSON is multi-line — grab everything between '- Payload JSON:' and
-  // the '\n--------' end-of-event sentinel.
+  // Payload JSON is multi-line. Primary path: match between '- Payload JSON:'
+  // and the '\n--------' end-of-event sentinel. Tolerant of CRLF + 3+ dashes
+  // (some Edgar forwarders normalize the separator differently).
   var payloadJson = '';
-  var payloadMatch = message.match(/- Payload JSON:[ \t]*\n([\s\S]*?)\n--------/);
+  var payloadMatch = message.match(/- Payload JSON:[ \t]*\r?\n([\s\S]*?)\r?\n-{3,}/);
   if (payloadMatch) payloadJson = payloadMatch[1].trim();
+
+  // Fallback: if the separator regex misses (the production failure mode
+  // observed on capoeira-tribo-mirim pk-4LBWHX9DJ_wH on 2026-05-16: col M
+  // landed empty despite col C having the full payload), parse a balanced
+  // JSON object starting at the first '{' after '- Payload JSON:'. This
+  // doesn't depend on the trailing sentinel format at all — survives any
+  // future change to how Edgar appends signature blocks.
+  if (!payloadJson) {
+    var headerIdx = message.indexOf('- Payload JSON:');
+    if (headerIdx >= 0) {
+      var jsonStart = message.indexOf('{', headerIdx);
+      if (jsonStart >= 0) {
+        var depth = 0;
+        var inString = false;
+        var escape = false;
+        var jsonEnd = -1;
+        for (var i = jsonStart; i < message.length; i++) {
+          var ch = message.charAt(i);
+          if (escape) { escape = false; continue; }
+          if (ch === '\\') { escape = true; continue; }
+          if (ch === '"') { inString = !inString; continue; }
+          if (inString) continue;
+          if (ch === '{') depth++;
+          else if (ch === '}') {
+            depth--;
+            if (depth === 0) { jsonEnd = i + 1; break; }
+          }
+        }
+        if (jsonEnd > jsonStart) {
+          payloadJson = message.substring(jsonStart, jsonEnd).trim();
+          Logger.log('[parsePracticeEvent] payload extracted via balanced-brace fallback (len=' + payloadJson.length + ')');
+        }
+      }
+    }
+  }
+
+  if (!payloadJson) {
+    Logger.log('[parsePracticeEvent] could not extract Payload JSON; message head: ' + message.substring(0, 240).replace(/\n/g, '\\n'));
+  }
 
   var sigMatch    = message.match(/My Digital Signature:[ \t]*([^\n]*)/i);
   var txIdMatch   = message.match(/Request Transaction ID:[ \t]*([^\n]*)/i);
@@ -449,4 +489,104 @@ function doGet(e) {
   }
 
   return ContentService.createTextOutput('practice_event_processing.gs — ready. Actions: parseAndProcessCredentialingLogs, installTimeTrigger').setMimeType(ContentService.MimeType.TEXT);
+}
+
+// ============================================================================
+// BACKFILL — re-parse + re-commit existing PROCESSED rows that have empty
+// Payload JSON (col M). Required after fixing the parser bug observed on
+// 2026-05-16 where capoeira-tribo-mirim rows landed with col M empty AND
+// committed-to-repo `payload: null` — which made the cache builder report
+// total_practice_minutes = 0 on the CV.
+// ============================================================================
+
+/**
+ * Backfill a single row by row number (1-indexed including the header row).
+ * Re-parses col C, fills col M, and re-commits the event file in
+ * lineage-credentials with the corrected `payload` + `raw_payload_json`.
+ *
+ * Operator usage from the IDE:
+ *   reprocessCredentialingRow(5);   // row 5 (first practice for pk-4LBWHX9DJ_wH)
+ *   reprocessCredentialingRow(6);   // row 6 (second practice)
+ *
+ * Idempotent: re-running for the same row just overwrites the existing
+ * event file with the same content + advances Processed At.
+ */
+function reprocessCredentialingRow(rowNumber) {
+  var intake = getIntakeSheet();
+  if (!intake) throw new Error('Credentialing Events sheet not found');
+  if (rowNumber < 2) throw new Error('rowNumber must be >= 2 (row 1 is the header)');
+
+  var lastCol = CRED_INTAKE_HEADERS.length;
+  var rowValues = intake.getRange(rowNumber, 1, 1, lastCol).getValues()[0];
+  var message = String(rowValues[2] || '');  // col C = Raw Message
+  if (!message) throw new Error('Row ' + rowNumber + ' has empty Raw Message (col C)');
+
+  var parsed = parsePracticeEvent(message);
+  if (!parsed) throw new Error('Row ' + rowNumber + ' is not a [PRACTICE EVENT] payload');
+
+  // Always update col M (Payload JSON) — this is the fix the parser missed before.
+  intake.getRange(rowNumber, CRED_INTAKE_HEADERS.indexOf('Payload JSON') + 1).setValue(parsed.payloadJson || '');
+
+  // Re-build + re-commit the event file with the proper payload populated.
+  var slug = derivePkSlug(parsed.practitionerPublicKey);
+  var eventFile = {
+    program: parsed.program,
+    practice_type: parsed.practiceType,
+    practitioner_public_key: parsed.practitionerPublicKey,
+    practitioner_name: parsed.practitionerName,
+    slug: slug,
+    captured_at: parsed.capturedAt,
+    source_url: parsed.sourceUrl,
+    payload: tryParseJson(parsed.payloadJson),
+    raw_payload_json: parsed.payloadJson,
+    digital_signature: parsed.digitalSignature,
+    request_transaction_id: parsed.requestTransactionId,
+    intake: {
+      telegram_update_id: String(rowValues[0] || ''),
+      telegram_message_id: String(rowValues[1] || ''),
+      processed_at: new Date().toISOString(),
+      reprocessed: true,
+    },
+  };
+  var filename = buildEventFilename(parsed.capturedAt, parsed.requestTransactionId);
+  var commit = commitPracticeEvent(parsed.program, slug, filename, JSON.stringify(eventFile, null, 2));
+
+  setIntakeRowStatus(intake, rowNumber, 'PROCESSED', commit.sha || '', commit.html_url || '');
+  Logger.log('🔁 Reprocessed row ' + rowNumber + ' → slug=' + slug + ' commit=' + (commit.sha || '(no sha)'));
+  return { ok: true, rowNumber: rowNumber, slug: slug, commit_sha: commit.sha, payload_len: (parsed.payloadJson || '').length };
+}
+
+/**
+ * Backfill every PROCESSED row that has an empty Payload JSON column. Use
+ * this once after pulling the parser fix to retroactively fill in missed
+ * payloads from any pre-fix events.
+ */
+function reprocessAllRowsWithEmptyPayload() {
+  var intake = getIntakeSheet();
+  if (!intake) throw new Error('Credentialing Events sheet not found');
+  var lastRow = intake.getLastRow();
+  if (lastRow < 2) { Logger.log('No data rows to reprocess.'); return; }
+
+  var lastCol = CRED_INTAKE_HEADERS.length;
+  var values = intake.getRange(2, 1, lastRow - 1, lastCol).getValues();
+  var payloadColIdx = CRED_INTAKE_HEADERS.indexOf('Payload JSON');
+  var statusColIdx = CRED_INTAKE_HEADERS.indexOf('Status');
+
+  var reprocessed = 0, skipped = 0, errors = 0;
+  for (var i = 0; i < values.length; i++) {
+    var rowNumber = i + 2;
+    var status = String(values[i][statusColIdx] || '');
+    var payload = String(values[i][payloadColIdx] || '');
+    if (status.indexOf('PROCESSED') !== 0) { skipped++; continue; }
+    if (payload) { skipped++; continue; }
+    try {
+      reprocessCredentialingRow(rowNumber);
+      reprocessed++;
+    } catch (e) {
+      Logger.log('Row ' + rowNumber + ' reprocess error: ' + e.message);
+      errors++;
+    }
+  }
+  Logger.log('🔁 Backfill done: reprocessed=' + reprocessed + ' skipped=' + skipped + ' errors=' + errors);
+  return { reprocessed: reprocessed, skipped: skipped, errors: errors };
 }
