@@ -530,7 +530,8 @@ function doGet(e) {
   // a browser tab; returns a JSON summary.
   if (action === 'reprocessAllRowsWithEmptyPayload') {
     try {
-      var summary = reprocessAllRowsWithEmptyPayload();
+      var force = String((e && e.parameter && e.parameter.force) || '') === '1';
+      var summary = reprocessAllRowsWithEmptyPayload({ force: force });
       return ContentService.createTextOutput(JSON.stringify(summary, null, 2)).setMimeType(ContentService.MimeType.JSON);
     } catch (err) {
       Logger.log('❌ reprocessAllRowsWithEmptyPayload error: ' + err.message);
@@ -632,7 +633,9 @@ function reprocessCredentialingRow(rowNumber) {
  * this once after pulling the parser fix to retroactively fill in missed
  * payloads from any pre-fix events.
  */
-function reprocessAllRowsWithEmptyPayload() {
+function reprocessAllRowsWithEmptyPayload(opts) {
+  opts = opts || {};
+  var force = opts.force === true;
   var intake = getIntakeSheet();
   if (!intake) throw new Error('Credentialing Events sheet not found');
   var lastRow = intake.getLastRow();
@@ -650,7 +653,7 @@ function reprocessAllRowsWithEmptyPayload() {
     var status = String(values[i][statusColIdx] || '');
     var payload = String(values[i][payloadColIdx] || '');
     if (status.indexOf('PROCESSED') !== 0) { skipped++; continue; }
-    if (payload) { skipped++; continue; }
+    if (payload && !force) { skipped++; continue; }
     try {
       var r = reprocessCredentialingRow(rowNumber);
       reprocessed++;
