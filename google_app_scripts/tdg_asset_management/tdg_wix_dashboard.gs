@@ -845,39 +845,166 @@ function calculateAUM() {
   Logger.log("========================================");
   Logger.log("CALCULATING ASSETS UNDER MANAGEMENT (AUM)");
   Logger.log("========================================");
-  
-  // Main ledger assets
-  var offChainAssets = getOffChainAssetValue();
-  var usdtVaultBalance = getUSDTBalanceInVault();
-  var mainLedgerAssets = offChainAssets + usdtVaultBalance;
-  
-  Logger.log("");
-  Logger.log("--- MAIN LEDGER ASSETS ---");
-  Logger.log(`  Off-chain assets: $${offChainAssets.toFixed(2)} USD`);
-  Logger.log(`  USDT vault balance: $${usdtVaultBalance.toFixed(2)} USD`);
-  Logger.log(`  Total main ledger assets: $${mainLedgerAssets.toFixed(2)} USD`);
-  Logger.log("");
-  
-  // Get all managed ledger URLs
-  var ledgerUrls = getLedgerUrlsFromWix();
-  Logger.log(`--- MANAGED LEDGER ASSETS (${ledgerUrls.length} ledgers) ---`);
-  Logger.log(`  Processing ${ledgerUrls.length} managed ledger(s)...`);
-  Logger.log("");
-  
-  // Sum all assets (USD and non-USD) from all managed ledgers
-  var managedLedgerAssets = getAllManagedLedgerAssets(ledgerUrls);
-  
-  Logger.log("");
-  Logger.log("--- AUM CALCULATION SUMMARY ---");
-  Logger.log(`  Main ledger assets: $${mainLedgerAssets.toFixed(2)} USD`);
-  Logger.log(`  Managed ledger assets: $${managedLedgerAssets.toFixed(2)} USD`);
-  
-  var aum = mainLedgerAssets + managedLedgerAssets;
-  Logger.log(`  TOTAL AUM: $${aum.toFixed(2)} USD`);
+  var breakdown = computeAumBreakdown();
+  cacheAumBreakdown(breakdown);
+  Logger.log(`  Off-chain assets: $${breakdown.off_chain_assets_usd.toFixed(2)} USD`);
+  Logger.log(`  USDT vault: $${breakdown.usdt_vault_usd.toFixed(2)} USD`);
+  Logger.log(`  Managed ledger assets (Asset section sum): $${breakdown.managed_ledgers.total_usd.toFixed(2)} USD`);
+  Logger.log(`  TOTAL AUM: $${breakdown.total_usd.toFixed(2)} USD`);
   Logger.log("========================================");
-  Logger.log("");
-  
-  return aum;
+  return breakdown.total_usd;
+}
+
+/**
+ * Read the Asset section (columns A-B) of each managed ledger's Balance
+ * sheet, convert each row to USD via the master Currencies sheet
+ * (Currencies!A = asset name → Currencies!B = price in USD), and return
+ * a per-ledger structured payload.
+ *
+ * This is the *asset side* of each AGL's balance sheet (what the ledger
+ * actually holds, in native units), NOT the equity side (sum of stakeholder
+ * claims) that getAllManagedLedgerAssets() reads. AUM should be the asset
+ * side — same total per-ledger when the balance sheet reconciles, but
+ * semantically the right read because AUM means "assets we manage", not
+ * "sum of equity claims".
+ *
+ * Skips rows with empty asset names, non-numeric amounts, or asset names
+ * not present in the Currencies sheet (defensive against template drift).
+ *
+ * @param {Array<{ledger_id, url}>} ledgers
+ * @return {Array<{ledger_id, ledger_url, total_usd, assets:[{asset, qty, rate, usd}]}>}
+ */
+function getManagedLedgerAssetsFromAssetSection(ledgers) {
+  var exchangeRates = getCurrencyExchangeRates();
+  var results = [];
+  ledgers.forEach(function (entry) {
+    var ledgerId = entry.ledger_id;
+    var url = entry.url;
+    var resolvedUrl = url;
+    if (!url.includes('docs.google.com/spreadsheets')) {
+      resolvedUrl = resolveRedirect(url);
+    }
+    if (!resolvedUrl || !resolvedUrl.includes('docs.google.com/spreadsheets')) return;
+    try {
+      var spreadsheet = SpreadsheetApp.openByUrl(resolvedUrl);
+      var balanceSheet = spreadsheet.getSheetByName("Balance");
+      if (!balanceSheet) return;
+      var lastRow = balanceSheet.getLastRow();
+      if (lastRow < 6) return;
+
+      // Different AGLs use different column layouts for the Asset section:
+      //   - AGL4 (older template): cols A-B = Asset | Amount
+      //   - AGL14/8/7/10/6/13/15/SEF1/PP1: cols E-F = Asset Name | Amount
+      // Detect via row 5 (the canonical column-header row) by finding a cell
+      // matching "Asset" or "Asset Name" and treating the next column to the
+      // right as the Amount.
+      var HEADER_ROW = 5;
+      var DATA_START_ROW = 6;
+      var SCAN_WIDTH = 10; // scan first 10 cols of the header row
+      var headerCells = balanceSheet.getRange(HEADER_ROW, 1, 1, SCAN_WIDTH).getValues()[0];
+      var assetCol = -1;
+      for (var h = 0; h < headerCells.length - 1; h++) {
+        var label = String(headerCells[h] || '').trim().toLowerCase();
+        if (label === 'asset' || label === 'asset name') {
+          assetCol = h + 1; // 1-based for getRange
+          break;
+        }
+      }
+      if (assetCol < 0) {
+        Logger.log("  [" + ledgerId + "] no 'Asset'/'Asset Name' header on row " + HEADER_ROW + " — skipping");
+        return;
+      }
+      var amountCol = assetCol + 1;
+      var numRows = lastRow - DATA_START_ROW + 1;
+      var nameValues   = balanceSheet.getRange(DATA_START_ROW, assetCol,  numRows, 1).getValues();
+      var amountValues = balanceSheet.getRange(DATA_START_ROW, amountCol, numRows, 1).getValues();
+
+      var assets = [];
+      var totalUsd = 0;
+      for (var i = 0; i < numRows; i++) {
+        var assetName = String(nameValues[i][0] || '').trim();
+        var qty = parseFloat(amountValues[i][0]);
+        if (!assetName || !isFinite(qty) || qty === 0) continue;
+        var rate = exchangeRates[assetName];
+        if (!isFinite(rate) || rate <= 0) {
+          Logger.log("  [" + ledgerId + "] skipped '" + assetName + "' qty=" + qty + " — no Currencies!B rate");
+          continue;
+        }
+        var usd = qty * rate;
+        assets.push({ asset: assetName, qty: qty, rate: rate, usd: usd });
+        totalUsd += usd;
+      }
+      assets.sort(function (a, b) { return b.usd - a.usd; });
+      results.push({
+        ledger_id: ledgerId,
+        ledger_url: resolvedUrl,
+        total_usd: totalUsd,
+        assets: assets
+      });
+    } catch (e) {
+      Logger.log("Error reading Asset section for " + ledgerId + ": " + e.message);
+    }
+  });
+  return results;
+}
+
+/**
+ * Compute the structured AUM breakdown for the truesight.me /aum page.
+ * Same shape pattern as computeTreasuryBreakdown() — both fronted by
+ * PropertiesService cache + doGet endpoint so /aum serves in ~3s.
+ *
+ * Formula: off_chain (Main Ledger D1) + USDT vault + Σ over AGLs of
+ * (Σ over Balance!A:B of qty × Currencies!B[lookup by A]).
+ */
+function computeAumBreakdown() {
+  var offChain = getOffChainAssetValue();
+  var usdtVault = getUSDTBalanceInVault();
+  var ledgers = getLedgerUrlsWithIdsFromWix();
+  var perLedger = getManagedLedgerAssetsFromAssetSection(ledgers);
+  perLedger.sort(function (a, b) { return (b.total_usd || 0) - (a.total_usd || 0); });
+  var managedTotal = perLedger.reduce(function (s, l) { return s + (l.total_usd || 0); }, 0);
+  return {
+    off_chain_assets_usd: offChain,
+    usdt_vault_usd: usdtVault,
+    main_ledger_usd: offChain + usdtVault,
+    managed_ledgers: {
+      total_usd: managedTotal,
+      per_ledger: perLedger
+    },
+    total_usd: offChain + usdtVault + managedTotal,
+    formula: "off_chain_assets_usd + usdt_vault_usd + Σ over AGLs of (Σ over Balance!A:B of qty × Currencies!B[lookup by A])",
+    note: "Per-AGL figures come from the Asset section (columns A-B) of each AGL's Balance sheet — what the ledger actually holds in native units, converted via Main Ledger Currencies sheet. This is the asset side, not the equity side (sum of stakeholder claims) — semantically correct for AUM and avoids the structural risk of summing stakeholder claims that may include items already counted on the Main Ledger off-chain balance."
+  };
+}
+
+var AUM_BREAKDOWN_CACHE_KEY = 'AUM_BREAKDOWN_CACHE_V1';
+
+function cacheAumBreakdown(breakdown) {
+  try {
+    var enriched = JSON.parse(JSON.stringify(breakdown));
+    enriched.cached_at = new Date().toISOString();
+    var json = JSON.stringify(enriched);
+    PropertiesService.getScriptProperties().setProperty(AUM_BREAKDOWN_CACHE_KEY, json);
+    Logger.log("✅ Cached AUM breakdown (" + json.length + " bytes)");
+  } catch (e) {
+    Logger.log("⚠️ Failed to cache AUM breakdown: " + e.message);
+  }
+}
+
+function readCachedAumBreakdown() {
+  try {
+    var raw = PropertiesService.getScriptProperties().getProperty(AUM_BREAKDOWN_CACHE_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch (e) {
+    return null;
+  }
+}
+
+function updateAumBreakdown() {
+  var breakdown = computeAumBreakdown();
+  cacheAumBreakdown(breakdown);
+  return breakdown;
 }
 
 /**
@@ -2130,6 +2257,63 @@ function doGet(e) {
       };
       return ContentService
         .createTextOutput(JSON.stringify(breakdownResponse))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+
+    if (type === 'aum_debug') {
+      // Diagnostic: dump the first 20 rows of cols A..F of a given AGL's
+      // Balance sheet so we can see the actual template layout. Use:
+      //   ?type=aum_debug&ledger_id=AGL4
+      // Returns the raw values so we can verify which rows/cols hold the
+      // Asset section. Remove or disable after the layout is confirmed.
+      var debugLedgerId = e.parameter.ledger_id || '';
+      if (!debugLedgerId) {
+        return ContentService.createTextOutput(JSON.stringify({ error: 'pass ?ledger_id=<id>' })).setMimeType(ContentService.MimeType.JSON);
+      }
+      var debugLedgers = getLedgerUrlsWithIdsFromWix();
+      var match = debugLedgers.filter(function (l) { return l.ledger_id === debugLedgerId; })[0];
+      if (!match) {
+        return ContentService.createTextOutput(JSON.stringify({ error: 'ledger_id not found', searched: debugLedgers.map(function (l) { return l.ledger_id; }) })).setMimeType(ContentService.MimeType.JSON);
+      }
+      var debugSs = SpreadsheetApp.openByUrl(match.url);
+      var debugBalance = debugSs.getSheetByName("Balance");
+      if (!debugBalance) {
+        return ContentService.createTextOutput(JSON.stringify({ error: 'Balance sheet not found' })).setMimeType(ContentService.MimeType.JSON);
+      }
+      var dumpRows = Math.min(20, debugBalance.getLastRow());
+      var dumpCols = 6;
+      var dump = debugBalance.getRange(1, 1, dumpRows, dumpCols).getValues();
+      return ContentService.createTextOutput(JSON.stringify({
+        ledger_id: debugLedgerId,
+        url: match.url,
+        rows_x_cols: dumpRows + 'x' + dumpCols,
+        rows: dump
+      }, null, 2)).setMimeType(ContentService.MimeType.JSON);
+    }
+
+    if (type === 'aum_breakdown' || type === 'aum-breakdown') {
+      // Structured AUM breakdown — sums each AGL's Asset section
+      // (Balance!A:B converted via Currencies!B[lookup by A]) plus Main
+      // Ledger off-chain + USDT vault. Same total as the AUM scalar
+      // landing-page stat (both derived from computeAumBreakdown).
+      //
+      // Pass &refresh=1 to force a live recompute + cache overwrite.
+      var aumForceRefresh = (e.parameter.refresh === '1' || e.parameter.refresh === 'true');
+      var cachedAum = aumForceRefresh ? null : readCachedAumBreakdown();
+      var aumFromCache = !!cachedAum;
+      var aumBreakdown;
+      if (cachedAum) {
+        aumBreakdown = cachedAum;
+      } else {
+        aumBreakdown = computeAumBreakdown();
+        cacheAumBreakdown(aumBreakdown);
+      }
+      return ContentService
+        .createTextOutput(JSON.stringify({
+          timestamp: new Date().toISOString(),
+          from_cache: aumFromCache,
+          data: aumBreakdown
+        }))
         .setMimeType(ContentService.MimeType.JSON);
     }
     
