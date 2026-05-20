@@ -84,7 +84,11 @@ var VELOCITY_URL  = 'https://raw.githubusercontent.com/TrueSightDAO/agroverse-in
 var INVENTORY_URL = 'https://raw.githubusercontent.com/TrueSightDAO/agroverse-inventory/main/partners-inventory.json';
 
 var PARTNER_CHECK_INS_SHEET   = 'Partner Check-ins';                  // on MAIN_SPREADSHEET_ID
-var AGROVERSE_PARTNERS_SHEET  = 'Agroverse Partners';                  // on MAIN_SPREADSHEET_ID
+var AGROVERSE_PARTNERS_SHEET  = 'Agroverse Partners';                  // on MAIN_SPREADSHEET_ID (display name; gid below is stable)
+// Lookup by gid first so a rename of the tab (queued — see
+// agentic_ai_context/OPEN_FOLLOWUPS.md) doesn't break partner-poke draft
+// generation.
+var AGROVERSE_PARTNERS_SHEET_GID = 1983902109;
 var CONTACT_SHEET             = 'Contributors contact information';   // on MAIN_SPREADSHEET_ID
 var POKE_DRAFT_LOG_DEFAULT    = 'Partner Poke Drafts';                 // on HIT_LIST_SPREADSHEET_ID
 
@@ -394,9 +398,18 @@ function loadAgroversePartners_() {
   var out = {};
   try {
     var ss = SpreadsheetApp.openById(MAIN_SPREADSHEET_ID);
-    var sheet = ss.getSheetByName(AGROVERSE_PARTNERS_SHEET);
+    var sheet = null;
+    var allSheets = ss.getSheets();
+    for (var si = 0; si < allSheets.length; si++) {
+      if (allSheets[si].getSheetId() === AGROVERSE_PARTNERS_SHEET_GID) {
+        sheet = allSheets[si];
+        break;
+      }
+    }
+    if (!sheet) sheet = ss.getSheetByName(AGROVERSE_PARTNERS_SHEET);
     if (!sheet) {
-      Logger.log('[partner-poke] %s sheet not found', AGROVERSE_PARTNERS_SHEET);
+      Logger.log('[partner-poke] partners sheet not found (gid %s name %s)',
+                 AGROVERSE_PARTNERS_SHEET_GID, AGROVERSE_PARTNERS_SHEET);
       return out;
     }
     var lastRow = sheet.getLastRow();
