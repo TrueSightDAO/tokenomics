@@ -325,7 +325,17 @@ function listPartnersNeedingAttention() {
 function listPartnerContributors() {
   try {
     const ss = SpreadsheetApp.openById(MAIN_SPREADSHEET_ID);
-    const sheet = ss.getSheetByName('Agroverse Partners');
+    // Look up by gid first (stable across rename); fall back to name. The
+    // tab is currently 'Agroverse Partners' but queued for rename to
+    // 'DAO Partners' since its rows now span Operator/Supplier/Freight
+    // Provider beyond just retail. See agentic_ai_context/OPEN_FOLLOWUPS.md.
+    const PARTNERS_GID = 1983902109;
+    const sheets = ss.getSheets();
+    var sheet = null;
+    for (var i = 0; i < sheets.length; i++) {
+      if (sheets[i].getSheetId() === PARTNERS_GID) { sheet = sheets[i]; break; }
+    }
+    if (!sheet) sheet = ss.getSheetByName('Agroverse Partners');
     if (!sheet) return [];
     const values = sheet.getDataRange().getValues();
     if (values.length < 2) return [];
