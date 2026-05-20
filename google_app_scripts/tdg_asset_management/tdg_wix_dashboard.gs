@@ -890,19 +890,77 @@ function updateTotalDAOAssetOnWix() {
  */
 function updateUSD_TREASURY_BALANCE() {
   try {
-    var treasuryBalance = getOffChainAssetValue() + getUSDTBalanceInVault() + getInvestmentHoldingsInAGL();
+    // Compute the structured breakdown once. Both the scalar (written to
+    // Performance Statistics) and the JSON cache (read by the /treasury
+    // page via doGet?type=treasury_breakdown) are derived from this —
+    // avoids hitting each AGL's Balance sheet twice, which would have
+    // doubled the cron runtime.
+    var breakdown = computeTreasuryBreakdown();
+    var treasuryBalance = breakdown.total_usd;
+
     Logger.log("Calculating USD_TREASURY_BALANCE: " + treasuryBalance);
-    Logger.log("  - Off-chain assets: " + getOffChainAssetValue());
-    Logger.log("  - USDT vault balance: " + getUSDTBalanceInVault());
-    Logger.log("  - AGL investment holdings: " + getInvestmentHoldingsInAGL());
-    
+    Logger.log("  - Off-chain assets: " + breakdown.off_chain_assets_usd);
+    Logger.log("  - USDT vault balance: " + breakdown.usdt_vault_usd);
+    Logger.log("  - AGL investment holdings: " + breakdown.agl_equity.total_usd);
+
     updatePerformanceStatistic("USD_TREASURY_BALANCE", treasuryBalance, "USD");
+
+    // Cache the structured breakdown so /treasury can serve in ~3s
+    // (matching the other performance-stats endpoints) instead of
+    // recomputing live (~22s).
+    cacheTreasuryBreakdown(breakdown);
+
     Logger.log("✅ Successfully updated USD_TREASURY_BALANCE: " + treasuryBalance);
     return treasuryBalance;
   } catch (error) {
     Logger.log("❌ Error updating USD_TREASURY_BALANCE: " + error.message);
     throw error;
   }
+}
+
+/**
+ * PropertiesService cache for the treasury breakdown.
+ *
+ * Pattern matches how USD_TREASURY_BALANCE is exposed — write once on the
+ * cron-driven update cycle, read fast on every API request. PropertiesService
+ * is chosen over a sheet cell because (a) the JSON blob doesn't belong in a
+ * human-audit sheet, (b) reads are faster, (c) the breakdown carries its own
+ * `cached_at` timestamp for freshness audit.
+ */
+var TREASURY_BREAKDOWN_CACHE_KEY = 'TREASURY_BREAKDOWN_CACHE_V1';
+
+function cacheTreasuryBreakdown(breakdown) {
+  try {
+    var enriched = JSON.parse(JSON.stringify(breakdown));
+    enriched.cached_at = new Date().toISOString();
+    var json = JSON.stringify(enriched);
+    PropertiesService.getScriptProperties().setProperty(TREASURY_BREAKDOWN_CACHE_KEY, json);
+    Logger.log("✅ Cached treasury breakdown (" + json.length + " bytes)");
+  } catch (e) {
+    Logger.log("⚠️ Failed to cache treasury breakdown: " + e.message);
+  }
+}
+
+function readCachedTreasuryBreakdown() {
+  try {
+    var raw = PropertiesService.getScriptProperties().getProperty(TREASURY_BREAKDOWN_CACHE_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch (e) {
+    return null;
+  }
+}
+
+/**
+ * Standalone refresh — operator can invoke directly to warm the cache after
+ * a deploy, or wire as a separate time-driven trigger independent of
+ * updateUSD_TREASURY_BALANCE. In normal operation the cache stays fresh as
+ * a side effect of the existing scalar trigger.
+ */
+function updateTreasuryBreakdown() {
+  var breakdown = computeTreasuryBreakdown();
+  cacheTreasuryBreakdown(breakdown);
+  return breakdown;
 }
 
 
@@ -2031,11 +2089,26 @@ function doGet(e) {
       // /treasury page. Same three components used by
       // updateUSD_TREASURY_BALANCE() — off-chain assets + USDT vault +
       // per-AGL DAO equity holdings — so the page's totals always match
-      // the headline stat (no more "breakdown sums to a different number
-      // than the top-line" surprises).
-      var breakdown = computeTreasuryBreakdown();
+      // the headline stat.
+      //
+      // Reads from the PropertiesService cache populated by
+      // cacheTreasuryBreakdown() (called as a side effect of every
+      // updateUSD_TREASURY_BALANCE cron run). Falls back to a live
+      // compute only on a cold cache (first-ever request after deploy,
+      // or after a manual cache invalidation), and warms the cache on
+      // its way out so subsequent requests are fast again.
+      var cachedBreakdown = readCachedTreasuryBreakdown();
+      var fromCache = !!cachedBreakdown;
+      var breakdown;
+      if (cachedBreakdown) {
+        breakdown = cachedBreakdown;
+      } else {
+        breakdown = computeTreasuryBreakdown();
+        cacheTreasuryBreakdown(breakdown);
+      }
       var breakdownResponse = {
         timestamp: new Date().toISOString(),
+        from_cache: fromCache,
         data: breakdown
       };
       return ContentService
