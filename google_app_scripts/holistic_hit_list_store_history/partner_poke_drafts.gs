@@ -131,8 +131,10 @@ function onOpen() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   if (!ss) return;
   ss.addMenu('Partner Poke Drafts', [
-    { name: 'Run Partner Poke Drafts', functionName: 'runPartnerPokeDrafts' },
-    { name: 'Run (DRY_RUN preview)',   functionName: 'runPartnerPokeDraftsDryRun' }
+    { name: 'Run Partner Poke Drafts',        functionName: 'runPartnerPokeDrafts' },
+    { name: 'Run (DRY_RUN preview)',          functionName: 'runPartnerPokeDraftsDryRun' },
+    null,
+    { name: 'Process sent pokes (auto-checkin)', functionName: 'runProcessSentPartnerPokes' }
   ]);
 }
 
@@ -352,6 +354,184 @@ function processCandidate_(c, ctx) {
   });
 
   Logger.log('[partner-poke] draft created for %s -> %s (self_poke=%s)', c.slug, toAddr, isSelfPoke);
+}
+
+// ====================================================================
+// AUTO-CHECKIN-ON-SEND (v0.1)
+// ====================================================================
+
+/**
+ * Public entry point — run from menu, IDE Run button, or time-based trigger.
+ * Scans the Partner Poke Drafts audit log for rows where status='draft_created',
+ * checks whether each draft has been sent or discarded, and:
+ *  - If sent + addressed to a real partner → files a Partner Check-in row
+ *    (Method=Email, Stock Status=Unknown, Next Check-in Date=blank — operator-
+ *    driven cadence stays in operator's hands; auto-row just captures the
+ *    send event so future scheduler runs see "we already poked them").
+ *  - If sent + addressed to self (self-poke) → marks log row 'sent_self_poke'
+ *    but does NOT file a check-in (the operator-channel outreach hasn't
+ *    actually happened yet — that comes later when Gary acts on the reminder).
+ *  - If discarded (draft gone but no matching sent message) → marks 'discarded'.
+ * Idempotent via Update ID = poke-auto-<gmail_draft_id> on the Partner
+ * Check-ins tab (col K dedup key, same convention as the human-driven scanner).
+ */
+function runProcessSentPartnerPokes() {
+  processSentPartnerPokes_();
+}
+
+function processSentPartnerPokes_() {
+  var startedAt = new Date();
+  var props = PropertiesService.getScriptProperties();
+  var logSheetName = props.getProperty('POKE_DRAFT_LOG_SHEET') || POKE_DRAFT_LOG_DEFAULT;
+
+  var ss = SpreadsheetApp.openById(HIT_LIST_SPREADSHEET_ID);
+  var logSheet = ss.getSheetByName(logSheetName);
+  if (!logSheet) {
+    Logger.log('[partner-poke-send] no log sheet found, exiting');
+    return;
+  }
+
+  var values = logSheet.getDataRange().getValues();
+  if (values.length < 2) {
+    Logger.log('[partner-poke-send] log sheet empty, exiting');
+    return;
+  }
+
+  var headers = values[0].map(function (h) { return String(h || '').trim(); });
+  var idxStatus    = headers.indexOf('status');
+  var idxDraftId   = headers.indexOf('gmail_draft_id');
+  var idxPartner   = headers.indexOf('partner_id');
+  var idxSubject   = headers.indexOf('subject');
+  var idxToEmail   = headers.indexOf('to_email');
+  var idxSelfPoke  = headers.indexOf('is_self_poke');
+  var idxNotes     = headers.indexOf('notes');
+
+  if (idxStatus < 0 || idxDraftId < 0 || idxPartner < 0) {
+    Logger.log('[partner-poke-send] missing required columns in log sheet (status/gmail_draft_id/partner_id)');
+    return;
+  }
+
+  var contributorByPartner = loadAgroversePartners_();
+  var filed = 0, skipped_self = 0, discarded = 0, errors = 0, still_drafts = 0;
+
+  for (var r = 1; r < values.length; r++) {
+    var row = values[r];
+    var status = String(row[idxStatus] || '').trim();
+    if (status !== 'draft_created') continue;
+
+    var draftId = String(row[idxDraftId] || '').trim();
+    if (!draftId) continue;
+
+    var isSelfPoke = idxSelfPoke >= 0 && String(row[idxSelfPoke] || '').toLowerCase() === 'true';
+    var partnerId = String(row[idxPartner] || '').trim();
+    var subject   = idxSubject >= 0 ? String(row[idxSubject] || '') : '';
+    var toEmail   = idxToEmail >= 0 ? String(row[idxToEmail] || '') : '';
+
+    if (draftStillExists_(draftId)) { still_drafts++; continue; }
+
+    // Draft is gone — sent or discarded
+    var sentMessage = findSentPartnerPokeMessage_(toEmail, subject);
+
+    if (!sentMessage) {
+      logSheet.getRange(r + 1, idxStatus + 1).setValue('discarded');
+      if (idxNotes >= 0) {
+        var prior = String(row[idxNotes] || '');
+        logSheet.getRange(r + 1, idxNotes + 1)
+          .setValue((prior ? prior + ' | ' : '') + 'draft discarded by operator');
+      }
+      discarded++;
+      continue;
+    }
+
+    if (isSelfPoke) {
+      // The reminder reached Gary, but the actual partner contact hasn't happened
+      // yet — auto-filing a Partner Check-in would falsely record an interaction.
+      logSheet.getRange(r + 1, idxStatus + 1).setValue('sent_self_poke');
+      skipped_self++;
+      continue;
+    }
+
+    try {
+      filePartnerCheckInForSentPoke_({
+        partner_id:       partnerId,
+        contributor_name: contributorByPartner[partnerId] || '',
+        subject:          subject,
+        to_email:         toEmail,
+        sent_date:        sentMessage.getDate(),
+        gmail_draft_id:   draftId
+      });
+      logSheet.getRange(r + 1, idxStatus + 1).setValue('sent_and_filed');
+      filed++;
+    } catch (err) {
+      Logger.log('[partner-poke-send] error filing check-in for %s: %s', partnerId, err);
+      errors++;
+    }
+  }
+
+  Logger.log('[partner-poke-send] done: %s filed, %s self-poke (no check-in), %s discarded, %s errors, %s still-draft, took %sms',
+             filed, skipped_self, discarded, errors, still_drafts, new Date().getTime() - startedAt.getTime());
+}
+
+function draftStillExists_(draftId) {
+  try { return !!GmailApp.getDraft(draftId); }
+  catch (e) { return false; }
+}
+
+function findSentPartnerPokeMessage_(toEmail, subject) {
+  if (!toEmail || !subject) return null;
+  var query = 'in:sent label:"' + LABEL_NAME + '" to:"' + toEmail + '" newer_than:14d';
+  var threads;
+  try { threads = GmailApp.search(query, 0, 20); }
+  catch (e) { return null; }
+  for (var t = 0; t < threads.length; t++) {
+    var msgs = threads[t].getMessages();
+    for (var m = 0; m < msgs.length; m++) {
+      if (msgs[m].getSubject() === subject) return msgs[m];
+    }
+  }
+  return null;
+}
+
+function filePartnerCheckInForSentPoke_(args) {
+  var ss = SpreadsheetApp.openById(MAIN_SPREADSHEET_ID);
+  var sheet = ss.getSheetByName(PARTNER_CHECK_INS_SHEET);
+  if (!sheet) throw new Error('Partner Check-ins sheet not found on Main Ledger');
+
+  var updateId = 'poke-auto-' + String(args.gmail_draft_id || '').slice(0, 32);
+
+  // Idempotency: dedup on Update ID (col K = index 10)
+  var lastRow = sheet.getLastRow();
+  if (lastRow > 1) {
+    var ids = sheet.getRange(2, 11, lastRow - 1, 1).getValues();
+    for (var i = 0; i < ids.length; i++) {
+      if (String(ids[i][0] || '').trim() === updateId) {
+        Logger.log('[partner-poke-send] %s already filed (Update ID dedup)', args.partner_id);
+        return;
+      }
+    }
+  }
+
+  var sentDate = args.sent_date instanceof Date ? args.sent_date : new Date(args.sent_date);
+  var ymd = Utilities.formatDate(sentDate, 'UTC', 'yyyy-MM-dd');
+  var notes = 'Auto-filed from sent AI/Partner Poke draft. Subject: ' + (args.subject || '') +
+              '. Method=Email. Awaiting partner reply. Next Check-in Date intentionally blank — operator sets one after the reply lands.';
+
+  sheet.appendRow([
+    new Date().toISOString(),         // A: Submitted At
+    args.partner_id,                  // B: Partner ID
+    args.contributor_name || '',      // C: Contributor Name (contributor_contact_id)
+    ymd,                              // D: Check-in Date
+    'Email',                          // E: Method
+    'Unknown',                        // F: Stock Status (don't know yet)
+    '',                               // G: Restock Needed
+    '',                               // H: Restock Quantity
+    '',                               // I: Next Check-in Date (operator-driven, blank)
+    notes,                            // J: Notes
+    updateId,                         // K: Update ID (dedup key)
+    '',                               // L: Digital Signature (auto, unsigned)
+    'Partner Poke Scheduler v0.1',    // M: Submitted By
+    ''                                // N: Restock SKU
+  ]);
 }
 
 // ====================================================================
