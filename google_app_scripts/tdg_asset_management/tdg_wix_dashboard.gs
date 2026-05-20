@@ -469,6 +469,119 @@ function getTrueSightDAOEquityHoldings(ledgerUrls) {
 }
 
 /**
+ * Like getLedgerUrlsFromWix() but also retains the Shipment ID (column A) so
+ * downstream consumers can label each ledger's contribution. Returns
+ * `[{ ledger_id, url }, ...]`. Used by the /treasury page on truesight.me
+ * to render the per-AGL DAO-equity split inside the "USD Treasury Balance"
+ * breakdown.
+ *
+ * The original getLedgerUrlsFromWix() is left intact — its callers only need
+ * URLs and would break if the return shape changed.
+ */
+function getLedgerUrlsWithIdsFromWix() {
+  try {
+    var spreadsheet = SpreadsheetApp.openById(ledgerDocId);
+    var shipmentSheet = spreadsheet.getSheetByName("Shipment Ledger Listing");
+    if (!shipmentSheet) {
+      Logger.log("Error: 'Shipment Ledger Listing' sheet not found");
+      return [];
+    }
+    var lastRow = shipmentSheet.getLastRow();
+    if (lastRow < 2) return [];
+    var dataRange = shipmentSheet.getRange(2, 1, lastRow - 1, 28); // A to AB
+    var data = dataRange.getValues();
+    var ledgers = [];
+    var seenUrls = {};
+    for (var i = 0; i < data.length; i++) {
+      var row = data[i];
+      var shipmentId = row[0] ? row[0].toString().trim() : '';
+      var resolvedUrl = row[27] ? row[27].toString().trim() : '';
+      if (!resolvedUrl || !shipmentId || shipmentId === '0') continue;
+      if (seenUrls[resolvedUrl]) continue;
+      seenUrls[resolvedUrl] = true;
+      if (resolvedUrl.indexOf('docs.google.com/spreadsheets') === -1) continue;
+      ledgers.push({ ledger_id: shipmentId, url: resolvedUrl });
+    }
+    Logger.log("getLedgerUrlsWithIdsFromWix returning " + ledgers.length + " ledgers");
+    return ledgers;
+  } catch (e) {
+    Logger.log("Error in getLedgerUrlsWithIdsFromWix: " + e.message);
+    return [];
+  }
+}
+
+/**
+ * Like getTrueSightDAOEquityHoldings() but keyed by ledger_id so the caller
+ * can render a per-AGL split. Returns `[{ ledger_id, dao_equity_usd }, ...]`.
+ * Skips ledgers where no TrueSight DAO row exists or the balance is non-numeric.
+ *
+ * @param {Array<{ledger_id: string, url: string}>} ledgers
+ * @return {Array<{ledger_id: string, dao_equity_usd: number}>}
+ */
+function getTrueSightDAOEquityHoldingsWithIds(ledgers) {
+  var results = [];
+  ledgers.forEach(function (entry) {
+    var ledgerId = entry.ledger_id;
+    var url = entry.url;
+    var resolvedUrl = url;
+    if (!url.includes('docs.google.com/spreadsheets')) {
+      resolvedUrl = resolveRedirect(url);
+    }
+    if (!resolvedUrl || !resolvedUrl.includes('docs.google.com/spreadsheets')) return;
+    try {
+      var spreadsheet = SpreadsheetApp.openByUrl(resolvedUrl);
+      var balanceSheet = spreadsheet.getSheetByName("Balance");
+      if (!balanceSheet) return;
+      var data = balanceSheet.getDataRange().getValues();
+      for (var i = 0; i < data.length; i++) {
+        if (data[i][0] === "TrueSight DAO" && data[i][2] === "USD") {
+          var balance = data[i][1];
+          if (typeof balance === 'number' && !isNaN(balance)) {
+            results.push({ ledger_id: ledgerId, dao_equity_usd: balance });
+          }
+          break; // one DAO/USD row per ledger
+        }
+      }
+    } catch (e) {
+      Logger.log("Error reading equity for " + ledgerId + ": " + e.message);
+    }
+  });
+  return results;
+}
+
+/**
+ * Compute the structured breakdown of USD_TREASURY_BALANCE — the same three
+ * components used by updateUSD_TREASURY_BALANCE() (off_chain + usdt_vault +
+ * agl_equity), but emitted as JSON suitable for the truesight.me /treasury
+ * page. Exposed via doGet?type=treasury_breakdown.
+ *
+ * The per-ledger DAO equity is the TrueSight DAO line in each AGL's Balance
+ * sheet, NOT gross USD in that AGL — investor capital is intentionally
+ * excluded since it isn't owned by the DAO.
+ *
+ * @return {Object}
+ */
+function computeTreasuryBreakdown() {
+  var offChain = getOffChainAssetValue();
+  var usdtVault = getUSDTBalanceInVault();
+  var ledgers = getLedgerUrlsWithIdsFromWix();
+  var perLedger = getTrueSightDAOEquityHoldingsWithIds(ledgers);
+  perLedger.sort(function (a, b) { return (b.dao_equity_usd || 0) - (a.dao_equity_usd || 0); });
+  var aglEquityTotal = perLedger.reduce(function (s, e) { return s + (e.dao_equity_usd || 0); }, 0);
+  return {
+    off_chain_assets_usd: offChain,
+    usdt_vault_usd: usdtVault,
+    agl_equity: {
+      total_usd: aglEquityTotal,
+      per_ledger: perLedger
+    },
+    total_usd: offChain + usdtVault + aglEquityTotal,
+    formula: "off_chain_assets_usd + usdt_vault_usd + sum(agl_equity.per_ledger[].dao_equity_usd)",
+    note: "Per-ledger figures are TrueSight DAO's equity stake in each AGL (the TrueSight DAO row in that AGL's Balance sheet), not gross USD in the AGL. AGL investors' capital is intentionally excluded since it isn't owned by the DAO."
+  };
+}
+
+/**
  * Calculates the total investment holdings in AGL (USD) by summing TrueSight DAO equity holdings.
  * @return {number} Total USD value of TrueSight DAO holdings across all ledgers.
  */
@@ -1902,14 +2015,31 @@ function doGet(e) {
     if (type === 'monthly' || type === 'monthly-statistics') {
       // Return monthly statistics for charting
       var monthlyData = readMonthlyStatistics();
-      
+
       var response = {
         timestamp: new Date().toISOString(),
         data: monthlyData
       };
-      
+
       return ContentService
         .createTextOutput(JSON.stringify(response))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+
+    if (type === 'treasury_breakdown' || type === 'treasury-breakdown') {
+      // Structured breakdown of USD_TREASURY_BALANCE for the truesight.me
+      // /treasury page. Same three components used by
+      // updateUSD_TREASURY_BALANCE() — off-chain assets + USDT vault +
+      // per-AGL DAO equity holdings — so the page's totals always match
+      // the headline stat (no more "breakdown sums to a different number
+      // than the top-line" surprises).
+      var breakdown = computeTreasuryBreakdown();
+      var breakdownResponse = {
+        timestamp: new Date().toISOString(),
+        data: breakdown
+      };
+      return ContentService
+        .createTextOutput(JSON.stringify(breakdownResponse))
         .setMimeType(ContentService.MimeType.JSON);
     }
     
