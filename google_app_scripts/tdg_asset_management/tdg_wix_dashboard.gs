@@ -568,6 +568,17 @@ function computeTreasuryBreakdown() {
   var perLedger = getTrueSightDAOEquityHoldingsWithIds(ledgers);
   perLedger.sort(function (a, b) { return (b.dao_equity_usd || 0) - (a.dao_equity_usd || 0); });
   var aglEquityTotal = perLedger.reduce(function (s, e) { return s + (e.dao_equity_usd || 0); }, 0);
+  // ledger_urls dict — exposes the resolved Google Sheets URL for every
+  // ledger in Shipment Ledger Listing (not just the ones with DAO equity).
+  // Consumed by truesight.me /treasury and /aum pages to render each
+  // per-ledger row as a click-through to the underlying Balance sheet.
+  // Includes Main Ledger explicitly via env constant so /aum's "Main Ledger"
+  // row resolves too (it's not in Shipment Ledger Listing).
+  var ledgerUrls = {};
+  ledgers.forEach(function (l) {
+    if (l && l.ledger_id) ledgerUrls[l.ledger_id] = l.url;
+  });
+  ledgerUrls['Main Ledger'] = 'https://docs.google.com/spreadsheets/d/' + ledgerDocId + '/edit';
   return {
     off_chain_assets_usd: offChain,
     usdt_vault_usd: usdtVault,
@@ -576,6 +587,7 @@ function computeTreasuryBreakdown() {
       per_ledger: perLedger
     },
     total_usd: offChain + usdtVault + aglEquityTotal,
+    ledger_urls: ledgerUrls,
     formula: "off_chain_assets_usd + usdt_vault_usd + sum(agl_equity.per_ledger[].dao_equity_usd)",
     note: "Per-ledger figures are TrueSight DAO's equity stake in each AGL (the TrueSight DAO row in that AGL's Balance sheet), not gross USD in the AGL. AGL investors' capital is intentionally excluded since it isn't owned by the DAO."
   };
@@ -2097,7 +2109,12 @@ function doGet(e) {
       // compute only on a cold cache (first-ever request after deploy,
       // or after a manual cache invalidation), and warms the cache on
       // its way out so subsequent requests are fast again.
-      var cachedBreakdown = readCachedTreasuryBreakdown();
+      //
+      // Pass &refresh=1 to force a live recompute + cache overwrite
+      // (operator escape hatch when the cache schema changes and the
+      // existing payload is missing new fields).
+      var forceRefresh = (e.parameter.refresh === '1' || e.parameter.refresh === 'true');
+      var cachedBreakdown = forceRefresh ? null : readCachedTreasuryBreakdown();
       var fromCache = !!cachedBreakdown;
       var breakdown;
       if (cachedBreakdown) {
