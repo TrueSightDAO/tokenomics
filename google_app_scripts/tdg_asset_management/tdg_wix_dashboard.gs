@@ -2260,6 +2260,22 @@ function doGet(e) {
         .setMimeType(ContentService.MimeType.JSON);
     }
 
+    if (type === 'recalculate_aum') {
+      // Operator escape hatch: trigger calculateAUM() out-of-band AND
+      // overwrite the Performance Statistics 'AUM' cell (the same thing
+      // the cron does in its main update loop). Useful when a formula
+      // change (e.g. the Equity → Asset section refactor 2026-05-20)
+      // needs to land in the landing-page stat immediately.
+      var newAum = calculateAUM();
+      updatePerformanceStatistic("AUM", newAum, "USD");
+      return ContentService.createTextOutput(JSON.stringify({
+        timestamp: new Date().toISOString(),
+        triggered: 'calculateAUM + updatePerformanceStatistic',
+        aum: newAum,
+        note: 'Performance Statistics AUM cell + aum_breakdown cache both refreshed.'
+      }, null, 2)).setMimeType(ContentService.MimeType.JSON);
+    }
+
     if (type === 'aum_debug') {
       // Diagnostic: dump the first 20 rows of cols A..F of a given AGL's
       // Balance sheet so we can see the actual template layout. Use:
