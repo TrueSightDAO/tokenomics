@@ -189,8 +189,13 @@ function processPartnerCheckInsFromTelegramChatLogs() {
       }
 
       var partnerId = String(fields.partner_id || '').trim();
-      if (!partnerId) {
-        Logger.log('Partner check-in ' + updateId + ': missing partner_id; skipping.');
+      var contributorName = String(fields.contributor_name || '').trim();
+      // Accept either a partner_id (venue partner) OR a contributor_name
+      // (operator partner — DAO Partners rows with empty col A by convention,
+      // e.g. Wayne - UX.APP). Reject only if BOTH are missing, since we'd
+      // have nothing to join on downstream.
+      if (!partnerId && !contributorName) {
+        Logger.log('Partner check-in ' + updateId + ': missing both partner_id and contributor_name; skipping.');
         skipped++;
         continue;
       }
@@ -201,7 +206,7 @@ function processPartnerCheckInsFromTelegramChatLogs() {
       try {
         appendPartnerCheckInRow_({
           partner_id: partnerId,
-          contributor_name: String(fields.contributor_name || ''),
+          contributor_name: contributorName,
           check_in_date: String(fields.check_in_date || ''),
           method: String(fields.method || ''),
           stock_status: String(fields.stock_status || ''),
