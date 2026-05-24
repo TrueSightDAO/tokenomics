@@ -38,6 +38,8 @@ var STRIPE_CHECKOUT_SHEET_NAME = 'Stripe Social Media Checkout ID';
 /** Stripe checkout: Session ID column C, Shipping Provider column M, Tracking Number column N, Agroverse QR code column P (legacy); primary link is column Z of "Agroverse QR codes" */
 var QR_CODE_PARAM = 'qr_code';
 var EMAIL_ADDRESS_PARAM = 'email_address';
+var SUBSCRIBE_PARAM = 'subscribe';
+var NEWSLETTER_SUBSCRIBERS_SHEET_NAME = 'Agroverse News Letter Subscribers';
 var LIST_PARAM = 'list';
 var LIST_ALL_PARAM = 'list_all';
 var LIST_WITH_MEMBERS_PARAM = 'list_with_members';
@@ -327,12 +329,32 @@ function doGetWebLedger_(e) {
     sheet.getRange(rowIndex, 12).setValue(emailAddress);
     SpreadsheetApp.flush(); // Ensure the write is committed
 
+    // Optional newsletter opt-in: only when the visitor explicitly ticked the
+    // consent box on the landing page (&subscribe=true). Tree-update consent
+    // (Column L above) stays separate from marketing-list consent.
+    var addedToNewsletter = false;
+    var wantsNewsletter = String(e.parameter[SUBSCRIBE_PARAM] || '').toLowerCase();
+    if (wantsNewsletter === 'true' || wantsNewsletter === '1' || wantsNewsletter === 'yes') {
+      var newsletterSheet = spreadsheet.getSheetByName(NEWSLETTER_SUBSCRIBERS_SHEET_NAME);
+      if (newsletterSheet) {
+        var nowIso = new Date().toISOString();
+        // Columns: A Email | B Status | C Created Date | D Imported Date | E Source.
+        // Append one row per (email, QR) on purpose — send_newsletter.py dedupes
+        // recipients by email at send time, so duplicates never double-send; the
+        // duplicate rows are the per-QR attribution signal (COUNTIF on Column E).
+        newsletterSheet.appendRow([emailAddress, 'CONFIRMED', nowIso, nowIso, 'qr:' + qrCode]);
+        SpreadsheetApp.flush();
+        addedToNewsletter = true;
+      }
+    }
+
     // Return success response
     return createCORSResponse({
       status: 'success',
       message: 'Email address updated for QR code: ' + qrCode,
       email: emailAddress,
-      row: rowIndex
+      row: rowIndex,
+      subscribed: addedToNewsletter
     });
 
   } catch (error) {
