@@ -1,10 +1,17 @@
 /**
  * File: google_app_scripts/agroverse_qr_codes/qr_code_web_service.gs
  * Repository: https://github.com/TrueSightDAO/tokenomics
- * Apps Script editor:
- * https://script.google.com/home/projects/1slQVojn5P2wC7l5LdFesFT243afkZ2HQ9no9mciExl574VeOe3Wom2rW/edit
+ * Apps Script editor (live project):
+ * https://script.google.com/home/projects/1MnAsIQAxcSfZO_hALOtMFJ4y1k4OnqeXKMwYs6xev600rPNUYepqcXsT/edit
+ * (1slQVojn… is the DEPRECATED predecessor project — do not use.)
  *
- * Consolidated web service for the batch QR / Agroverse QR HTTP project (clasp script 1slQVojn…).
+ * NOTE: the live agroverse_shop QR-scan email-link (shipments/agl*/index.html
+ * LINK_EMAIL_API_URL → AKfycbxig…/exec) is served by web_app.gs on a SEPARATE
+ * project (1y6JVYwq…), NOT this consolidated service. The AKfycbxig… URL in the
+ * constants below is an inherited copy from the web_app.gs merge; this file's own
+ * public deployment is the "Batch / DApp" one (AKfycbySJ86…) listed below.
+ *
+ * Consolidated web service for the batch QR / Agroverse QR HTTP project (clasp script 1MnAsIQ…).
  * Merges former web_app.gs + qr_code_generator.gs + subscription_notification.gs into one global scope
  * so duplicate identifiers and competing doGet handlers are avoided.
  *

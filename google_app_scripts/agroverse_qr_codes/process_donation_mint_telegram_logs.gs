@@ -1,8 +1,8 @@
 /**
  * File: google_app_scripts/agroverse_qr_codes/process_donation_mint_telegram_logs.gs
  * Repository: https://github.com/TrueSightDAO/tokenomics
- * Apps Script editor:
- * https://script.google.com/home/projects/1slQVojn5P2wC7l5LdFesFT243afkZ2HQ9no9mciExl574VeOe3Wom2rW/edit
+ * Apps Script editor (live project; 1slQVojn… is the DEPRECATED predecessor):
+ * https://script.google.com/home/projects/1MnAsIQAxcSfZO_hALOtMFJ4y1k4OnqeXKMwYs6xev600rPNUYepqcXsT/edit
  *
  * Description: Async scanner for `[DONATION MINT EVENT]` rows on the canonical
  *   **Telegram Chat Logs** intake (`1qbZZhf-_7xzmDTriaJVWj6OZshyQsFkdsAV8-pyzASQ`).
