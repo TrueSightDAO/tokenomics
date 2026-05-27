@@ -35,7 +35,7 @@ var WARMUP_HOSTS_CIRCLES_HEADER = 'Hosts Circles';
  * Returns drafts grouped by label so the DApp can render tabs without
  * multiple API calls. One bulk read, one GmailApp.getDrafts() call.
  */
-function getWarmupReviewQueue_(optLabel) {
+function getWarmupReviewQueue_(optLabel, optWithBodies) {
   var ss = SpreadsheetApp.openById(HIT_LIST_SPREADSHEET_ID);
   var draftsSh = getSheetSafe_(ss, SHEET_EMAIL_DRAFTS);
   if (!draftsSh) {
@@ -74,7 +74,10 @@ function getWarmupReviewQueue_(optLabel) {
   var hasLiveDrafts = Object.keys(liveDraftIds).length > 0;
 
   // Build full-body lookup from live Gmail drafts (keyed by draft id).
-  var fullBodyByDraftId = hasLiveDrafts ? warmupBuildFullBodyMap_() : {};
+  // This is an N+1 Gmail-API fetch (getPlainBody per draft) — the dominant cost
+  // (~37s). Skip it unless explicitly requested; callers/UI fall back to the
+  // 500-char body_preview already stored in the sheet.
+  var fullBodyByDraftId = (optWithBodies === true && hasLiveDrafts) ? warmupBuildFullBodyMap_() : {};
   // Build prospect reply lookup from DApp Remarks (keyed by shop name lower).
   var prospectReplies = warmupBuildProspectReplyMap_(ss);
 

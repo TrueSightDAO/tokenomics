@@ -844,7 +844,11 @@ function doGet(e) {
       //   AI/Follow-up (manager follow-ups to replied prospects)
       // Implementation: warmup_review_api.gs (clasp_mirrors/.../WarmupReviewApi.gs).
       var lbl = (e.parameter.label || '').toString();
-      return success_(getWarmupReviewQueue_(lbl));
+      // Full Gmail bodies are an N+1 Gmail-API fetch (~37s) — opt-in only via
+      // ?withBodies=true. Default (page + notification badge) returns fast on the
+      // 500-char body_preview from the sheet; warmup_review.html falls back to it.
+      var withBodies = String(e.parameter.withBodies || '').toLowerCase() === 'true';
+      return success_(getWarmupReviewQueue_(lbl, withBodies));
     }
 
     if (action === 'apply_warmup_send') {
