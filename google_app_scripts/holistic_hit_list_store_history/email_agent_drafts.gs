@@ -61,19 +61,10 @@ var SUGG_HEADERS = [
   'notes',
 ];
 
-/**
- * Optional menu when this script is **container-bound** to the Hit List spreadsheet.
- * For standalone projects, run `runManagerFollowupDrafts` / `runBulkInfoDraftsWithPdf` from the IDE.
- */
-function onOpen() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  if (!ss) return;
-  ss.addMenu('Email Agent drafts', [
-    { name: 'Run Manager Follow-up drafts (no PDF)', functionName: 'runManagerFollowupDrafts' },
-    { name: 'Run Bulk Info Requested drafts (with PDF)', functionName: 'runBulkInfoDraftsWithPdf' },
-    { name: 'Run both (Manager then Bulk)', functionName: 'runAllEmailAgentDrafts' },
-  ]);
-}
+// NOTE: onOpen() lives once in partner_poke_drafts.gs and builds BOTH the Partner
+// Poke and Email Agent menus. GAS shares one global namespace across files, so a
+// second onOpen() here would be a duplicate definition and break the whole web app
+// ("Script function not found"). Do not re-add onOpen() in this file.
 
 function runAllEmailAgentDrafts() {
   runManagerFollowupDrafts();
@@ -262,14 +253,8 @@ function withTrackingLogoFooterHtml_(plainBody, baseUrl, suggestionId) {
   );
 }
 
-function escapeHtml_(s) {
-  return String(s)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
+// escapeHtml_() is defined once in partner_poke_drafts.gs (null-safe version) and is
+// global across the project — removed here to avoid a duplicate-definition compile error.
 
 function loadHitListTargets_(sheet, wantStatus) {
   var values = sheet.getDataRange().getValues();
@@ -478,14 +463,8 @@ function bodyTemplateBulk_(shop, threadExcerpts) {
   );
 }
 
-function headerMap_(headerRow) {
-  var m = {};
-  for (var i = 0; i < headerRow.length; i++) {
-    var h = String(headerRow[i] || '').trim();
-    if (h) m[h] = i;
-  }
-  return m;
-}
+// headerMap_() is defined once in store_interaction_history_api.gs and is global across
+// the project — removed here to avoid a duplicate-definition compile error.
 
 function normalizeEmail_(v) {
   var s = String(v || '').trim().toLowerCase();
