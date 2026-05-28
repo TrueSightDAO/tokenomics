@@ -13,10 +13,24 @@
       "scriptId": "1Og2g8Q0_SdM9A5mJNO-tq_9r8XMQ00ybBmss4L3tItBAJ01-KdM-w40c",
       "owner_email": "admin@truesight.me",
       "deployments": {
-        "head": "TBC — list every /exec URL for this scriptId in pre-flight"
+        "head": "TBC — list every /exec URL for this scriptId in pre-flight",
+        "probe_d10xMbcg": {
+          "url": "https://script.google.com/macros/s/AKfycbz5Tt_vz1X26i82yqlGUSI_OtCUEO31jImZH2tXfNaxMbfmJ01dkwUIEZDjsnd10xMbcg/exec",
+          "status_code": 200,
+          "final_url": "https://script.googleusercontent.com/macros/echo?user_content_key=AUkAhnRoeHeSqM8QWASY5hcseHpMEpDEw_7hpsHQYpfRQOy9uESzAhc631B1AlK84WebDZ-H4DwZv9pUgfF4u8k40PiMXgLSrl6QSWVXcgjdTRSGZ0D-D_Sn74dXq4Eois7uHHbSASIdh1PujgesD9qzJTgz1hxR2H2e8AWl9A8kpTND0_-i1YKsL6WA_b6LlFrZIsVnvFsPgCizBTBOB12ICKejtWV_ZPEp92L3_9eo5sa2C969bfge5_OrNILjlvGG74rMsv-Kt-2XvYmMtf-rfiApCXV2ig&lib=MzDEDtck1RZ95zmAHWqW3kI7EDSP_SR0z",
+          "content_type": "application/json; charset=utf-8",
+          "body_peek": "{\"status\":\"error\",\"message\":\"Invalid or missing action parameter. Available actions: list_managers, get_inventory, get_partner_check_ins, list_partners_needing_attention, list_partner_contributors, calculate_shipping\"}",
+          "probed_at": "2026-05-28T21:48:06.849418+00:00"
+        }
       },
       "post_push_hooks": [],
-      "consumer_callers": [],
+      "consumer_callers": [
+        "agentic_ai_context/AGROVERSE_PARTNER_ADDRESSES.md",
+        "dapp/partner_check_in.html",
+        "dapp/restock_recommender.html",
+        "dapp/routes.js",
+        "dapp/shipping_planner.html"
+      ],
       "source_files": [
         "shipping_planner_api.gs"
       ],

@@ -13,10 +13,27 @@
       "scriptId": "1QtK-InsHH6SBtxoxc33-y4vQvuNkbhlkUi_9S1X-AaEgIlSlygM1iZtP",
       "owner_email": "admin@truesight.me",
       "deployments": {
-        "head": "TBC — list every /exec URL for this scriptId in pre-flight"
+        "head": "TBC — list every /exec URL for this scriptId in pre-flight",
+        "probe_kmJtz7xV": {
+          "url": "https://script.google.com/macros/s/AKfycbztpV3TUIRn3ftNW1aGHAKw32OBJrp_p1Pr9mMAttoyWFZyQgBRPU2T6eGhkmJtz7xV/exec",
+          "status_code": 200,
+          "final_url": "https://script.googleusercontent.com/macros/echo?user_content_key=AUkAhnRnf7eC2TisLSQJ-g0DJsLB1cy-SMPcS62v_IsiZCqjCkVdfB08rks7SXJ5yu40xbaxmSaiJHnWsmk65bDZrOuDTTcljyW3Swc-CHdi1cmTto5jJuRwMl1m-6NUR0raHFPlRG6N117opJbAo3bAtu9PmmGKkBHUNHPg40DGU3q5lshS3oAsP9cw4PFaMVTkRgwgapIokmrA6VNLIwaqKBm_d0qx2PY3TIVRk4Ol7BjlixFhn2fzx_URvx_lz6CDTiHJZ61tIOzpECuqd6iCL3ibGMjjJg&lib=MbblptWLBOlRcifutr1o0x7Celqghh4iM",
+          "content_type": "application/json; charset=utf-8",
+          "body_peek": "{\"error\":\"Please specify ?list=true to list managers, ?manager=<key> to get assets, ?recipients=true to list recipients, ?ledgers=true to list ledgers, or ?all_currencies=true to list all currencies.\"}",
+          "probed_at": "2026-05-28T21:48:19.174681+00:00"
+        }
       },
       "post_push_hooks": [],
-      "consumer_callers": [],
+      "consumer_callers": [
+        "dapp/currency_conversion.html",
+        "dapp/repackaging_planner.html",
+        "dapp/report_capital_injection.html",
+        "dapp/report_contribution.html",
+        "dapp/report_dao_expenses.html",
+        "dapp/report_inventory_movement.html",
+        "dapp/routes.js",
+        "dapp/view_inventory_holdings.html"
+      ],
       "source_files": [
         "Version.gs",
         "web_app.gs"
@@ -28,7 +45,15 @@
       "scriptId": "1dsWecVwbN0dOvilIz9r8DNt7LD3Ay13V8G9qliow4tZtF5LHsvQOFpF7",
       "owner_email": "admin@truesight.me",
       "deployments": {
-        "head": "TBC — list every /exec URL for this scriptId in pre-flight"
+        "head": "TBC — list every /exec URL for this scriptId in pre-flight",
+        "probe_JhZ5uAxq": {
+          "url": "https://script.google.com/macros/s/AKfycbzc15gptNmn8Pm726cfeXDnBxbxZ1L31MN6bkfBH7ziiz4gxl87vJXEhAAJJhZ5uAxq/exec",
+          "status_code": 200,
+          "final_url": "https://script.googleusercontent.com/macros/echo?user_content_key=AUkAhnREwAxjzMVClNhimvcwv0lPMTkrzshJXpmWpvug6Rg3cQPyCGMHk2pWlbm1GpxuLpo8IPpafyaurqRxD3gKPCMfW1OOMyhCKd4IPKc0sr8ICIYJPV4dTu4QieS0KKo2p7GA-y9ktHtkJAP511U0PBLStwXPKQGncNLEkYcuCPFyXbZom_7p_aESQQNv6FtXx0N7Oefw7QDw2g_TCW681Jjun2fCJIhZDG1t0oG43PYDbpYxz_OcxGBUwbIoz_dbXyvb5b_lVPKYu1lPumeJgwXzqzeZgg&lib=MqAz_LTy3Nm39eyqGWlAh8rCelqghh4iM",
+          "content_type": "text/plain; charset=utf-8",
+          "body_peek": "ℹ️ No valid action specified",
+          "probed_at": "2026-05-28T21:48:14.613962+00:00"
+        }
       },
       "post_push_hooks": [],
       "consumer_callers": [],
@@ -56,7 +81,15 @@
       "scriptId": "1wONDeDwZ_fXNapDKpstWrBION3aV3r7NXwq7PCdqbW1LvI5ceaykQNbR",
       "owner_email": "admin@truesight.me",
       "deployments": {
-        "head": "TBC — list every /exec URL for this scriptId in pre-flight"
+        "head": "TBC — list every /exec URL for this scriptId in pre-flight",
+        "probe_M0usmSJ1": {
+          "url": "https://script.google.com/macros/s/AKfycbzECOd1Y3mH7L0zU8hOC4AxQctYICX0Ws8j2-Md1dWg0k3GFGQx_4Cf7n-CM0usmSJ1/exec",
+          "status_code": 200,
+          "final_url": "https://script.googleusercontent.com/macros/echo?user_content_key=AUkAhnQ7q3F4M8fCUARzLvzHVGP2Sq6fGDIZE0dVDFO_LdSTd2vlgA6x2BkprWvr877VluIXkkx2tNczMmfhbOqYAwZwvwd3SyufIfaDndAYA0U2SqBH7HoN1KG-8pom0BqtSyQ5tjYpkZ5NO6nzl_nMG2IQjZyHB8gn7FpF_U35AX_Z3lJqg-D0k7eeYzzfrwG0Ywu1FOnl40Z0P63s873VwuzuT_IGWv27OmJdvQcfcHZBcsOkcA1Pz4uO2KBdRLe6pdiuz1lSDojnMzExcQvVkvilPRsXCA&lib=Mw-UGYgCuk3CD8c6q32PJPY7EDSP_SR0z",
+          "content_type": "text/plain; charset=utf-8",
+          "body_peek": "ℹ️ No valid action specified. Use ?action=processTelegramChatLogs or ?action=processInventoryMovementToLedgers",
+          "probed_at": "2026-05-28T21:48:08.178635+00:00"
+        }
       },
       "post_push_hooks": [],
       "consumer_callers": [],
@@ -70,7 +103,23 @@
       "scriptId": "1wmgYPwfRDxpiboa8OH-C6Ndovklf8HaJY305n7dhRzs7BmUBQg7fL_sZ",
       "owner_email": "admin@truesight.me",
       "deployments": {
-        "head": "TBC — list every /exec URL for this scriptId in pre-flight"
+        "head": "TBC — list every /exec URL for this scriptId in pre-flight",
+        "probe_hrnbSXdQ": {
+          "url": "https://script.google.com/macros/s/AKfycbyBmjwmFhR8nQ5ZCtdqQwr-OgC5-htdFnMeXOKLD-Z-NWvNpLGvi7nPbMQVvnhrnbSXdQ/exec",
+          "status_code": 200,
+          "final_url": "https://script.googleusercontent.com/macros/echo?user_content_key=AUkAhnQbU21BkURDUlRLTDHlK2BsACpzY2Xellf5vimPLQSIjEASKWLArlXRXd7P6yAguR4TOKErx6Ifnv-YKdTWkcN_mKqYeswyJD5RJB-Fy1eL0XNZZiaY9fsdF1af4AUf_czVRbfzJIjGNmiqfxdxrjtpnGADUrDutVxrfcCx8NczZn2WM4CVBlqFEbXxR3juz4lISf4PeBkNZf_4TLuCLxhtO5qmZcvO0rIbk5K9x4o7P6kvgd1uTRYT_sPLpF3-_EoJSvCLCzA2PZFvxPYnzUmZvhtKVw&lib=MLogN0fBre8_vewQCW-8NTY7EDSP_SR0z",
+          "content_type": "application/json; charset=utf-8",
+          "body_peek": "{\"ok\":true,\"service\":\"treasury-cache-publisher\",\"schema_version\":1,\"hint\":\"GET ?action=publish&token=<secret>&trigger=movement|cron|manual to regenerate and commit the treasury snapshot.\"}",
+          "probed_at": "2026-05-28T21:48:00.298443+00:00"
+        },
+        "probe_IgMggWGA": {
+          "url": "https://script.google.com/macros/s/AKfycbyVeNZdBngZodsyDzPQS1yUGYaaaDUd3DwbFx05KsOs9vwAtAFQoV1I5qf_B6IgMggWGA/exec",
+          "status_code": 200,
+          "final_url": "https://script.googleusercontent.com/macros/echo?user_content_key=AUkAhnRJi60dg1qVqhOEgSLK8eIe2p9GYebzHUFZNqpl9EVG6rJSXwhYZXnzdpHpAjWY58613rLJDbHe79atngOwyKDtgbrRXjFduagdIGI9V9yfIt-dG8weaIPZAkP2MSUNiZhJ-J5reewIChjGmHG0TqTwiYmSPzZkOvLtaTHvNYpZvW_wgb4E7-JzKy8e2mH0jnN-i-qFtLKQ5u4YLWYsDcmLU0wlzkN2WPOPecBbpDTb3BM_thnfdstgR51Bge9TvVytDy2_THH5ghxi3B6SNJu0nJMn9w&lib=MXxnzKMldaXaV3jt__6nn2I7EDSP_SR0z",
+          "content_type": "text/plain; charset=utf-8",
+          "body_peek": "ℹ️ No valid action specified",
+          "probed_at": "2026-05-28T21:48:03.525491+00:00"
+        }
       },
       "post_push_hooks": [],
       "consumer_callers": [],

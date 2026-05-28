@@ -13,7 +13,15 @@
       "scriptId": "10NKp8uLMGyfgDv0ByakHVGioOYzvDV7NbHMSBigB2TCVcY7aqYXhbywv",
       "owner_email": "admin@truesight.me",
       "deployments": {
-        "head": "TBC — list every /exec URL for this scriptId in pre-flight"
+        "head": "TBC — list every /exec URL for this scriptId in pre-flight",
+        "probe_NaigOk60": {
+          "url": "https://script.google.com/macros/s/AKfycbwlh2u-SktykzL6S_qamE2rQVd-G_3uSd3GhJ_8KI5b2e8oVuMYxXA5UfJ-NaigOk60/exec",
+          "status_code": 200,
+          "final_url": "https://script.googleusercontent.com/macros/echo?user_content_key=AUkAhnRUyofdJ7cnHuaDFWGCf3bJqAGlnI9k27PEtNBl2KgbUd5uMZ-qDYllDjesifhVF2nuqWOVaTLbfnefmBpQCdC0pSMajpz3Mxt93MAGJvJF1FDQt3bMgD3mSP0gafu0Ryki-dxvzm3Mn0-urhs0qngKQ_7ASeMIhytgxd_BuuxXSatKMLdQ2jpwr5UqWn1u-U-A_pqyfJbohLj0UHkkpFZKzWfrP407owiJkhz1STf-iPLwGOxwxy-r1OJ5OsWuR6lKcqih32HAwOfMvkpKobc_uEKDYQ&lib=MI5pefXjuknrwsqhSDyq_orCelqghh4iM",
+          "content_type": "application/json; charset=utf-8",
+          "body_peek": "{\"ok\":false,\"error\":\"No valid action (use action=sendEmailVerification or action=processDigitalSignatureEvents on GET, or POST JSON for email verification).\"}",
+          "probed_at": "2026-05-28T21:47:52.167487+00:00"
+        }
       },
       "post_push_hooks": [],
       "consumer_callers": [],
@@ -41,7 +49,15 @@
       "scriptId": "1zKgMwd6KJFjoWkRH6OobgFvtVzrXVuEKfxVbgixgnfcp4TZTjrsfNKq0",
       "owner_email": "admin@truesight.me",
       "deployments": {
-        "head": "TBC — list every /exec URL for this scriptId in pre-flight"
+        "head": "TBC — list every /exec URL for this scriptId in pre-flight",
+        "probe_v5lN6sLQ": {
+          "url": "https://script.google.com/macros/s/AKfycbwbtBlxkK0TzwLGnwUNQ_INfvLFvTRli-31r-b51Tnx4c-xlwMoqwT5sKFmfZv5lN6sLQ/exec",
+          "status_code": 200,
+          "final_url": "https://script.google.com/macros/s/AKfycbwbtBlxkK0TzwLGnwUNQ_INfvLFvTRli-31r-b51Tnx4c-xlwMoqwT5sKFmfZv5lN6sLQ/exec",
+          "content_type": "text/html; charset=utf-8",
+          "body_peek": "<!DOCTYPE html><html><head><link rel=\"shortcut icon\" href=\"//ssl.gstatic.com/docs/script/images/favicon.ico\"><title>Error</title><style type=\"text/css\" nonce=\"ISq_Fti_mrtGNrY7d4rf1A\">body {background-color: #fff; margin: 0; padding: 0;}.err",
+          "probed_at": "2026-05-28T21:47:51.062582+00:00"
+        }
       },
       "post_push_hooks": [],
       "consumer_callers": [],

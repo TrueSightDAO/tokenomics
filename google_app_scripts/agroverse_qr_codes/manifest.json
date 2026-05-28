@@ -13,10 +13,68 @@
       "scriptId": "1MnAsIQAxcSfZO_hALOtMFJ4y1k4OnqeXKMwYs6xev600rPNUYepqcXsT",
       "owner_email": "admin@truesight.me",
       "deployments": {
-        "head": "TBC — list every /exec URL for this scriptId in pre-flight"
+        "head": "TBC — list every /exec URL for this scriptId in pre-flight",
+        "probe_edZzzgaL": {
+          "url": "https://script.google.com/macros/s/AKfycbxigq4-J0izShubqIC5k6Z7fgNRyVJLakfQ34HPuENiSpxuCG-wSq0g-wOAedZzzgaL/exec",
+          "status_code": 200,
+          "final_url": "https://script.googleusercontent.com/macros/echo?user_content_key=AUkAhnQ_4VtpPXVgYZGF8-g_cCyWz3JnR4rpFSoXKLOw1JJIVBuHk92BF4EDEYcpcyEEGTForgskvUj6E3E81Vo6XMoZZL7iUI2XI2nudUB0MO1DvZmNZmn0Y31oI6rMdPq_3so2RWIv4a5-kO3ifNyS9dDQ224dK9Q2Q6x_OJH6naA4jl7lkUpuPe94cwQkkGrIvyNT6A2JtavrgiFeXCyXphjJ0VJzCi40mR_4FHgW6cMO-EaxwwDN4jI4QGVOGqK5aigz1eNMsyiQKnrC3fWQy62lYd4xmg&lib=MOt28r4W1MN_dSTd1czEvgrCelqghh4iM",
+          "content_type": "application/json; charset=utf-8",
+          "body_peek": "{\"status\":\"error\",\"message\":\"Missing required parameters: qr_code and email_address\",\"example\":\"https://script.google.com/macros/s/AKfycbxigq4-J0izShubqIC5k6Z7fgNRyVJLakfQ34HPuENiSpxuCG-wSq0g-wOAedZzzgaL/exec?qr_code=2025BF_20250521_PROPANE",
+          "probed_at": "2026-05-28T21:47:57.533629+00:00"
+        },
+        "probe_ICHoJo1z": {
+          "url": "https://script.google.com/macros/s/AKfycbySJ86OcVsk5gETTiJ-CY-zBZGHAQoZ8yVW-buxXMjOI9eEc3HP7AicHhtNICHoJo1z/exec",
+          "status_code": 200,
+          "final_url": "https://script.googleusercontent.com/macros/echo?user_content_key=AUkAhnRhV-6XeU139nX1WF8bP1ja4-BFH8OpMfGTfWhBxl9_1DkKESXLxVg26T0HIW9QEYqEXzUNh3rmJvOmdfoXXmvPIySyzGz7SQTlYo6JwfAFlp7P2SyHzRVhMP63mFPj-N3P3AnfFDub3nOi77Hict17K6OhUFtAwpxgoCQnJUnCfN-1mRVPL_wcql7kKQOv5g5af8pB56pyhyUtgZEjMYodZePs92T_k9dc_n-ehB7MPT8o_3LsrJoKm-uwKxT-KY_EBjWhK3fG7ZIsSrD38TbewImHQg&lib=MMXdatZgL_VlblUkp0jGin7Celqghh4iM",
+          "content_type": "application/json; charset=utf-8",
+          "body_peek": "{\"status\":\"error\",\"message\":\"Missing required parameter: product_name for generate action\"}",
+          "probed_at": "2026-05-28T21:48:01.713628+00:00"
+        },
+        "probe__eCsvVs7": {
+          "url": "https://script.google.com/macros/s/AKfycbygmwRbyqse-dpCYMco0rb93NSgg-Jc1QIw7kUiBM7CZK6jnWnMB5DEjdoX_eCsvVs7/exec",
+          "status_code": 200,
+          "final_url": "https://script.googleusercontent.com/macros/echo?user_content_key=AUkAhnTcXwfZb1LuEikpcywHBDJAdd2XBvtrhVsJi3ioLGtfFjHU39hvIjyoES_UdpHVMk-ZjpaxGUfLvDPN1vhFCazMHqViIgzQdqiFpBP5h3bTIaHeG3J6RV2P3egy9RYnssWKPcXrQcuSHP_1JOLgBPf4EpJbM41p1SfIqXUF2bVhc0M4v8cifzbOvhoSVgMX3n1PhR_Zf2qBoawNkdePBiAS3LmiZMAReZhRKkgDZwCyu4ZuUCNLkMNtjsZnl4yQU_W-NbhDlWpDMwY_T-14HJWq0O0mow&lib=MU4uDppWdwiqizy6J7uUdW7Celqghh4iM",
+          "content_type": "application/json; charset=utf-8",
+          "body_peek": "{\"error\":\"Signature parameter missing\"}",
+          "probed_at": "2026-05-28T21:48:05.415638+00:00"
+        }
       },
       "post_push_hooks": [],
-      "consumer_callers": [],
+      "consumer_callers": [
+        "agentic_ai_context/NOTES_dapp.md",
+        "agentic_ai_context/notes/claude_serialized_qr_sales_2026-04-29.md",
+        "agroverse_shop/shipments/agl0/index.html",
+        "agroverse_shop/shipments/agl1/index.html",
+        "agroverse_shop/shipments/agl10/index.html",
+        "agroverse_shop/shipments/agl13/index.html",
+        "agroverse_shop/shipments/agl14/index.html",
+        "agroverse_shop/shipments/agl2/index.html",
+        "agroverse_shop/shipments/agl4/index.html",
+        "agroverse_shop/shipments/agl5/index.html",
+        "agroverse_shop/shipments/agl6/index.html",
+        "agroverse_shop/shipments/agl7/index.html",
+        "agroverse_shop/shipments/agl8/index.html",
+        "agroverse_shop/sunmint-pledge/index.html",
+        "dapp/batch_qr_generator.html",
+        "dapp/create_proposal.html",
+        "dapp/notarize.html",
+        "dapp/register_farm.html",
+        "dapp/repackaging_planner.html",
+        "dapp/report_inventory_movement.html",
+        "dapp/report_sales.html",
+        "dapp/report_tree_planting.html",
+        "dapp/review_proposal.html",
+        "dapp/routes.js",
+        "dapp/scanner.html",
+        "dapp/store_interaction_history.html",
+        "dapp/stores_nearby.html",
+        "dapp/submit_feedback.html",
+        "dapp/tdg_balance.js",
+        "dapp/update_qr_code.html",
+        "dapp/verify_request.html",
+        "dapp/view_inventory_holdings.html",
+        "dapp/withdraw_voting_rights.html"
+      ],
       "source_files": [
         "process_donation_mint_telegram_logs.gs",
         "qr_code_web_service.gs"
