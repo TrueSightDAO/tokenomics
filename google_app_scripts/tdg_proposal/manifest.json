@@ -1,0 +1,31 @@
+{
+  "thematic_folder": "tdg_proposal",
+  "audit_metadata": {
+    "generated_at": "2026-05-28",
+    "generated_by": "PR-1 manifest-convention sweep",
+    "completeness": "audit-derived; PR-1 captures only what is in source comments. Pre-flight checklist (roadmap §4) must be resolved before promoting to v1.",
+    "schema_version": "v0-audit"
+  },
+  "project_count": 1,
+  "projects": [
+    {
+      "name": "TBC — confirm display name in GAS UI for 1Dh_QQUn8hGG…",
+      "scriptId": "1Dh_QQUn8hGGo75RsPpsN-GMn-uFgw-akwyv3uSZgO140J3NfQzsnuu9s",
+      "owner_email": "admin@truesight.me",
+      "deployments": {
+        "head": "TBC — list every /exec URL for this scriptId in pre-flight"
+      },
+      "post_push_hooks": [],
+      "consumer_callers": [],
+      "source_files": [
+        "proposal_manager.gs"
+      ],
+      "notes": "Audit-derived from in-source header-comment scriptIds on 2026-05-28. Pre-flight checklist (TOKENOMICS_GAS_RESTRUCTURE_PLAN.md §4) must resolve: full deployments list, post-push cache-refresh hooks, confirmed owner_email, consumer callers."
+    }
+  ],
+  "files_without_scriptid": [],
+  "exec_urls_seen_in_folder_sources": [
+    "https://script.google.com/macros/s/AKfycbzgNstwRX1dWo17Dxny0t1ipJ6yLX02bTD_cKRuHr5RPJPemNVTj25mFhKo4UmR5Z7BIg/exec"
+  ],
+  "see_also": "agentic_ai_context/TOKENOMICS_GAS_RESTRUCTURE_PLAN.md"
+}
