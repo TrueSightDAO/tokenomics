@@ -402,6 +402,19 @@ function parseAndProcessCredentialingLogs() {
     }
   }
   Logger.log('📊 Credentialing parse: ' + newRows + ' new, ' + failedRows + ' failed');
+
+  // Auto-backfill: after processing new rows, also fix any existing rows
+  // that have empty Payload JSON (col M). This catches events that were
+  // committed before the balanced-brace parser fallback was deployed on
+  // 2026-05-16. Idempotent — skips rows that already have a payload.
+  try {
+    var backfillResult = reprocessAllRowsWithEmptyPayload({ force: false });
+    if (backfillResult.reprocessed > 0) {
+      Logger.log('🔁 Auto-backfill fixed ' + backfillResult.reprocessed + ' rows with empty payload');
+    }
+  } catch (e) {
+    Logger.log('⚠️ Auto-backfill error (non-fatal): ' + e.message);
+  }
 }
 
 function processOnePracticeEvent(intake, telegramRow, message) {
