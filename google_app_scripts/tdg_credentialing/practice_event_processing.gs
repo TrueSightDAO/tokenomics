@@ -402,6 +402,19 @@ function parseAndProcessCredentialingLogs() {
     }
   }
   Logger.log('📊 Credentialing parse: ' + newRows + ' new, ' + failedRows + ' failed');
+
+  // Auto-backfill: after processing new rows, also fix any existing rows
+  // that have empty Payload JSON (col M). This catches events that were
+  // committed before the balanced-brace parser fallback was deployed on
+  // 2026-05-16. Idempotent — skips rows that already have a payload.
+  try {
+    var backfillResult = reprocessAllRowsWithEmptyPayload({ force: false });
+    if (backfillResult.reprocessed > 0) {
+      Logger.log('🔁 Auto-backfill fixed ' + backfillResult.reprocessed + ' rows with empty payload');
+    }
+  } catch (e) {
+    Logger.log('⚠️ Auto-backfill error (non-fatal): ' + e.message);
+  }
 }
 
 function processOnePracticeEvent(intake, telegramRow, message) {
@@ -496,72 +509,15 @@ function listTriggers() {
 }
 
 /**
- * doGet — webhook entry. Triggered by Edgar's trigger_immediate_processing
- * branch for [PRACTICE EVENT] submissions, so processing happens in seconds
- * instead of waiting for the 10-min cron.
+ * doGet is defined in program_admin_endpoint.gs (the combined dispatcher).
+ * See that file for the full action routing table.
  *
- * URL shape:
- *   https://script.google.com/macros/s/<deployment>/exec?action=parseAndProcessCredentialingLogs
- *   https://script.google.com/macros/s/<deployment>/exec?action=installTimeTrigger
- *   https://script.google.com/macros/s/<deployment>/exec?action=reprocessAllRowsWithEmptyPayload
- *   https://script.google.com/macros/s/<deployment>/exec?action=reprocessCredentialingRow&row=5
+ * Actions from this file:
+ *   parseAndProcessCredentialingLogs
+ *   installTimeTrigger
+ *   reprocessAllRowsWithEmptyPayload
+ *   reprocessCredentialingRow&row=N
  */
-function doGet(e) {
-  var action = (e && e.parameter && e.parameter.action) || '';
-  Logger.log('doGet called with action: ' + (action || 'none'));
-
-  if (action === 'parseAndProcessCredentialingLogs') {
-    try {
-      parseAndProcessCredentialingLogs();
-      return ContentService.createTextOutput('✅ Credentialing logs processed.').setMimeType(ContentService.MimeType.TEXT);
-    } catch (err) {
-      Logger.log('❌ ' + err.message);
-      return ContentService.createTextOutput('❌ Error: ' + err.message).setMimeType(ContentService.MimeType.TEXT);
-    }
-  }
-
-  if (action === 'installTimeTrigger') {
-    return ContentService.createTextOutput(JSON.stringify(installTimeTrigger(), null, 2)).setMimeType(ContentService.MimeType.JSON);
-  }
-
-  // Backfill: re-parse + re-commit every PROCESSED row whose col M (Payload
-  // JSON) is empty. Use after pulling the balanced-brace parser fallback
-  // shipped 2026-05-16. Operator can curl the URL directly OR click it from
-  // a browser tab; returns a JSON summary.
-  if (action === 'reprocessAllRowsWithEmptyPayload') {
-    try {
-      var force = String((e && e.parameter && e.parameter.force) || '') === '1';
-      var summary = reprocessAllRowsWithEmptyPayload({ force: force });
-      return ContentService.createTextOutput(JSON.stringify(summary, null, 2)).setMimeType(ContentService.MimeType.JSON);
-    } catch (err) {
-      Logger.log('❌ reprocessAllRowsWithEmptyPayload error: ' + err.message);
-      return ContentService.createTextOutput(JSON.stringify({ ok: false, error: err.message })).setMimeType(ContentService.MimeType.JSON);
-    }
-  }
-
-  // Backfill a single row by number — useful for spot-fixes (e.g. when a
-  // newer parser bug surfaces and the operator wants to retry just one row).
-  if (action === 'reprocessCredentialingRow') {
-    var rowParam = (e && e.parameter && e.parameter.row) || '';
-    var rowNumber = parseInt(rowParam, 10);
-    if (!rowNumber || rowNumber < 2) {
-      return ContentService.createTextOutput(JSON.stringify({ ok: false, error: 'Missing or invalid &row=N (N must be >= 2)' })).setMimeType(ContentService.MimeType.JSON);
-    }
-    try {
-      var result = reprocessCredentialingRow(rowNumber);
-      return ContentService.createTextOutput(JSON.stringify(result, null, 2)).setMimeType(ContentService.MimeType.JSON);
-    } catch (err) {
-      Logger.log('❌ reprocessCredentialingRow(' + rowNumber + ') error: ' + err.message);
-      return ContentService.createTextOutput(JSON.stringify({ ok: false, rowNumber: rowNumber, error: err.message })).setMimeType(ContentService.MimeType.JSON);
-    }
-  }
-
-  return ContentService.createTextOutput(
-    'practice_event_processing.gs — ready. Actions: ' +
-    'parseAndProcessCredentialingLogs, installTimeTrigger, ' +
-    'reprocessAllRowsWithEmptyPayload, reprocessCredentialingRow&row=N'
-  ).setMimeType(ContentService.MimeType.TEXT);
-}
 
 // ============================================================================
 // BACKFILL — re-parse + re-commit existing PROCESSED rows that have empty
