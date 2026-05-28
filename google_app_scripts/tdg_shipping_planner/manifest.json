@@ -31,6 +31,7 @@
         "dapp/routes.js",
         "dapp/shipping_planner.html"
       ],
+      "candidate_cache_refresh_hooks": [],
       "source_files": [
         "shipping_planner_api.gs"
       ],

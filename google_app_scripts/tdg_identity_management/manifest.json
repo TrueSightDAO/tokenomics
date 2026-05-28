@@ -25,6 +25,7 @@
       },
       "post_push_hooks": [],
       "consumer_callers": [],
+      "candidate_cache_refresh_hooks": [],
       "source_files": [
         "register_member_digital_signatures_telegram.gs"
       ],
@@ -39,6 +40,16 @@
       },
       "post_push_hooks": [],
       "consumer_callers": [],
+      "candidate_cache_refresh_hooks": [
+        {
+          "handler_functions": [],
+          "action_strings": [
+            "refresh_dao_members_cache"
+          ],
+          "mirror_code_path": "clasp_mirrors/1m8IZPs1vFN99cuu-39kbC-OGXggRVtJtXq5rfSB0M1sCQjMdolEUDuGU/Code.js",
+          "consumer_callers_with_known_url": []
+        }
+      ],
       "source_files": [
         "email_verification_from_edgar.gs"
       ],
@@ -61,6 +72,7 @@
       },
       "post_push_hooks": [],
       "consumer_callers": [],
+      "candidate_cache_refresh_hooks": [],
       "source_files": [
         "register_member_digital_signatures_email.gs"
       ],

@@ -30,6 +30,7 @@
         "dapp/stores_by_status.html",
         "dapp/warmup_review.html"
       ],
+      "candidate_cache_refresh_hooks": [],
       "source_files": [
         "email_agent_drafts.gs",
         "partner_poke_drafts.gs",

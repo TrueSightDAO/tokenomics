@@ -27,6 +27,7 @@
       "consumer_callers": [
         "agroverse_shop/index.html"
       ],
+      "candidate_cache_refresh_hooks": [],
       "source_files": [
         "agroverse_wix_site_updates.gs"
       ],

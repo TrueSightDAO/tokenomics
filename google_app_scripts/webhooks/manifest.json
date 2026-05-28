@@ -25,6 +25,7 @@
       },
       "post_push_hooks": [],
       "consumer_callers": [],
+      "candidate_cache_refresh_hooks": [],
       "source_files": [
         "telegram_webhook_listener.gs"
       ],
@@ -47,6 +48,16 @@
       },
       "post_push_hooks": [],
       "consumer_callers": [],
+      "candidate_cache_refresh_hooks": [
+        {
+          "handler_functions": [
+            "notifyTreasuryCachePublisher_"
+          ],
+          "action_strings": [],
+          "mirror_code_path": "clasp_mirrors/19Wag9x-sjbLVgIsPh2vj90ZG7Rgq2iGaVOomAeAvtg6CdZKJHLZ9AJrC/Code.js",
+          "consumer_callers_with_known_url": []
+        }
+      ],
       "source_files": [
         "telegram_webhook_listener.gs"
       ],
@@ -69,6 +80,7 @@
       },
       "post_push_hooks": [],
       "consumer_callers": [],
+      "candidate_cache_refresh_hooks": [],
       "source_files": [
         "telegram_webhook_listener.gs"
       ],
@@ -91,6 +103,7 @@
       },
       "post_push_hooks": [],
       "consumer_callers": [],
+      "candidate_cache_refresh_hooks": [],
       "source_files": [
         "telegram_webhook_listener.gs"
       ],
@@ -113,6 +126,7 @@
       },
       "post_push_hooks": [],
       "consumer_callers": [],
+      "candidate_cache_refresh_hooks": [],
       "source_files": [
         "telegram_webhook_listener.gs"
       ],
@@ -127,6 +141,16 @@
       },
       "post_push_hooks": [],
       "consumer_callers": [],
+      "candidate_cache_refresh_hooks": [
+        {
+          "handler_functions": [
+            "notifyTreasuryCachePublisher_"
+          ],
+          "action_strings": [],
+          "mirror_code_path": "clasp_mirrors/1duQFfTO0Pj0lC4tPVNmMOhNOS1GvJgzqVxXbsEDu-eqt_64DwxvrOVyl/Code.js",
+          "consumer_callers_with_known_url": []
+        }
+      ],
       "source_files": [
         "telegram_webhook_listener.gs"
       ],
@@ -141,6 +165,7 @@
       },
       "post_push_hooks": [],
       "consumer_callers": [],
+      "candidate_cache_refresh_hooks": [],
       "source_files": [
         "telegram_webhook_listener.gs"
       ],
@@ -171,6 +196,16 @@
       },
       "post_push_hooks": [],
       "consumer_callers": [],
+      "candidate_cache_refresh_hooks": [
+        {
+          "handler_functions": [
+            "notifyTreasuryCachePublisher_"
+          ],
+          "action_strings": [],
+          "mirror_code_path": "clasp_mirrors/1wmgYPwfRDxpiboa8OH-C6Ndovklf8HaJY305n7dhRzs7BmUBQg7fL_sZ/Code.js",
+          "consumer_callers_with_known_url": []
+        }
+      ],
       "source_files": [
         "telegram_webhook_listener.gs"
       ],

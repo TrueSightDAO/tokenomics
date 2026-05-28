@@ -27,6 +27,7 @@
       "consumer_callers": [
         "agentic_ai_context/STRIPE_LEDGER_ROUTING.md"
       ],
+      "candidate_cache_refresh_hooks": [],
       "source_files": [
         "stripe_sales_sync.gs"
       ],
@@ -41,6 +42,7 @@
       },
       "post_push_hooks": [],
       "consumer_callers": [],
+      "candidate_cache_refresh_hooks": [],
       "source_files": [
         "tdg_airdrop_refresher.gs"
       ],
@@ -63,6 +65,16 @@
       },
       "post_push_hooks": [],
       "consumer_callers": [],
+      "candidate_cache_refresh_hooks": [
+        {
+          "handler_functions": [
+            "notifyTreasuryCachePublisher_"
+          ],
+          "action_strings": [],
+          "mirror_code_path": "clasp_mirrors/19Wag9x-sjbLVgIsPh2vj90ZG7Rgq2iGaVOomAeAvtg6CdZKJHLZ9AJrC/Code.js",
+          "consumer_callers_with_known_url": []
+        }
+      ],
       "source_files": [
         "tdg_expenses_processing.gs"
       ],
@@ -77,6 +89,7 @@
       },
       "post_push_hooks": [],
       "consumer_callers": [],
+      "candidate_cache_refresh_hooks": [],
       "source_files": [
         "tdg_recurring_tokenization_monthly.gs"
       ],
@@ -91,6 +104,7 @@
       },
       "post_push_hooks": [],
       "consumer_callers": [],
+      "candidate_cache_refresh_hooks": [],
       "source_files": [
         "tdg_wallet_balance_check.gs"
       ],
@@ -105,6 +119,7 @@
       },
       "post_push_hooks": [],
       "consumer_callers": [],
+      "candidate_cache_refresh_hooks": [],
       "source_files": [
         "tdg_wix_dashboard.gs"
       ],
@@ -119,6 +134,16 @@
       },
       "post_push_hooks": [],
       "consumer_callers": [],
+      "candidate_cache_refresh_hooks": [
+        {
+          "handler_functions": [
+            "notifyTreasuryCachePublisher_"
+          ],
+          "action_strings": [],
+          "mirror_code_path": "clasp_mirrors/1orWgdGckts55owiYOysR_y4sde52T_eUmrtDGAEkb4YV5DlUfJ0JZC5J/Code.js",
+          "consumer_callers_with_known_url": []
+        }
+      ],
       "source_files": [
         "capital_injection_processing.gs"
       ],
@@ -133,6 +158,7 @@
       },
       "post_push_hooks": [],
       "consumer_callers": [],
+      "candidate_cache_refresh_hooks": [],
       "source_files": [
         "tdg_wix_dashboard.gs",
         "web_app.gs"

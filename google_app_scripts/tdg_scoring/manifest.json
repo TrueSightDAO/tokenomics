@@ -17,6 +17,7 @@
       },
       "post_push_hooks": [],
       "consumer_callers": [],
+      "candidate_cache_refresh_hooks": [],
       "source_files": [
         "transfer_scored_contributions_to_main_ledger.gs"
       ],
@@ -39,6 +40,7 @@
       },
       "post_push_hooks": [],
       "consumer_callers": [],
+      "candidate_cache_refresh_hooks": [],
       "source_files": [
         "grok_scoring_for_telegram_and_whatsapp_logs.gs"
       ],
@@ -61,6 +63,7 @@
       },
       "post_push_hooks": [],
       "consumer_callers": [],
+      "candidate_cache_refresh_hooks": [],
       "source_files": [
         "importer_telegram_chatlogs_to_google_sheet.gs"
       ],
