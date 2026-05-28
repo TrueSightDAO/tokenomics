@@ -1,0 +1,16 @@
+{
+  "thematic_folder": "_clasp_default",
+  "audit_metadata": {
+    "generated_at": "2026-05-28",
+    "generated_by": "PR-1 manifest-convention sweep",
+    "completeness": "audit-derived; PR-1 captures only what is in source comments. Pre-flight checklist (roadmap §4) must be resolved before promoting to v1.",
+    "schema_version": "v0-audit"
+  },
+  "project_count": 0,
+  "projects": [],
+  "files_without_scriptid": [
+    "Version.gs"
+  ],
+  "exec_urls_seen_in_folder_sources": [],
+  "see_also": "agentic_ai_context/TOKENOMICS_GAS_RESTRUCTURE_PLAN.md"
+}

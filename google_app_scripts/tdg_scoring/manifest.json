@@ -1,0 +1,60 @@
+{
+  "thematic_folder": "tdg_scoring",
+  "audit_metadata": {
+    "generated_at": "2026-05-28",
+    "generated_by": "PR-1 manifest-convention sweep",
+    "completeness": "audit-derived; PR-1 captures only what is in source comments. Pre-flight checklist (roadmap §4) must be resolved before promoting to v1.",
+    "schema_version": "v0-audit"
+  },
+  "project_count": 3,
+  "projects": [
+    {
+      "name": "TBC — confirm display name in GAS UI for 1-ts0WTM8J4n…",
+      "scriptId": "1-ts0WTM8J4nOWdI29I9NJLzPQBGqph3ajSB8d8qrAHINJaZynwxLzPx8",
+      "owner_email": "admin@truesight.me",
+      "deployments": {
+        "head": "TBC — list every /exec URL for this scriptId in pre-flight"
+      },
+      "post_push_hooks": [],
+      "consumer_callers": [],
+      "source_files": [
+        "transfer_scored_contributions_to_main_ledger.gs"
+      ],
+      "notes": "Audit-derived from in-source header-comment scriptIds on 2026-05-28. Pre-flight checklist (TOKENOMICS_GAS_RESTRUCTURE_PLAN.md §4) must resolve: full deployments list, post-push cache-refresh hooks, confirmed owner_email, consumer callers."
+    },
+    {
+      "name": "TBC — confirm display name in GAS UI for 1BHAGZd_T1I5…",
+      "scriptId": "1BHAGZd_T1I5mQnqnAFqUJKX2x_N8Uv05n1O2OohRA908Ja8wVwVxaR7K",
+      "owner_email": "admin@truesight.me",
+      "deployments": {
+        "head": "TBC — list every /exec URL for this scriptId in pre-flight"
+      },
+      "post_push_hooks": [],
+      "consumer_callers": [],
+      "source_files": [
+        "grok_scoring_for_telegram_and_whatsapp_logs.gs"
+      ],
+      "notes": "Audit-derived from in-source header-comment scriptIds on 2026-05-28. Pre-flight checklist (TOKENOMICS_GAS_RESTRUCTURE_PLAN.md §4) must resolve: full deployments list, post-push cache-refresh hooks, confirmed owner_email, consumer callers."
+    },
+    {
+      "name": "TBC — confirm display name in GAS UI for 1Q5HfGR_AcSY…",
+      "scriptId": "1Q5HfGR_AcSYmrKCy5bs-Jo8pdtV-vZJ6Zhv2VCY0HGo2haVoeWMjOCGC",
+      "owner_email": "admin@truesight.me",
+      "deployments": {
+        "head": "TBC — list every /exec URL for this scriptId in pre-flight"
+      },
+      "post_push_hooks": [],
+      "consumer_callers": [],
+      "source_files": [
+        "importer_telegram_chatlogs_to_google_sheet.gs"
+      ],
+      "notes": "Audit-derived from in-source header-comment scriptIds on 2026-05-28. Pre-flight checklist (TOKENOMICS_GAS_RESTRUCTURE_PLAN.md §4) must resolve: full deployments list, post-push cache-refresh hooks, confirmed owner_email, consumer callers."
+    }
+  ],
+  "files_without_scriptid": [],
+  "exec_urls_seen_in_folder_sources": [
+    "https://script.google.com/macros/s/AKfycbw6Pgl5a1FqX58EWyCEIi1rG_NuI4P34R6SBtdsCP-0INjcSE8HH8apvTCZlCVrM1ft/exec",
+    "https://script.google.com/macros/s/AKfycbwnCn80es4Jd1pS9oKghpIvJ9pPYSXLonsWztrfXP6YYVVHy8lymMDEk2iRYWlNmjRT/exec"
+  ],
+  "see_also": "agentic_ai_context/TOKENOMICS_GAS_RESTRUCTURE_PLAN.md"
+}

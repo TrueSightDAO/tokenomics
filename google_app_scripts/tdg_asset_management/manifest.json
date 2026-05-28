@@ -1,0 +1,136 @@
+{
+  "thematic_folder": "tdg_asset_management",
+  "audit_metadata": {
+    "generated_at": "2026-05-28",
+    "generated_by": "PR-1 manifest-convention sweep",
+    "completeness": "audit-derived; PR-1 captures only what is in source comments. Pre-flight checklist (roadmap §4) must be resolved before promoting to v1.",
+    "schema_version": "v0-audit"
+  },
+  "project_count": 8,
+  "projects": [
+    {
+      "name": "TBC — confirm display name in GAS UI for 15qbfLN3ZCk-…",
+      "scriptId": "15qbfLN3ZCk-Ee6YNQnLj2OryWN3bWGh4BkqBaADonGQSLGzRyIo5skDR",
+      "owner_email": "admin@truesight.me",
+      "deployments": {
+        "head": "TBC — list every /exec URL for this scriptId in pre-flight"
+      },
+      "post_push_hooks": [],
+      "consumer_callers": [],
+      "source_files": [
+        "stripe_sales_sync.gs"
+      ],
+      "notes": "Audit-derived from in-source header-comment scriptIds on 2026-05-28. Pre-flight checklist (TOKENOMICS_GAS_RESTRUCTURE_PLAN.md §4) must resolve: full deployments list, post-push cache-refresh hooks, confirmed owner_email, consumer callers."
+    },
+    {
+      "name": "TBC — confirm display name in GAS UI for 177OJC0tVytZ…",
+      "scriptId": "177OJC0tVytZfSa6gMldKCqS5LxUZGnV_dT2NJ_FJE1uwvoGHzqC8HbyG",
+      "owner_email": "admin@truesight.me",
+      "deployments": {
+        "head": "TBC — list every /exec URL for this scriptId in pre-flight"
+      },
+      "post_push_hooks": [],
+      "consumer_callers": [],
+      "source_files": [
+        "tdg_airdrop_refresher.gs"
+      ],
+      "notes": "Audit-derived from in-source header-comment scriptIds on 2026-05-28. Pre-flight checklist (TOKENOMICS_GAS_RESTRUCTURE_PLAN.md §4) must resolve: full deployments list, post-push cache-refresh hooks, confirmed owner_email, consumer callers."
+    },
+    {
+      "name": "TBC — confirm display name in GAS UI for 19Wag9x-sjbL…",
+      "scriptId": "19Wag9x-sjbLVgIsPh2vj90ZG7Rgq2iGaVOomAeAvtg6CdZKJHLZ9AJrC",
+      "owner_email": "admin@truesight.me",
+      "deployments": {
+        "head": "TBC — list every /exec URL for this scriptId in pre-flight"
+      },
+      "post_push_hooks": [],
+      "consumer_callers": [],
+      "source_files": [
+        "tdg_expenses_processing.gs"
+      ],
+      "notes": "Audit-derived from in-source header-comment scriptIds on 2026-05-28. Pre-flight checklist (TOKENOMICS_GAS_RESTRUCTURE_PLAN.md §4) must resolve: full deployments list, post-push cache-refresh hooks, confirmed owner_email, consumer callers."
+    },
+    {
+      "name": "TBC — confirm display name in GAS UI for 1LxWu9hOs56J…",
+      "scriptId": "1LxWu9hOs56JZ6Mbxra3eDv74xjpjgkJQW40xjpQBIHObsqiv1D5jr5fK",
+      "owner_email": "admin@truesight.me",
+      "deployments": {
+        "head": "TBC — list every /exec URL for this scriptId in pre-flight"
+      },
+      "post_push_hooks": [],
+      "consumer_callers": [],
+      "source_files": [
+        "tdg_recurring_tokenization_monthly.gs"
+      ],
+      "notes": "Audit-derived from in-source header-comment scriptIds on 2026-05-28. Pre-flight checklist (TOKENOMICS_GAS_RESTRUCTURE_PLAN.md §4) must resolve: full deployments list, post-push cache-refresh hooks, confirmed owner_email, consumer callers."
+    },
+    {
+      "name": "TBC — confirm display name in GAS UI for 1QKqUTyl3_py…",
+      "scriptId": "1QKqUTyl3_pyDHfVMoRUkzvU75eV6UtizIw5bR5xeDMaLyZGUPzWTz8Et",
+      "owner_email": "admin@truesight.me",
+      "deployments": {
+        "head": "TBC — list every /exec URL for this scriptId in pre-flight"
+      },
+      "post_push_hooks": [],
+      "consumer_callers": [],
+      "source_files": [
+        "tdg_wallet_balance_check.gs"
+      ],
+      "notes": "Audit-derived from in-source header-comment scriptIds on 2026-05-28. Pre-flight checklist (TOKENOMICS_GAS_RESTRUCTURE_PLAN.md §4) must resolve: full deployments list, post-push cache-refresh hooks, confirmed owner_email, consumer callers."
+    },
+    {
+      "name": "TBC — confirm display name in GAS UI for 1ZQjgSZvAXL2…",
+      "scriptId": "1ZQjgSZvAXL2PB3e3YW289xY7Ork4S5wV4uKTXJyw83xQT4R0lh_hwNWn",
+      "owner_email": "admin@truesight.me",
+      "deployments": {
+        "head": "TBC — list every /exec URL for this scriptId in pre-flight"
+      },
+      "post_push_hooks": [],
+      "consumer_callers": [],
+      "source_files": [
+        "tdg_wix_dashboard.gs"
+      ],
+      "notes": "Audit-derived from in-source header-comment scriptIds on 2026-05-28. Pre-flight checklist (TOKENOMICS_GAS_RESTRUCTURE_PLAN.md §4) must resolve: full deployments list, post-push cache-refresh hooks, confirmed owner_email, consumer callers."
+    },
+    {
+      "name": "TBC — confirm display name in GAS UI for 1orWgdGckts5…",
+      "scriptId": "1orWgdGckts55owiYOysR_y4sde52T_eUmrtDGAEkb4YV5DlUfJ0JZC5J",
+      "owner_email": "admin@truesight.me",
+      "deployments": {
+        "head": "TBC — list every /exec URL for this scriptId in pre-flight"
+      },
+      "post_push_hooks": [],
+      "consumer_callers": [],
+      "source_files": [
+        "capital_injection_processing.gs"
+      ],
+      "notes": "Audit-derived from in-source header-comment scriptIds on 2026-05-28. Pre-flight checklist (TOKENOMICS_GAS_RESTRUCTURE_PLAN.md §4) must resolve: full deployments list, post-push cache-refresh hooks, confirmed owner_email, consumer callers."
+    },
+    {
+      "name": "TBC — confirm display name in GAS UI for 1rLl94jQ9tDY…",
+      "scriptId": "1rLl94jQ9tDYdRvudnP0prPY5SEjvM07R4gPs6-vRyZEpSJhUqbiE3CZY",
+      "owner_email": "admin@truesight.me",
+      "deployments": {
+        "head": "TBC — list every /exec URL for this scriptId in pre-flight"
+      },
+      "post_push_hooks": [],
+      "consumer_callers": [],
+      "source_files": [
+        "tdg_wix_dashboard.gs",
+        "web_app.gs"
+      ],
+      "notes": "Audit-derived from in-source header-comment scriptIds on 2026-05-28. Pre-flight checklist (TOKENOMICS_GAS_RESTRUCTURE_PLAN.md §4) must resolve: full deployments list, post-push cache-refresh hooks, confirmed owner_email, consumer callers."
+    }
+  ],
+  "files_without_scriptid": [
+    "currency_conversion_processing.gs"
+  ],
+  "exec_urls_seen_in_folder_sources": [
+    "https://script.google.com/macros/s/AKfycbwYBlFigSSPJKkI-F2T3dSsdLnvvBi2SCGF1z2y1k95YzA5HBrJVyMo6InTA9Fud2bOEw/exec",
+    "https://script.google.com/macros/s/AKfycbwauCMu-3Es0s4rB7Cr-fsP2JuEnebyPS8W-ecXG6RUi_zhqpLfG71bramoEwtk54drfg/exec",
+    "https://script.google.com/macros/s/AKfycbyBmjwmFhR8nQ5ZCtdqQwr-OgC5-htdFnMeXOKLD-Z-NWvNpLGvi7nPbMQVvnhrnbSXdQ/exec",
+    "https://script.google.com/macros/s/AKfycbygmwRbyqse-dpCYMco0rb93NSgg-Jc1QIw7kUiBM7CZK6jnWnMB5DEjdoX_eCsvVs7/exec",
+    "https://script.google.com/macros/s/AKfycbzlfOBo9UqKOh7jIqGcmbPAMM1RxCbsJHb-UV_vM6VbvK_HSdT44KyGbbXIeo-_Ovfy/exec"
+  ],
+  "see_also": "agentic_ai_context/TOKENOMICS_GAS_RESTRUCTURE_PLAN.md"
+}
