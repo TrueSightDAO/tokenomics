@@ -233,12 +233,57 @@ function paListPendingRows(sheetUrl, tabName) {
 }
 
 // ============================================================================
-// HTTP API (admin panels call these)
+// HTTP API — combined dispatcher for ALL actions from both files
 // ============================================================================
 
+/**
+ * Combined doGet — routes actions from both practice_event_processing.gs and
+ * program_admin_endpoint.gs. This is the single entry point for the web app.
+ *
+ * Actions from practice_event_processing.gs:
+ *   ?action=parseAndProcessCredentialingLogs
+ *   ?action=installTimeTrigger
+ *   ?action=reprocessAllRowsWithEmptyPayload[&force=1]
+ *   ?action=reprocessCredentialingRow&row=N
+ *
+ * Actions from program_admin_endpoint.gs:
+ *   ?action=list_sheet_editors&sheet_url=<URL>
+ *   ?action=list_pending_rows&sheet_url=<URL>&tab=<tab>
+ *   ?action=resolve_admin&sheet_url=<URL>&email=<email>
+ *   ?action=process_attestation_events
+ */
 function doGet(e) {
   const action = (e && e.parameter && e.parameter.action) || '';
+  Logger.log('doGet called with action: ' + (action || 'none'));
+
   try {
+    // --- practice_event_processing.gs actions ---
+    if (action === 'parseAndProcessCredentialingLogs') {
+      parseAndProcessCredentialingLogs();
+      return ContentService.createTextOutput('✅ Credentialing logs processed.').setMimeType(ContentService.MimeType.TEXT);
+    }
+
+    if (action === 'installTimeTrigger') {
+      return ContentService.createTextOutput(JSON.stringify(installTimeTrigger(), null, 2)).setMimeType(ContentService.MimeType.JSON);
+    }
+
+    if (action === 'reprocessAllRowsWithEmptyPayload') {
+      const force = String((e && e.parameter && e.parameter.force) || '') === '1';
+      const summary = reprocessAllRowsWithEmptyPayload({ force: force });
+      return ContentService.createTextOutput(JSON.stringify(summary, null, 2)).setMimeType(ContentService.MimeType.JSON);
+    }
+
+    if (action === 'reprocessCredentialingRow') {
+      const rowParam = (e && e.parameter && e.parameter.row) || '';
+      const rowNumber = parseInt(rowParam, 10);
+      if (!rowNumber || rowNumber < 2) {
+        return ContentService.createTextOutput(JSON.stringify({ ok: false, error: 'Missing or invalid &row=N (N must be >= 2)' })).setMimeType(ContentService.MimeType.JSON);
+      }
+      const result = reprocessCredentialingRow(rowNumber);
+      return ContentService.createTextOutput(JSON.stringify(result, null, 2)).setMimeType(ContentService.MimeType.JSON);
+    }
+
+    // --- program_admin_endpoint.gs actions ---
     if (action === 'list_sheet_editors') {
       const sheetUrl = e.parameter.sheet_url;
       const editors = paListSheetEditors(sheetUrl);
@@ -260,6 +305,7 @@ function doGet(e) {
       const summary = paProcessAttestationEvents();
       return paJson({ status: 'ok', summary: summary });
     }
+
     return paJson({ status: 'error', message: 'Unknown action: ' + action }, 400);
   } catch (err) {
     return paJson({ status: 'error', message: String(err && err.message ? err.message : err) }, 500);
