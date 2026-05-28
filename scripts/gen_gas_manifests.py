@@ -85,6 +85,7 @@ def emit_manifest(folder: Path) -> dict | None:
             },
             "post_push_hooks": prior.get("post_push_hooks") or [],
             "consumer_callers": prior.get("consumer_callers") or [],
+            "candidate_cache_refresh_hooks": prior.get("candidate_cache_refresh_hooks") or [],
             "source_files": owned,  # always re-derived
             "notes": prior.get("notes") or (
                 "Audit-derived from in-source header-comment scriptIds on 2026-05-28. "

@@ -17,6 +17,7 @@
       },
       "post_push_hooks": [],
       "consumer_callers": [],
+      "candidate_cache_refresh_hooks": [],
       "source_files": [
         "practice_event_processing.gs"
       ],

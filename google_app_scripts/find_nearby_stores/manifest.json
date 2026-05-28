@@ -17,6 +17,7 @@
       },
       "post_push_hooks": [],
       "consumer_callers": [],
+      "candidate_cache_refresh_hooks": [],
       "source_files": [
         "process_retail_field_reports_telegram_logs.gs",
         "process_store_adds_telegram_logs.gs"

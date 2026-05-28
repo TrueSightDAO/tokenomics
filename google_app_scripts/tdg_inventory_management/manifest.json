@@ -34,6 +34,7 @@
         "dapp/routes.js",
         "dapp/view_inventory_holdings.html"
       ],
+      "candidate_cache_refresh_hooks": [],
       "source_files": [
         "Version.gs",
         "web_app.gs"
@@ -57,6 +58,7 @@
       },
       "post_push_hooks": [],
       "consumer_callers": [],
+      "candidate_cache_refresh_hooks": [],
       "source_files": [
         "process_sales_telegram_logs.gs"
       ],
@@ -71,6 +73,16 @@
       },
       "post_push_hooks": [],
       "consumer_callers": [],
+      "candidate_cache_refresh_hooks": [
+        {
+          "handler_functions": [
+            "notifyTreasuryCachePublisher_"
+          ],
+          "action_strings": [],
+          "mirror_code_path": "clasp_mirrors/1duQFfTO0Pj0lC4tPVNmMOhNOS1GvJgzqVxXbsEDu-eqt_64DwxvrOVyl/Code.js",
+          "consumer_callers_with_known_url": []
+        }
+      ],
       "source_files": [
         "sales_update_managed_agl_ledgers.gs"
       ],
@@ -93,6 +105,16 @@
       },
       "post_push_hooks": [],
       "consumer_callers": [],
+      "candidate_cache_refresh_hooks": [
+        {
+          "handler_functions": [
+            "notifyTreasuryCachePublisher_"
+          ],
+          "action_strings": [],
+          "mirror_code_path": "clasp_mirrors/1wONDeDwZ_fXNapDKpstWrBION3aV3r7NXwq7PCdqbW1LvI5ceaykQNbR/Code.js",
+          "consumer_callers_with_known_url": []
+        }
+      ],
       "source_files": [
         "process_movement_telegram_logs.gs"
       ],
@@ -123,6 +145,16 @@
       },
       "post_push_hooks": [],
       "consumer_callers": [],
+      "candidate_cache_refresh_hooks": [
+        {
+          "handler_functions": [
+            "notifyTreasuryCachePublisher_"
+          ],
+          "action_strings": [],
+          "mirror_code_path": "clasp_mirrors/1wmgYPwfRDxpiboa8OH-C6Ndovklf8HaJY305n7dhRzs7BmUBQg7fL_sZ/Code.js",
+          "consumer_callers_with_known_url": []
+        }
+      ],
       "source_files": [
         "sales_update_main_dao_offchain_ledger.gs"
       ],
