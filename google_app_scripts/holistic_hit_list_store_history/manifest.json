@@ -13,10 +13,23 @@
       "scriptId": "14gKJ0VW49RsSn4S03pgxKXy0sp4Z7Z3Wm1Wj8jQiWW5dj1sFuPnp95sh",
       "owner_email": "admin@truesight.me",
       "deployments": {
-        "head": "TBC — list every /exec URL for this scriptId in pre-flight"
+        "head": "TBC — list every /exec URL for this scriptId in pre-flight",
+        "probe_e9anL108": {
+          "url": "https://script.google.com/macros/s/AKfycbwoBqZnDS4JRRdFkxSXdlGt-qIn-RauMcORuDHeWs29oQ2CpJ3L4A10uM8se9anL108/exec",
+          "status_code": 200,
+          "final_url": "https://script.googleusercontent.com/macros/echo?user_content_key=AUkAhnTKsZIMnrmZ2M07SMV_pTjppqpfDFn5YKXnLDXlJR2faWaBIAZVIjkpZnj1JgLV9txDP3mK7xan0VXoiZ4LEhEKMMmKo-Py6td2HRzDucls0JinPhQzQR6SCsdZ7qq0Q3xFNbN782uli7o7lzx026ZLMEBpdKjbKkCDSXlykCIuamLhPt_0f1lVdfIjmAUpkRttj7M2YbJGdvsVics84aPjVg_XJDPlRCtTMncnd54CE5btv_XDBTFrGF4D8UJBZPP5CKOBEbYm4EMLfkulAaRPmnHeNQ&lib=M6DQmKBEo6smaE8GeJsuNfbCelqghh4iM",
+          "content_type": "application/json; charset=utf-8",
+          "body_peek": "{\"status\":\"error\",\"message\":\"Unknown action. Use suggestStores, getStoreHistory, listStoresByFilter, listStatusSummary, getWarmupReviewQueue, or apply_warmup_send.\",\"code\":400}",
+          "probed_at": "2026-05-28T21:47:56.421128+00:00"
+        }
       },
       "post_push_hooks": [],
-      "consumer_callers": [],
+      "consumer_callers": [
+        "dapp/routes.js",
+        "dapp/store_interaction_history.html",
+        "dapp/stores_by_status.html",
+        "dapp/warmup_review.html"
+      ],
       "source_files": [
         "email_agent_drafts.gs",
         "partner_poke_drafts.gs",

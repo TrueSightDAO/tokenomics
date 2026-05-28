@@ -13,10 +13,20 @@
       "scriptId": "1Y8sJ22lZuqQYS_kF_3ItMuyfiAzbJ4wRA1xGC_bGx7FPB7uLTvrUObly",
       "owner_email": "admin@truesight.me",
       "deployments": {
-        "head": "TBC — list every /exec URL for this scriptId in pre-flight"
+        "head": "TBC — list every /exec URL for this scriptId in pre-flight",
+        "probe_AYIlxVRH": {
+          "url": "https://script.google.com/macros/s/AKfycbzHDqxI4lWlDcl6AnAhZxw7kbOp4exPPk5GFgdwqJuAfMva_00q8eIMFOAzAYIlxVRH/exec",
+          "status_code": 200,
+          "final_url": "https://script.googleusercontent.com/macros/echo?user_content_key=AUkAhnTLSsG4WZ3pFKOdbNXkgGJ7x4b4H-jMBA1PG_knqMB6neOYvs8ocWu1IYKEDXMUvnS8AtONVXI0gbss3cN0mTxektGPKt3upYgy3SSl45CX5Nxam_-LAdhFNpy2nk2YYLu81KPuL-6xWOmC65ZeMm-fuMa4sSLiUe4hE3WNMRN7_M4bHg5ftYGvAIce08QjGwqZ-sLP7JIp0PuHIzhD1ylJNiO2Ytw12lGY60Q4vfkPxNyIfUTHkZ1aofDw-3-8rvFhVu3IT2qk78yWXobH7LbyCXYsfg&lib=M_T0qb3SBEK3H34qlxatDbrCelqghh4iM",
+          "content_type": "application/json; charset=utf-8",
+          "body_peek": "{\"timestamp\":\"2026-05-28T21:48:13.444Z\",\"soldBagsCount\":337,\"status\":\"success\"}",
+          "probed_at": "2026-05-28T21:48:11.342404+00:00"
+        }
       },
       "post_push_hooks": [],
-      "consumer_callers": [],
+      "consumer_callers": [
+        "agroverse_shop/index.html"
+      ],
       "source_files": [
         "agroverse_wix_site_updates.gs"
       ],

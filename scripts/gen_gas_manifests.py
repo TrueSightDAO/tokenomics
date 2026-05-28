@@ -57,22 +57,36 @@ def emit_manifest(folder: Path) -> dict | None:
     # OR genuinely unrouted scripts. Surface them explicitly.
     files_without_scriptid = sorted(f for f, s in file_to_sids.items() if not s)
 
-    # If no scriptIds at all, still emit a manifest noting the folder is
-    # source-only / awaiting routing.
+    # Preserve any per-project fields a prior pass or companion script wrote
+    # (probe results, consumer_callers, operator-edited name / deployments).
+    # source_files and scriptId are re-derived every run; everything else is
+    # merge-friendly.
+    existing_projects: dict[str, dict] = {}
+    existing_path = folder / "manifest.json"
+    if existing_path.is_file():
+        try:
+            existing = json.loads(existing_path.read_text(encoding="utf-8"))
+            for p in existing.get("projects", []):
+                if p.get("scriptId"):
+                    existing_projects[p["scriptId"]] = p
+        except Exception:
+            pass
+
     projects: list[dict] = []
     for sid in sorted(all_sids):
         owned = sorted(f for f, s in file_to_sids.items() if sid in s)
+        prior = existing_projects.get(sid, {})
         projects.append({
-            "name": f"TBC — confirm display name in GAS UI for {sid[:12]}…",
+            "name": prior.get("name") or f"TBC — confirm display name in GAS UI for {sid[:12]}…",
             "scriptId": sid,
-            "owner_email": "admin@truesight.me",
-            "deployments": {
+            "owner_email": prior.get("owner_email") or "admin@truesight.me",
+            "deployments": prior.get("deployments") or {
                 "head": "TBC — list every /exec URL for this scriptId in pre-flight"
             },
-            "post_push_hooks": [],
-            "consumer_callers": [],
-            "source_files": owned,
-            "notes": (
+            "post_push_hooks": prior.get("post_push_hooks") or [],
+            "consumer_callers": prior.get("consumer_callers") or [],
+            "source_files": owned,  # always re-derived
+            "notes": prior.get("notes") or (
                 "Audit-derived from in-source header-comment scriptIds on 2026-05-28. "
                 "Pre-flight checklist (TOKENOMICS_GAS_RESTRUCTURE_PLAN.md §4) must "
                 "resolve: full deployments list, post-push cache-refresh hooks, "
