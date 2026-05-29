@@ -4,6 +4,18 @@ _Triage-and-act companion to [`docs/gas_orphan_mirror_audit.md`](gas_orphan_mirr
 
 Each row in the original orphan-mirror audit needs an operator-confirmed disposition. This doc tracks the decision per orphan and the action taken (or recommended) — so the restructure roadmap (`TOKENOMICS_GAS_RESTRUCTURE_PLAN.md` §4) can close out the "orphan-mirror disposition" pre-flight item one row at a time.
 
+## Actions taken in PR-1f (2026-05-29) — mint the missing mirrors
+
+| scriptId | Owner | Action |
+|---|---|---|
+| `1MnAsIQAxcSfZO_hAL…` | **admin@truesight.me** (QR + tree-pledge notification) | ✅ Minted via `clasp clone` — 5 files (`appsscript.json`, `Credentials.js`, `process_donation_mint_telegram_logs.js`, `qr_code_web_service.js`, `Version.js`). |
+| `1gi4YKh2ikLWmp6qEL…` | garyjob@agroverse.shop | ✅ Minted via `clasp clone` — 2 files (`Code.js`, `appsscript.json`). The redundant `google_app_scripts/seacoast_freight_quotation_ingest/.clasp.json` was `git rm`'d (the convention is one clasp project per mirror folder, not per thematic source folder). |
+| `1zKgMwd6KJFjoWkRH6…` | **admin@truesight.me** (Gmail-based digital-signature ingestion) | ⛔ **Failed — `The caller does not have permission`.** The current `clasp` identity on Gary's machine doesn't have access. **Operator action:** either (a) `clasp login` as the admin@truesight.me account that owns this project, then re-run the mint step; or (b) share the GAS project with the current clasp account from `script.google.com`. After that, re-run: `mkdir -p clasp_mirrors/1zKgMwd6KJFjoWkRH6OobgFvtVzrXVuEKfxVbgixgnfcp4TZTjrsfNKq0 && cd $_ && clasp clone 1zKgMwd6KJFjoWkRH6OobgFvtVzrXVuEKfxVbgixgnfcp4TZTjrsfNKq0 --rootDir . && cd ../.. && node scripts/ensure_clasp_version_gs.mjs && python3 scripts/audit_orphan_clasp_mirrors.py`. |
+
+After this PR: audit moves from 34 healthy / 13 orphans / 3 unmirrored → **36 healthy / 13 orphans / 1 unmirrored**.
+
+---
+
 ## Actions taken in PR-1e (2026-05-29)
 
 | # | scriptId | Disposition | Action |

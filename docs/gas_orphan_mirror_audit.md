@@ -7,10 +7,10 @@ Resolves the 51-vs-36 delta noted in [`agentic_ai_context/TOKENOMICS_GAS_RESTRUC
 ## Summary
 
 - **37** distinct scriptIds referenced in `google_app_scripts/**/*.gs` source-comment URLs.
-- **47** clasp_mirror folders.
-- **34** healthy (in both).
+- **49** clasp_mirror folders.
+- **36** healthy (in both).
 - **13** orphan mirrors (mirror exists; no source references it).
-- **3** unmirrored sources (source references; no mirror folder — `clasp push` would fail without one).
+- **1** unmirrored sources (source references; no mirror folder — `clasp push` would fail without one).
 
 ## Orphan mirrors (no source file references this scriptId)
 
@@ -34,17 +34,12 @@ These mirrors have no `.gs` source under `google_app_scripts/` carrying the stan
 
 These would fail at `clasp push` time because there is no local clasp project to push to. Mint the mirror via `scripts/clone_clasp_mirrors.mjs` (or whatever the workspace convention is) **before** the restructure PR for that scriptId lands.
 
-- `1MnAsIQAxcSfZO_hALOtMFJ4y1k4OnqeXKMwYs6xev600rPNUYepqcXsT` — referenced by:
-    - `google_app_scripts/agroverse_qr_codes/process_donation_mint_telegram_logs.gs`
-    - `google_app_scripts/agroverse_qr_codes/qr_code_web_service.gs`
-- `1gi4YKh2ikLWmp6qEL1A6N3dfF6gQP-jwRPf_hc0N0EvaVU0-1tWu0nxo` — referenced by:
-    - `google_app_scripts/seacoast_freight_quotation_ingest/Code.gs`
 - `1zKgMwd6KJFjoWkRH6OobgFvtVzrXVuEKfxVbgixgnfcp4TZTjrsfNKq0` — referenced by:
     - `google_app_scripts/tdg_identity_management/register_member_digital_signatures_email.gs`
 
 ## Healthy
 
-_34 scriptIds appear in both `google_app_scripts/` and `clasp_mirrors/`._
+_36 scriptIds appear in both `google_app_scripts/` and `clasp_mirrors/`._
 
 <details><summary>Show full list</summary>
 
@@ -61,6 +56,7 @@ _34 scriptIds appear in both `google_app_scripts/` and `clasp_mirrors/`._
 - `1IBrXqW_uTsFkbKU-fiOTrkfBlxLnX8KHsKSw2qqF3NoOa36wU0OKEVGH`
 - `1Jp8qNIBCZaRTlmOmbJoJmYnSFyXtQkUHP2Qv5uqKZpt0Ugo-e25nhASF`
 - `1LxWu9hOs56JZ6Mbxra3eDv74xjpjgkJQW40xjpQBIHObsqiv1D5jr5fK`
+- `1MnAsIQAxcSfZO_hALOtMFJ4y1k4OnqeXKMwYs6xev600rPNUYepqcXsT`
 - `1N6o00N9VtRK_L3e0NQXEsmC6QME1KObZdmdbJgo0Tbgj_7P-ElNL5THn`
 - `1NpHrKJW8Q4suu6-f5gXQcbjHqUZtGOG-KcIf81M1GG8lDShm5-fLphD2`
 - `1Og2g8Q0_SdM9A5mJNO-tq_9r8XMQ00ybBmss4L3tItBAJ01-KdM-w40c`
@@ -74,6 +70,7 @@ _34 scriptIds appear in both `google_app_scripts/` and `clasp_mirrors/`._
 - `1_3D4o2RdHdPuu5EHCUwkMQe8sFJBqXWqCiE-wpwME2Gdr6_oTt3VBAVC`
 - `1dsWecVwbN0dOvilIz9r8DNt7LD3Ay13V8G9qliow4tZtF5LHsvQOFpF7`
 - `1duQFfTO0Pj0lC4tPVNmMOhNOS1GvJgzqVxXbsEDu-eqt_64DwxvrOVyl`
+- `1gi4YKh2ikLWmp6qEL1A6N3dfF6gQP-jwRPf_hc0N0EvaVU0-1tWu0nxo`
 - `1m2sQONdMGw6HbxIVP0H0JJJ1aYrYLSRRlHb2MIplrDDsKhm8-IwKBntk`
 - `1m8IZPs1vFN99cuu-39kbC-OGXggRVtJtXq5rfSB0M1sCQjMdolEUDuGU`
 - `1orWgdGckts55owiYOysR_y4sde52T_eUmrtDGAEkb4YV5DlUfJ0JZC5J`
