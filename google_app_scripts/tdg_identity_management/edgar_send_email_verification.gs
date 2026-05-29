@@ -2,6 +2,13 @@
  * File: google_app_scripts/tdg_identity_management/edgar_send_email_verification.gs
  * Repository: https://github.com/TrueSightDAO/tokenomics
  *
+ * Apps Script project:
+ *   https://script.google.com/home/projects/1m8IZPs1vFN99cuu-39kbC-OGXggRVtJtXq5rfSB0M1sCQjMdolEUDuGU/edit
+ *
+ * Routing verified 2026-05-29 by matching the `handleEmailVerificationRequest_`
+ * function fingerprint against `clasp_mirrors/1m8IZPs1.../Code.js`. owner_email
+ * is admin@truesight.me per the manifest (PR-1d).
+ *
  * Summary:
  * - Standalone web app invoked by Edgar (`sentiment_importer`) after a verified
  *   `[EMAIL REGISTERED EVENT]`. Sends the contributor a DApp link with `em` + `vk`.
