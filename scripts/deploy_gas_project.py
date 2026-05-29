@@ -44,6 +44,11 @@ Safety:
 - Refuses to push when there are uncommitted changes to source files for
   this scriptId — push the working tree intentionally, don't accidentally
   ship in-progress edits.
+- **Refuses to push when the active clasp identity doesn't match the
+  project's `owner_email`.** This is the mistake-proofing for the
+  "1zKgMwd6… must always deploy as admin@truesight.me" class of
+  constraint. Override with `--allow-identity-mismatch` only when you
+  intentionally want to push a project under a non-owner account.
 - Reads `manifest.json` only; never edits it. To change which sources
   belong to a project, edit the manifest first.
 
@@ -59,11 +64,74 @@ import os
 import shutil
 import subprocess
 import sys
+import urllib.error
+import urllib.parse
+import urllib.request
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 SRC = ROOT / "google_app_scripts"
 MIRRORS = ROOT / "clasp_mirrors"
+CLASPRC = Path(os.environ.get("CLASPRC_PATH") or os.path.expanduser("~/.clasprc.json"))
+
+
+# ── clasp identity resolution ──────────────────────────────────────────────
+
+
+def resolve_clasp_identity() -> tuple[str | None, str | None]:
+    """Return (email, error) of the active clasp account.
+
+    Reads `~/.clasprc.json`, exchanges its refresh_token for a fresh access
+    token, calls Google's `oauth2/v3/userinfo`. Returns `(email, None)` on
+    success; `(None, reason)` if any step fails — caller decides whether
+    to treat that as fatal or just a warning.
+    """
+    if not CLASPRC.is_file():
+        return None, f"no clasprc at {CLASPRC} (clasp not logged in?)"
+    try:
+        rc = json.loads(CLASPRC.read_text(encoding="utf-8"))
+    except Exception as e:
+        return None, f"failed to parse {CLASPRC}: {e}"
+    tok = (rc.get("tokens") or {}).get("default") or {}
+    client_id = tok.get("client_id") or ""
+    client_secret = tok.get("client_secret") or ""
+    refresh_token = tok.get("refresh_token") or ""
+    if not (client_id and client_secret and refresh_token):
+        return None, f"clasprc at {CLASPRC} is missing client_id/secret/refresh_token"
+
+    try:
+        data = urllib.parse.urlencode({
+            "client_id": client_id,
+            "client_secret": client_secret,
+            "refresh_token": refresh_token,
+            "grant_type": "refresh_token",
+        }).encode("utf-8")
+        req = urllib.request.Request(
+            "https://oauth2.googleapis.com/token",
+            data=data,
+            headers={"Content-Type": "application/x-www-form-urlencoded"},
+        )
+        resp = json.loads(urllib.request.urlopen(req, timeout=10).read())
+        access = resp.get("access_token")
+        if not access:
+            return None, f"oauth refresh returned no access_token: {resp}"
+        info = json.loads(urllib.request.urlopen(
+            urllib.request.Request(
+                "https://www.googleapis.com/oauth2/v3/userinfo",
+                headers={"Authorization": f"Bearer {access}"},
+            ),
+            timeout=10,
+        ).read())
+        email = info.get("email")
+        if not email:
+            return None, f"userinfo returned no email: {info}"
+        return email, None
+    except urllib.error.HTTPError as e:
+        return None, f"HTTP {e.code} resolving clasp identity: {e.reason}"
+    except urllib.error.URLError as e:
+        return None, f"network error resolving clasp identity: {e}"
+    except Exception as e:
+        return None, f"unexpected error resolving clasp identity: {e}"
 
 
 # ── manifest discovery ────────────────────────────────────────────────────
@@ -310,6 +378,8 @@ def main() -> int:
     ap.add_argument("--list", action="store_true", help="list every known scriptId and exit")
     ap.add_argument("--force-uncommitted", action="store_true",
                     help="push even when source has uncommitted git changes (default: refuse)")
+    ap.add_argument("--allow-identity-mismatch", action="store_true",
+                    help="push even when active clasp identity != project owner_email (default: refuse)")
     args = ap.parse_args()
 
     if args.list:
@@ -356,8 +426,38 @@ def main() -> int:
         return 1
 
     project_block = projects[0]["project"]
-    print(f"\n  owner_email:     {project_block.get('owner_email', '?')}")
+    owner_email = (project_block.get("owner_email") or "").strip().lower()
+    print(f"\n  owner_email:     {owner_email or '?'}")
     print(f"  source_files:    {[s.name for s in all_sources]}")
+
+    # Safety: refuse to push when active clasp identity doesn't match
+    # the project's owner_email. This is the mistake-proofing for the
+    # "1zKgMwd6… must always deploy as admin@truesight.me" class of
+    # constraint — Gary's 2026-05-29 ask.
+    active_email, identity_err = resolve_clasp_identity()
+    if active_email:
+        print(f"  clasp identity:  {active_email}")
+    elif identity_err:
+        print(f"  clasp identity:  (unresolved — {identity_err})")
+
+    if owner_email and active_email and active_email.lower() != owner_email:
+        msg = (
+            f"\n✗ identity mismatch — refusing to push.\n"
+            f"    project owner_email:  {owner_email}\n"
+            f"    active clasp:         {active_email}\n"
+            f"  Switch clasp accounts before pushing:\n"
+            f"    clasp logout && clasp login   # then sign in as {owner_email}\n"
+            f"  Or set CLASPRC_PATH=~/.clasprc-<account>.json to point at a per-account credentials file.\n"
+            f"  Override only when intentional: --allow-identity-mismatch."
+        )
+        if args.push and not args.allow_identity_mismatch:
+            print(msg)
+            return 1
+        elif args.push:
+            print("\n⚠  --allow-identity-mismatch is set; pushing anyway:" + msg)
+        else:
+            # Dry-run still tells the user about the mismatch loudly.
+            print("\n⚠  identity mismatch — push would be refused without --allow-identity-mismatch." + msg)
 
     # Safety: refuse to push when source has uncommitted changes.
     if args.push and not args.force_uncommitted:
