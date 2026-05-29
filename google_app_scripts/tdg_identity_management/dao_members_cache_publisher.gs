@@ -164,7 +164,8 @@ function publishDaoMembersCacheToGithub_(opts) {
       const name = String(row[0] || '').trim();
       if (!name) return;
       votingByName[name.toLowerCase()] = {
-        voting_rights: toNumberOrNull_(row[6]),          // I = Total TDG controlled
+        name: name,                                        // preserve original casing
+        voting_rights: toNumberOrNull_(row[6]),            // I = Total TDG controlled
         total_voting_power_pct: String(row[8] || ''),     // K = Total Voting Power
       };
     });
@@ -216,6 +217,16 @@ function publishDaoMembersCacheToGithub_(opts) {
       created_at: formatTimestamp_(row[1]),
       last_active_at: formatTimestamp_(row[2]),
     });
+  });
+
+  // ----- Ensure every contributor from voting weight sheet is present --------
+  // Contributors who haven't registered any ACTIVE public key are missing from
+  // byName. Add them with an empty public_keys array so dao_members.json is the
+  // superset of all DAO contributors (matching the members.html page).
+  Object.keys(votingByName).forEach(function (k) {
+    if (!byName[k]) {
+      byName[k] = { name: votingByName[k].name || k, email: null, public_keys: [] };
+    }
   });
 
   // ----- Merge voting weight + governor flag + emit sorted contributors ----
