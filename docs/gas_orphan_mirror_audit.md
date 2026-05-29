@@ -1,37 +1,32 @@
 # GAS clasp_mirrors orphan audit
 
-_Generated: 2026-05-28 by `scripts/audit_orphan_clasp_mirrors.py`. Re-run any time `google_app_scripts/` or `clasp_mirrors/` change._
+_Generated: 2026-05-29 by `scripts/audit_orphan_clasp_mirrors.py`. Re-run any time `google_app_scripts/` or `clasp_mirrors/` change._
 
 Resolves the 51-vs-36 delta noted in [`agentic_ai_context/TOKENOMICS_GAS_RESTRUCTURE_PLAN.md` §2](https://github.com/TrueSightDAO/agentic_ai_context/blob/main/TOKENOMICS_GAS_RESTRUCTURE_PLAN.md).
 
 ## Summary
 
-- **36** distinct scriptIds referenced in `google_app_scripts/**/*.gs` source-comment URLs.
-- **51** clasp_mirror folders.
-- **33** healthy (in both).
-- **18** orphan mirrors (mirror exists; no source references it).
+- **37** distinct scriptIds referenced in `google_app_scripts/**/*.gs` source-comment URLs.
+- **47** clasp_mirror folders.
+- **34** healthy (in both).
+- **13** orphan mirrors (mirror exists; no source references it).
 - **3** unmirrored sources (source references; no mirror folder — `clasp push` would fail without one).
 
 ## Orphan mirrors (no source file references this scriptId)
 
 These mirrors have no `.gs` source under `google_app_scripts/` carrying the standard `script.google.com/home/projects/<scriptId>` header URL. Most likely deprecated or historical clones. **Restructure roadmap PR-2…PR-N resolves case-by-case** — don't auto-delete; some may be live GAS projects that just never had the source-comment convention applied.
 
-- `clasp_mirrors/17KSH5GQW1TINrI_O4Kn2F3EvdzCqOC15nASX-hmwCf4_eBlD0c64vKrY/`
 - `clasp_mirrors/1CpAVMPR2mAHlnt20oDhi-_-C8gRbiPbHiemHzlrlpiRgrL0r8MLTMYhi/`
 - `clasp_mirrors/1DYSZKFYM-PsQuCMII7ki-T5H3D8q92yn-9GZ3lzUOLxpH8o3zyxLUFyO/`
 - `clasp_mirrors/1E6XFs1X7GMqAEOJxoINHEYPazuYI7HYSyjqW2s9OhFXENm09ne0mUOER/`
 - `clasp_mirrors/1EBoewfPK3hkHAhEGXD_E6lEIF_qFon6Vh5udnd_wJa_ZENf4APdL1_V2/`
-- `clasp_mirrors/1IBrXqW_uTsFkbKU-fiOTrkfBlxLnX8KHsKSw2qqF3NoOa36wU0OKEVGH/`
 - `clasp_mirrors/1K1wcXFAopSA0cI7oBpu5bl1sagrJ2Quv44B0ppjiIxtl3MKJ_PCsppCf/`
-- `clasp_mirrors/1KreecWzQ1ZRXcqsWuoT8qY1SlQ5MWkmI1YrVBhQ6EMZ67MCV7pTdKx46/`
 - `clasp_mirrors/1P0Mg33i_dD9x9IeoHYvtKrf0xFcmUznpqAswyC_KXR3VJZu-0C-UOP0v/`
 - `clasp_mirrors/1Uq1EHReKpXtf3CnT94Rax9YD8oKxmvyFOBGqnI4heqiW_VTnRzurgido/`
 - `clasp_mirrors/1XmwyzzauOoLUZAbm5jK1GBwWNIDLHBrlA465a3EE7bnNW3cvhqzIR8ml/`
 - `clasp_mirrors/1YpJCLtmSEFLiY9bfvMB_-BToxcTPr9Pf9Wi7YKWzQ6ugkoR3gMVkBUmo/`
 - `clasp_mirrors/1_jTHZZI033E0y2TQNZg98N_bW6lNP2I9sLA__nNQEWpRAw2Q6vsn9DsL/`
-- `clasp_mirrors/1o2lzpdTZBYTTFdXzWJoATxznbqL959b_O7_no2Gd-OV4ryOPZOsqxtpU/`
 - `clasp_mirrors/1ovx-Hq5L5MgzF32qB_cPV_G5Hc6XshKMAYOmiJY8tZ355gzWUqvFCPvn/`
-- `clasp_mirrors/1slQVojn5P2wC7l5LdFesFT243afkZ2HQ9no9mciExl574VeOe3Wom2rW/`
 - `clasp_mirrors/1yDOuOZgfbzOllbbxHpMTNLZo3-7SNl1-wtq1oQzqiMPOoxiFpMrhzSOw/`
 - `clasp_mirrors/1zAXSdLe_vigsygxqX41w_evQb3KfrtzUc4rFI3AxwdUjp8E-h3nIvgDG/`
 
@@ -49,7 +44,7 @@ These would fail at `clasp push` time because there is no local clasp project to
 
 ## Healthy
 
-_33 scriptIds appear in both `google_app_scripts/` and `clasp_mirrors/`._
+_34 scriptIds appear in both `google_app_scripts/` and `clasp_mirrors/`._
 
 <details><summary>Show full list</summary>
 
@@ -63,6 +58,7 @@ _33 scriptIds appear in both `google_app_scripts/` and `clasp_mirrors/`._
 - `1BHAGZd_T1I5mQnqnAFqUJKX2x_N8Uv05n1O2OohRA908Ja8wVwVxaR7K`
 - `1Dh_QQUn8hGGo75RsPpsN-GMn-uFgw-akwyv3uSZgO140J3NfQzsnuu9s`
 - `1Dj3-m_ejxYJ4UQK2zNadnqNHJIvPQfj-VYvH9_Gnap6MYRmOJhK3B0VR`
+- `1IBrXqW_uTsFkbKU-fiOTrkfBlxLnX8KHsKSw2qqF3NoOa36wU0OKEVGH`
 - `1Jp8qNIBCZaRTlmOmbJoJmYnSFyXtQkUHP2Qv5uqKZpt0Ugo-e25nhASF`
 - `1LxWu9hOs56JZ6Mbxra3eDv74xjpjgkJQW40xjpQBIHObsqiv1D5jr5fK`
 - `1N6o00N9VtRK_L3e0NQXEsmC6QME1KObZdmdbJgo0Tbgj_7P-ElNL5THn`

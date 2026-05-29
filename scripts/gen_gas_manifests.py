@@ -79,7 +79,11 @@ def emit_manifest(folder: Path) -> dict | None:
         projects.append({
             "name": prior.get("name") or f"TBC — confirm display name in GAS UI for {sid[:12]}…",
             "scriptId": sid,
-            "owner_email": prior.get("owner_email") or "admin@truesight.me",
+            # Default for newly-discovered scriptIds is garyjob@agroverse.shop
+            # per Gary's rule (2026-05-28). Known admin@truesight.me senders
+            # are pinned via scripts/assign_gas_owner_emails.py — run that
+            # after gen to apply the override.
+            "owner_email": prior.get("owner_email") or "garyjob@agroverse.shop",
             "deployments": prior.get("deployments") or {
                 "head": "TBC — list every /exec URL for this scriptId in pre-flight"
             },
