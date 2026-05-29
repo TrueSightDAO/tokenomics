@@ -164,7 +164,8 @@ function publishDaoMembersCacheToGithub_(opts) {
       const name = String(row[0] || '').trim();
       if (!name) return;
       votingByName[name.toLowerCase()] = {
-        voting_rights: toNumberOrNull_(row[6]),          // I = Total TDG controlled
+        name: name,                                        // preserve original casing
+        voting_rights: toNumberOrNull_(row[6]),            // I = Total TDG controlled
         total_voting_power_pct: String(row[8] || ''),     // K = Total Voting Power
       };
     });
