@@ -218,6 +218,16 @@ function publishDaoMembersCacheToGithub_(opts) {
     });
   });
 
+  // ----- Ensure every contributor from voting weight sheet is present --------
+  // Contributors who haven't registered any ACTIVE public key are missing from
+  // byName. Add them with an empty public_keys array so dao_members.json is the
+  // superset of all DAO contributors (matching the members.html page).
+  Object.keys(votingByName).forEach(function (k) {
+    if (!byName[k]) {
+      byName[k] = { name: votingByName[k].name || k, email: null, public_keys: [] };
+    }
+  });
+
   // ----- Merge voting weight + governor flag + emit sorted contributors ----
   const contributors = Object.keys(byName).sort().map(function (k) {
     const entry = byName[k];
