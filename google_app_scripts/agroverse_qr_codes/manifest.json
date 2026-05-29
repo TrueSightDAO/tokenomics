@@ -6,8 +6,23 @@
     "completeness": "audit-derived; PR-1 captures only what is in source comments. Pre-flight checklist (roadmap §4) must be resolved before promoting to v1.",
     "schema_version": "v0-audit"
   },
-  "project_count": 4,
+  "project_count": 5,
   "projects": [
+    {
+      "name": "TBC — confirm display name in GAS UI for 1IBrXqW_uTsF…",
+      "scriptId": "1IBrXqW_uTsFkbKU-fiOTrkfBlxLnX8KHsKSw2qqF3NoOa36wU0OKEVGH",
+      "owner_email": "garyjob@agroverse.shop",
+      "deployments": {
+        "head": "TBC — list every /exec URL for this scriptId in pre-flight"
+      },
+      "post_push_hooks": [],
+      "consumer_callers": [],
+      "candidate_cache_refresh_hooks": [],
+      "source_files": [
+        "subscription_notification.gs"
+      ],
+      "notes": "Audit-derived from in-source header-comment scriptIds on 2026-05-28. Pre-flight checklist (TOKENOMICS_GAS_RESTRUCTURE_PLAN.md §4) must resolve: full deployments list, post-push cache-refresh hooks, confirmed owner_email, consumer callers."
+    },
     {
       "name": "TBC — confirm display name in GAS UI for 1MnAsIQAxcSf…",
       "scriptId": "1MnAsIQAxcSfZO_hALOtMFJ4y1k4OnqeXKMwYs6xev600rPNUYepqcXsT",
