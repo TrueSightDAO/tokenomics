@@ -52,6 +52,7 @@
       ],
       "source_files": [
         "edgar_send_email_verification.gs",
+        "edgar_send_onboarding_invitation.gs",
         "email_verification_from_edgar.gs"
       ],
       "notes": "Audit-derived from in-source header-comment scriptIds on 2026-05-28. Pre-flight checklist (TOKENOMICS_GAS_RESTRUCTURE_PLAN.md §4) must resolve: full deployments list, post-push cache-refresh hooks, confirmed owner_email, consumer callers."
