@@ -37,6 +37,63 @@ scripts/deploy_gas_project.py <scriptId> --push --with-hooks
    manifest-declared method + body. `$ENV_VAR` placeholders in body values
    are resolved from the local environment.
 
+## Identity pinning (owner_email vs active clasp account)
+
+Each manifest project block carries an `owner_email` field (PR-1d) that
+specifies *which Google account this scriptId is supposed to deploy as.*
+The deploy script enforces it:
+
+- Before any push, it resolves the **active clasp identity** by
+  exchanging `~/.clasprc.json`'s refresh token for an access token, then
+  calling `oauth2/v3/userinfo`.
+- If the active identity doesn't equal `owner_email`, the script
+  **refuses to push** with a clear "switch accounts" message.
+- Override only when intentional: `--allow-identity-mismatch`.
+
+This is the mistake-proofing for the `1zKgMwd6…` class of constraint:
+the Gmail digital-signature ingestion project must always deploy as
+admin@truesight.me, never as the daily-driver gary@. Even if a tired
+operator runs `deploy_gas_project.py 1zKgMwd6…` from the wrong shell at
+1am, the push won't go through.
+
+### Switching clasp identity (one-time per session)
+
+```bash
+clasp logout
+clasp login   # sign in as the right Google account in the browser flow
+```
+
+### Multiple clasp identities (recommended if you deploy across accounts)
+
+Store one credentials file per account:
+
+```bash
+# As gary@agroverse.shop:
+clasp login
+cp ~/.clasprc.json ~/.clasprc-gary.json
+
+# As admin@truesight.me:
+clasp logout && clasp login   # sign in as admin@
+cp ~/.clasprc.json ~/.clasprc-admin.json
+```
+
+Then point clasp at the right one per deploy:
+
+```bash
+# Deploy a gary@ project:
+CLASPRC_PATH=~/.clasprc-gary.json scripts/deploy_gas_project.py <scriptId> --push
+
+# Deploy an admin@ project:
+CLASPRC_PATH=~/.clasprc-admin.json scripts/deploy_gas_project.py <scriptId> --push
+```
+
+The `CLASPRC_PATH` env var changes which file the deploy script reads
+for identity resolution. **It does not currently change which file
+`clasp` itself reads** — clasp still looks at `~/.clasprc.json`. So
+the per-account-clasprc workflow is: copy the right `~/.clasprc-<account>.json`
+to `~/.clasprc.json` before invoking the deploy script. (A future PR
+could automate the swap; out of scope for this one.)
+
 ## Safety
 
 - **Dry-run by default.** Re-run with `--push` to actually do anything.
