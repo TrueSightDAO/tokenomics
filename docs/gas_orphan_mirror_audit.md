@@ -7,10 +7,10 @@ Resolves the 51-vs-36 delta noted in [`agentic_ai_context/TOKENOMICS_GAS_RESTRUC
 ## Summary
 
 - **37** distinct scriptIds referenced in `google_app_scripts/**/*.gs` source-comment URLs.
-- **49** clasp_mirror folders.
-- **36** healthy (in both).
+- **50** clasp_mirror folders.
+- **37** healthy (in both).
 - **13** orphan mirrors (mirror exists; no source references it).
-- **1** unmirrored sources (source references; no mirror folder — `clasp push` would fail without one).
+- **0** unmirrored sources (source references; no mirror folder — `clasp push` would fail without one).
 
 ## Orphan mirrors (no source file references this scriptId)
 
@@ -34,12 +34,11 @@ These mirrors have no `.gs` source under `google_app_scripts/` carrying the stan
 
 These would fail at `clasp push` time because there is no local clasp project to push to. Mint the mirror via `scripts/clone_clasp_mirrors.mjs` (or whatever the workspace convention is) **before** the restructure PR for that scriptId lands.
 
-- `1zKgMwd6KJFjoWkRH6OobgFvtVzrXVuEKfxVbgixgnfcp4TZTjrsfNKq0` — referenced by:
-    - `google_app_scripts/tdg_identity_management/register_member_digital_signatures_email.gs`
+_(none — every referenced scriptId has a corresponding mirror folder.)_
 
 ## Healthy
 
-_36 scriptIds appear in both `google_app_scripts/` and `clasp_mirrors/`._
+_37 scriptIds appear in both `google_app_scripts/` and `clasp_mirrors/`._
 
 <details><summary>Show full list</summary>
 
@@ -79,5 +78,6 @@ _36 scriptIds appear in both `google_app_scripts/` and `clasp_mirrors/`._
 - `1wONDeDwZ_fXNapDKpstWrBION3aV3r7NXwq7PCdqbW1LvI5ceaykQNbR`
 - `1wmgYPwfRDxpiboa8OH-C6Ndovklf8HaJY305n7dhRzs7BmUBQg7fL_sZ`
 - `1y6JVYwqdrFD4zHT4zyIfU762RRsW7GgZKPVuzorpwUS61mDnFQZ65Qsz`
+- `1zKgMwd6KJFjoWkRH6OobgFvtVzrXVuEKfxVbgixgnfcp4TZTjrsfNKq0`
 
 </details>
