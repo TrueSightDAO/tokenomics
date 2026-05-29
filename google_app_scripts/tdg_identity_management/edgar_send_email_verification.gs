@@ -97,10 +97,34 @@ function doGet(e) {
     });
   }
 
+  if (action === 'sendOnboardingInvitation') {
+    // Edgar → GET ?action=sendOnboardingInvitation&secret=...&email=...
+    //   &contributor_name=...&inviter_name=...&inviter_email=...&return_url=...
+    // Implementation lives in edgar_send_onboarding_invitation.gs. Sends a
+    // Seth-Godin-voiced welcome to a contributor a governor just added via
+    // dapp/governor_contributor_admin.html. Distinct from the verification
+    // flow above; both run as admin@truesight.me from the same project.
+    logEmailVerification_('doGet', {
+      transport: 'GET',
+      action: 'sendOnboardingInvitation',
+      secret_present: Boolean(e.parameter && e.parameter.secret),
+      email_present: Boolean(e.parameter && e.parameter.email),
+      inviter_name_present: Boolean(e.parameter && e.parameter.inviter_name),
+    });
+    return handleOnboardingInvitationRequest_({
+      secret: e.parameter.secret,
+      email: e.parameter.email,
+      contributor_name: e.parameter.contributor_name || '',
+      inviter_name: e.parameter.inviter_name || '',
+      inviter_email: e.parameter.inviter_email || '',
+      return_url: e.parameter.return_url || '',
+    });
+  }
+
   return ContentService.createTextOutput(
     JSON.stringify({
       ok: false,
-      error: 'No valid action (use action=sendEmailVerification, action=refresh_dao_members_cache, or action=apply_permission_change on GET, or POST JSON for email verification).',
+      error: 'No valid action (use action=sendEmailVerification, action=sendOnboardingInvitation, action=refresh_dao_members_cache, or action=apply_permission_change on GET, or POST JSON).',
     })
   ).setMimeType(ContentService.MimeType.JSON);
 }
@@ -169,13 +193,30 @@ function handleEmailVerificationRequest_(body) {
 }
 
 /**
- * Edgar → POST JSON { secret, email, verification_key, return_url }
+ * Edgar → POST JSON. Dispatches on `action` field:
+ *   - "sendEmailVerification" (default for backward compat) → email verification
+ *   - "sendOnboardingInvitation"                            → onboarding invitation
+ * Other action values fall through to verification for backward compat.
  */
 function doPost(e) {
   try {
     const body = e.postData && e.postData.contents ? JSON.parse(e.postData.contents) : {};
+    const action = body && body.action ? String(body.action) : 'sendEmailVerification';
+
+    if (action === 'sendOnboardingInvitation') {
+      logEmailVerification_('doPost', {
+        transport: 'POST_JSON',
+        action: action,
+        secret_present: Boolean(body && body.secret),
+        email_present: Boolean(body && body.email),
+        inviter_name_present: Boolean(body && body.inviter_name),
+      });
+      return handleOnboardingInvitationRequest_(body);
+    }
+
     logEmailVerification_('doPost', {
       transport: 'POST_JSON',
+      action: action,
       secret_present: Boolean(body && body.secret),
       email_present: Boolean(body && body.email),
       vk_len: body && body.verification_key ? String(body.verification_key).length : 0,
