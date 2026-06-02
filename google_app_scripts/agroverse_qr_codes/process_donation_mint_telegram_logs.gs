@@ -65,6 +65,40 @@
  *  scoped to tree pledges (it can't mint arbitrary SKUs like cacao bags). */
 var DONATION_MINT_CURRENCY_PATTERN = /tree planting pledge - qr code$/i;
 
+/** Bump this on every deploy. Lets us verify WHICH code version a deployment serves:
+ *  run debugDonationMintCurrencies() in the editor (= @HEAD) vs curl a deployment's
+ *  /exec?action=debugDonationMintCurrencies and compare CODE_MARKER. If they differ,
+ *  that deployment is stale and needs "Manage deployments → New version". */
+var DONATION_MINT_CODE_MARKER = '2026-06-02d-mint-to-managed-ledger';
+
+/** DIAGNOSTIC (safe, read-only): returns the donation-mint validation state — which
+ *  code version is live + which currencies are currently eligible (serializable rows on
+ *  the Currencies tab matching the pledge pattern). Call from the Apps Script editor to
+ *  confirm @HEAD; expose via the web app (doGet ?action=debugDonationMintCurrencies) to
+ *  test a specific deployment URL. */
+function debugDonationMintCurrencies() {
+  var eligible = [];
+  var ss = SpreadsheetApp.openById(SHEET_URL_TO_ID_(SHEET_URL));
+  var ws = ss.getSheetByName('Currencies');
+  if (ws && ws.getLastRow() >= 2) {
+    var rows = ws.getRange(2, 1, ws.getLastRow() - 1, 3).getValues();
+    for (var i = 0; i < rows.length; i++) {
+      var name = String(rows[i][0] || '').trim();
+      var serializable = rows[i][2] === true || String(rows[i][2]).toUpperCase() === 'TRUE';
+      if (name && serializable && DONATION_MINT_CURRENCY_PATTERN.test(name)) eligible.push(name);
+    }
+  }
+  var out = {
+    code_marker: DONATION_MINT_CODE_MARKER,
+    validation: 'dynamic Currencies tab + pattern ' + DONATION_MINT_CURRENCY_PATTERN.toString(),
+    eligible_currencies: eligible,
+    butterfly_effect_eligible:
+      eligible.indexOf('Butterfly Effect Club Tree Planting Pledge - QR Code') !== -1
+  };
+  Logger.log(JSON.stringify(out, null, 2));
+  return out;
+}
+
 /** Donation Pledge dedup tab on the Telegram compilation workbook (sibling to Telegram Chat Logs). */
 var DONATION_PLEDGE_SHEET = 'Donation Pledge';
 
@@ -486,17 +520,59 @@ var DONATION_MINT_OFFCHAIN_TX_SHEET = 'offchain transactions';
  *
  * Returns the row number that was appended.
  */
-function appendDonationMintOffchainTransaction_(eventData) {
+/** Resolve a Currencies `ledger` URL (e.g. `https://truesight.me/sunmint/bec`) to the
+ *  managed ledger's spreadsheet ID via `Shipment Ledger Listing` (col L unresolved URL →
+ *  col AB Resolved URL). Returns '' if not found (caller falls back to main offchain). */
+function resolveManagedLedgerSheetId_(ledgerUrl) {
+  var needle = String(ledgerUrl || '').trim();
+  if (!needle) return '';
   var ss = SpreadsheetApp.openById(DONATION_MINT_GOVERNORS_SPREADSHEET_ID);
-  var ws = ss.getSheetByName(DONATION_MINT_OFFCHAIN_TX_SHEET);
-  if (!ws) throw new Error('offchain transactions sheet not found');
+  var ws = ss.getSheetByName('Shipment Ledger Listing');
+  if (!ws) return '';
+  var last = ws.getLastRow();
+  if (last < 2) return '';
+  var rows = ws.getRange(2, 1, last - 1, 28).getValues(); // A..AB
+  for (var i = 0; i < rows.length; i++) {
+    if (String(rows[i][11] || '').trim() === needle) {        // L: Ledger URL
+      var m = String(rows[i][27] || '').trim().match(/\/d\/([a-zA-Z0-9_-]+)/); // AB: Resolved URL
+      return m ? m[1] : '';
+    }
+  }
+  return '';
+}
 
+function appendDonationMintOffchainTransaction_(eventData) {
   var today = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyyMMdd');
   var description = '[DONATION MINT] ' + (eventData.qr_code || '') +
     (eventData.donor_name ? ' — donor: ' + eventData.donor_name : '') +
     (eventData.donation_amount ? ' (donation: $' + eventData.donation_amount + ')' : '') +
     ' — proof: ' + (eventData.visual_proof_url || '');
 
+  // Write the +1 Pledge asset to the program's OWN managed ledger (resolved from the
+  // currency's `ledger` URL), not the main offchain ledger — so each program's books
+  // stand alone (e.g. BEC). Falls back to main offchain only if no managed ledger resolves.
+  var currencyData = findCurrencyForDonationMint_(eventData.currency);
+  var ledgerSheetId = currencyData ? resolveManagedLedgerSheetId_(currencyData.ledger) : '';
+  if (ledgerSheetId) {
+    var lws = SpreadsheetApp.openById(ledgerSheetId).getSheetByName('Transactions');
+    if (lws) {
+      // Managed-ledger Transactions schema: A Date | B Description | C Entity | D Amount | E Currency | F Transaction Type
+      lws.appendRow([
+        today,
+        description,
+        eventData.governor_name || '',        // C: Entity (asset holder = signing governor)
+        1,                                    // D: Amount (+1 Pledge unit minted)
+        eventData.currency || '',             // E: Currency
+        'Assets'                              // F: Transaction Type (rolls into Balance asset)
+      ]);
+      return 'ledger:' + ledgerSheetId + '#' + lws.getLastRow();
+    }
+  }
+
+  // Fallback (legacy): main offchain transactions ledger.
+  var ss = SpreadsheetApp.openById(DONATION_MINT_GOVERNORS_SPREADSHEET_ID);
+  var ws = ss.getSheetByName(DONATION_MINT_OFFCHAIN_TX_SHEET);
+  if (!ws) throw new Error('offchain transactions sheet not found');
   ws.appendRow([
     today,                                  // A: Transaction Date
     description,                            // B: Description (with proof URL)
