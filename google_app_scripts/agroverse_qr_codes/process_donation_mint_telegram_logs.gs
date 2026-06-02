@@ -56,16 +56,14 @@
  *   - `dapp_permission_change_handler.gs` — Pattern A governor-lookup precedent.
  */
 
-/** Allowed currencies for `[DONATION MINT EVENT]`.
- *  Each entry is a serialized tree-planting pledge SKU whose Currencies `ledger`
- *  URL (col F) routes the mint to a managed ledger. Add a program's pledge
- *  currency here to let its attested members' trees mint via this flow. */
-var DONATION_MINT_ALLOWED_CURRENCIES = [
-  'SunMint Tree Planting Pledge - QR Code',
-  // ERA Professionals — Butterfly Effect Club cohort trees → BEC managed ledger.
-  // QR id == credential pk_hash; per-row landing_page == member profile_url.
-  'Butterfly Effect Club Tree Planting Pledge - QR Code'
-];
+/** Donation-mint currencies are validated **dynamically against the `Currencies` tab**
+ *  (not a hardcoded list — that was brittle: every new program needed a code edit + deploy).
+ *  A currency is eligible iff it (a) exists on `Currencies` and is serializable
+ *  (`findCurrencyForDonationMint_`) AND (b) matches the tree-planting-pledge name pattern.
+ *  So onboarding a program = just add its `<Program> Tree Planting Pledge - QR Code` row to
+ *  `Currencies` (with col F ledger URL); no GAS change. The pattern keeps the donation flow
+ *  scoped to tree pledges (it can't mint arbitrary SKUs like cacao bags). */
+var DONATION_MINT_CURRENCY_PATTERN = /tree planting pledge - qr code$/i;
 
 /** Donation Pledge dedup tab on the Telegram compilation workbook (sibling to Telegram Chat Logs). */
 var DONATION_PLEDGE_SHEET = 'Donation Pledge';
@@ -266,11 +264,14 @@ function validateDonationMintEvent_(fields, fullMessage) {
     });
   }
 
-  if (DONATION_MINT_ALLOWED_CURRENCIES.indexOf(currency) === -1) {
+  // Dynamic validation against the Currencies tab (live) + the pledge name pattern,
+  // instead of a brittle hardcoded allowlist. Any serializable "<Program> Tree Planting
+  // Pledge - QR Code" row on Currencies is eligible — no per-program GAS edit.
+  if (!DONATION_MINT_CURRENCY_PATTERN.test(currency) || !findCurrencyForDonationMint_(currency)) {
     return Object.assign({}, base, {
       ok: false,
       status: 'REJECTED_INVALID_CURRENCY',
-      error_message: 'Currency not in donation-eligible allowlist: ' + currency
+      error_message: 'Currency is not a serializable tree-planting pledge on the Currencies tab: ' + currency
     });
   }
 
