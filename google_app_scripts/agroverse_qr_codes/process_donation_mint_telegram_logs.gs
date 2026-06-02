@@ -56,9 +56,15 @@
  *   - `dapp_permission_change_handler.gs` — Pattern A governor-lookup precedent.
  */
 
-/** Allowed currencies for `[DONATION MINT EVENT]`. V1: single entry. */
+/** Allowed currencies for `[DONATION MINT EVENT]`.
+ *  Each entry is a serialized tree-planting pledge SKU whose Currencies `ledger`
+ *  URL (col F) routes the mint to a managed ledger. Add a program's pledge
+ *  currency here to let its attested members' trees mint via this flow. */
 var DONATION_MINT_ALLOWED_CURRENCIES = [
-  'SunMint Tree Planting Pledge - QR Code'
+  'SunMint Tree Planting Pledge - QR Code',
+  // ERA Professionals — Butterfly Effect Club cohort trees → BEC managed ledger.
+  // QR id == credential pk_hash; per-row landing_page == member profile_url.
+  'Butterfly Effect Club Tree Planting Pledge - QR Code'
 ];
 
 /** Donation Pledge dedup tab on the Telegram compilation workbook (sibling to Telegram Chat Logs). */
@@ -235,6 +241,7 @@ function validateDonationMintEvent_(fields, fullMessage) {
   var donorName = String(fields.donor_name || '').trim();
   var donorEmail = String(fields.donor_email || '').trim();
   var donationAmount = String(fields.donation_amount || '').trim();
+  var landingPage = String(fields.landing_page || '').trim();
   var visualProofUrl = String(fields.destination_contribution_file_location || '').trim();
   var submittedBy = '';
   var sigMatch = (fullMessage || '').match(/My Digital Signature:\s*([^\n]+)/);
@@ -246,6 +253,7 @@ function validateDonationMintEvent_(fields, fullMessage) {
     donor_name: donorName,
     donor_email: donorEmail,
     donation_amount: donationAmount,
+    landing_page: landingPage,
     visual_proof_url: visualProofUrl,
     submitted_by: submittedBy
   };
@@ -359,10 +367,16 @@ function appendDonationMintToAgroverseQrCodes_(eventData, currencyData) {
   var row = createQRCodeRow(eventData.qr_code, currencyData);
 
   // Donation-specific overrides:
+  //   col B (index 1)  — Landing page = per-row override when provided (e.g. a program
+  //                      member's credential profile_url); else stays the Currencies col E
+  //                      default from createQRCodeRow. Col C `ledger` is left as the
+  //                      currency default (the managed-ledger page), so funds routing is
+  //                      unaffected — only the consumer-facing scan target changes.
   //   col L (index 11) — Owner Email = donor email at mint time
   //   col T (index 19) — Price = donation amount (createQRCodeRow defaults to 25)
   //   col U (index 20) — Manager Name = governor's display name (server-validated)
   //   col V (index 21) — Ledger Name = derived from Currencies `ledger` URL
+  if (eventData.landing_page) row[1] = eventData.landing_page;
   if (eventData.donor_email) row[11] = eventData.donor_email;
   var amount = parseFloat(eventData.donation_amount);
   if (!isNaN(amount) && amount > 0) row[19] = amount;
@@ -375,15 +389,25 @@ function appendDonationMintToAgroverseQrCodes_(eventData, currencyData) {
   return ws.getLastRow();
 }
 
-/** Derive the `Ledger Name` (e.g. "AGL4") from the Currencies tab's `ledger` URL.
- *  Single source of truth: Currencies col F. If the Pledge currency moves to a
- *  different AGL ledger later, only one cell needs to change.
- *  Returns '' if the URL doesn't contain an `agl<N>` segment — operator can
- *  back-fill the cell manually in that edge case. */
+/** Derive the `Ledger Name` (e.g. "AGL4", "BEC", "SEF1") from the Currencies tab's
+ *  `ledger` URL (col F). Single source of truth: if the pledge currency moves to a
+ *  different managed ledger later, only one cell needs to change.
+ *
+ *  Resolution order:
+ *    1. An explicit `agl<N>` segment anywhere in the URL → uppercased (e.g. `…/agl4` → `AGL4`).
+ *    2. Otherwise the last non-empty path segment, uppercased (e.g. `…/sunmint/bec` → `BEC`,
+ *       matching the non-AGL managed-ledger codenames like SEF1 / PP1 / BEC).
+ *  Returns '' only if no usable segment is found — operator back-fills col V manually. */
 function ledgerNameFromCurrencies_(currencyData) {
   var url = String(currencyData && currencyData.ledger || '').trim();
-  var m = url.match(/\/(agl\d+)\b/i);
-  return m ? m[1].toUpperCase() : '';
+  if (!url) return '';
+  var aglMatch = url.match(/\/(agl\d+)\b/i);
+  if (aglMatch) return aglMatch[1].toUpperCase();
+  // Strip query/fragment + trailing slash, then take the last path segment.
+  var path = url.split(/[?#]/)[0].replace(/\/+$/, '');
+  var segments = path.split('/');
+  var last = segments.length ? segments[segments.length - 1] : '';
+  return String(last || '').trim().toUpperCase();
 }
 
 /** Inline Currencies-tab lookup, scoped to the donation-mint scanner.
