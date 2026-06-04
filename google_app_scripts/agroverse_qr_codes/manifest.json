@@ -93,6 +93,7 @@
       "candidate_cache_refresh_hooks": [],
       "source_files": [
         "process_donation_mint_telegram_logs.gs",
+        "process_program_registration_telegram_logs.gs",
         "qr_code_web_service.gs"
       ],
       "notes": "Audit-derived from in-source header-comment scriptIds on 2026-05-28. Pre-flight checklist (TOKENOMICS_GAS_RESTRUCTURE_PLAN.md §4) must resolve: full deployments list, post-push cache-refresh hooks, confirmed owner_email, consumer callers."
