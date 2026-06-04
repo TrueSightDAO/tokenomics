@@ -2000,6 +2000,16 @@ function doGet(e) {
       // See process_donation_mint_telegram_logs.gs (same Apps Script project).
       return createCORSResponse(processDonationMintsFromTelegramChatLogs());
     }
+    if (actionStr === 'processProgramRegistrationsFromTelegramChatLogs') {
+      // Triggered by Edgar after a [PROGRAM REGISTRATION REQUEST] lands on Telegram Chat
+      // Logs. Appends a PENDING row to the Program Registrations review tab (no provisioning).
+      // See process_program_registration_telegram_logs.gs (same Apps Script project).
+      return createCORSResponse(processProgramRegistrationsFromTelegramChatLogs());
+    }
+    if (actionStr === 'getPendingProgramRegistrations') {
+      // DApp review page + notification bell read PENDING program-registration requests.
+      return createCORSResponse(getPendingProgramRegistrations(getQueryParam_(e, 'status')));
+    }
     if (shouldRouteToWebLedger_(e)) {
       return doGetWebLedger_(e);
     }
