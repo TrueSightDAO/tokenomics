@@ -349,6 +349,38 @@ function commitPracticeEvent(program, slug, filename, content) {
   };
 }
 
+/**
+ * Fetch + decode an existing committed practice-event file, or null.
+ * Used by reprocessing so re-commits never DOWNGRADE fields enriched
+ * out-of-band — e.g. the 2026-06-05 oracle source_url permalink backfill
+ * (?reading=<sums>&cast=<ts> deep links reconstructed from the original
+ * Telegram texts). A re-parse of the original message only knows the bare
+ * page URL and must not clobber the richer one.
+ */
+function fetchExistingPracticeEvent(program, slug, filename) {
+  var path = 'programs/' + program + '/' + slug + '/practice/' + filename;
+  var url = LC_CONTENTS_API_FMT.replace('{path}', path);
+  try {
+    var resp = UrlFetchApp.fetch(url + '?ref=' + encodeURIComponent(LC_BRANCH), {
+      method: 'get',
+      headers: {
+        Authorization: 'Bearer ' + getGithubToken(),
+        Accept: 'application/vnd.github+json',
+        'User-Agent': 'tdg-credentialing-processing/1.0',
+        'X-GitHub-Api-Version': '2022-11-28',
+      },
+      muteHttpExceptions: true,
+    });
+    var code = resp.getResponseCode();
+    if (code < 200 || code >= 300) return null;
+    var meta = JSON.parse(resp.getContentText());
+    var raw = Utilities.newBlob(Utilities.base64Decode((meta.content || '').replace(/\n/g, ''))).getDataAsString();
+    return JSON.parse(raw);
+  } catch (e) {
+    return null;
+  }
+}
+
 // ============================================================================
 // MAIN PIPELINE
 // ============================================================================
@@ -577,6 +609,24 @@ function reprocessCredentialingRow(rowNumber) {
     },
   };
   var filename = buildEventFilename(parsed.capturedAt, parsed.requestTransactionId);
+
+  // Never-downgrade guard: a reprocess rebuilds the file from the ORIGINAL
+  // message, but the committed file may carry fields enriched after the
+  // fact (oracle source_url permalinks; payloads backfilled out-of-band).
+  // Keep any existing value that is strictly richer than the re-parse.
+  var existing = fetchExistingPracticeEvent(parsed.program, slug, filename);
+  if (existing) {
+    if (existing.source_url && parsed.sourceUrl &&
+        existing.source_url.indexOf(parsed.sourceUrl) === 0 &&
+        existing.source_url.length > parsed.sourceUrl.length) {
+      eventFile.source_url = existing.source_url;
+    }
+    if (!eventFile.payload && existing.payload) {
+      eventFile.payload = existing.payload;
+      eventFile.raw_payload_json = existing.raw_payload_json || '';
+    }
+  }
+
   var commit = commitPracticeEvent(parsed.program, slug, filename, JSON.stringify(eventFile, null, 2));
 
   setIntakeRowStatus(intake, rowNumber, 'PROCESSED', commit.sha || '', commit.html_url || '');
