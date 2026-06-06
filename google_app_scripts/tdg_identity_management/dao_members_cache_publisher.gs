@@ -20,8 +20,11 @@
  *     `null` if no row has an email yet (older legacy contributors).
  *   - `roles` — string array; always includes "member"; includes "governor" if
  *     the contributor's name appears on the `Governors` tab (auto-derived 4×/year
- *     from the trailing 180-day contribution leaderboard).
- *   These two fields back the dapp permission model: `permissions.js` resolves
+ *     from the trailing 180-day contribution leaderboard); includes "sentinel" if
+ *     the contributor's name appears on the `Contributors contact information` tab
+ *     with `Is Sentinel` = TRUE (manual operator assignment for AI agents with
+ *     governor-equivalent operational privileges).
+ *   These fields back the dapp permission model: `permissions.js` resolves
  *   the signed-in RSA → contributor → roles, and gates governor-only UI/actions
  *   (add-contributor, governor chat, act-on-behalf-of-other) accordingly. The
  *   email is also used by the dedup pre-flight on the new add-contributor flow.
@@ -53,6 +56,12 @@ const DAO_MEMBERS_CACHE_GOVERNORS_SHEET = 'Governors';
 // formulas elsewhere in the workbook based on the trailing contribution
 // leaderboard; we just read the resolved name strings here.
 const DAO_MEMBERS_CACHE_GOVERNORS_FIRST_ROW = 11;
+
+// Sentinel flag lives on Contributors contact information tab, column W
+// (Is Sentinel). Header row is 4, data starts at row 5.
+const DAO_MEMBERS_CACHE_CONTACT_SHEET = 'Contributors contact information';
+const DAO_MEMBERS_CACHE_CONTACT_HEADER_ROW = 4;
+const DAO_MEMBERS_CACHE_SENTINEL_COL = 23; // Column W = index 22 (0-based)
 const DAO_MEMBERS_CACHE_REPO_OWNER = 'TrueSightDAO';
 const DAO_MEMBERS_CACHE_REPO_NAME = 'treasury-cache';
 const DAO_MEMBERS_CACHE_REPO_PATH = 'dao_members.json';
@@ -171,6 +180,32 @@ function publishDaoMembersCacheToGithub_(opts) {
     });
   }
 
+  // ----- Contributors contact information — Sentinel flag -------------------
+  // Column A = Name, Column W = Is Sentinel (TRUE/FALSE). Header row 4,
+  // data starts at row 5. Build a sentinelByName map (lowercased names).
+  const contactSheet = ss.getSheetByName(DAO_MEMBERS_CACHE_CONTACT_SHEET);
+  const sentinelByName = {};
+  if (contactSheet) {
+    const contactLastRow = contactSheet.getLastRow();
+    if (contactLastRow >= DAO_MEMBERS_CACHE_CONTACT_HEADER_ROW + 1) {
+      const contactRows = contactSheet.getRange(
+          DAO_MEMBERS_CACHE_CONTACT_HEADER_ROW + 1, 1,
+          contactLastRow - DAO_MEMBERS_CACHE_CONTACT_HEADER_ROW,
+          DAO_MEMBERS_CACHE_SENTINEL_COL
+      ).getValues();
+      contactRows.forEach(function (row) {
+        const name = String(row[0] || '').trim();
+        const isSentinel = String(row[DAO_MEMBERS_CACHE_SENTINEL_COL - 1] || '').trim().toUpperCase();
+        if (!name || isSentinel !== 'TRUE') return;
+        sentinelByName[name.toLowerCase()] = true;
+      });
+    }
+  } else {
+    Logger.log(
+        'Warning: ' + DAO_MEMBERS_CACHE_CONTACT_SHEET + ' tab not found; ' +
+        'no contributors will be flagged as sentinel.');
+  }
+
   // ----- Governors tab — names of currently-elected governors --------------
   // Read column A from row 11 to last-row, lowercase, stash in a Set-like map.
   // The leaderboard is recomputed quarterly (equinoxes / solstices) by the
@@ -235,10 +270,11 @@ function publishDaoMembersCacheToGithub_(opts) {
     const voting = votingByName[k] || {};
     const roles = ['member'];
     if (governorsByName[k]) roles.unshift('governor');
+    if (sentinelByName[k]) roles.push('sentinel');
     return {
       name: entry.name,
       email: entry.email,                                  // may be null
-      roles: roles,                                        // ["governor","member"] or ["member"]
+      roles: roles,                                        // ["governor","member"], ["member","sentinel"], or ["member"]
       voting_rights: voting.voting_rights,                 // may be null
       total_voting_power_pct: voting.total_voting_power_pct || null,
       public_keys: entry.public_keys,
@@ -279,6 +315,9 @@ function publishDaoMembersCacheToGithub_(opts) {
       governors: contributors.reduce(function (sum, c) {
         return sum + (c.roles.indexOf('governor') >= 0 ? 1 : 0);
       }, 0),
+      sentinels: contributors.reduce(function (sum, c) {
+        return sum + (c.roles.indexOf('sentinel') >= 0 ? 1 : 0);
+      }, 0),
       contributors_with_email: contributors.reduce(function (sum, c) {
         return sum + (c.email ? 1 : 0);
       }, 0),
@@ -292,6 +331,7 @@ function publishDaoMembersCacheToGithub_(opts) {
   const commitMessage =
       'chore: refresh dao_members.json (' + snapshot.counts.contributors +
       ' contributors, ' + snapshot.counts.governors + ' governors, ' +
+      snapshot.counts.sentinels + ' sentinels, ' +
       snapshot.counts.contributors_with_email + ' with email, ' +
       snapshot.counts.active_public_keys + ' active keys, trigger=' +
       snapshot.trigger + ')';
