@@ -176,6 +176,37 @@ function publishDaoMembersCacheToGithub_(opts) {
     });
   }
 
+  // ----- Contributors contact information — sentinel flag --------------------
+  // Column A = name, column W (index 22) = Is Sentinel (TRUE/FALSE).
+  // Header row 4, data starts row 5.
+  const contactSheet = ss.getSheetByName(DAO_MEMBERS_CACHE_CONTACT_SHEET);
+  const sentinelByName = {};
+  if (contactSheet) {
+    const contactLastRow = contactSheet.getLastRow();
+    if (contactLastRow >= DAO_MEMBERS_CACHE_CONTACT_HEADER_ROW + 1) {
+      const contactRows = contactSheet.getRange(
+          DAO_MEMBERS_CACHE_CONTACT_HEADER_ROW + 1, 1,
+          contactLastRow - DAO_MEMBERS_CACHE_CONTACT_HEADER_ROW, 2
+      ).getValues();
+      // Read column W separately (can't read non-contiguous columns in one range)
+      const sentinelValues = contactSheet.getRange(
+          DAO_MEMBERS_CACHE_CONTACT_HEADER_ROW + 1,
+          DAO_MEMBERS_CACHE_CONTACT_SENTINEL_COL + 1,
+          contactLastRow - DAO_MEMBERS_CACHE_CONTACT_HEADER_ROW, 1
+      ).getValues();
+      contactRows.forEach(function (row, idx) {
+        const name = String(row[0] || '').trim();
+        if (!name) return;
+        const isSentinel = String(sentinelValues[idx][0] || '').trim().toUpperCase() === 'TRUE';
+        if (isSentinel) {
+          sentinelByName[name.toLowerCase()] = true;
+        }
+      });
+    }
+  } else {
+    Logger.log('Warning: ' + DAO_MEMBERS_CACHE_CONTACT_SHEET + ' tab not found; no sentinel roles will be assigned.');
+  }
+
   // ----- Governors tab — names of currently-elected governors --------------
   // Read column A from row 11 to last-row, lowercase, stash in a Set-like map.
   // The leaderboard is recomputed quarterly (equinoxes / solstices) by the
