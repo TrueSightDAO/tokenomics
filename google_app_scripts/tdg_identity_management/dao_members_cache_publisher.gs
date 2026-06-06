@@ -271,6 +271,7 @@ function publishDaoMembersCacheToGithub_(opts) {
     const voting = votingByName[k] || {};
     const roles = ['member'];
     if (governorsByName[k]) roles.unshift('governor');
+    if (sentinelByName[k]) roles.push('sentinel');
     return {
       name: entry.name,
       email: entry.email,                                  // may be null
