@@ -20,7 +20,9 @@
  *     `null` if no row has an email yet (older legacy contributors).
  *   - `roles` — string array; always includes "member"; includes "governor" if
  *     the contributor's name appears on the `Governors` tab (auto-derived 4×/year
- *     from the trailing 180-day contribution leaderboard).
+ *     from the trailing 180-day contribution leaderboard); includes "sentinel" if
+ *     the contributor's name has `Is Sentinel` = TRUE on the
+ *     `Contributors contact information` tab (column W, header row 4).
  *   These two fields back the dapp permission model: `permissions.js` resolves
  *   the signed-in RSA → contributor → roles, and gates governor-only UI/actions
  *   (add-contributor, governor chat, act-on-behalf-of-other) accordingly. The
