@@ -332,6 +332,7 @@ function publishDaoMembersCacheToGithub_(opts) {
   const commitMessage =
       'chore: refresh dao_members.json (' + snapshot.counts.contributors +
       ' contributors, ' + snapshot.counts.governors + ' governors, ' +
+      snapshot.counts.sentinels + ' sentinels, ' +
       snapshot.counts.contributors_with_email + ' with email, ' +
       snapshot.counts.active_public_keys + ' active keys, trigger=' +
       snapshot.trigger + ')';
