@@ -55,6 +55,9 @@ const DAO_MEMBERS_CACHE_GOVERNORS_SHEET = 'Governors';
 // formulas elsewhere in the workbook based on the trailing contribution
 // leaderboard; we just read the resolved name strings here.
 const DAO_MEMBERS_CACHE_GOVERNORS_FIRST_ROW = 11;
+const DAO_MEMBERS_CACHE_CONTACT_SHEET = 'Contributors contact information';
+const DAO_MEMBERS_CACHE_CONTACT_HEADER_ROW = 4;
+const DAO_MEMBERS_CACHE_CONTACT_SENTINEL_COL = 22;  // Column W (0-based)
 const DAO_MEMBERS_CACHE_REPO_OWNER = 'TrueSightDAO';
 const DAO_MEMBERS_CACHE_REPO_NAME = 'treasury-cache';
 const DAO_MEMBERS_CACHE_REPO_PATH = 'dao_members.json';
