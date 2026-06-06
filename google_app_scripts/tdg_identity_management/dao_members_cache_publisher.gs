@@ -316,6 +316,9 @@ function publishDaoMembersCacheToGithub_(opts) {
       governors: contributors.reduce(function (sum, c) {
         return sum + (c.roles.indexOf('governor') >= 0 ? 1 : 0);
       }, 0),
+      sentinels: contributors.reduce(function (sum, c) {
+        return sum + (c.roles.indexOf('sentinel') >= 0 ? 1 : 0);
+      }, 0),
       contributors_with_email: contributors.reduce(function (sum, c) {
         return sum + (c.email ? 1 : 0);
       }, 0),
