@@ -48,6 +48,8 @@ const DAO_MEMBERS_CACHE_SPREADSHEET_ID =
 const DAO_MEMBERS_CACHE_SIGS_SHEET = 'Contributors Digital Signatures';
 const DAO_MEMBERS_CACHE_VOTING_SHEET = 'Contributors voting weight';
 const DAO_MEMBERS_CACHE_GOVERNORS_SHEET = 'Governors';
+// "Is Sentinel" = TRUE on this sheet → the "sentinel" role (autopilot persona).
+const DAO_MEMBERS_CACHE_CONTACT_SHEET = 'Contributors contact information';
 // Governor names live in column A starting at row 11 (rows 1–10 are header /
 // configuration / equinox-rotation copy). The cell list is auto-populated by
 // formulas elsewhere in the workbook based on the trailing contribution
@@ -196,6 +198,60 @@ function publishDaoMembersCacheToGithub_(opts) {
         'all contributors will be emitted with roles=["member"] only.');
   }
 
+  // ----- Sentinel flag — "Contributors contact information" sheet ----------
+  // A contributor with "Is Sentinel" = TRUE gets the "sentinel" role (autopilot
+  // persona). Columns are located by header (so layout shifts don't break it);
+  // join by name, with email as a fallback. Missing sheet/column → no sentinels,
+  // never breaks the cache.
+  const sentinelByName = {};
+  const sentinelByEmail = {};
+  const contactSheet = ss.getSheetByName(DAO_MEMBERS_CACHE_CONTACT_SHEET);
+  if (contactSheet && contactSheet.getLastRow() >= 2) {
+    const cVals = contactSheet.getDataRange().getValues();
+    // The header is NOT on row 1 (this sheet keeps config/legend rows up top —
+    // "Is Sentinel" lives on row 4). Auto-detect the header row by scanning the
+    // first few rows for the one that actually carries the "sentinel" column, so
+    // a future layout shift doesn't silently break the join.
+    var headerRowIdx = 0;
+    for (var hr = 0; hr < Math.min(cVals.length, 10); hr++) {
+      var hasSentinel = (cVals[hr] || []).some(function (h) {
+        return String(h || '').trim().toLowerCase().indexOf('sentinel') >= 0;
+      });
+      if (hasSentinel) { headerRowIdx = hr; break; }
+    }
+    const cHeader = (cVals[headerRowIdx] || []).map(function (h) { return String(h || '').trim().toLowerCase(); });
+    const findCol = function (preds) {
+      for (var pi = 0; pi < preds.length; pi++) {
+        for (var i = 0; i < cHeader.length; i++) { if (preds[pi](cHeader[i])) return i; }
+      }
+      return -1;
+    };
+    const sentinelCol = findCol([function (h) { return h.indexOf('sentinel') >= 0; }]);
+    const nameCol = findCol([
+      function (h) { return h === 'name' || h === 'contributor name' || h === 'full name'; },
+      function (h) { return h.indexOf('name') >= 0; },
+    ]);
+    const emailCol = findCol([function (h) { return h.indexOf('email') >= 0; }]);
+    if (sentinelCol < 0) {
+      Logger.log('dao_members_cache: no "Is Sentinel" column in ' + DAO_MEMBERS_CACHE_CONTACT_SHEET);
+    } else {
+      for (var r = headerRowIdx + 1; r < cVals.length; r++) {
+        var sv = cVals[r][sentinelCol];
+        if (sv !== true && String(sv).trim().toUpperCase() !== 'TRUE') continue;
+        if (nameCol >= 0) {
+          var nm = String(cVals[r][nameCol] || '').trim().toLowerCase();
+          if (nm) sentinelByName[nm] = true;
+        }
+        if (emailCol >= 0) {
+          var em = String(cVals[r][emailCol] || '').trim().toLowerCase();
+          if (em) sentinelByEmail[em] = true;
+        }
+      }
+    }
+  } else {
+    Logger.log('dao_members_cache: ' + DAO_MEMBERS_CACHE_CONTACT_SHEET + ' not found/empty; no sentinel roles.');
+  }
+
   // ----- Aggregate signatures by contributor name --------------------------
   // Email lives on col F (`Contributor Email Address`); per-key in the sheet
   // but we hoist the first non-empty email to the contributor record because
@@ -235,6 +291,7 @@ function publishDaoMembersCacheToGithub_(opts) {
     const voting = votingByName[k] || {};
     const roles = ['member'];
     if (governorsByName[k]) roles.unshift('governor');
+    if (sentinelByName[k] || (entry.email && sentinelByEmail[entry.email])) roles.push('sentinel');
     return {
       name: entry.name,
       email: entry.email,                                  // may be null
