@@ -601,6 +601,9 @@ class GitHubWebhookHandler:
         
         # Use target repository and path if provided, otherwise use defaults
         repo = target_repo or GITHUB_REPOSITORY
+        # If a target_path was provided via CLI, use it; otherwise fall back to qr_code_value.png
+        if not target_path and args.target_path:
+            target_path = args.target_path
         path = target_path or f"{qr_code_value}.png"
         api_url = f"https://api.github.com/repos/{repo}/contents/{path}"
         
@@ -851,6 +854,7 @@ def main():
     parser.add_argument("--is-cacao", action="store_true", help="Mark as cacao product (uses agroverse logo)")
     parser.add_argument("--github-token", help="GitHub personal access token")
     parser.add_argument("--no-commit", action="store_true", help="Don't commit to GitHub")
+    parser.add_argument("--target-path", help="Target path in the GitHub repo (e.g. pngs/E2E_TEST.png)")
     parser.add_argument("--output-file", help="Output file for results (JSON)")
     
     args = parser.parse_args()
