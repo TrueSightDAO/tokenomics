@@ -90,7 +90,7 @@ jobs:
         if [ -n "$STATE" ]; then CMD="$CMD --state \"$STATE\""; fi
         if [ -n "$COUNTRY" ]; then CMD="$CMD --country \"$COUNTRY\""; fi
         if [ -n "$YEAR" ]; then CMD="$CMD --year \"$YEAR\""; fi
-        CMD="$CMD --target-path "generated_qr_codes/$QR_CODE.png""
+        CMD="$CMD --target-path generated_qr_codes/$QR_CODE.png"
         CMD="$CMD --output-file results.json"
         
         echo "Running: $CMD"
