@@ -61,37 +61,39 @@ jobs:
       env:
         QR_CODE_REPOSITORY_TOKEN: ${{ secrets.QR_CODE_REPOSITORY_TOKEN }}
         GITHUB_REPOSITORY: TrueSightDAO/qr_codes
-        GDRIVE_KEY: ${{ secrets.GDRIVE_KEY }}
       run: |
         # Change to the agroverse_qr_code_web_service directory
         cd tokenomics/agroverse_qr_code_web_service
         
-        # Create a temporary script to handle arguments properly
-        cat > run_webhook.sh << 'EOF'
-        #!/bin/bash
-        set -e
+        # Use client_payload data directly (no sheet read needed)
+        QR_CODE="${{ github.event.client_payload.qr_code }}"
+        LANDING_PAGE="${{ github.event.client_payload.landing_page }}"
+        FARM_NAME="${{ github.event.client_payload.farm_name }}"
+        STATE="${{ github.event.client_payload.state }}"
+        COUNTRY="${{ github.event.client_payload.country }}"
+        YEAR="${{ github.event.client_payload.year }}"
+        CURRENCY="${{ github.event.client_payload.currency }}"
+        STATUS="${{ github.event.client_payload.status }}"
+        MANAGER="${{ github.event.client_payload.manager }}"
+        CREATION_DATE="${{ github.event.client_payload.creation_date }}"
         
-        SHEET_ROW="$1"
-        OUTPUT_FILE="$2"
-        NO_COMMIT="$3"
+        echo "Generating QR code: $QR_CODE"
+        echo "Farm: $FARM_NAME, $STATE, $COUNTRY"
+        echo "Currency: $CURRENCY"
         
-        CMD="python github_webhook_handler.py --sheet-row \"$SHEET_ROW\" --output-file \"$OUTPUT_FILE\""
-        
-        if [ "$NO_COMMIT" = "true" ]; then
-          CMD="$CMD --no-commit"
-        fi
+        # Build command with available params
+        CMD="python github_webhook_handler.py"
+        CMD="$CMD --product-name \"$CURRENCY\""
+        CMD="$CMD --qr-code-value \"$QR_CODE\""
+        CMD="$CMD --landing-page-url \"$LANDING_PAGE\""
+        CMD="$CMD --farm-name \"$FARM_NAME\""
+        if [ -n "$STATE" ]; then CMD="$CMD --state \"$STATE\""; fi
+        if [ -n "$COUNTRY" ]; then CMD="$CMD --country \"$COUNTRY\""; fi
+        if [ -n "$YEAR" ]; then CMD="$CMD --year \"$YEAR\""; fi
+        CMD="$CMD --output-file results.json"
         
         echo "Running: $CMD"
         eval $CMD
-        EOF
-        
-        chmod +x run_webhook.sh
-        
-        # Run the webhook handler
-        ./run_webhook.sh \
-          "${{ steps.extract-params.outputs.sheet_row }}" \
-          "results.json" \
-          "${{ steps.extract-params.outputs.no_commit }}"
         
         # Display results
         cat results.json
