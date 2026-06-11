@@ -217,6 +217,7 @@ class GitHubWebhookHandler:
     def __init__(self, github_token=None):
         self.github_token = github_token or GITHUB_TOKEN
         self.workspace = GITHUB_WORKSPACE
+        self.target_path = None
         
         # Ensure to_upload directory exists
         os.makedirs(self.workspace, exist_ok=True)
@@ -601,9 +602,6 @@ class GitHubWebhookHandler:
         
         # Use target repository and path if provided, otherwise use defaults
         repo = target_repo or GITHUB_REPOSITORY
-        # If a target_path was provided via CLI, use it; otherwise fall back to qr_code_value.png
-        if not target_path and args.target_path:
-            target_path = args.target_path
         path = target_path or f"{qr_code_value}.png"
         api_url = f"https://api.github.com/repos/{repo}/contents/{path}"
         
@@ -729,7 +727,7 @@ class GitHubWebhookHandler:
             'path': path
         }
     
-    def handle_webhook_request(self, product_name, landing_page_url=None, farm_name=None, state=None, country=None, year=None, is_cacao=False, auto_commit=True, sheet_data=None):
+    def handle_webhook_request(self, product_name, landing_page_url=None, farm_name=None, state=None, country=None, year=None, is_cacao=False, auto_commit=True, sheet_data=None, target_path=None):
         """Handle webhook request for QR code generation"""
         self.log(f"Starting QR code generation for product: {product_name}")
         
@@ -800,7 +798,7 @@ class GitHubWebhookHandler:
                 self.log(f"🔍 DEBUG: target_path: {target_path}")
                 self.log(f"🔍 DEBUG: Final path will be: {target_path}")
                 
-                upload_result = self.upload_to_github(qr_code_value, qr_image_path, commit_message, target_repo, target_path)
+                upload_result = self.upload_to_github(qr_code_value, qr_image_path, commit_message, target_repo, target_path or self.target_path)
             
             # Return success result
             result = {
@@ -908,6 +906,7 @@ def main():
             state=state,
             country=country,
             year=year,
+            target_path=args.target_path,
             is_cacao=is_cacao,
             auto_commit=not args.no_commit,
             sheet_data=sheet_data
