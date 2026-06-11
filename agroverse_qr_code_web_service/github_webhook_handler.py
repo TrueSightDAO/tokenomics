@@ -850,6 +850,7 @@ def main():
     parser.add_argument("--state", help="State for the QR code")
     parser.add_argument("--country", help="Country for the QR code")
     parser.add_argument("--year", help="Year for the QR code")
+    parser.add_argument("--qr-code-value", help="Pre-defined QR code value (skip auto-generation from product name)")
     parser.add_argument("--is-cacao", action="store_true", help="Mark as cacao product (uses agroverse logo)")
     parser.add_argument("--github-token", help="GitHub personal access token")
     parser.add_argument("--no-commit", action="store_true", help="Don't commit to GitHub")
@@ -889,6 +890,14 @@ def main():
             country = args.country
             year = args.year
             is_cacao = args.is_cacao
+        
+        # Override QR code value if provided
+        if args.qr_code_value:
+            if sheet_data:
+                sheet_data['qr_code_value'] = args.qr_code_value
+            else:
+                # Create a minimal sheet_data with the QR code value
+                sheet_data = {'qr_code_value': args.qr_code_value}
         
         # Handle the webhook request
         result = handler.handle_webhook_request(
