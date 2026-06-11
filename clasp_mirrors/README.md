@@ -21,6 +21,35 @@ node scripts/clone_clasp_mirrors.mjs
 
 Options: `--dry-run`, `--skip-clone` (checklist only), `--force-clone` (delete `<scriptId>/` and re-clone — **destructive**).
 
+## Credentials — two clasp accounts
+
+The autopilot box has **two** clasp credential files at `/home/ubuntu/`:
+
+| File | Account | Owns which scripts |
+|------|---------|-------------------|
+| `.clasprc-admin.json` | `admin@truesight.me` | Most TDG / Edgar / QR-code scripts |
+| `.clasprc-gary.json` | `garyjob@agroverse.shop` | **Agroverse - Shopping Cart** (checkout GAS) |
+
+The default `.clasprc.json` is a symlink to one of these (currently admin).
+
+**Before pushing**, check which account owns the target script:
+```bash
+cat clasp_mirrors/<scriptId>/.clasp-owner   # if it exists
+```
+Then swap credentials:
+```bash
+cp /home/ubuntu/.clasprc-gary.json /home/ubuntu/.clasprc.json   # for gary-owned scripts
+# or
+cp /home/ubuntu/.clasprc-admin.json /home/ubuntu/.clasprc.json  # for admin-owned scripts
+```
+After pushing, restore the default:
+```bash
+cp /home/ubuntu/.clasprc-admin.json /home/ubuntu/.clasprc.json
+```
+
+Every mirror should have a `.clasp-owner` file (single line: the owner email) so
+any Sophia can check before attempting a push.
+
 ## Workflow
 
 1. Treat **`clasp_mirrors/<scriptId>/`** as the folder clasp expects for that cloud project (**master copy** for deploying to Google).
