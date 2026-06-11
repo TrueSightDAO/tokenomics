@@ -59,6 +59,7 @@ jobs:
     
     - name: Generate QR Code
       env:
+        QR_CODE_REPOSITORY_TOKEN: ${{ secrets.QR_CODE_REPOSITORY_TOKEN }}
         GITHUB_REPOSITORY: TrueSightDAO/lineage-assets
       run: |
         # Change to the agroverse_qr_code_web_service directory
@@ -89,8 +90,6 @@ jobs:
         if [ -n "$STATE" ]; then CMD="$CMD --state \"$STATE\""; fi
         if [ -n "$COUNTRY" ]; then CMD="$CMD --country \"$COUNTRY\""; fi
         if [ -n "$YEAR" ]; then CMD="$CMD --year \"$YEAR\""; fi
-        GITHUB_TOKEN="${{ github.event.client_payload.github_token }}"
-        CMD="$CMD --github-token "$GITHUB_TOKEN""
         CMD="$CMD --target-path "pngs/$QR_CODE.png""
         CMD="$CMD --output-file results.json"
         
