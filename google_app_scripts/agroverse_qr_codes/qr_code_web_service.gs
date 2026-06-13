@@ -1840,27 +1840,39 @@ function processBatch() {
       // Force the writes to flush before we read them back
       SpreadsheetApp.flush();
 
-      // Verify each stamp actually persisted. setValue can succeed but the cell
-      // can still come back empty if column M is driven by a formula, has strict
-      // data validation, or sits under a protected range — none of which raise
-      // an exception. This is the most common silent-failure mode.
+      // Verify each stamp persisted — WITH RETRIES. setValue + flush() followed by
+      // an immediate getValue() can transiently read empty on a large sheet even
+      // though the write succeeds (Sheets eventual-consistency: the value lands a
+      // beat after flush). That race was firing false "stamp failed" alerts and
+      // re-sending already-delivered emails (M1/no-formula, no data-validation,
+      // and admin@truesight.me IS an editor — so none of the old (a)/(b)/(c)
+      // causes applied; it was the read-back racing the commit). Re-read, and
+      // re-write, with short backoffs before declaring a genuine failure.
       const unstampedRows = [];
       for (const item of items) {
-        const verify = sheet.getRange(item.rowIndex + 1, TIMESTAMP_COLUMN).getValue();
-        if (!verify) {
-          unstampedRows.push(item.rowIndex + 1);
-        } else {
+        const row = item.rowIndex + 1;
+        let stamped = false;
+        for (let attempt = 0; attempt < 4 && !stamped; attempt++) {
+          if (attempt > 0) {
+            Utilities.sleep(800);
+            sheet.getRange(row, TIMESTAMP_COLUMN).setValue(now); // re-write in case it never landed
+            SpreadsheetApp.flush();
+          }
+          if (sheet.getRange(row, TIMESTAMP_COLUMN).getValue()) stamped = true;
+        }
+        if (stamped) {
           stampedCount += 1;
+        } else {
+          unstampedRows.push(row);
         }
       }
       if (unstampedRows.length > 0) {
         throw new Error(
           'Stamp verification failed for row(s) ' + unstampedRows.join(', ') +
-          '. Column M came back empty after setValue + flush. Likely cause: ' +
-          '(a) ARRAYFORMULA / formula in M1 re-spilling and overwriting the write, ' +
-          '(b) strict data validation on column M rejecting Date input, ' +
-          '(c) protected range on column M restricting this script\'s identity. ' +
-          'Email already sent — these rows will be re-sent next run until M is populated.'
+          ' after 4 write+read retries. Column M still empty — this is now a REAL ' +
+          'persistent write failure (not the read-back race), e.g. a protected ' +
+          'range or formula on column M. Email already sent — these rows will be ' +
+          're-sent next run until M is populated.'
         );
       }
     } catch (e) {
