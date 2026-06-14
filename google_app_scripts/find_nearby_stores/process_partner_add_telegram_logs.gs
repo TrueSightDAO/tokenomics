@@ -70,7 +70,30 @@ function extractMyDigitalSignatureFromText_(text) {
 }
 
 /**
+ * Generate a URL-safe slug from a partner name.
+ * @param {string} name
+ * @return {string}
+ */
+function slugify_(name) {
+  return String(name || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '');
+}
+
+/**
  * Ensure the DAO Partners sheet exists on the Main Ledger.
+ * Uses the EXISTING canonical column layout:
+ *   A: partner_id (slug)
+ *   B: partner_name
+ *   C: partner_page_url
+ *   D: status
+ *   E: contributor_contact_id
+ *   F: location
+ *   G: notes
+ *   H: last_synced_at
+ *   I: partner type
+ *   J: address
  * @param {Spreadsheet} ss
  * @return {Sheet}
  */
@@ -79,16 +102,16 @@ function ensureDAOPartnersSheet_(ss) {
   if (sheet) return sheet;
   sheet = ss.insertSheet(DAO_PARTNERS_SHEET);
   var headers = [
-    'Partner Name',
-    'Email',
-    'Address',
-    'Type',
-    'Website',
-    'About',
-    'Status',
-    'Governor Name',
-    'Submitted At',
-    'Digital Signature'
+    'partner_id',
+    'partner_name',
+    'partner_page_url',
+    'status',
+    'contributor_contact_id',
+    'location',
+    'notes',
+    'last_synced_at',
+    'partner type',
+    'address'
   ];
   sheet.appendRow(headers);
   sheet.getRange(1, 1, 1, headers.length).setFontWeight('bold');
@@ -96,24 +119,39 @@ function ensureDAOPartnersSheet_(ss) {
 }
 
 /**
- * Append one row to DAO Partners.
+ * Append one row to DAO Partners using the canonical column layout.
  * @param {Object} fields
  */
 function appendPartnerAddRow_(fields) {
   var ss = SpreadsheetApp.openById(MAIN_LEDGER_SPREADSHEET_ID);
   var sheet = ensureDAOPartnersSheet_(ss);
+  var slug = slugify_(fields.partner_name || '');
+  var partnerUrl = 'https://agroverse.shop/partners/' + slug + '/';
   var now = new Date().toISOString();
+  var contributorId = (fields.governor_name || '') + ' - ' + (fields.partner_name || '');
+  var location = fields.address || '';
+  // Extract city/state from address for location column
+  if (location) {
+    var parts = location.split(',');
+    if (parts.length >= 2) {
+      location = (parts[parts.length - 2] + ',' + parts[parts.length - 1]).trim();
+    }
+  }
+  var notes = (fields.type || '') + ' partner. Onboarded ' + new Date().toISOString().split('T')[0] + '.';
+  if (fields.about) {
+    notes += ' ' + fields.about;
+  }
   sheet.appendRow([
+    slug,
     fields.partner_name || '',
-    fields.email || '',
-    fields.address || '',
-    fields.type || '',
-    fields.website || '',
-    fields.about || '',
+    partnerUrl,
     'active',
-    fields.governor_name || '',
+    contributorId,
+    location,
+    notes,
     now,
-    fields.digital_signature || ''
+    fields.type || '',
+    fields.address || ''
   ]);
 }
 
