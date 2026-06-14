@@ -20,14 +20,15 @@
       "candidate_cache_refresh_hooks": [],
       "source_files": [
         "process_retail_field_reports_telegram_logs.gs",
-        "process_store_adds_telegram_logs.gs"
+        "process_store_adds_telegram_logs.gs",
+        "process_partner_check_in_telegram_logs.gs",
+        "process_partner_add_telegram_logs.gs"
       ],
       "notes": "Audit-derived from in-source header-comment scriptIds on 2026-05-28. Pre-flight checklist (TOKENOMICS_GAS_RESTRUCTURE_PLAN.md §4) must resolve: full deployments list, post-push cache-refresh hooks, confirmed owner_email, consumer callers."
     }
   ],
   "files_without_scriptid": [
-    "process_deferred_auto_flip.gs",
-    "process_partner_check_in_telegram_logs.gs"
+    "process_deferred_auto_flip.gs"
   ],
   "exec_urls_seen_in_folder_sources": [],
   "see_also": "agentic_ai_context/TOKENOMICS_GAS_RESTRUCTURE_PLAN.md"
