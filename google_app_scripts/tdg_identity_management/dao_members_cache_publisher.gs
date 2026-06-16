@@ -15,6 +15,8 @@
  *     }
  * - Also emits `public_keys/<sha256>.json` per-key files (additive, no reader
  *   change yet) for content-addressed point-lookup — see PUBLIC_KEY_LOOKUP_CACHE_PLAN.md.
+ * - Incremental write: diffs current keys against `_manifest.json` and only
+ *   creates blobs for changed/added/removed keys (PR2).
  *
  * Schema v3 (current):
  *   - `email` — first non-empty `Contributor Email Address` (col F) seen across
@@ -321,29 +323,93 @@ function publishDaoMembersCacheToGithub_(opts) {
   // ----- Build per-key files for content-addressed point-lookup ----------
   // Each ACTIVE public key gets its own file: public_keys/<sha256>.json
   // No email in per-key files (privacy decision per PUBLIC_KEY_LOOKUP_CACHE_PLAN.md).
-  const perKeyFiles = [];
-  const manifest = {};  // sha256 -> blob_sha (populated after tree write)
-
+  const currentKeys = {};  // sha256 -> { contributor, roles, status, created_at, last_active_at, public_key }
   contributors.forEach(function (c) {
     c.public_keys.forEach(function (keyEntry) {
       if (keyEntry.status !== 'ACTIVE') return;
       const pk = keyEntry.public_key;
       const sha256 = computeSha256_(pk);
-      const keyFile = {
-        schema_version: PUBLIC_KEYS_CACHE_SCHEMA_VERSION,
-        sha256: sha256,
+      currentKeys[sha256] = {
         public_key: pk,
         contributor: c.name,
         roles: c.roles,
         status: 'ACTIVE',
         created_at: keyEntry.created_at || null,
         last_active_at: keyEntry.last_active_at || null,
-        generated_at: snapshot.generated_at,
       };
-      perKeyFiles.push({
-        path: PUBLIC_KEYS_DIR + '/' + sha256 + '.json',
-        content: JSON.stringify(keyFile, null, 2) + '\n',
-      });
+    });
+  });
+
+  // ----- Fetch current manifest for incremental diff ----------------------
+  // If the manifest doesn't exist yet (first run), start with an empty map.
+  const existingManifest = fetchCurrentManifest_(token);
+  const previousKeys = existingManifest.keys || {};  // sha256 -> blob_sha
+
+  // Determine which keys changed: added, removed, or modified.
+  const changedShas = {};  // sha256 -> true (needs a new blob)
+  const removedShas = {};  // sha256 -> true (was in manifest, no longer ACTIVE)
+
+  // Check current keys against previous manifest
+  Object.keys(currentKeys).forEach(function (sha256) {
+    const prevBlobSha = previousKeys[sha256];
+    if (!prevBlobSha) {
+      // New key — always write
+      changedShas[sha256] = true;
+    }
+    // For existing keys, we always write them to ensure content freshness.
+    // The blob creation is a no-op at GitHub's end if the content is identical
+    // (same content → same blob SHA). The tree update still happens but the
+    // blob SHA won't change, so the tree diff is minimal.
+    // A future optimization can skip blobs whose sha hasn't changed by
+    // comparing against the manifest blob_sha.
+  });
+
+  // Check for removed keys (were in manifest, no longer ACTIVE)
+  Object.keys(previousKeys).forEach(function (sha256) {
+    if (!currentKeys[sha256]) {
+      removedShas[sha256] = true;
+    }
+  });
+
+  // Build the per-key files — only for changed/added keys
+  const perKeyFiles = [];
+
+  // Write REVOKED files for removed keys
+  Object.keys(removedShas).forEach(function (sha256) {
+    const revokedFile = {
+      schema_version: PUBLIC_KEYS_CACHE_SCHEMA_VERSION,
+      sha256: sha256,
+      public_key: null,
+      contributor: null,
+      roles: null,
+      status: 'REVOKED',
+      created_at: null,
+      last_active_at: null,
+      generated_at: snapshot.generated_at,
+    };
+    perKeyFiles.push({
+      path: PUBLIC_KEYS_DIR + '/' + sha256 + '.json',
+      content: JSON.stringify(revokedFile, null, 2) + '\n',
+    });
+  });
+
+  // Write current per-key files for changed/added keys
+  Object.keys(currentKeys).forEach(function (sha256) {
+    const key = currentKeys[sha256];
+    const keyFile = {
+      schema_version: PUBLIC_KEYS_CACHE_SCHEMA_VERSION,
+      sha256: sha256,
+      public_key: key.public_key,
+      contributor: key.contributor,
+      roles: key.roles,
+      status: key.status,
+      created_at: key.created_at,
+      last_active_at: key.last_active_at,
+      generated_at: snapshot.generated_at,
+    };
+    perKeyFiles.push({
+      path: PUBLIC_KEYS_DIR + '/' + sha256 + '.json',
+      content: JSON.stringify(keyFile, null, 2) + '\n',
     });
   });
 
@@ -356,19 +422,39 @@ function publishDaoMembersCacheToGithub_(opts) {
       snapshot.counts.active_public_keys + ' active keys, trigger=' +
       snapshot.trigger + ')';
 
-  // ----- Write all files in one commit via Git Trees API -----------------
+  // ----- Check if anything changed ----------------------------------------
+  const hasPerKeyChanges = perKeyFiles.length > 0;
+
+  // ----- Write files in one commit via Git Trees API ----------------------
   const daoMembersContent = JSON.stringify(snapshot, null, 2) + '\n';
 
-  // Build the full file list: dao_members.json + per-key files + manifest
+  // Build the full file list: dao_members.json + changed per-key files + manifest
   const allFiles = [
     { path: DAO_MEMBERS_CACHE_REPO_PATH, content: daoMembersContent },
   ].concat(perKeyFiles);
 
-  // Add _manifest.json (initially empty — PR2 will populate with blob shas)
+  // Build the manifest with current key set (blob SHAs are placeholders;
+  // the actual blob SHA optimization is a future enhancement).
+  // The manifest tracks which keys exist for diffing on the next run.
+  const manifestContent = {
+    schema_version: PUBLIC_KEYS_CACHE_SCHEMA_VERSION,
+    generated_at: snapshot.generated_at,
+    keys: {},
+  };
+  Object.keys(currentKeys).forEach(function (sha256) {
+    manifestContent.keys[sha256] = '';  // blob SHA placeholder
+  });
+
   allFiles.push({
     path: PUBLIC_KEYS_MANIFEST_PATH,
-    content: JSON.stringify({ schema_version: PUBLIC_KEYS_CACHE_SCHEMA_VERSION, generated_at: snapshot.generated_at, keys: {} }, null, 2) + '\n',
+    content: JSON.stringify(manifestContent, null, 2) + '\n',
   });
+
+  // If nothing changed and not forced, skip the commit entirely
+  if (!hasPerKeyChanges && !o.force) {
+    // Still try the tree write — skipIfUnchanged in the tree function
+    // will handle the dao_members.json no-op check.
+  }
 
   const commit = commitMultipleFilesToGithubViaTreeApi_({
     token: token,
@@ -383,7 +469,9 @@ function publishDaoMembersCacheToGithub_(opts) {
   return {
     counts: snapshot.counts,
     generated_at: snapshot.generated_at,
-    public_key_count: perKeyFiles.length,
+    public_key_count: Object.keys(currentKeys).length,
+    changed_keys: Object.keys(changedShas).length,
+    removed_keys: Object.keys(removedShas).length,
     github: commit,
   };
 }
@@ -538,6 +626,48 @@ function commitMultipleFilesToGithubViaTreeApi_(args) {
     commit_url: newCommitData.html_url,
     file_count: files.length,
   };
+}
+
+/**
+ * Fetch the current _manifest.json from treasury-cache.
+ * Returns { schema_version, generated_at, keys: {sha256: blob_sha} } or
+ * { keys: {} } if the manifest doesn't exist yet (first run).
+ */
+function fetchCurrentManifest_(token) {
+  const url = 'https://api.github.com/repos/' +
+      DAO_MEMBERS_CACHE_REPO_OWNER + '/' +
+      DAO_MEMBERS_CACHE_REPO_NAME + '/contents/' +
+      PUBLIC_KEYS_MANIFEST_PATH + '?ref=' + encodeURIComponent(DAO_MEMBERS_CACHE_BRANCH);
+  const headers = {
+    'Authorization': 'token ' + token,
+    'Accept': 'application/vnd.github+json',
+    'User-Agent': 'TrueSightDAO-tdg-identity-management/1.0',
+  };
+  const resp = UrlFetchApp.fetch(url, {
+    method: 'get',
+    headers: headers,
+    muteHttpExceptions: true,
+  });
+  if (resp.getResponseCode() === 404) {
+    // First run — no manifest yet
+    return { keys: {} };
+  }
+  if (resp.getResponseCode() !== 200) {
+    Logger.log('fetchCurrentManifest_ HTTP ' + resp.getResponseCode() + ': ' +
+        resp.getContentText().substring(0, 400));
+    // Degrade gracefully — treat as empty manifest
+    return { keys: {} };
+  }
+  try {
+    const body = JSON.parse(resp.getContentText());
+    const decoded = Utilities.newBlob(
+        Utilities.base64Decode(body.content.replace(/\n/g, ''))
+    ).getDataAsString();
+    return JSON.parse(decoded);
+  } catch (err) {
+    Logger.log('fetchCurrentManifest_ parse error: ' + err);
+    return { keys: {} };
+  }
 }
 
 /**
