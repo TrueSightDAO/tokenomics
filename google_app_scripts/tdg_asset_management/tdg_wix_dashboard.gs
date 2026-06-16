@@ -3321,7 +3321,18 @@ function syncAllPerformanceStatistics() {
       Logger.log("❌ Error updating AUM: " + e.message);
     }
     
-    // 8. Update current month's statistics in Monthly Statistics sheet
+    // 8. BUY_BACK_RESERVE (accumulated provisions for voting rights cash out)
+    try {
+      var buyBackReserve = getBuyBackReserveFromOffChainBalance();
+      updatePerformanceStatistic("BUY_BACK_RESERVE", buyBackReserve, "USD");
+      report.updated.push({ key: "BUY_BACK_RESERVE", value: buyBackReserve });
+      Logger.log("✅ Updated BUY_BACK_RESERVE: " + buyBackReserve);
+    } catch (e) {
+      report.errors.push({ key: "BUY_BACK_RESERVE", error: e.message });
+      Logger.log("❌ Error updating BUY_BACK_RESERVE: " + e.message);
+    }
+    
+    // 9. Update current month's statistics in Monthly Statistics sheet
     try {
       updateCurrentMonthStatistics();
       Logger.log("✅ Updated current month statistics in Monthly Statistics sheet");
