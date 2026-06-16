@@ -1111,6 +1111,32 @@ function getOffChainAssetValue() {
   return assets[0];
 }
 
+/**
+ * Reads the "USD - provisions for voting rights cash out" balance from the
+ * "off chain asset balance" sheet (column A = asset name, column B = balance).
+ * Returns the numeric value from column B, or 0 if the row is not found.
+ *
+ * @return {number} The buy-back reserve balance in USD.
+ */
+function getBuyBackReserveFromOffChainBalance() {
+  try {
+    var data = offChainAssetBalanceTab.getDataRange().getValues();
+    for (var i = 0; i < data.length; i++) {
+      var assetName = String(data[i][0] || '').trim();
+      if (assetName === "USD - provisions for voting rights cash out") {
+        var balance = parseFloat(data[i][1]) || 0;
+        Logger.log("Buy-back reserve (off-chain): " + balance);
+        return balance;
+      }
+    }
+    Logger.log("Buy-back reserve row not found in off chain asset balance sheet, returning 0");
+    return 0;
+  } catch (e) {
+    Logger.log("Error reading buy-back reserve from off chain asset balance: " + e.message);
+    return 0;
+  }
+}
+
 function getTdgTokensIssued() {
   var assets = tdgIssuedBalanceTab.getRange(1,5).getValues().map(function(valueArray) {
     return valueArray[0];
