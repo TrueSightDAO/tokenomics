@@ -2391,6 +2391,23 @@ function doGet(e) {
       })).setMimeType(ContentService.MimeType.JSON);
     }
     
+    // Check if action parameter is provided for admin operations
+    var action = e.parameter.action;
+    
+    if (action === 'triggerSync') {
+      // Trigger sync of all Performance Statistics
+      var result = syncAllPerformanceStatistics();
+      return ContentService
+        .createTextOutput(JSON.stringify({
+          timestamp: new Date().toISOString(),
+          status: 'ok',
+          updated: result.updated ? result.updated.length : 0,
+          errors: result.errors ? result.errors.length : 0,
+          details: result
+        }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+    
     // Default: return all performance statistics
     var data = readPerformanceStatistics();
     
