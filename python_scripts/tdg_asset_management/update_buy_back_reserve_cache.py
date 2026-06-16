@@ -37,8 +37,9 @@ GAS_PERF_STATS_URL = (
     '?action=getPerformanceStatistics'
 )
 
-OUTPUT_DIR = os.path.expanduser('~/Applications/treasury-cache')
-REPO_DIR = os.path.expanduser('~/Applications/treasury-cache')
+# Write to current working directory (repo root when run from GitHub Action)
+OUTPUT_DIR = os.getcwd()
+REPO_DIR = os.getcwd()
 
 SERVICE_ACCOUNT_PATH = os.path.expanduser(
     '~/Applications/sentiment_importer/config/cypher_defense_gdrive_key.json'
