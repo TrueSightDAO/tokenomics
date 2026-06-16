@@ -18,7 +18,6 @@ Usage:
 
 import json
 import os
-import subprocess
 import sys
 from datetime import datetime, timezone
 
@@ -39,7 +38,6 @@ GAS_PERF_STATS_URL = (
 
 # Write to current working directory (repo root when run from GitHub Action)
 OUTPUT_DIR = os.getcwd()
-REPO_DIR = os.getcwd()
 
 SERVICE_ACCOUNT_PATH = os.path.expanduser(
     '~/Applications/sentiment_importer/config/cypher_defense_gdrive_key.json'
@@ -204,29 +202,16 @@ def write_cache(data, dry_run=False):
 
 
 def commit_and_push(dry_run=False):
-    """Commit and push the updated cache to the treasury-cache repo."""
+    """Commit and push the updated cache to the treasury-cache repo.
+    
+    NOTE: This function is intentionally a no-op when called from the GitHub Action.
+    The workflow handles the commit step separately to avoid git config issues
+    inside the tokenomics checkout directory. The script only writes the JSON file.
+    """
     if dry_run:
         print('  [dry-run] Would commit and push to treasury-cache')
         return
-
-    os.chdir(REPO_DIR)
-
-    # Check if there are changes
-    result = subprocess.run(
-        ['git', 'status', '--porcelain'],
-        capture_output=True, text=True
-    )
-    if not result.stdout.strip():
-        print('  No changes to commit.')
-        return
-
-    subprocess.run(['git', 'add', 'buy-back-reserve.json'], check=True)
-    subprocess.run(
-        ['git', 'commit', '-m', f'Update buy-back-reserve cache [{datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")}]'],
-        check=True
-    )
-    subprocess.run(['git', 'push'], check=True)
-    print('  Committed and pushed to treasury-cache.')
+    print('  Commit step handled by GitHub Action workflow.')
 
 
 def main():
