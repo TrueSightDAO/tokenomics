@@ -2377,6 +2377,20 @@ function doGet(e) {
         .setMimeType(ContentService.MimeType.JSON);
     }
     
+    // Check if action parameter is provided for remote trigger
+    var action = e.parameter.action;
+    
+    if (action === 'triggerSync') {
+      var result = syncAllPerformanceStatistics();
+      return ContentService.createTextOutput(JSON.stringify({
+        timestamp: new Date().toISOString(),
+        status: 'ok',
+        updated: result.updated.length,
+        errors: result.errors.length,
+        details: result
+      })).setMimeType(ContentService.MimeType.JSON);
+    }
+    
     // Default: return all performance statistics
     var data = readPerformanceStatistics();
     
