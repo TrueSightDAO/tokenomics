@@ -150,7 +150,7 @@ def get_daily_provisions(gc):
             provisions.append({
                 'date': date_val,
                 'description': desc.split('\n')[0],  # first line only
-                'amount': round(amount, 2),
+                'amount': round(abs(amount), 2),  # use absolute value (ledger stores as debit)
             })
 
     # Sort by date ascending
