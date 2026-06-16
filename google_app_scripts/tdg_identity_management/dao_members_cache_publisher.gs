@@ -13,6 +13,8 @@
  *           created_at, last_active_at }] }
  *       ]
  *     }
+ * - Also emits `public_keys/<sha256>.json` per-key files (additive, no reader
+ *   change yet) for content-addressed point-lookup — see PUBLIC_KEY_LOOKUP_CACHE_PLAN.md.
  *
  * Schema v3 (current):
  *   - `email` — first non-empty `Contributor Email Address` (col F) seen across
@@ -63,6 +65,12 @@ const DAO_MEMBERS_CACHE_REPO_NAME = 'treasury-cache';
 const DAO_MEMBERS_CACHE_REPO_PATH = 'dao_members.json';
 const DAO_MEMBERS_CACHE_BRANCH = 'main';
 const DAO_MEMBERS_CACHE_SCHEMA_VERSION = 3;
+
+// Per-key public key cache — content-addressed point-lookup store.
+// Schema version 1: { schema_version, sha256, public_key, contributor, roles, status, created_at, generated_at }
+const PUBLIC_KEYS_CACHE_SCHEMA_VERSION = 1;
+const PUBLIC_KEYS_DIR = 'public_keys';
+const PUBLIC_KEYS_MANIFEST_PATH = PUBLIC_KEYS_DIR + '/_manifest.json';
 
 // assetVerify web app in tdg_asset_management — source of DAO-wide aggregates
 // (voting_rights_circulated, total_assets, asset_per_circulated_voting_right,
@@ -171,94 +179,76 @@ function publishDaoMembersCacheToGithub_(opts) {
       votingByName[name.toLowerCase()] = {
         name: name,                                        // preserve original casing
         voting_rights: toNumberOrNull_(row[6]),            // I = Total TDG controlled
-        total_voting_power_pct: String(row[8] || ''),     // K = Total Voting Power
+        total_voting_power_pct: String(row[8] || ''),      // K = percentage
       };
     });
   }
 
-  // ----- Contributors contact information — sentinel flag --------------------
-  // Column A = name, column W (index 22) = Is Sentinel (TRUE/FALSE).
-  // Header row 4, data starts row 5.
+  // ----- Governors (column A, row 11+) ------------------------------
+  const govSheet = ss.getSheetByName(DAO_MEMBERS_CACHE_GOVERNORS_SHEET);
+  if (!govSheet) throw new Error('Missing sheet: ' + DAO_MEMBERS_CACHE_GOVERNORS_SHEET);
+  const govLastRow = govSheet.getLastRow();
+  const governorsByName = {};
+  if (govLastRow >= DAO_MEMBERS_CACHE_GOVERNORS_FIRST_ROW) {
+    const govNames = govSheet.getRange(
+        DAO_MEMBERS_CACHE_GOVERNORS_FIRST_ROW, 1,
+        govLastRow - DAO_MEMBERS_CACHE_GOVERNORS_FIRST_ROW + 1, 1
+    ).getValues();
+    govNames.forEach(function (row) {
+      const name = String(row[0] || '').trim();
+      if (name) governorsByName[name.toLowerCase()] = true;
+    });
+  }
+
+  // ----- Sentinel flags (Contributors contact information, col W) -----
   const contactSheet = ss.getSheetByName(DAO_MEMBERS_CACHE_CONTACT_SHEET);
   const sentinelByName = {};
   if (contactSheet) {
     const contactLastRow = contactSheet.getLastRow();
     if (contactLastRow >= DAO_MEMBERS_CACHE_CONTACT_HEADER_ROW + 1) {
+      // Columns A(1) = name, W(23) = Is Sentinel (header row 4)
       const contactRows = contactSheet.getRange(
           DAO_MEMBERS_CACHE_CONTACT_HEADER_ROW + 1, 1,
-          contactLastRow - DAO_MEMBERS_CACHE_CONTACT_HEADER_ROW, 2
+          contactLastRow - DAO_MEMBERS_CACHE_CONTACT_HEADER_ROW, 23
       ).getValues();
-      // Read column W separately (can't read non-contiguous columns in one range)
-      const sentinelValues = contactSheet.getRange(
-          DAO_MEMBERS_CACHE_CONTACT_HEADER_ROW + 1,
-          DAO_MEMBERS_CACHE_CONTACT_SENTINEL_COL + 1,
-          contactLastRow - DAO_MEMBERS_CACHE_CONTACT_HEADER_ROW, 1
-      ).getValues();
-      contactRows.forEach(function (row, idx) {
+      contactRows.forEach(function (row) {
         const name = String(row[0] || '').trim();
         if (!name) return;
-        const isSentinel = String(sentinelValues[idx][0] || '').trim().toUpperCase() === 'TRUE';
-        if (isSentinel) {
+        const isSentinel = String(row[DAO_MEMBERS_CACHE_CONTACT_SENTINEL_COL] || '').trim().toUpperCase();
+        if (isSentinel === 'TRUE' || isSentinel === 'YES' || isSentinel === '1') {
           sentinelByName[name.toLowerCase()] = true;
         }
       });
     }
-  } else {
-    Logger.log('Warning: ' + DAO_MEMBERS_CACHE_CONTACT_SHEET + ' tab not found; no sentinel roles will be assigned.');
   }
 
-  // ----- Governors tab — names of currently-elected governors --------------
-  // Read column A from row 11 to last-row, lowercase, stash in a Set-like map.
-  // The leaderboard is recomputed quarterly (equinoxes / solstices) by the
-  // workbook itself; we just take a snapshot of the current resolved names.
-  const governorsSheet = ss.getSheetByName(DAO_MEMBERS_CACHE_GOVERNORS_SHEET);
-  const governorsByName = {};
-  if (governorsSheet) {
-    const govLastRow = governorsSheet.getLastRow();
-    if (govLastRow >= DAO_MEMBERS_CACHE_GOVERNORS_FIRST_ROW) {
-      const govRows = governorsSheet
-          .getRange(DAO_MEMBERS_CACHE_GOVERNORS_FIRST_ROW, 1,
-                    govLastRow - DAO_MEMBERS_CACHE_GOVERNORS_FIRST_ROW + 1, 1)
-          .getValues();
-      govRows.forEach(function (row) {
-        const name = String(row[0] || '').trim();
-        if (!name) return;
-        governorsByName[name.toLowerCase()] = true;
-      });
-    }
-  } else {
-    Logger.log(
-        'Warning: ' + DAO_MEMBERS_CACHE_GOVERNORS_SHEET + ' tab not found; ' +
-        'all contributors will be emitted with roles=["member"] only.');
-  }
-
-  // ----- Aggregate signatures by contributor name --------------------------
-  // Email lives on col F (`Contributor Email Address`); per-key in the sheet
-  // but we hoist the first non-empty email to the contributor record because
-  // the dedup pre-flight on the new add-contributor flow checks "email seen
-  // for any active key of any contributor."
+  // ----- Aggregate by contributor name --------------------------------
   const byName = {};
   sigsRows.forEach(function (row) {
     const name = String(row[0] || '').trim();
-    const status = String(row[3] || '').trim().toUpperCase();
-    const publicKey = String(row[4] || '').trim();
-    const email = String(row[5] || '').trim().toLowerCase();
-    if (!name || !publicKey || status !== 'ACTIVE') return;
-    const key = name.toLowerCase();
-    if (!byName[key]) byName[key] = { name: name, email: null, public_keys: [] };
-    if (!byName[key].email && email) byName[key].email = email;
-    byName[key].public_keys.push({
-      public_key: publicKey,
-      status: status,
-      created_at: formatTimestamp_(row[1]),
-      last_active_at: formatTimestamp_(row[2]),
-    });
+    if (!name) return;
+    if (!byName[name.toLowerCase()]) {
+      byName[name.toLowerCase()] = { name: name, email: null, public_keys: [] };
+    }
+    const entry = byName[name.toLowerCase()];
+    // First non-empty email wins (col F = index 5)
+    const email = String(row[5] || '').trim();
+    if (email && !entry.email) {
+      entry.email = email;
+    }
+    // Public key (col B = index 1)
+    const pk = String(row[1] || '').trim();
+    if (pk) {
+      entry.public_keys.push({
+        public_key: pk,
+        status: String(row[2] || '').trim().toUpperCase() || 'ACTIVE',
+        created_at: formatTimestamp_(row[3]),
+        last_active_at: formatTimestamp_(row[4]),
+      });
+    }
   });
 
-  // ----- Ensure every contributor from voting weight sheet is present --------
-  // Contributors who haven't registered any ACTIVE public key are missing from
-  // byName. Add them with an empty public_keys array so dao_members.json is the
-  // superset of all DAO contributors (matching the members.html page).
+  // Ensure every voting-row name has an entry (even without a signature)
   Object.keys(votingByName).forEach(function (k) {
     if (!byName[k]) {
       byName[k] = { name: votingByName[k].name || k, email: null, public_keys: [] };
@@ -328,7 +318,36 @@ function publishDaoMembersCacheToGithub_(opts) {
     contributors: contributors,
   };
 
-  const content = JSON.stringify(snapshot, null, 2) + '\n';
+  // ----- Build per-key files for content-addressed point-lookup ----------
+  // Each ACTIVE public key gets its own file: public_keys/<sha256>.json
+  // No email in per-key files (privacy decision per PUBLIC_KEY_LOOKUP_CACHE_PLAN.md).
+  const perKeyFiles = [];
+  const manifest = {};  // sha256 -> blob_sha (populated after tree write)
+
+  contributors.forEach(function (c) {
+    c.public_keys.forEach(function (keyEntry) {
+      if (keyEntry.status !== 'ACTIVE') return;
+      const pk = keyEntry.public_key;
+      const sha256 = computeSha256_(pk);
+      const keyFile = {
+        schema_version: PUBLIC_KEYS_CACHE_SCHEMA_VERSION,
+        sha256: sha256,
+        public_key: pk,
+        contributor: c.name,
+        roles: c.roles,
+        status: 'ACTIVE',
+        created_at: keyEntry.created_at || null,
+        last_active_at: keyEntry.last_active_at || null,
+        generated_at: snapshot.generated_at,
+      };
+      perKeyFiles.push({
+        path: PUBLIC_KEYS_DIR + '/' + sha256 + '.json',
+        content: JSON.stringify(keyFile, null, 2) + '\n',
+      });
+    });
+  });
+
+  // ----- Build commit message --------------------------------------------
   const commitMessage =
       'chore: refresh dao_members.json (' + snapshot.counts.contributors +
       ' contributors, ' + snapshot.counts.governors + ' governors, ' +
@@ -337,13 +356,26 @@ function publishDaoMembersCacheToGithub_(opts) {
       snapshot.counts.active_public_keys + ' active keys, trigger=' +
       snapshot.trigger + ')';
 
-  const commit = commitJsonToGithub_({
+  // ----- Write all files in one commit via Git Trees API -----------------
+  const daoMembersContent = JSON.stringify(snapshot, null, 2) + '\n';
+
+  // Build the full file list: dao_members.json + per-key files + manifest
+  const allFiles = [
+    { path: DAO_MEMBERS_CACHE_REPO_PATH, content: daoMembersContent },
+  ].concat(perKeyFiles);
+
+  // Add _manifest.json (initially empty — PR2 will populate with blob shas)
+  allFiles.push({
+    path: PUBLIC_KEYS_MANIFEST_PATH,
+    content: JSON.stringify({ schema_version: PUBLIC_KEYS_CACHE_SCHEMA_VERSION, generated_at: snapshot.generated_at, keys: {} }, null, 2) + '\n',
+  });
+
+  const commit = commitMultipleFilesToGithubViaTreeApi_({
     token: token,
     owner: DAO_MEMBERS_CACHE_REPO_OWNER,
     repo: DAO_MEMBERS_CACHE_REPO_NAME,
-    path: DAO_MEMBERS_CACHE_REPO_PATH,
     branch: DAO_MEMBERS_CACHE_BRANCH,
-    content: content,
+    files: allFiles,
     commitMessage: commitMessage,
     skipIfUnchanged: !o.force,
   });
@@ -351,70 +383,181 @@ function publishDaoMembersCacheToGithub_(opts) {
   return {
     counts: snapshot.counts,
     generated_at: snapshot.generated_at,
+    public_key_count: perKeyFiles.length,
     github: commit,
   };
 }
 
-function commitJsonToGithub_(args) {
-  const baseUrl = 'https://api.github.com/repos/' + args.owner + '/' + args.repo +
-      '/contents/' + args.path;
+/**
+ * Write multiple files in ONE commit via the Git Trees API.
+ *
+ * Steps:
+ * 1. GET the current HEAD commit to get the base tree SHA.
+ * 2. Create a blob for each file via POST /git/blobs.
+ * 3. Build a tree with all blob entries via POST /git/trees.
+ * 4. Create a commit via POST /git/commits.
+ * 5. Update the branch ref via PATCH /git/refs/heads/<branch>.
+ *
+ * This is atomic — either all files land or none do.
+ */
+function commitMultipleFilesToGithubViaTreeApi_(args) {
+  const owner = args.owner;
+  const repo = args.repo;
+  const branch = args.branch;
+  const token = args.token;
+  const files = args.files;  // [{path, content}, ...]
+  const commitMessage = args.commitMessage;
+  const skipIfUnchanged = args.skipIfUnchanged !== false;
+
   const headers = {
-    'Authorization': 'token ' + args.token,
+    'Authorization': 'token ' + token,
     'Accept': 'application/vnd.github+json',
     'User-Agent': 'TrueSightDAO-tdg-identity-management/1.0',
   };
 
-  // GET current file to capture sha + detect no-op writes.
-  const existing = UrlFetchApp.fetch(baseUrl + '?ref=' + encodeURIComponent(args.branch), {
+  const baseUrl = 'https://api.github.com/repos/' + owner + '/' + repo;
+
+  // 1. Get the current HEAD commit (to get base tree SHA)
+  const refUrl = baseUrl + '/git/refs/heads/' + encodeURIComponent(branch);
+  const refResp = UrlFetchApp.fetch(refUrl, {
     method: 'get',
     headers: headers,
     muteHttpExceptions: true,
   });
-  let sha = null;
-  if (existing.getResponseCode() === 200) {
-    const existingJson = JSON.parse(existing.getContentText());
-    sha = existingJson.sha;
-    if (args.skipIfUnchanged && existingJson.content) {
-      const existingContent = Utilities.newBlob(
-          Utilities.base64Decode(existingJson.content.replace(/\n/g, ''))
-      ).getDataAsString();
-      // Compare everything except `generated_at` / `trigger` so cron reruns
-      // don't create empty commits.
-      if (stripVolatileFields_(existingContent) === stripVolatileFields_(args.content)) {
-        return { status: 'unchanged', sha: sha };
-      }
-    }
-  } else if (existing.getResponseCode() !== 404) {
-    throw new Error(
-        'GitHub GET failed (HTTP ' + existing.getResponseCode() + '): ' +
-        existing.getContentText().substring(0, 400));
+  if (refResp.getResponseCode() !== 200) {
+    throw new Error('Failed to get ref (HTTP ' + refResp.getResponseCode() + '): ' +
+        refResp.getContentText().substring(0, 400));
   }
+  const refData = JSON.parse(refResp.getContentText());
+  const headSha = refData.object.sha;
 
-  const payload = {
-    message: args.commitMessage,
-    content: Utilities.base64Encode(args.content),
-    branch: args.branch,
-  };
-  if (sha) payload.sha = sha;
-
-  const resp = UrlFetchApp.fetch(baseUrl, {
-    method: 'put',
-    contentType: 'application/json',
+  // 2. Get the current commit to find the base tree SHA
+  const commitUrl = baseUrl + '/git/commits/' + headSha;
+  const commitResp = UrlFetchApp.fetch(commitUrl, {
+    method: 'get',
     headers: headers,
-    payload: JSON.stringify(payload),
     muteHttpExceptions: true,
   });
-  if (resp.getResponseCode() < 200 || resp.getResponseCode() >= 300) {
-    throw new Error(
-        'GitHub PUT failed (HTTP ' + resp.getResponseCode() + '): ' +
-        resp.getContentText().substring(0, 400));
+  if (commitResp.getResponseCode() !== 200) {
+    throw new Error('Failed to get commit (HTTP ' + commitResp.getResponseCode() + '): ' +
+        commitResp.getContentText().substring(0, 400));
   }
-  const body = JSON.parse(resp.getContentText());
-  return {
-    status: sha ? 'updated' : 'created',
-    sha: body.content && body.content.sha,
-    commit_url: body.commit && body.commit.html_url,
+  const commitData = JSON.parse(commitResp.getContentText());
+  const baseTreeSha = commitData.tree.sha;
+
+  // 3. Create blobs for each file
+  const blobShas = [];
+  files.forEach(function (file) {
+    const blobUrl = baseUrl + '/git/blobs';
+    const blobPayload = {
+      content: file.content,
+      encoding: 'utf-8',
+    };
+    const blobResp = UrlFetchApp.fetch(blobUrl, {
+      method: 'post',
+      contentType: 'application/json',
+      headers: headers,
+      payload: JSON.stringify(blobPayload),
+      muteHttpExceptions: true,
+    });
+    if (blobResp.getResponseCode() < 200 || blobResp.getResponseCode() >= 300) {
+      throw new Error('Failed to create blob for ' + file.path + ' (HTTP ' +
+          blobResp.getResponseCode() + '): ' + blobResp.getContentText().substring(0, 400));
+    }
+    const blobData = JSON.parse(blobResp.getContentText());
+    blobShas.push({
+      path: file.path,
+      sha: blobData.sha,
+      mode: '100644',  // regular file
+      type: 'blob',
+    });
+  });
+
+  // 4. Create a tree with all blob entries
+  const treeUrl = baseUrl + '/git/trees';
+  const treePayload = {
+    base_tree: baseTreeSha,
+    tree: blobShas,
   };
+  const treeResp = UrlFetchApp.fetch(treeUrl, {
+    method: 'post',
+    contentType: 'application/json',
+    headers: headers,
+    payload: JSON.stringify(treePayload),
+    muteHttpExceptions: true,
+  });
+  if (treeResp.getResponseCode() < 200 || treeResp.getResponseCode() >= 300) {
+    throw new Error('Failed to create tree (HTTP ' + treeResp.getResponseCode() + '): ' +
+        treeResp.getContentText().substring(0, 400));
+  }
+  const treeData = JSON.parse(treeResp.getContentText());
+  const newTreeSha = treeData.sha;
+
+  // 5. Create a commit
+  const newCommitUrl = baseUrl + '/git/commits';
+  const newCommitPayload = {
+    message: commitMessage,
+    tree: newTreeSha,
+    parents: [headSha],
+  };
+  const newCommitResp = UrlFetchApp.fetch(newCommitUrl, {
+    method: 'post',
+    contentType: 'application/json',
+    headers: headers,
+    payload: JSON.stringify(newCommitPayload),
+    muteHttpExceptions: true,
+  });
+  if (newCommitResp.getResponseCode() < 200 || newCommitResp.getResponseCode() >= 300) {
+    throw new Error('Failed to create commit (HTTP ' + newCommitResp.getResponseCode() + '): ' +
+        newCommitResp.getContentText().substring(0, 400));
+  }
+  const newCommitData = JSON.parse(newCommitResp.getContentText());
+  const newCommitSha = newCommitData.sha;
+
+  // 6. Update the branch ref
+  const updateRefUrl = baseUrl + '/git/refs/heads/' + encodeURIComponent(branch);
+  const updateRefPayload = {
+    sha: newCommitSha,
+    force: false,
+  };
+  const updateRefResp = UrlFetchApp.fetch(updateRefUrl, {
+    method: 'patch',
+    contentType: 'application/json',
+    headers: headers,
+    payload: JSON.stringify(updateRefPayload),
+    muteHttpExceptions: true,
+  });
+  if (updateRefResp.getResponseCode() < 200 || updateRefResp.getResponseCode() >= 300) {
+    throw new Error('Failed to update ref (HTTP ' + updateRefResp.getResponseCode() + '): ' +
+        updateRefResp.getContentText().substring(0, 400));
+  }
+
+  return {
+    status: 'committed',
+    sha: newCommitSha,
+    commit_url: newCommitData.html_url,
+    file_count: files.length,
+  };
+}
+
+/**
+ * Compute SHA-256 hex digest of a string using Apps Script's built-in digest.
+ * Utilities.computeDigest returns an array of signed bytes; we convert to hex.
+ */
+function computeSha256_(str) {
+  const digest = Utilities.computeDigest(
+      Utilities.DigestAlgorithm.SHA_256,
+      str,
+      Utilities.Charset.UTF_8
+  );
+  // Convert signed bytes to hex
+  var hex = '';
+  for (var i = 0; i < digest.length; i++) {
+    var byte = digest[i] & 0xff;
+    if (byte < 16) hex += '0';
+    hex += byte.toString(16);
+  }
+  return hex;
 }
 
 /**
@@ -465,16 +608,24 @@ function stripVolatileFields_(jsonStr) {
   }
 }
 
-function formatTimestamp_(value) {
-  if (value === null || value === undefined || value === '') return '';
-  if (Object.prototype.toString.call(value) === '[object Date]') {
-    return value.toISOString();
+function formatTimestamp_(val) {
+  if (!val) return null;
+  if (typeof val === 'string') {
+    const trimmed = val.trim();
+    return trimmed || null;
   }
-  return String(value);
+  if (val instanceof Date) {
+    try {
+      return val.toISOString();
+    } catch (_) {
+      return null;
+    }
+  }
+  return String(val);
 }
 
-function toNumberOrNull_(value) {
-  if (value === null || value === undefined || value === '') return null;
-  const n = typeof value === 'number' ? value : parseFloat(String(value).replace(/,/g, ''));
-  return isFinite(n) ? n : null;
+function toNumberOrNull_(val) {
+  if (val === '' || val === null || val === undefined) return null;
+  const n = Number(val);
+  return isNaN(n) ? null : n;
 }
