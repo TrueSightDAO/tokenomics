@@ -68,6 +68,14 @@
  */
 
 // Stores the credentials object retrieved from the getCredentials() function
+// getCredentials() reads API keys from GAS ScriptProperties (set in the editor UI)
+function getCredentials() {
+  var props = PropertiesService.getScriptProperties();
+  return {
+    WIX_API_KEY: props.getProperty('WIX_API_KEY'),
+    QUICKNODE_API_KEY: props.getProperty('QUICKNODE_API_KEY')
+  };
+}
 const creds = getCredentials();
 
 // Wix API key for authentication with Wix APIs
