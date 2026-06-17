@@ -138,7 +138,7 @@ def resolve_clasp_identity() -> tuple[str | None, str | None]:
 
 
 def discover_projects_for_scriptid(target_sid: str) -> list[dict]:
-    """Return [{thematic_folder, source_files: [Path], project: dict}] for
+    """Return [{thematic_folder, source_files: [Path], mirror_filename_map: dict, project: dict}] for
     every project block whose scriptId matches `target_sid`."""
     out: list[dict] = []
     for manifest_path in sorted(SRC.glob("*/manifest.json")):
@@ -155,6 +155,7 @@ def discover_projects_for_scriptid(target_sid: str) -> list[dict]:
             out.append({
                 "thematic_folder": thematic,
                 "source_files": source_paths,
+                "mirror_filename_map": project.get("mirror_filename_map") or {},
                 "project": project,
             })
     return out
@@ -186,44 +187,77 @@ def _file_hash(path: Path) -> str:
     return h.hexdigest()
 
 
-def plan_mirror_sync(scriptId: str, source_files: list[Path]) -> dict:
-    """Return a dict describing what the sync would do. Does not touch disk."""
+def plan_mirror_sync(scriptId: str, source_files: list[Path], mirror_filename_map: dict[str, str] | None = None) -> dict:
+    """Return a dict describing what the sync would do. Does not touch disk.
+
+    `mirror_filename_map` maps source basename → mirror target basename.
+    When a mapping exists, the source is copied under the mapped name and any
+    stale mirror file matching the UNMAPPED source basename is flagged for
+    removal.  Multiple source files can map to the same mirror target
+    (concatenation).
+    """
     mirror = MIRRORS / scriptId
+    fmap = mirror_filename_map or {}
     plan = {
         "mirror_dir": mirror,
         "mirror_exists": mirror.is_dir(),
-        "to_copy": [],     # [(source, mirror_target)]
+        "to_copy": [],            # [(source, mirror_target)]
+        "to_copy_append": [],     # [(source, mirror_target)] — append to existing target
         "to_skip_identical": [],
-        "to_remove_stale": [],  # mirror .gs files not in manifest
+        "to_remove_stale": [],    # mirror .gs/.js files not claimed by any source
         "missing_source": [],
     }
     if not mirror.is_dir():
         return plan
 
-    # Map manifest source basenames → expected mirror filenames.
-    expected_basenames: set[str] = set()
+    # Build the set of expected mirror basenames (after applying the map)
+    # and track which source files map to which mirror targets.
+    expected_mirror_basenames: set[str] = set()
+    # source basenames that are mapped AWAY — their unmapped mirror copies are stale
+    remapped_source_basenames: set[str] = set(fmap.keys())
+
     for src in source_files:
         if not src.is_file():
             plan["missing_source"].append(src)
             continue
-        basename = src.name  # keep the same .gs filename in the mirror
-        expected_basenames.add(basename)
-        mirror_target = mirror / basename
+        mirror_basename = fmap.get(src.name, src.name)
+        expected_mirror_basenames.add(mirror_basename)
+        mirror_target = mirror / mirror_basename
+
         if mirror_target.is_file() and _file_hash(src) == _file_hash(mirror_target):
             plan["to_skip_identical"].append((src, mirror_target))
+        elif mirror_target.is_file() and fmap.get(src.name):
+            # Target exists and source is mapped — check if this is the FIRST
+            # source mapping to this target (copy/overwrite) or a SUBSEQUENT
+            # one (append/concatenate). We detect this by checking whether
+            # another source for the same target was already queued.
+            already_queued = any(
+                t == mirror_target for _, t in plan["to_copy"]
+            ) or any(
+                t == mirror_target for _, t in plan["to_copy_append"]
+            )
+            if already_queued:
+                plan["to_copy_append"].append((src, mirror_target))
+            else:
+                plan["to_copy"].append((src, mirror_target))
         else:
             plan["to_copy"].append((src, mirror_target))
 
-    # Stale: any .gs in the mirror NOT in the expected basenames.
-    # Leave Version.gs / appsscript.json / Credentials.js / Code.js intact — those
-    # are clasp-managed bundles or clasp config. Only prune additional .gs files
-    # that the manifest no longer claims.
-    PRESERVE = {"Version.gs", "appsscript.json", "Credentials.js", "Code.js"}
-    for existing in sorted(mirror.glob("*.gs")):
+    # Stale cleanup: any .gs or .js in the mirror that is NOT in the
+    # expected mirror basenames AND is not a clasp-managed file.
+    PRESERVE = {"Version.gs", "appsscript.json", "Credentials.js", ".clasp.json"}
+    for existing in sorted(mirror.glob("*")):
+        if not existing.is_file():
+            continue
+        if existing.suffix not in (".gs", ".js", ".json", ".html"):
+            continue
         if existing.name in PRESERVE:
             continue
-        if existing.name not in expected_basenames:
-            plan["to_remove_stale"].append(existing)
+        if existing.name in expected_mirror_basenames:
+            continue
+        # If this is a source-named file whose source has been remapped,
+        # it is definitely stale.
+        plan["to_remove_stale"].append(existing)
 
     return plan
 
@@ -251,12 +285,22 @@ def apply_mirror_sync(plan: dict, dry_run: bool) -> bool:
             print(f"             copy  {rel_src}  →  {rel_target}")
     for src, target in plan["to_skip_identical"]:
         print(f"  ⏭  unchanged   {src.relative_to(ROOT)}")
+    for src, target in plan["to_copy_append"]:
+        rel_src = src.relative_to(ROOT)
+        rel_target = target.relative_to(ROOT)
+        if dry_run:
+            print(f"  [DRY-RUN]  append  {rel_src}  →  {rel_target}")
+        else:
+            with target.open("a", encoding="utf-8") as f:
+                f.write("\n")
+                f.write(src.read_text(encoding="utf-8"))
+            print(f"             append  {rel_src}  →  {rel_target}")
     for stale in plan["to_remove_stale"]:
         rel = stale.relative_to(ROOT)
         if dry_run:
             print(f"  [DRY-RUN]  remove stale  {rel}")
         else:
-            stale.unlink()
+            stale.unlink(missing_ok=True)
             print(f"             remove stale  {rel}")
     return True
 
@@ -413,12 +457,15 @@ def main() -> int:
     # readability convention.
     all_sources: list[Path] = []
     seen_basenames: set[str] = set()
+    merged_filename_map: dict[str, str] = {}
     for entry in projects:
         for src in entry["source_files"]:
             if src.name in seen_basenames:
                 continue
             seen_basenames.add(src.name)
             all_sources.append(src)
+        # Merge mirror_filename_map — later entries override earlier ones
+        merged_filename_map.update(entry.get("mirror_filename_map") or {})
         print(f"  manifest: {entry['thematic_folder'].relative_to(ROOT)}/manifest.json"
               f"  files: {[s.name for s in entry['source_files']]}")
     if not all_sources:
@@ -471,7 +518,7 @@ def main() -> int:
 
     # Sync
     print("\n--- sync source → mirror ---")
-    plan = plan_mirror_sync(target, all_sources)
+    plan = plan_mirror_sync(target, all_sources, merged_filename_map)
     if not apply_mirror_sync(plan, dry_run=dry_run):
         return 1
 

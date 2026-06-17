@@ -58,7 +58,13 @@
         "dapp_permission_change_handler.gs",
         "process_contributor_add_telegram_logs.gs"
       ],
-      "notes": "Audit-derived from in-source header-comment scriptIds on 2026-05-28. Pre-flight checklist (TOKENOMICS_GAS_RESTRUCTURE_PLAN.md §4) must resolve: full deployments list, post-push cache-refresh hooks, confirmed owner_email, consumer callers. RESOLVED 2026-06-06: the three former files_without_scriptid all live in THIS project (verified via clasp pull). Live project filenames DIFFER from repo source filenames: DaoMembersCache.js=dao_members_cache_publisher.gs, DappPermissionChangeHandler.js=dapp_permission_change_handler.gs, ContributorAddHandler.js=process_contributor_add_telegram_logs.gs, Code.js=edgar_send_email_verification.gs. dao_members cache refresh is served by web-app deployment AKfycbxvAi7DUCd1pv8GgSPazcNgNxhUsfEiBOBZBaB3CbqqY3kScTEau273dip1YHyRsEFY-w (action=refresh_dao_members_cache; secret=EMAIL_VERIFICATION_SECRET script property; caller dao_protocol holds it as DAO_PROTOCOL_EMAIL_VERIFICATION_GAS_SECRET). Redeploy that deployment id after any push or the webhook serves stale code."
+      "mirror_filename_map": {
+        "edgar_send_email_verification.gs": "Code.js",
+        "dao_members_cache_publisher.gs": "DaoMembersCache.js",
+        "dapp_permission_change_handler.gs": "DappPermissionChangeHandler.js",
+        "process_contributor_add_telegram_logs.gs": "ContributorAddHandler.js"
+      },
+      "notes": "Audit-derived from in-source header-comment scriptIds on 2026-05-28. Pre-flight checklist (TOKENOMICS_GAS_RESTRUCTURE_PLAN.md §4) must resolve: full deployments list, post-push cache-refresh hooks, confirmed owner_email, consumer callers. RESOLVED 2026-06-06: the three former files_without_scriptid all live in THIS project (verified via clasp pull). Live project filenames DIFFER from repo source filenames (see mirror_filename_map). dao_members cache refresh is served by web-app deployment AKfycbxvAi7DUCd1pv8GgSPazcNgNxhUsfEiBOBZBaB3CbqqY3kScTEau273dip1YHyRsEFY-w (action=refresh_dao_members_cache; secret=EMAIL_VERIFICATION_SECRET script property; caller dao_protocol holds it as DAO_PROTOCOL_EMAIL_VERIFICATION_GAS_SECRET). Redeploy that deployment id after any push or the webhook serves stale code."
     },
     {
       "name": "TBC — confirm display name in GAS UI for 1zKgMwd6KJFj…",
