@@ -19,7 +19,8 @@ token.json
 
 # Apps Script sources that embed API keys / secrets (basename contains "credential(s)")
 google_app_scripts/**/*redential*.gs
-google_app_scripts/**/Credentials*.js
+google_app_scripts/**/Credentials.js
+!google_app_scripts/**/Credentials.sample.js
 
 # Schema validation output
 python_scripts/schema_validation/discovered_headers.json
