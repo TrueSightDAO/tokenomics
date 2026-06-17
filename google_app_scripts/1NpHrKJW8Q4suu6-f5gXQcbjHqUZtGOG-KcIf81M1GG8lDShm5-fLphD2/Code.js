@@ -1,0 +1,1915 @@
+/**
+ * File: google_apps_scripts/market_research/find_nearby_stores.gs
+ * Repository: https://github.com/TrueSightDAO/market_research
+ * 
+ * Description: REST API endpoint for finding nearby stores from the holistic wellness hit list.
+ * Provides distance-based queries to find the top N stores nearest to a given location.
+ * Filters stores by status (default: "Contacted") and returns results ordered by distance.
+ * Supports status updates with digital signature tracking for audit trails.
+ */
+
+/**
+ * Web app to find nearby stores from the holistic wellness hit list spreadsheet.
+ * 
+ * Deployment URL: https://script.google.com/macros/s/AKfycbwB2zqNV9nMCMWs2hSa8FecjA36Oh-mSVuz3pk8TpXrXcy9dvqOqgbWIirNka2LmacgPw/exec
+ * 
+ * Query parameters (for search):
+ *   lat=<number>          : User's latitude (required)
+ *   lng=<number>          : User's longitude (required)
+ *   limit=<number>        : Maximum number of results (optional, default: 10, max: 50 without bounds, max: 200 with bounds)
+ *   status=<string>       : Filter by store status (optional, default: "Contacted")
+ *                           Valid values: "Contacted", "Research", "Partnered", "Deferred / Revisit later", "Rejected", or any status value
+ *                           Use empty string "" or omit parameter to show all statuses
+ *   ne_lat=<number>       : Northeast latitude bound (optional, for map viewport filtering)
+ *   ne_lng=<number>       : Northeast longitude bound (optional, for map viewport filtering)
+ *   sw_lat=<number>       : Southwest latitude bound (optional, for map viewport filtering)
+ *   sw_lng=<number>       : Southwest longitude bound (optional, for map viewport filtering)
+ *                           When all four bounds parameters are provided, only stores within the bounds are returned
+ *   shop_type=<string>    : Filter by shop type (optional)
+ *                           Valid values: "Metaphysical/Spiritual", "Wellness Center", "Health Food Store", etc.
+ *                           Use empty string "" or omit parameter to show all shop types
+ *   save_location=true    : When present with a valid lat/lng search, append one row to the
+ *                           "Recent Field Agent Location" tab (Status=pending) for Python automation.
+ *                           Requires digital_signature (or submitted_by) when save_location is enabled.
+ *                           Response may include field_agent_location: { saved, location_id?, reason? }.
+ *   open_now=true         : When present, only return stores that appear open at the viewer's
+ *                           local wall-clock time in time zone ``tz`` (IANA), e.g. America/Los_Angeles.
+ *                           Requires ``tz`` when ``open_now`` is enabled. Rows missing hour cells for
+ *                           that weekday are excluded. Hours use columns Monday Open … Sunday Close
+ *                           (24h HH:MM as written by Places automation / the DApp). Rows whose
+ *                           **Google listing** cell is **Closed** (permanently closed on Google) are
+ *                           always excluded when ``open_now`` is enabled.
+ *   tz=<IANA>             : Time zone for open_now (e.g. America/Los_Angeles). Defaults to script
+ *                           time zone when open_now is set but tz is omitted.
+ * 
+ * Query parameters (for status update):
+ *   action=update_status     : Action to update store status
+ *   shop_name=<string>       : Name of the shop to update (required)
+ *   new_status=<string>      : New status value (required)
+ *                              Valid values: "Contacted", "Research", "Partnered", "Deferred / Revisit later", "Rejected", or any status value
+ *   shop_type=<string>       : New shop type value (optional)
+ *                              Valid values: "Metaphysical/Spiritual", "Wellness Center", "Health Food Store", etc.
+ *   digital_signature=<string> : Digital signature (public key) of the person making the change (optional but recommended for audit trail)
+ *   update_id=<string>         : Optional field-report id (e.g. SFR_20260426213205). Stored on **DApp Remarks** and used to attach **Attachment Raw URL** / **Attachment GitHub URL** when the same id is sent to `action=log_field_report_attachment`.
+ *
+ * Query parameters (log attachment metadata — **Stores Visits Field Reports** tab):
+ *   Prefer **HTTP POST** with ``Content-Type: application/x-www-form-urlencoded`` and the same fields in the body — GET query strings often exceed URL length limits once ``digital_signature``, ``remarks``, and GitHub URLs are included, so rows never append.
+ *   action=log_field_report_attachment : Append one row with GitHub URLs (after Edgar upload)
+ *   shop_name=<string>               : Required (Hit List shop name)
+ *   digital_signature=<string>     : Required (same public key as update_status)
+ *   github_raw_url=<url>           : Required unless github_blob_url is set
+ *   github_blob_url=<url>          : Optional
+ *   store_key, update_id, hit_list_row, email, filename_original, mime_type, github_path, remarks : Optional
+ *   When ``update_id`` matches a **DApp Remarks** row (same **Submitted By** if both set), **Attachment Raw URL** / **Attachment GitHub URL** on that row are filled or appended (newline for multiple files).
+ *
+ * Response format:
+ *   {
+ *     "success": true,
+ *     "location": { "latitude": <number>, "longitude": <number> },
+ *     "status_filter": "<string>",
+ *     "count": <number>,
+ *     "stores": [
+ *       {
+ *         "name": "<string>",
+ *         "address": "<string>",
+ *         "city": "<string>",
+ *         "state": "<string>",
+ *         "phone": "<string>",
+ *         "website": "<string>",
+ *         "email": "<string>",
+ *         "instagram": "<string>",
+ *         "shop_type": "<string>",
+ *         "priority": "<string>",
+ *         "status": "<string>",
+ *         "notes": "<string>",
+ *         "contact_date": "<string>",
+ *         "contact_method": "<string>",
+ *         "latitude": <number>,
+ *         "longitude": <number>",
+ *         "distance": <number>  // Distance in miles
+ *       },
+ *       ...
+ *     ]
+ *   }
+ * 
+ * Error response:
+ *   {
+ *     "success": false,
+ *     "error": "<error message>"
+ *   }
+ * 
+ * Instructions to call this endpoint:
+ * 1. Deploy this script as a web app:
+ *    - Click Deploy > New deployment > Web app.
+ *    - Set "Execute as" to "Me" and "Who has access" to "Anyone" (or restrict as needed).
+ *    - Click Deploy and copy the web app URL.
+ * 2. Make an HTTP GET request with latitude and longitude:
+ *    - URL format: <web_app_url>?lat=37.7749&lng=-122.4194&limit=10&status=Contacted
+ *    - Example: https://script.google.com/macros/s/<ID>/exec?lat=37.7749&lng=-122.4194&limit=10
+ * 3. Use a tool like curl, Postman, or JavaScript fetch to test:
+ *    - curl: curl "<web_app_url>?lat=37.7749&lng=-122.4194&limit=10"
+ *    - JavaScript: fetch("<web_app_url>?lat=37.7749&lng=-122.4194&limit=10").then(res => res.json())
+ * 4. To test the function directly:
+ *    - Open the script editor and run the testFindNearbyStores() function.
+ *    - Check the Logs (View > Logs) for the result.
+ * 
+ * Note: Ensure the spreadsheet ID and sheet name defined in constants below match your setup.
+ */
+
+// Constants for spreadsheet ID and sheet name
+const SPREADSHEET_ID = '1eiqZr3LW-qEI6Hmy0Vrur_8flbRwxwA7jXVrbUnHbvc';
+const SHEET_NAME = 'Hit List';
+const DAPP_REMARKS_SHEET = 'DApp Remarks';
+/** Tab for DApp “field agent was here” pings (Python automation reads Status). */
+const RECENT_FIELD_AGENT_SHEET = 'Recent Field Agent Location';
+const FIELD_AGENT_STATUS_PENDING = 'pending';
+/**
+ * Attachment metadata for store visit / field reports (URLs to GitHub raw/blob).
+ * Must match name in holistic_hit_list_store_history / store_interaction_history_api.gs.
+ */
+const STORES_VISITS_FIELD_REPORTS_SHEET = 'Stores Visits Field Reports';
+
+/** Hit List weekday hour columns (Monday … Sunday; open/close pairs, 24h HH:MM). */
+const HIT_LIST_OPENING_HOUR_HEADERS = [
+  'Monday Open', 'Monday Close',
+  'Tuesday Open', 'Tuesday Close',
+  'Wednesday Open', 'Wednesday Close',
+  'Thursday Open', 'Thursday Close',
+  'Friday Open', 'Friday Close',
+  'Saturday Open', 'Saturday Close',
+  'Sunday Open', 'Sunday Close'
+];
+
+/** Hit List column: Google ``business_status`` as sheet text (e.g. **Closed** = permanently closed). */
+const GOOGLE_LISTING_HEADER = 'Google listing';
+
+/**
+ * Hit List columns **AU** / **AV** (1-based A=1 …), same layout as
+ * ``market_research/scripts/set_hit_list_warmup_touches_formula.py``.
+ */
+const HIT_LIST_COL_AU = 47;
+const HIT_LIST_COL_AV = 48;
+
+/**
+ * COUNTIFS against **Email Agent Follow Up** (``C`` = ``store_key``, ``E`` = ``to_email``, ``J`` = ``status``).
+ * @param {number} row Hit List data row (1-based, matches Sheets).
+ * @param {string} status ``warmup`` or ``follow_up`` (from ``sync_email_agent_followup.py``).
+ * @return {string}
+ */
+function hitListSentTouchCountFormula_(row, status) {
+  return (
+    '=IF($AD' +
+      row +
+      '<>"", COUNTIFS(\'Email Agent Follow Up\'!$C:$C, $AD' +
+      row +
+      ', \'Email Agent Follow Up\'!$J:$J, "' +
+      status +
+      '"), IF($K' +
+      row +
+      '<>"", COUNTIFS(\'Email Agent Follow Up\'!$E:$E, LOWER($K' +
+      row +
+      '), \'Email Agent Follow Up\'!$J:$J, "' +
+      status +
+      '"), 0))'
+  );
+}
+
+/**
+ * Writes AU (warm-up sends) and AV (follow-up sends) for one Hit List row.
+ * @param {GoogleAppsScript.Spreadsheet.Sheet} sheet
+ * @param {number} rowNum 1-based sheet row
+ */
+function applyHitListAuAvFormulasToRow_(sheet, rowNum) {
+  sheet
+    .getRange(rowNum, HIT_LIST_COL_AU, 1, 2)
+    .setFormulas([
+      [
+        hitListSentTouchCountFormula_(rowNum, 'warmup'),
+        hitListSentTouchCountFormula_(rowNum, 'follow_up'),
+      ],
+    ]);
+}
+
+/**
+ * Sheets often returns times as Date (1899-12-30 wall clock) or as a day-fraction number.
+ * Open-now parsing expects "HH:mm" text; this normalizes before parseHmToMinutes_.
+ * @param {*} raw Cell value from getValues()
+ * @param {string} sheetTz Spreadsheet time zone from spreadsheet.getSpreadsheetTimeZone()
+ * @return {string}
+ */
+function normalizeHourCellToHmString_(raw, sheetTz) {
+  if (raw === null || raw === undefined || raw === '') {
+    return '';
+  }
+  var tz = sheetTz || Session.getScriptTimeZone();
+  if (Object.prototype.toString.call(raw) === '[object Date]') {
+    var d = /** @type {Date} */ (raw);
+    if (isNaN(d.getTime())) {
+      return '';
+    }
+    return Utilities.formatDate(d, tz, 'HH:mm');
+  }
+  if (typeof raw === 'number' && isFinite(raw)) {
+    var frac = raw;
+    if (frac < 0) {
+      return '';
+    }
+    if (frac >= 1) {
+      frac = frac - Math.floor(frac);
+    }
+    var totalMinutes = Math.round(frac * 24 * 60);
+    if (totalMinutes >= 24 * 60) {
+      totalMinutes = totalMinutes % (24 * 60);
+    }
+    if (totalMinutes < 0) {
+      totalMinutes = 0;
+    }
+    var hh = Math.floor(totalMinutes / 60);
+    var mm = totalMinutes % 60;
+    return (hh < 10 ? '0' : '') + hh + ':' + (mm < 10 ? '0' : '') + mm;
+  }
+  return String(raw).trim();
+}
+
+/**
+ * @param {string} s
+ * @return {number|null} minutes since midnight
+ */
+function parseHmToMinutes_(s) {
+  var t = String(s || '').trim();
+  if (!t) {
+    return null;
+  }
+  var m = t.match(/^([01]?\d|2[0-3]):([0-5]\d)$/);
+  if (!m) {
+    return null;
+  }
+  return parseInt(m[1], 10) * 60 + parseInt(m[2], 10);
+}
+
+/**
+ * ISO weekday in time zone: 1=Monday … 7=Sunday (Java ``u`` pattern).
+ * @param {string} timeZone
+ * @return {{u:number, minutes:number}}
+ */
+function localWallClockFromTz_(timeZone) {
+  var now = new Date();
+  var u = parseInt(Utilities.formatDate(now, timeZone, 'u'), 10);
+  var hm = Utilities.formatDate(now, timeZone, 'HH:mm');
+  var parts = hm.split(':');
+  var minutes = parseInt(parts[0], 10) * 60 + parseInt(parts[1], 10);
+  return { u: u, minutes: minutes };
+}
+
+/**
+ * @param {Array} row
+ * @param {Object} headerIndex map header -> 0-based column index
+ * @param {string} viewerTimeZone IANA time zone for "now" (e.g. America/Los_Angeles)
+ * @param {string} sheetTz Spreadsheet time zone for interpreting time-typed cells
+ * @return {boolean}
+ */
+function isHitListRowOpenNow_(row, headerIndex, viewerTimeZone, sheetTz) {
+  var ctx = localWallClockFromTz_(viewerTimeZone);
+  var u = ctx.u;
+  var nowM = ctx.minutes;
+  // u: 1 Mon .. 6 Sat, 7 Sun -> pair start index in HIT_LIST_OPENING_HOUR_HEADERS
+  var pairStart = (u === 7) ? 12 : (u - 1) * 2;
+  var openH = HIT_LIST_OPENING_HOUR_HEADERS[pairStart];
+  var closeH = HIT_LIST_OPENING_HOUR_HEADERS[pairStart + 1];
+  var oi = headerIndex[openH];
+  var ci = headerIndex[closeH];
+  var oRaw = (oi >= 0 && oi < row.length) ? row[oi] : '';
+  var cRaw = (ci >= 0 && ci < row.length) ? row[ci] : '';
+  var oS = normalizeHourCellToHmString_(oRaw, sheetTz);
+  var cS = normalizeHourCellToHmString_(cRaw, sheetTz);
+  if (!oS) {
+    return false;
+  }
+  var openM = parseHmToMinutes_(oS);
+  if (openM === null) {
+    return false;
+  }
+  if (!cS) {
+    return nowM >= openM;
+  }
+  var closeM = parseHmToMinutes_(cS);
+  if (closeM === null) {
+    return nowM >= openM;
+  }
+  if (closeM < openM) {
+    return nowM >= openM || nowM <= closeM;
+  }
+  return nowM >= openM && nowM <= closeM;
+}
+
+/**
+ * @param {Array} row
+ * @param {Object} headerIndex map header -> 0-based column index
+ * @return {boolean} True when the sheet marks this row as permanently closed on Google.
+ */
+function isHitListRowPermanentlyClosed_(row, headerIndex) {
+  var hi = headerIndex[GOOGLE_LISTING_HEADER];
+  if (hi === undefined || hi === null || hi < 0) {
+    return false;
+  }
+  var v = String((row[hi] || '')).trim().toLowerCase();
+  return v === 'closed';
+}
+
+/**
+ * Calculate distance between two points using Haversine formula
+ * Returns distance in miles
+ * @param {number} lat1 - Latitude of first point
+ * @param {number} lon1 - Longitude of first point
+ * @param {number} lat2 - Latitude of second point
+ * @param {number} lon2 - Longitude of second point
+ * @return {number} Distance in miles
+ */
+function calculateDistance(lat1, lon1, lat2, lon2) {
+  const R = 3959; // Earth's radius in miles
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  
+  const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+            Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+            Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  const distance = R * c;
+  
+  return distance;
+}
+
+/**
+ * Convert degrees to radians
+ * @param {number} degrees - Angle in degrees
+ * @return {number} Angle in radians
+ */
+function toRad(degrees) {
+  return degrees * (Math.PI / 180);
+}
+
+/**
+ * Normalize a string for use in store keys.
+ * @param {string} value
+ * @return {string}
+ */
+function normalizeForKey_(value) {
+  if (!value) {
+    return '';
+  }
+  return String(value)
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, '-')
+    .replace(/[^a-z0-9\-]/g, '');
+}
+
+/**
+ * Create a deterministic key for a store based on its core address fields.
+ * @param {string} name
+ * @param {string} address
+ * @param {string} city
+ * @param {string} state
+ * @return {string}
+ */
+function createStoreKey_(name, address, city, state) {
+  const parts = [
+    normalizeForKey_(name),
+    normalizeForKey_(address),
+    normalizeForKey_(city),
+    normalizeForKey_(state)
+  ].filter(Boolean);
+  return parts.join('__');
+}
+
+/**
+ * Check if a point is within bounds
+ * @param {number} lat - Latitude to check
+ * @param {number} lng - Longitude to check
+ * @param {number} neLat - Northeast latitude bound
+ * @param {number} neLng - Northeast longitude bound
+ * @param {number} swLat - Southwest latitude bound
+ * @param {number} swLng - Southwest longitude bound
+ * @return {boolean} True if point is within bounds
+ */
+function isWithinBounds(lat, lng, neLat, neLng, swLat, swLng) {
+  // Handle longitude wrapping (crossing the 180/-180 meridian)
+  if (neLng < swLng) {
+    // Bounds cross the date line
+    return lat >= swLat && lat <= neLat && (lng >= swLng || lng <= neLng);
+  } else {
+    // Normal case
+    return lat >= swLat && lat <= neLat && lng >= swLng && lng <= neLng;
+  }
+}
+
+/**
+ * Find nearby stores from the spreadsheet
+ * @param {number} userLat - User's latitude
+ * @param {number} userLng - User's longitude
+ * @param {number} limit - Maximum number of results (default: 10)
+ * @param {Array<string>|null} statusFilters - Filter by store status(es) (default: ["Contacted"]). Use null or empty array to show all statuses
+ * @param {Object|null} bounds - Optional bounds object with neLat, neLng, swLat, swLng to filter stores by visible area
+ * @param {Array<string>|null} shopTypeFilters - Filter by shop type(s) (optional). Use null or empty array to show all shop types
+ * @param {{enabled:boolean,timeZone:string}|null} openNowFilter When enabled, only rows open at local wall time in timeZone.
+ * @return {Array} Array of store objects with distance
+ */
+function findNearbyStores(userLat, userLng, limit, statusFilters, bounds, shopTypeFilters, openNowFilter) {
+  // If statusFilters is null, undefined, or empty array, it means show all statuses
+  if (statusFilters === undefined || statusFilters === null) {
+    statusFilters = null; // Show all
+  } else if (Array.isArray(statusFilters) && statusFilters.length === 0) {
+    statusFilters = null; // Show all
+  } else if (!Array.isArray(statusFilters)) {
+    // Convert single value to array for consistency
+    statusFilters = [statusFilters];
+  }
+  
+  // Handle shopTypeFilters similarly - null or empty means show all
+  if (shopTypeFilters === undefined || shopTypeFilters === null) {
+    shopTypeFilters = null; // Show all
+  } else if (Array.isArray(shopTypeFilters) && shopTypeFilters.length === 0) {
+    shopTypeFilters = null; // Show all
+  } else if (!Array.isArray(shopTypeFilters)) {
+    shopTypeFilters = [shopTypeFilters];
+  }
+  if (openNowFilter === undefined) {
+    openNowFilter = null;
+  }
+  try {
+    // Open the spreadsheet
+    const spreadsheet = SpreadsheetApp.openById(SPREADSHEET_ID);
+    const sheet = spreadsheet.getSheetByName(SHEET_NAME);
+    
+    if (!sheet) {
+      throw new Error(`Sheet "${SHEET_NAME}" not found`);
+    }
+
+    ensureHitListOpeningHourColumns_(sheet);
+    ensureHitListGoogleListingColumn_(sheet);
+
+    const sheetTz = spreadsheet.getSpreadsheetTimeZone();
+    
+    // Get all data
+    const data = sheet.getDataRange().getValues();
+    if (data.length < 2) {
+      return []; // No data rows
+    }
+    
+    // Find column indices
+    const headers = data[0];
+    const headerIndex = {};
+    headers.forEach(function (h, idx) {
+      headerIndex[String(h || '').trim()] = idx;
+    });
+    const shopNameIdx = headers.indexOf("Shop Name");
+    const statusIdx = headers.indexOf("Status");
+    const latIdx = headers.indexOf("Latitude");
+    const lngIdx = headers.indexOf("Longitude");
+    const salesNotesIdx = headers.indexOf("Sales Process Notes");
+    const addressIdx = headers.indexOf("Address");
+    const cityIdx = headers.indexOf("City");
+    const stateIdx = headers.indexOf("State");
+    const phoneIdx = headers.indexOf("Phone");
+    const websiteIdx = headers.indexOf("Website");
+    const emailIdx = headers.indexOf("Email");
+    const instagramIdx = headers.indexOf("Instagram");
+    const shopTypeIdx = headers.indexOf("Shop Type");
+    
+    if (shopNameIdx === -1 || statusIdx === -1 || latIdx === -1 || lngIdx === -1) {
+      throw new Error("Required columns not found in sheet");
+    }
+    const priorityIdx = headers.indexOf("Priority");
+    const notesIdx = headers.indexOf("Notes");
+    const contactDateIdx = headers.indexOf("Contact Date");
+    const contactMethodIdx = headers.indexOf("Contact Method");
+    const followUpDateIdx = headers.indexOf("Follow Up Date");
+    const contactPersonIdx = headers.indexOf("Contact Person");
+    const ownerNameIdx = headers.indexOf("Owner Name");
+    const cellPhoneIdx = headers.indexOf("Cell Phone");
+    const referralIdx = headers.indexOf("Referral");
+    const productInterestIdx = headers.indexOf("Product Interest");
+    const followUpEventLinkIdx = headers.indexOf("Follow Up Event Link");
+    const visitDateIdx = headers.indexOf("Visit Date");
+    const outcomeIdx = headers.indexOf("Outcome");
+    
+    // Process rows and filter by status and shop type
+    const stores = [];
+    
+    // Log filtering info for debugging
+    Logger.log("Filtering stores with statusFilters: " + JSON.stringify(statusFilters) + " (type: " + typeof statusFilters + ")");
+    if (shopTypeFilters) {
+      Logger.log("Filtering stores with shopTypeFilters: " + JSON.stringify(shopTypeFilters));
+    }
+    
+    for (let i = 1; i < data.length; i++) {
+      const row = data[i];
+      
+      // Get status from row and normalize it
+      const status = row[statusIdx];
+      const rowStatus = status ? String(status).trim() : "";
+      
+      // Apply status filter(s) (if statusFilters is null, show all stores regardless of status)
+      if (statusFilters !== null && statusFilters !== undefined && statusFilters.length > 0) {
+        // Check if row status matches any of the selected status filters
+        const matchesStatus = statusFilters.some(filterStatus => {
+          const trimmedFilter = String(filterStatus).trim();
+          return rowStatus === trimmedFilter;
+        });
+        if (!matchesStatus) {
+          continue; // Skip this store - it doesn't match any of the selected status filters
+        }
+      }
+      // If statusFilters is null or empty, we show all stores (no filtering)
+      
+      // Apply shop type filter(s) if provided
+      if (shopTypeFilters !== null && shopTypeFilters !== undefined && shopTypeFilters.length > 0) {
+        const rowShopType = shopTypeIdx >= 0 ? (row[shopTypeIdx] ? String(row[shopTypeIdx]).trim() : "") : "";
+        // Check if row shop type matches any of the selected shop type filters
+        const matchesShopType = shopTypeFilters.some(filterShopType => {
+          const trimmedFilter = String(filterShopType).trim();
+          return rowShopType === trimmedFilter;
+        });
+        if (!matchesShopType) {
+          continue; // Skip this store - it doesn't match any of the selected shop type filters
+        }
+      }
+      
+      // Get coordinates
+      const latStr = row[latIdx];
+      const lngStr = row[lngIdx];
+      
+      // Skip if no coordinates
+      if (!latStr || !lngStr || latStr === "" || lngStr === "") {
+        continue;
+      }
+      
+      // Parse coordinates
+      let storeLat, storeLng;
+      try {
+        storeLat = parseFloat(latStr);
+        storeLng = parseFloat(lngStr);
+        
+        if (isNaN(storeLat) || isNaN(storeLng)) {
+          continue;
+        }
+      } catch (e) {
+        continue;
+      }
+      
+      // Filter by bounds FIRST if provided (for map viewport filtering)
+      // This is more efficient - check bounds before calculating distance
+      if (bounds && bounds.neLat !== null && bounds.neLng !== null && bounds.swLat !== null && bounds.swLng !== null) {
+        const withinBounds = isWithinBounds(storeLat, storeLng, bounds.neLat, bounds.neLng, bounds.swLat, bounds.swLng);
+        if (!withinBounds) {
+          // Store is outside the visible bounds - skip it
+          // Logger.log('Skipping store outside bounds: ' + storeName + ' at (' + storeLat + ', ' + storeLng + ')');
+          continue;
+        }
+      }
+      
+      // Calculate distance
+      const distance = calculateDistance(userLat, userLng, storeLat, storeLng);
+
+      if (openNowFilter && openNowFilter.enabled && openNowFilter.timeZone) {
+        if (isHitListRowPermanentlyClosed_(row, headerIndex)) {
+          continue;
+        }
+        if (!isHitListRowOpenNow_(row, headerIndex, openNowFilter.timeZone, sheetTz)) {
+          continue;
+        }
+      }
+      
+      // Build store object with all available fields
+      const store = {
+        name: row[shopNameIdx] || "",
+        address: addressIdx >= 0 ? (row[addressIdx] || "") : "",
+        city: cityIdx >= 0 ? (row[cityIdx] || "") : "",
+        state: stateIdx >= 0 ? (row[stateIdx] || "") : "",
+        phone: phoneIdx >= 0 ? (row[phoneIdx] || "") : "",
+        cell_phone: cellPhoneIdx >= 0 ? (row[cellPhoneIdx] || "") : "",
+        website: websiteIdx >= 0 ? (row[websiteIdx] || "") : "",
+        email: emailIdx >= 0 ? (row[emailIdx] || "") : "",
+        instagram: instagramIdx >= 0 ? (row[instagramIdx] || "") : "",
+        shop_type: shopTypeIdx >= 0 ? (row[shopTypeIdx] || "") : "",
+        priority: priorityIdx >= 0 ? (row[priorityIdx] || "") : "",
+        status: rowStatus, // Use the trimmed status
+        notes: notesIdx >= 0 ? (row[notesIdx] || "") : "",
+        contact_date: contactDateIdx >= 0 ? (row[contactDateIdx] || "") : "",
+        contact_method: contactMethodIdx >= 0 ? (row[contactMethodIdx] || "") : "",
+        follow_up_date: followUpDateIdx >= 0 ? (row[followUpDateIdx] || "") : "",
+        contact_person: contactPersonIdx >= 0 ? (row[contactPersonIdx] || "") : "",
+        owner_name: ownerNameIdx >= 0 ? (row[ownerNameIdx] || "") : "",
+        referral: referralIdx >= 0 ? (row[referralIdx] || "") : "",
+        product_interest: productInterestIdx >= 0 ? (row[productInterestIdx] || "") : "",
+        follow_up_event_link: followUpEventLinkIdx >= 0 ? (row[followUpEventLinkIdx] || "") : "",
+        visit_date: visitDateIdx >= 0 ? (row[visitDateIdx] || "") : "",
+        outcome: outcomeIdx >= 0 ? (row[outcomeIdx] || "") : "",
+        sales_process_notes: salesNotesIdx >= 0 ? (row[salesNotesIdx] || "") : "",
+        google_listing: (function () {
+          var gli = headerIndex.hasOwnProperty(GOOGLE_LISTING_HEADER) ? headerIndex[GOOGLE_LISTING_HEADER] : -1;
+          if (gli < 0 || gli >= row.length) {
+            return '';
+          }
+          return String(row[gli] || '').trim();
+        })(),
+        latitude: storeLat,
+        longitude: storeLng,
+        distance: Math.round(distance * 10) / 10 // Round to 1 decimal place
+      };
+
+      HIT_LIST_OPENING_HOUR_HEADERS.forEach(function (hh) {
+        var di = headerIndex[hh];
+        var key = String(hh || '').trim().toLowerCase().replace(/\s+/g, '_');
+        if (key) {
+          var rawCell = di >= 0 && di < row.length ? row[di] : '';
+          store[key] = normalizeHourCellToHmString_(rawCell, sheetTz);
+        }
+      });
+      
+      stores.push(store);
+    }
+    
+    // Sort by distance
+    stores.sort((a, b) => a.distance - b.distance);
+    
+    // Return top N stores
+    return stores.slice(0, limit);
+    
+  } catch (error) {
+    Logger.log("Error in findNearbyStores: " + error.toString());
+    throw error;
+  }
+}
+
+/**
+ * Ensure “Recent Field Agent Location” exists with expected headers.
+ * @param {GoogleAppsScript.Spreadsheet.Spreadsheet} spreadsheet
+ * @return {GoogleAppsScript.Spreadsheet.Sheet}
+ */
+function ensureRecentFieldAgentLocationSheet_(spreadsheet) {
+  let sheet = spreadsheet.getSheetByName(RECENT_FIELD_AGENT_SHEET);
+  const headers = [
+    'Logged At',
+    'Latitude',
+    'Longitude',
+    'Digital Signature',
+    'Location ID',
+    'Status'
+  ];
+  if (!sheet) {
+    sheet = spreadsheet.insertSheet(RECENT_FIELD_AGENT_SHEET);
+    sheet.appendRow(headers);
+    return sheet;
+  }
+
+  const lastRow = sheet.getLastRow();
+  const lastCol = Math.max(sheet.getLastColumn(), headers.length);
+  const firstRow = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
+  const row1Blank = firstRow.every(function (cell) {
+    return String(cell || '').trim() === '';
+  });
+
+  // Tab exists but has no header row yet (completely empty sheet is common).
+  if (lastRow === 0 || row1Blank) {
+    sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+    return sheet;
+  }
+
+  const matches = headers.every(function (h, i) {
+    return String(firstRow[i] || '').trim() === h;
+  });
+  if (matches) {
+    return sheet;
+  }
+
+  // Row 1 has text but not our canonical headers (e.g. placeholders or different labels).
+  // Safe to overwrite only when there is no data in row 2+.
+  if (lastRow <= 1) {
+    sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+    return sheet;
+  }
+
+  throw new Error(
+    'Sheet "' + RECENT_FIELD_AGENT_SHEET + '" row 1 must be exactly: ' + headers.join(', ') +
+      '. Fix row 1 in the spreadsheet, or move existing rows down so row 1 can be the header row.'
+  );
+}
+
+/**
+ * Append one field-agent location row (Status pending for downstream Python).
+ * @param {number} lat
+ * @param {number} lng
+ * @param {string} digitalSignature
+ * @return {string} Location ID (UUID)
+ */
+function appendFieldAgentLocation_(lat, lng, digitalSignature) {
+  const spreadsheet = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const sheet = ensureRecentFieldAgentLocationSheet_(spreadsheet);
+  const locationId = Utilities.getUuid();
+  const now = new Date();
+  sheet.appendRow([
+    now,
+    lat,
+    lng,
+    digitalSignature || '',
+    locationId,
+    FIELD_AGENT_STATUS_PENDING
+  ]);
+  return locationId;
+}
+
+/**
+ * Canonical headers for **Stores Visits Field Reports** (row 1).
+ * Columns align with store_interaction_history_api README and DApp preview keys
+ * (`github_raw_url`, `MIME Type`, `Store Key`, `Shop Name`, `Email`).
+ * @param {GoogleAppsScript.Spreadsheet.Spreadsheet} spreadsheet
+ * @return {GoogleAppsScript.Spreadsheet.Sheet}
+ */
+function ensureStoresVisitsFieldReportsSheet_(spreadsheet) {
+  let sheet = spreadsheet.getSheetByName(STORES_VISITS_FIELD_REPORTS_SHEET);
+  const headers = [
+    'created_at_utc',
+    'attachment_id',
+    'Store Key',
+    'Shop Name',
+    'Email',
+    'hit_list_row',
+    'update_id',
+    'Submitted By',
+    'filename_original',
+    'MIME Type',
+    'github_path',
+    'github_blob_url',
+    'github_raw_url',
+    'remarks'
+  ];
+  if (!sheet) {
+    sheet = spreadsheet.insertSheet(STORES_VISITS_FIELD_REPORTS_SHEET);
+    sheet.appendRow(headers);
+    return sheet;
+  }
+
+  const lastRow = sheet.getLastRow();
+  const lastCol = Math.max(sheet.getLastColumn(), headers.length);
+  const firstRow = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
+  const row1Blank = firstRow.every(function (cell) {
+    return String(cell || '').trim() === '';
+  });
+
+  if (lastRow === 0 || row1Blank) {
+    sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+    return sheet;
+  }
+
+  const matches = headers.every(function (h, i) {
+    return String(firstRow[i] || '').trim() === h;
+  });
+  if (matches) {
+    return sheet;
+  }
+
+  if (lastRow <= 1) {
+    sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+    return sheet;
+  }
+
+  throw new Error(
+    'Sheet "' +
+      STORES_VISITS_FIELD_REPORTS_SHEET +
+      '" row 1 must be exactly: ' +
+      headers.join(', ') +
+      '. Fix row 1 in the spreadsheet, or move data so row 1 can be replaced.'
+  );
+}
+
+/**
+ * Append one attachment metadata row (after Edgar / GitHub upload).
+ * @param {Object} params
+ * @return {string} attachment_id
+ */
+function appendStoresVisitsFieldReportRow_(params) {
+  const spreadsheet = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const sheet = ensureStoresVisitsFieldReportsSheet_(spreadsheet);
+  const attachmentId = Utilities.getUuid();
+  const nowIso = new Date().toISOString();
+  sheet.appendRow([
+    nowIso,
+    attachmentId,
+    (params.store_key || '').toString(),
+    (params.shop_name || '').toString(),
+    (params.email || '').toString(),
+    (params.hit_list_row || '').toString(),
+    (params.update_id || '').toString(),
+    (params.digital_signature || '').toString(),
+    (params.filename_original || '').toString(),
+    (params.mime_type || '').toString(),
+    (params.github_path || '').toString(),
+    (params.github_blob_url || '').toString(),
+    (params.github_raw_url || '').toString(),
+    (params.remarks || '').toString()
+  ]);
+  return attachmentId;
+}
+
+/**
+ * Run once from the Apps Script editor (stores web app project) to create the tab and headers.
+ * Safe if the tab already exists with matching row 1.
+ */
+function setupStoresVisitsFieldReportsTab() {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  ensureStoresVisitsFieldReportsSheet_(ss);
+}
+
+/**
+ * HTTP handler: `?action=log_field_report_attachment&shop_name=...&digital_signature=...`
+ * plus `github_raw_url` or `github_blob_url`, optional `store_key`, `update_id`, `hit_list_row`, etc.
+ * @param {Object} e
+ * @return {{success:boolean, attachment_id?:string, error?:string}}
+ */
+function logFieldReportAttachment_(e) {
+  const shopName = (e.parameter.shop_name || '').toString().trim();
+  const raw = (e.parameter.github_raw_url || '').toString().trim();
+  const blob = (e.parameter.github_blob_url || '').toString().trim();
+  const digitalSignature = (e.parameter.digital_signature || e.parameter.signature || e.parameter.public_key || '')
+    .toString()
+    .trim();
+  if (!shopName) {
+    return { success: false, error: 'shop_name is required' };
+  }
+  if (!digitalSignature) {
+    return { success: false, error: 'digital_signature is required' };
+  }
+  if (!raw && !blob) {
+    return { success: false, error: 'github_raw_url or github_blob_url is required' };
+  }
+  try {
+    const spreadsheet = SpreadsheetApp.openById(SPREADSHEET_ID);
+    const attachmentId = appendStoresVisitsFieldReportRow_({
+      shop_name: shopName,
+      store_key: (e.parameter.store_key || '').toString().trim(),
+      email: (e.parameter.email || '').toString().trim(),
+      hit_list_row: (e.parameter.hit_list_row || '').toString().trim(),
+      update_id: (e.parameter.update_id || '').toString().trim(),
+      digital_signature: digitalSignature,
+      filename_original: (e.parameter.filename_original || '').toString().trim(),
+      mime_type: (e.parameter.mime_type || '').toString().trim(),
+      github_path: (e.parameter.github_path || '').toString().trim(),
+      github_blob_url: blob,
+      github_raw_url: raw || blob,
+      remarks: (e.parameter.remarks || '').toString().trim()
+    });
+    linkFieldReportUrlsToDappRemarks_(
+      spreadsheet,
+      (e.parameter.update_id || '').toString().trim(),
+      digitalSignature,
+      raw || blob,
+      blob || raw
+    );
+    return { success: true, attachment_id: attachmentId };
+  } catch (err) {
+    return { success: false, error: String(err.message || err) };
+  }
+}
+
+/** Row 1 header names on **DApp Remarks** (trimmed). */
+function dappRemarksHeaderNames_(sheet) {
+  const lastCol = sheet.getLastColumn();
+  if (lastCol < 1) {
+    return [];
+  }
+  return sheet
+    .getRange(1, 1, 1, lastCol)
+    .getValues()[0]
+    .map(function (h) {
+      return String(h || '').trim();
+    });
+}
+
+function ensureDappRemarksSheet_(spreadsheet) {
+  let sheet = spreadsheet.getSheetByName(DAPP_REMARKS_SHEET);
+  const BASE_HEADERS = [
+    'Submission ID',
+    'Shop Name',
+    'Status',
+    'Remarks',
+    'Submitted By',
+    'Submitted At',
+    'Processed',
+    'Processed At'
+  ];
+  const LINK_HEADERS = ['Update ID', 'Attachment Raw URL', 'Attachment GitHub URL'];
+
+  if (!sheet) {
+    sheet = spreadsheet.insertSheet(DAPP_REMARKS_SHEET);
+    sheet.appendRow(BASE_HEADERS.concat(LINK_HEADERS));
+    return sheet;
+  }
+
+  var names = dappRemarksHeaderNames_(sheet);
+  var nameSet = {};
+  var i;
+  for (i = 0; i < names.length; i++) {
+    if (names[i]) {
+      nameSet[names[i]] = true;
+    }
+  }
+  for (i = 0; i < LINK_HEADERS.length; i++) {
+    var h = LINK_HEADERS[i];
+    if (!nameSet[h]) {
+      var nextCol = sheet.getLastColumn() + 1;
+      sheet.getRange(1, nextCol).setValue(h);
+      nameSet[h] = true;
+    }
+  }
+  return sheet;
+}
+
+/**
+ * After **Stores Visits Field Reports** append, copy GitHub URLs onto the **DApp Remarks** row
+ * with the same **Update ID** (and same **Submitted By** when both present).
+ * @param {GoogleAppsScript.Spreadsheet.Spreadsheet} spreadsheet
+ * @param {string} updateId
+ * @param {string} digitalSignature
+ * @param {string} rawUrl
+ * @param {string} blobUrl
+ */
+function linkFieldReportUrlsToDappRemarks_(spreadsheet, updateId, digitalSignature, rawUrl, blobUrl) {
+  updateId = String(updateId || '').trim();
+  rawUrl = String(rawUrl || '').trim();
+  blobUrl = String(blobUrl || '').trim();
+  if (!updateId) {
+    return;
+  }
+
+  var sheet = spreadsheet.getSheetByName(DAPP_REMARKS_SHEET);
+  if (!sheet) {
+    return;
+  }
+
+  var headers = dappRemarksHeaderNames_(sheet);
+  function colIndex(name) {
+    var idx = headers.indexOf(name);
+    return idx >= 0 ? idx : -1;
+  }
+  var idxUpdate = colIndex('Update ID');
+  var idxRaw = colIndex('Attachment Raw URL');
+  var idxBlob = colIndex('Attachment GitHub URL');
+  var idxSig = colIndex('Submitted By');
+  if (idxUpdate < 0) {
+    return;
+  }
+  if (idxRaw < 0 && idxBlob < 0) {
+    return;
+  }
+
+  var sigNeedle = String(digitalSignature || '').trim();
+  var data = sheet.getDataRange().getValues();
+  var r;
+  for (r = data.length - 1; r >= 1; r--) {
+    var cellUpdate = String(data[r][idxUpdate] || '').trim();
+    if (cellUpdate !== updateId) {
+      continue;
+    }
+    if (sigNeedle && idxSig >= 0) {
+      var rowSig = String(data[r][idxSig] || '').trim();
+      if (rowSig && rowSig !== sigNeedle) {
+        continue;
+      }
+    }
+    var rowNum = r + 1;
+    if (idxRaw >= 0 && rawUrl) {
+      var existingR = String(sheet.getRange(rowNum, idxRaw + 1).getValue() || '').trim();
+      sheet.getRange(rowNum, idxRaw + 1).setValue(existingR ? existingR + '\n' + rawUrl : rawUrl);
+    }
+    if (idxBlob >= 0 && blobUrl) {
+      var existingB = String(sheet.getRange(rowNum, idxBlob + 1).getValue() || '').trim();
+      sheet.getRange(rowNum, idxBlob + 1).setValue(existingB ? existingB + '\n' + blobUrl : blobUrl);
+    }
+    return;
+  }
+}
+
+function logDappSubmission_(spreadsheet, shopName, status, remarks, submittedBy, processed, updateId, attachRaw, attachBlob) {
+  const sheet = ensureDappRemarksSheet_(spreadsheet);
+  const headers = dappRemarksHeaderNames_(sheet);
+  if (!headers.length) {
+    throw new Error('DApp Remarks sheet has no header row');
+  }
+  const submissionId = Utilities.getUuid();
+  const submittedAt = new Date();
+  let processedFlag;
+  let processedAt = '';
+
+  if (processed === true) {
+    processedFlag = 'Yes';
+    processedAt = submittedAt;
+  } else if (processed === null) {
+    processedFlag = 'Status Applied';
+  } else {
+    processedFlag = 'No';
+  }
+
+  var colMap = {};
+  colMap['Submission ID'] = submissionId;
+  colMap['Shop Name'] = shopName || '';
+  colMap['Status'] = status || '';
+  colMap['Remarks'] = remarks || '';
+  colMap['Submitted By'] = submittedBy || '';
+  colMap['Submitted At'] = submittedAt;
+  colMap['Processed'] = processedFlag;
+  colMap['Processed At'] = processedAt;
+  colMap['Update ID'] = String(updateId || '').trim();
+  colMap['Attachment Raw URL'] = String(attachRaw || '').trim();
+  colMap['Attachment GitHub URL'] = String(attachBlob || '').trim();
+
+  var row = [];
+  var c;
+  for (c = 0; c < headers.length; c++) {
+    var hn = headers[c];
+    row[c] = Object.prototype.hasOwnProperty.call(colMap, hn) ? colMap[hn] : '';
+  }
+  sheet.appendRow(row);
+  return submissionId;
+}
+
+/**
+ * Update store status and/or shop type in the spreadsheet
+ * @param {string} shopName - Name of the shop to update
+ * @param {string} newStatus - New status value
+ * @param {string} digitalSignature - Digital signature (public key) of the person making the change
+ * @param {string} remarks - Optional remarks
+ * @param {string} submittedBy - Optional submitted by identifier
+ * @param {string} newShopType - Optional new shop type value
+ * @param {string} newInstagram - Optional new Instagram URL value
+ * @param {string} ownerName - Optional owner name value
+ * @param {string} contactPerson - Optional contact person value
+ * @param {string} email - Optional email value
+ * @param {string} cellPhone - Optional cell phone value
+ * @param {string} phone - Optional phone value
+ * @param {string} website - Optional website value
+ * @param {string} followUpDate - Optional follow up date value
+ * @param {string} visitDate - Optional visit date value
+ * @param {string} contactDate - Optional contact date value
+ * @param {string} contactMethod - Optional contact method value
+ * @param {string} fieldReportUpdateId - Optional SFR_* id linking DApp Remarks to field-report attachments
+ * @return {Object} Result object with success/error
+ */
+function updateStoreStatus(shopName, newStatus, digitalSignature, remarks, submittedBy, newShopType, newInstagram, ownerName, contactPerson, email, cellPhone, phone, website, followUpDate, visitDate, contactDate, contactMethod, fieldReportUpdateId, deferredUntil) {
+  try {
+    const spreadsheet = SpreadsheetApp.openById(SPREADSHEET_ID);
+    const sheet = spreadsheet.getSheetByName(SHEET_NAME);
+    
+    if (!sheet) {
+      throw new Error(`Sheet "${SHEET_NAME}" not found`);
+    }
+    
+    // Get all data
+    const data = sheet.getDataRange().getValues();
+    if (data.length < 2) {
+      throw new Error("No data found in sheet");
+    }
+    
+    // Find column indices
+    const headers = data[0];
+    const shopNameIdx = headers.indexOf("Shop Name");
+    const statusIdx = headers.indexOf("Status");
+    const shopTypeIdx = headers.indexOf("Shop Type");
+    const instagramIdx = headers.indexOf("Instagram");
+    const ownerNameIdx = headers.indexOf("Owner Name");
+    const contactPersonIdx = headers.indexOf("Contact Person");
+    const emailIdx = headers.indexOf("Email");
+    const cellPhoneIdx = headers.indexOf("Cell Phone");
+    const phoneIdx = headers.indexOf("Phone");
+    const websiteIdx = headers.indexOf("Website");
+    const followUpDateIdx = headers.indexOf("Follow Up Date");
+    const visitDateIdx = headers.indexOf("Visit Date");
+    const contactDateIdx = headers.indexOf("Contact Date");
+    const contactMethodIdx = headers.indexOf("Contact Method");
+    const salesNotesIdx = headers.indexOf("Sales Process Notes");
+    // Deferred Until — added 2026-04-30. Single-purpose date column for the
+    // auto-flip cron (process_deferred_auto_flip.gs); does NOT overload Follow Up Date.
+    const deferredUntilIdx = headers.indexOf("Deferred Until");
+    
+    // Find or create "Status Updated By" column
+    let statusUpdatedByIdx = headers.indexOf("Status Updated By");
+    if (statusUpdatedByIdx === -1) {
+      // Column doesn't exist, add it at the end
+      const lastCol = headers.length;
+      sheet.getRange(1, lastCol + 1).setValue("Status Updated By");
+      statusUpdatedByIdx = lastCol;
+      Logger.log("Created 'Status Updated By' column");
+    }
+    
+    // Find or create "Status Updated Date" column
+    let statusUpdatedDateIdx = headers.indexOf("Status Updated Date");
+    if (statusUpdatedDateIdx === -1) {
+      // Column doesn't exist, add it after "Status Updated By"
+      const lastCol = headers.length + (statusUpdatedByIdx === headers.length ? 1 : 0);
+      sheet.getRange(1, lastCol + 1).setValue("Status Updated Date");
+      statusUpdatedDateIdx = lastCol;
+      Logger.log("Created 'Status Updated Date' column");
+    }
+    
+    if (shopNameIdx === -1 || statusIdx === -1) {
+      throw new Error("Required columns not found in sheet");
+    }
+    
+    // Find the shop by name (exact match)
+    let found = false;
+    for (let i = 1; i < data.length; i++) {
+      if (data[i][shopNameIdx] === shopName) {
+        const rowNum = i + 1; // Convert to 1-indexed for sheet
+        
+        // Update status
+        sheet.getRange(rowNum, statusIdx + 1).setValue(newStatus);
+        
+        // Update shop type if provided
+        if (newShopType && newShopType !== null && newShopType !== undefined && newShopType !== "") {
+          if (shopTypeIdx === -1) {
+            // Shop Type column doesn't exist, add it
+            const lastCol = headers.length;
+            sheet.getRange(1, lastCol + 1).setValue("Shop Type");
+            const newShopTypeIdx = lastCol;
+            sheet.getRange(rowNum, newShopTypeIdx + 1).setValue(newShopType);
+            Logger.log("Created 'Shop Type' column and updated value");
+          } else {
+            sheet.getRange(rowNum, shopTypeIdx + 1).setValue(newShopType);
+            Logger.log(`Updated shop type for "${shopName}" to "${newShopType}"`);
+          }
+        }
+        
+        // Update Instagram URL if provided
+        if (newInstagram && newInstagram !== null && newInstagram !== undefined && newInstagram !== "") {
+          if (instagramIdx === -1) {
+            // Instagram column doesn't exist, add it
+            const lastCol = headers.length;
+            sheet.getRange(1, lastCol + 1).setValue("Instagram");
+            const newInstagramIdx = lastCol;
+            sheet.getRange(rowNum, newInstagramIdx + 1).setValue(newInstagram);
+            Logger.log("Created 'Instagram' column and updated value");
+          } else {
+            sheet.getRange(rowNum, instagramIdx + 1).setValue(newInstagram);
+            Logger.log(`Updated Instagram URL for "${shopName}" to "${newInstagram}"`);
+          }
+        }
+        
+        // Helper function to update a field if provided
+        function updateFieldIfProvided(fieldValue, columnIdx, columnName, rowNum) {
+          if (fieldValue && fieldValue !== null && fieldValue !== undefined && fieldValue !== "") {
+            if (columnIdx === -1) {
+              // Column doesn't exist, add it
+              const lastCol = sheet.getLastColumn();
+              sheet.getRange(1, lastCol + 1).setValue(columnName);
+              sheet.getRange(rowNum, lastCol + 1).setValue(fieldValue);
+              Logger.log(`Created '${columnName}' column and updated value`);
+            } else {
+              sheet.getRange(rowNum, columnIdx + 1).setValue(fieldValue);
+              Logger.log(`Updated ${columnName} for "${shopName}" to "${fieldValue}"`);
+            }
+          }
+        }
+        
+        // Update all new fields if provided
+        updateFieldIfProvided(ownerName, ownerNameIdx, "Owner Name", rowNum);
+        updateFieldIfProvided(contactPerson, contactPersonIdx, "Contact Person", rowNum);
+        updateFieldIfProvided(email, emailIdx, "Email", rowNum);
+        updateFieldIfProvided(cellPhone, cellPhoneIdx, "Cell Phone", rowNum);
+        updateFieldIfProvided(phone, phoneIdx, "Phone", rowNum);
+        updateFieldIfProvided(website, websiteIdx, "Website", rowNum);
+        updateFieldIfProvided(followUpDate, followUpDateIdx, "Follow Up Date", rowNum);
+        updateFieldIfProvided(visitDate, visitDateIdx, "Visit Date", rowNum);
+        updateFieldIfProvided(contactDate, contactDateIdx, "Contact Date", rowNum);
+        updateFieldIfProvided(contactMethod, contactMethodIdx, "Contact Method", rowNum);
+        updateFieldIfProvided(deferredUntil, deferredUntilIdx, "Deferred Until", rowNum);
+
+        // Update digital signature (public key)
+        const submittedValue = digitalSignature || submittedBy || "";
+        if (submittedValue) {
+          sheet.getRange(rowNum, statusUpdatedByIdx + 1).setValue(submittedValue);
+        }
+        
+        // Update timestamp
+        const timestamp = new Date();
+        sheet.getRange(rowNum, statusUpdatedDateIdx + 1).setValue(timestamp);
+        
+        // Append remarks into Sales Process Notes
+        if (remarks && salesNotesIdx !== -1) {
+          const noteRange = sheet.getRange(rowNum, salesNotesIdx + 1);
+          const existingNotes = noteRange.getValue();
+          const timestampIso = timestamp.toISOString();
+          const noteLine = `[${timestampIso} | ${submittedValue || "DApp"}] ${remarks}`;
+          const updatedNotes = existingNotes ? `${existingNotes}\n\n${noteLine}` : noteLine;
+          noteRange.setValue(updatedNotes);
+        }
+        
+        found = true;
+        Logger.log(`Updated status for "${shopName}" to "${newStatus}" by ${digitalSignature || "unknown"}`);
+        break;
+      }
+    }
+    
+    if (!found) {
+      throw new Error(`Shop "${shopName}" not found`);
+    }
+
+    const submissionId = logDappSubmission_(
+      spreadsheet,
+      shopName,
+      newStatus,
+      remarks,
+      digitalSignature || submittedBy,
+      null,
+      fieldReportUpdateId || '',
+      '',
+      ''
+    );
+
+    return {
+      success: true,
+      message: `Status updated to "${newStatus}"`,
+      submissionId: submissionId
+    };
+  } catch (error) {
+    Logger.log("Error in updateStoreStatus: " + error.toString());
+    throw error;
+  }
+}
+
+function ensureHitListOpeningHourColumns_(sheet) {
+  var lastCol = sheet.getLastColumn();
+  var headers = sheet.getRange(1, 1, 1, Math.max(lastCol, 1)).getValues()[0];
+  var missing = [];
+  HIT_LIST_OPENING_HOUR_HEADERS.forEach(function (h) {
+    if (headers.indexOf(h) === -1) {
+      missing.push(h);
+    }
+  });
+  if (!missing.length) {
+    return;
+  }
+  var nextCol = sheet.getLastColumn() + 1;
+  sheet.getRange(1, nextCol, 1, nextCol + missing.length - 1).setValues([missing]);
+}
+
+/**
+ * Ensure **Google listing** column exists (Place business status summary for the DApp).
+ * @param {GoogleAppsScript.Spreadsheet.Sheet} sheet
+ */
+function ensureHitListGoogleListingColumn_(sheet) {
+  var lastCol = sheet.getLastColumn();
+  var headers = sheet.getRange(1, 1, 1, Math.max(lastCol, 1)).getValues()[0];
+  var trimmed = headers.map(function (h) {
+    return String(h || '').trim();
+  });
+  if (trimmed.indexOf(GOOGLE_LISTING_HEADER) !== -1) {
+    return;
+  }
+  var nextCol = sheet.getLastColumn() + 1;
+  sheet.getRange(1, nextCol).setValue(GOOGLE_LISTING_HEADER);
+}
+
+function addNewStore(storeData) {
+  const spreadsheet = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const sheet = spreadsheet.getSheetByName(SHEET_NAME);
+  if (!sheet) {
+    throw new Error(`Sheet "${SHEET_NAME}" not found`);
+  }
+
+  let data = sheet.getDataRange().getValues();
+  if (!data || data.length === 0) {
+    throw new Error(`Sheet "${SHEET_NAME}" does not have a header row.`);
+  }
+
+  let headers = data[0];
+  if (headers.indexOf('Store Key') === -1) {
+    sheet.getRange(1, headers.length + 1).setValue('Store Key');
+    data = sheet.getDataRange().getValues();
+    headers = data[0];
+  }
+
+  ensureHitListOpeningHourColumns_(sheet);
+  ensureHitListGoogleListingColumn_(sheet);
+  data = sheet.getDataRange().getValues();
+  headers = data[0];
+
+  const headerIndex = {};
+  headers.forEach((header, idx) => {
+    headerIndex[header] = idx;
+  });
+
+  const storeKeyIdx = headerIndex['Store Key'];
+  const shopNameIdx = headerIndex['Shop Name'];
+  const addressIdx = headerIndex['Address'];
+  const cityIdx = headerIndex['City'];
+  const stateIdx = headerIndex['State'];
+  const statusIdx = headerIndex['Status'];
+
+  if (shopNameIdx === undefined || shopNameIdx === -1) {
+    throw new Error('Required column "Shop Name" not found in sheet.');
+  }
+
+  const storeKey = createStoreKey_(storeData.shopName, storeData.address, storeData.city, storeData.state);
+  if (!storeKey) {
+    return {
+      success: false,
+      error: 'Missing required fields to determine uniqueness',
+      message: 'Shop name and at least one of address, city, or state are required.'
+    };
+  }
+
+  for (let i = 1; i < data.length; i++) {
+    const row = data[i];
+    const rowShopName = row[shopNameIdx];
+
+    if (!rowShopName) {
+      continue;
+    }
+
+    const existingKeyFromColumn = storeKeyIdx >= 0 ? row[storeKeyIdx] : '';
+    const fallbackKey = createStoreKey_(rowShopName, addressIdx >= 0 ? row[addressIdx] : '', cityIdx >= 0 ? row[cityIdx] : '', stateIdx >= 0 ? row[stateIdx] : '');
+    const normalizedExistingKey = (existingKeyFromColumn || fallbackKey || '').toLowerCase();
+
+    if (!existingKeyFromColumn && fallbackKey && storeKeyIdx >= 0) {
+      sheet.getRange(i + 1, storeKeyIdx + 1).setValue(fallbackKey);
+    }
+
+    if (normalizedExistingKey && normalizedExistingKey === storeKey.toLowerCase()) {
+      const existingStatus = statusIdx >= 0 ? (row[statusIdx] || '') : '';
+      return {
+        success: false,
+        duplicate: true,
+        message: `Store "${rowShopName}" is already on the hit list.`,
+        error: 'Duplicate store detected',
+        existingStore: {
+          shopName: rowShopName,
+          status: existingStatus,
+          rowNumber: i + 1
+        }
+      };
+    }
+  }
+
+  const row = new Array(headers.length).fill('');
+  function setValue(header, value) {
+    if (headerIndex.hasOwnProperty(header) && value !== undefined && value !== null) {
+      row[headerIndex[header]] = value;
+    }
+  }
+
+  const now = new Date();
+  const submittedBy = storeData.submittedBy || 'DApp';
+  const baseNote = `Added via DApp on ${now.toISOString()}${submittedBy ? ' by ' + submittedBy : ''}.`;
+
+  const latValue = storeData.latitude ? parseFloat(storeData.latitude) : '';
+  const lngValue = storeData.longitude ? parseFloat(storeData.longitude) : '';
+
+  const salesNotes = [];
+  if (storeData.remarks) {
+    salesNotes.push(`[${now.toISOString()} | ${submittedBy}] ${storeData.remarks}`);
+  }
+  salesNotes.push(`[${now.toISOString()} | ${submittedBy}] Added via DApp.`);
+
+  setValue('Shop Name', storeData.shopName);
+  setValue('Status', storeData.status || 'Research');
+  setValue('Priority', storeData.priority || 'Medium');
+  setValue('Address', storeData.address || '');
+  setValue('City', storeData.city || '');
+  setValue('State', storeData.state || '');
+  setValue('Shop Type', storeData.shopType || '');
+  setValue('Phone', storeData.phone || '');
+  setValue('Email', storeData.email || '');
+  setValue('Website', storeData.website || '');
+  setValue('Instagram', storeData.instagram || '');
+  setValue('Notes', baseNote);
+  setValue('Sales Process Notes', salesNotes.join('\n'));
+  setValue('Latitude', !isNaN(latValue) ? latValue : '');
+  setValue('Longitude', !isNaN(lngValue) ? lngValue : '');
+  setValue('Contact Date', storeData.contactDate || '');
+  setValue('Contact Method', storeData.contactMethod || '');
+  setValue('Status Updated By', submittedBy);
+  setValue('Status Updated Date', now);
+  setValue('Store Key', storeKey);
+
+  HIT_LIST_OPENING_HOUR_HEADERS.forEach(function (h) {
+    var k = String(h || '').trim().toLowerCase().replace(/\s+/g, '_');
+    if (k && storeData[k]) {
+      setValue(h, storeData[k]);
+    }
+  });
+
+  if (storeData.google_listing) {
+    setValue(GOOGLE_LISTING_HEADER, storeData.google_listing);
+  }
+
+  sheet.appendRow(row);
+  applyHitListAuAvFormulasToRow_(sheet, sheet.getLastRow());
+
+  const submissionId = logDappSubmission_(spreadsheet, storeData.shopName, storeData.status, storeData.remarks, submittedBy, true, '', '', '');
+  return {
+    success: true,
+    message: `Added new store "${storeData.shopName}"`,
+    submissionId: submissionId
+  };
+}
+
+/**
+ * Web app entry point - handles GET requests
+ * @param {Object} e - Event object with parameters
+ * @return {TextOutput} JSON response
+ */
+function doGet(e) {
+  try {
+    if (e.parameter.action === 'add_store') {
+      const shopName = (e.parameter.shop_name || '').trim();
+      if (!shopName) {
+        return ContentService
+          .createTextOutput(JSON.stringify({
+            success: false,
+            error: "Missing parameters",
+            message: "shop_name is required to add a store"
+          }))
+          .setMimeType(ContentService.MimeType.JSON);
+      }
+
+      const storeData = {
+        shopName: shopName,
+        status: (e.parameter.status || 'Research').trim(),
+        remarks: (e.parameter.remarks || '').trim(),
+        address: (e.parameter.address || '').trim(),
+        city: (e.parameter.city || '').trim(),
+        state: (e.parameter.state || '').trim(),
+        phone: (e.parameter.phone || '').trim(),
+        email: (e.parameter.email || '').trim(),
+        website: (e.parameter.website || '').trim(),
+        instagram: (e.parameter.instagram || '').trim(),
+        shopType: (e.parameter.shop_type || '').trim(),
+        latitude: (e.parameter.latitude || '').trim(),
+        longitude: (e.parameter.longitude || '').trim(),
+        submittedBy: (e.parameter.submitted_by || e.parameter.digital_signature || '').trim()
+      };
+
+      HIT_LIST_OPENING_HOUR_HEADERS.forEach(function (h) {
+        var k = String(h || '').trim().toLowerCase().replace(/\s+/g, '_');
+        if (k) {
+          storeData[k] = (e.parameter[k] || '').trim();
+        }
+      });
+
+      storeData.google_listing = (e.parameter.google_listing || '').trim();
+
+      let salesNotes = '';
+      if (storeData.remarks) {
+        salesNotes = `[${new Date().toISOString()} | ${storeData.submittedBy || 'DApp'}] ${storeData.remarks}`;
+      }
+      storeData.salesNotes = salesNotes;
+
+      const result = addNewStore(storeData);
+      if (result.success) {
+        return ContentService
+          .createTextOutput(JSON.stringify({
+            success: true,
+            message: result.message,
+            submission_id: result.submissionId || ''
+          }))
+          .setMimeType(ContentService.MimeType.JSON);
+      }
+
+      return ContentService
+        .createTextOutput(JSON.stringify({
+          success: false,
+          error: result.error || 'Unable to add store',
+          message: result.message || '',
+          duplicate: !!result.duplicate,
+          existing_store: result.existingStore || null
+        }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+
+    /** Log one row to **Stores Visits Field Reports** (GitHub attachment URLs after Edgar upload). */
+    if (e.parameter.action === 'log_field_report_attachment') {
+      const out = logFieldReportAttachment_(e);
+      return ContentService.createTextOutput(JSON.stringify(out)).setMimeType(ContentService.MimeType.JSON);
+    }
+
+    /**
+     * Async retail field report scanner — Edgar fires this from `WebhookTriggerWorker`
+     * after writing a `[RETAIL FIELD REPORT EVENT]` row to `Telegram Chat Logs`. The
+     * scanner dedups against `Stores Visits Field Reports` col G and applies updates
+     * to Hit List + DApp Remarks + Stores Visits Field Reports in one pass.
+     * Source: `google_app_scripts/find_nearby_stores/process_retail_field_reports_telegram_logs.gs`.
+     */
+    if (e.parameter.action === 'processRetailFieldReportsFromTelegramChatLogs') {
+      const out = processRetailFieldReportsFromTelegramChatLogs();
+      return ContentService.createTextOutput(JSON.stringify(out)).setMimeType(ContentService.MimeType.JSON);
+    }
+
+    /**
+     * Async partner check-in scanner (Telegram Chat Logs → Partner Check-ins).
+     * Triggered by Edgar after every [PARTNER CHECK-IN EVENT] is logged.
+     * Source: `google_app_scripts/find_nearby_stores/process_partner_check_in_telegram_logs.gs`.
+     */
+    if (e.parameter.action === 'processPartnerCheckInsFromTelegramChatLogs') {
+      const out = processPartnerCheckInsFromTelegramChatLogs();
+      return ContentService.createTextOutput(JSON.stringify(out)).setMimeType(ContentService.MimeType.JSON);
+    }
+
+    // Check if this is a status update request
+    if (e.parameter.action === 'update_status') {
+      const shopName = e.parameter.shop_name;
+      const newStatus = e.parameter.new_status;
+      const newShopType = e.parameter.shop_type || '';
+      const newInstagram = e.parameter.instagram || '';
+      const ownerName = e.parameter.owner_name || '';
+      const contactPerson = e.parameter.contact_person || '';
+      const email = e.parameter.email || '';
+      const cellPhone = e.parameter.cell_phone || '';
+      const phone = e.parameter.phone || '';
+      const website = e.parameter.website || '';
+      const followUpDate = e.parameter.follow_up_date || '';
+      const visitDate = e.parameter.visit_date || '';
+      const contactDate = e.parameter.contact_date || '';
+      const contactMethod = e.parameter.contact_method || '';
+      const fieldReportUpdateId = (e.parameter.update_id || '').toString().trim();
+      const digitalSignature = e.parameter.digital_signature || e.parameter.signature || e.parameter.public_key;                                                
+      const remarks = e.parameter.remarks || '';
+      const submittedBy = e.parameter.submitted_by || digitalSignature || '';
+      
+      if (!shopName || !newStatus) {
+        return ContentService
+          .createTextOutput(JSON.stringify({
+            success: false,
+            error: "Missing parameters",
+            message: "shop_name and new_status are required for status updates"
+          }))
+          .setMimeType(ContentService.MimeType.JSON);
+      }
+      
+      // Update the status, shop type, Instagram, and other fields (digitalSignature is optional but recommended)
+      const result = updateStoreStatus(
+        shopName,
+        newStatus,
+        digitalSignature,
+        remarks,
+        submittedBy,
+        newShopType,
+        newInstagram,
+        ownerName,
+        contactPerson,
+        email,
+        cellPhone,
+        phone,
+        website,
+        followUpDate,
+        visitDate,
+        contactDate,
+        contactMethod,
+        fieldReportUpdateId
+      );
+      
+      return ContentService
+        .createTextOutput(JSON.stringify({
+          success: true,
+          message: result.message,
+          submission_id: result.submissionId || ''
+        }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+    
+    // Otherwise, handle as a search request
+    // Get parameters
+    const lat = parseFloat(e.parameter.lat || e.parameter.latitude);
+    const lng = parseFloat(e.parameter.lng || e.parameter.longitude);
+    const limit = parseInt(e.parameter.limit || "10");
+    // Handle status filter: can be single value or array of values
+    // Parse query string manually to get all values when parameter appears multiple times
+    let statusFilters = null;
+    const queryString = e.queryString || "";
+    const statusMatches = [];
+    
+    // Extract all status parameter values from query string
+    const statusRegex = /[&?]status=([^&]*)/g;
+    let match;
+    while ((match = statusRegex.exec(queryString)) !== null) {
+      const value = decodeURIComponent(match[1].replace(/\+/g, ' '));
+      if (value && value !== "" && value !== "All") {
+        statusMatches.push(value);
+      }
+    }
+    
+    if (statusMatches.length > 0) {
+      statusFilters = statusMatches;
+    } else if (e.parameter.status !== undefined && e.parameter.status !== null) {
+      // Fallback to e.parameter for single value (backward compatibility)
+      if (e.parameter.status === "" || e.parameter.status === "All") {
+        statusFilters = null; // Show all
+      } else {
+        statusFilters = [e.parameter.status];
+      }
+    } else {
+      statusFilters = null; // Default to showing all if not provided
+    }
+    
+    // Get bounds parameters (optional, for map viewport filtering)
+    let bounds = null;
+    const neLat = e.parameter.ne_lat ? parseFloat(e.parameter.ne_lat) : null;
+    const neLng = e.parameter.ne_lng ? parseFloat(e.parameter.ne_lng) : null;
+    const swLat = e.parameter.sw_lat ? parseFloat(e.parameter.sw_lat) : null;
+    const swLng = e.parameter.sw_lng ? parseFloat(e.parameter.sw_lng) : null;
+    
+    // Only use bounds if all four values are provided and valid
+    if (neLat !== null && neLng !== null && swLat !== null && swLng !== null &&
+        !isNaN(neLat) && !isNaN(neLng) && !isNaN(swLat) && !isNaN(swLng)) {
+      bounds = {
+        neLat: neLat,
+        neLng: neLng,
+        swLat: swLat,
+        swLng: swLng
+      };
+    }
+    
+    // Get shop type filter: can be single value or array of values
+    // Parse query string manually to get all values when parameter appears multiple times
+    let shopTypeFilters = null;
+    const shopTypeMatches = [];
+    
+    // Extract all shop_type parameter values from query string
+    const shopTypeRegex = /[&?]shop_type=([^&]*)/g;
+    match = null;
+    while ((match = shopTypeRegex.exec(queryString)) !== null) {
+      const value = decodeURIComponent(match[1].replace(/\+/g, ' '));
+      if (value && value !== "" && value !== "All") {
+        shopTypeMatches.push(value);
+      }
+    }
+    
+    if (shopTypeMatches.length > 0) {
+      shopTypeFilters = shopTypeMatches;
+    } else if (e.parameter.shop_type !== undefined && e.parameter.shop_type !== null) {
+      // Fallback to e.parameter for single value (backward compatibility)
+      if (e.parameter.shop_type !== "" && e.parameter.shop_type !== "All") {
+        shopTypeFilters = [e.parameter.shop_type];
+      } else {
+        shopTypeFilters = null; // Show all
+      }
+    } else {
+      shopTypeFilters = null; // Default to showing all if not provided
+    }
+    
+    Logger.log("Status filters: " + JSON.stringify(statusFilters));
+    if (shopTypeFilters) {
+      Logger.log("Shop type filters: " + JSON.stringify(shopTypeFilters));
+    }
+    if (bounds) {
+      Logger.log("Bounds filter: NE(" + bounds.neLat + "," + bounds.neLng + ") SW(" + bounds.swLat + "," + bounds.swLng + ")");
+    }
+    
+    // Validate parameters
+    if (isNaN(lat) || isNaN(lng)) {
+      return ContentService
+        .createTextOutput(JSON.stringify({
+          success: false,
+          error: "Invalid parameters",
+          message: "lat and lng (or latitude and longitude) are required and must be valid numbers"
+        }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+    
+    // Allow higher limit when bounds are provided (for expanded map view)
+    const maxLimit = bounds ? 200 : 50;
+    if (isNaN(limit) || limit < 1 || limit > maxLimit) {
+      return ContentService
+        .createTextOutput(JSON.stringify({
+          success: false,
+          error: "Invalid limit",
+          message: "limit must be a number between 1 and " + maxLimit
+        }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+
+    /** Optional: log signed contributor location for automation (see Recent Field Agent Location). */
+    let fieldAgentLocation = undefined;
+    const saveLocRaw = String(e.parameter.save_location || '').toLowerCase();
+    if (saveLocRaw === 'true' || saveLocRaw === '1') {
+      const ds = (e.parameter.digital_signature || e.parameter.submitted_by || '').trim();
+      if (!ds) {
+        fieldAgentLocation = { saved: false, reason: 'missing digital_signature' };
+      } else {
+        try {
+          const locationId = appendFieldAgentLocation_(lat, lng, ds);
+          fieldAgentLocation = { saved: true, location_id: locationId };
+        } catch (locErr) {
+          Logger.log('appendFieldAgentLocation_: ' + locErr.toString());
+          fieldAgentLocation = { saved: false, reason: String(locErr) };
+        }
+      }
+    }
+    
+    const openNowRaw = String(e.parameter.open_now || '').toLowerCase();
+    const openNowEnabled = openNowRaw === 'true' || openNowRaw === '1';
+    const openNowTz = (e.parameter.tz || e.parameter.time_zone || Session.getScriptTimeZone() || 'Etc/UTC').trim();
+    let openNowFilter = null;
+    if (openNowEnabled) {
+      openNowFilter = { enabled: true, timeZone: openNowTz };
+    }
+
+    // Find nearby stores
+    const stores = findNearbyStores(lat, lng, limit, statusFilters, bounds, shopTypeFilters, openNowFilter);
+
+    const payload = {
+      success: true,
+      location: { latitude: lat, longitude: lng },
+      status_filters: statusFilters || [],
+      shop_type_filters: shopTypeFilters || [],
+      open_now: !!openNowFilter,
+      open_now_tz: openNowFilter ? openNowTz : '',
+      count: stores.length,
+      stores: stores
+    };
+    if (fieldAgentLocation !== undefined) {
+      payload.field_agent_location = fieldAgentLocation;
+    }
+
+    // Return JSON response
+    return ContentService
+      .createTextOutput(JSON.stringify(payload))
+      .setMimeType(ContentService.MimeType.JSON);
+      
+  } catch (error) {
+    Logger.log("Error in doGet: " + error.toString());
+    return ContentService
+      .createTextOutput(JSON.stringify({
+        success: false,
+        error: error.toString()
+      }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+/**
+ * POST entry — delegates to {@link doGet}. For ``application/x-www-form-urlencoded`` bodies,
+ * Apps Script populates ``e.parameter`` the same as for GET query strings.
+ * Required for ``action=log_field_report_attachment`` when the payload is too long for a URL.
+ * @param {Object} e
+ * @return {TextOutput}
+ */
+function doPost(e) {
+  return doGet(e);
+}
+
+/**
+ * Test function for status update
+ * Usage: Run this function in the Apps Script editor to test the updateStoreStatus function
+ */
+function testUpdateStoreStatus() {
+  const testShopName = "iChakras Smart Healing Center";
+  const testNewStatus = "Partnered";
+  
+  Logger.log("Testing updateStoreStatus with:");
+  Logger.log("  Shop Name: " + testShopName);
+  Logger.log("  New Status: " + testNewStatus);
+  Logger.log("");
+  
+  try {
+    const result = updateStoreStatus(testShopName, testNewStatus);
+    Logger.log("✅ Test successful!");
+    Logger.log("Result: " + JSON.stringify(result));
+    return result;
+  } catch (error) {
+    Logger.log("❌ Test failed: " + error.toString());
+    throw error;
+  }
+}
+
+/**
+ * Test function - tests the actual method called by doGet
+ * Usage: Run this function in the Apps Script editor to test the findNearbyStores function
+ * Check View > Logs for the output
+ */
+function testFindNearbyStores() {
+  // Test with San Francisco coordinates
+  const lat = 37.7749;
+  const lng = -122.4194;
+  const limit = 10;
+  
+  // Test different status filters
+  const testCases = [
+    { status: "Contacted", description: "Filter by Contacted" },
+    { status: "Research", description: "Filter by Research" },
+    { status: null, description: "Show all statuses (null)" },
+    { status: "", description: "Show all statuses (empty string)" }
+  ];
+  
+  testCases.forEach(testCase => {
+    Logger.log("=".repeat(50));
+    Logger.log("Testing: " + testCase.description);
+    Logger.log("  Latitude: " + lat);
+    Logger.log("  Longitude: " + lng);
+    Logger.log("  Limit: " + limit);
+    Logger.log("  Status Filter: " + testCase.status);
+    Logger.log("");
+  
+    try {
+      const stores = findNearbyStores(lat, lng, limit, testCase.status, null, null, null);
+    
+      Logger.log("✅ Test successful!");
+      Logger.log("Found " + stores.length + " stores");
+      Logger.log("");
+      if (stores.length > 0) {
+        stores.forEach((store, index) => {
+          Logger.log((index + 1) + ". " + store.name + " (Status: " + store.status + ") - " + store.distance.toFixed(2) + " miles");
+        });
+      } else {
+        Logger.log("No stores found matching the filter.");
+      }
+      Logger.log("");
+    } catch (error) {
+      Logger.log("❌ Test failed: " + error.toString());
+      Logger.log("");
+    }
+  });
+}
+
+/**
+ * Test function - simulates doGet call with test parameters
+ * Usage: Run this function in the Apps Script editor to test the full doGet flow
+ * Check View > Logs for the output
+ */
+function testDoGet() {
+  // Simulate doGet call with test parameters
+  const e = {
+    parameter: {
+      lat: "37.7749",
+      lng: "-122.4194",
+      limit: "10",
+      status: "Contacted"
+    }
+  };
+  
+  Logger.log("Testing doGet with parameters:");
+  Logger.log("  lat: " + e.parameter.lat);
+  Logger.log("  lng: " + e.parameter.lng);
+  Logger.log("  limit: " + e.parameter.limit);
+  Logger.log("  status: " + e.parameter.status);
+  Logger.log("");
+  
+  try {
+    const output = doGet(e);
+    const responseText = output.getContent();
+    const response = JSON.parse(responseText);
+    
+    Logger.log("✅ doGet test successful!");
+    Logger.log("Response:");
+    Logger.log(responseText);
+    
+    if (response.success) {
+      Logger.log("Found " + response.count + " stores");
+    } else {
+      Logger.log("Error: " + response.error);
+    }
+    
+    return response;
+  } catch (error) {
+    Logger.log("❌ doGet test failed: " + error.toString());
+    throw error;
+  }
+}
+
+/**
+ * Test function - simulates status update doGet call
+ * Usage: Run this function in the Apps Script editor to test the status update functionality
+ * Check View > Logs for the output
+ */
+function testDoGetStatusUpdate() {
+  // Simulate doGet call for status update
+  const e = {
+    parameter: {
+      action: "update_status",
+      shop_name: "iChakras Smart Healing Center",
+      new_status: "Partnered"
+    }
+  };
+  
+  Logger.log("Testing doGet status update with parameters:");
+  Logger.log("  action: " + e.parameter.action);
+  Logger.log("  shop_name: " + e.parameter.shop_name);
+  Logger.log("  new_status: " + e.parameter.new_status);
+  Logger.log("");
+  
+  try {
+    const output = doGet(e);
+    const responseText = output.getContent();
+    const response = JSON.parse(responseText);
+    
+    Logger.log("✅ Status update test successful!");
+    Logger.log("Response:");
+    Logger.log(responseText);
+    
+    return response;
+  } catch (error) {
+    Logger.log("❌ Status update test failed: " + error.toString());
+    throw error;
+  }
+}
+
