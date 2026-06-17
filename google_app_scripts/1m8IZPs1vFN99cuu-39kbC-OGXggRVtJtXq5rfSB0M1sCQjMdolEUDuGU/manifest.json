@@ -1,0 +1,27 @@
+{
+  "scriptId": "1m8IZPs1vFN99cuu-39kbC-OGXggRVtJtXq5rfSB0M1sCQjMdolEUDuGU",
+  "name": "TDG - Telegram Identity (scriptId 1m8IZPs1\u2026)",
+  "owner_email": "admin@truesight.me",
+  "post_push_hooks": [],
+  "candidate_cache_refresh_hooks": [
+    {
+      "handler_functions": [],
+      "action_strings": [
+        "refresh_dao_members_cache"
+      ],
+      "mirror_code_path": "google_app_scripts/1m8IZPs1vFN99cuu-39kbC-OGXggRVtJtXq5rfSB0M1sCQjMdolEUDuGU/Code.js",
+      "consumer_callers_with_known_url": []
+    }
+  ],
+  "deployments": {
+    "head": "TBC \u2014 list every /exec URL for this scriptId in pre-flight"
+  },
+  "source_files": [
+    "edgar_send_email_verification.gs",
+    "edgar_send_onboarding_invitation.gs",
+    "email_verification_from_edgar.gs",
+    "dao_members_cache_publisher.gs",
+    "dapp_permission_change_handler.gs",
+    "process_contributor_add_telegram_logs.gs"
+  ]
+}

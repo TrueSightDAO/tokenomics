@@ -1,0 +1,22 @@
+{
+  "scriptId": "1QtK-InsHH6SBtxoxc33-y4vQvuNkbhlkUi_9S1X-AaEgIlSlygM1iZtP",
+  "name": "TBC \u2014 confirm display name in GAS UI for 1QtK-InsHH6S\u2026",
+  "owner_email": "garyjob@agroverse.shop",
+  "post_push_hooks": [],
+  "candidate_cache_refresh_hooks": [],
+  "deployments": {
+    "head": "TBC \u2014 list every /exec URL for this scriptId in pre-flight",
+    "probe_kmJtz7xV": {
+      "url": "https://script.google.com/macros/s/AKfycbztpV3TUIRn3ftNW1aGHAKw32OBJrp_p1Pr9mMAttoyWFZyQgBRPU2T6eGhkmJtz7xV/exec",
+      "status_code": 200,
+      "final_url": "https://script.googleusercontent.com/macros/echo?user_content_key=AUkAhnRnf7eC2TisLSQJ-g0DJsLB1cy-SMPcS62v_IsiZCqjCkVdfB08rks7SXJ5yu40xbaxmSaiJHnWsmk65bDZrOuDTTcljyW3Swc-CHdi1cmTto5jJuRwMl1m-6NUR0raHFPlRG6N117opJbAo3bAtu9PmmGKkBHUNHPg40DGU3q5lshS3oAsP9cw4PFaMVTkRgwgapIokmrA6VNLIwaqKBm_d0qx2PY3TIVRk4Ol7BjlixFhn2fzx_URvx_lz6CDTiHJZ61tIOzpECuqd6iCL3ibGMjjJg&lib=MbblptWLBOlRcifutr1o0x7Celqghh4iM",
+      "content_type": "application/json; charset=utf-8",
+      "body_peek": "{\"error\":\"Please specify ?list=true to list managers, ?manager=<key> to get assets, ?recipients=true to list recipients, ?ledgers=true to list ledgers, or ?all_currencies=true to list all currencies.\"}",
+      "probed_at": "2026-05-28T21:48:19.174681+00:00"
+    }
+  },
+  "source_files": [
+    "Version.gs",
+    "web_app.gs"
+  ]
+}

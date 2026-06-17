@@ -1,0 +1,22 @@
+{
+  "scriptId": "10NKp8uLMGyfgDv0ByakHVGioOYzvDV7NbHMSBigB2TCVcY7aqYXhbywv",
+  "name": "TBC \u2014 confirm display name in GAS UI for 10NKp8uLMGyf\u2026",
+  "owner_email": "garyjob@agroverse.shop",
+  "post_push_hooks": [],
+  "candidate_cache_refresh_hooks": [],
+  "deployments": {
+    "head": "TBC \u2014 list every /exec URL for this scriptId in pre-flight",
+    "probe_NaigOk60": {
+      "url": "https://script.google.com/macros/s/AKfycbwlh2u-SktykzL6S_qamE2rQVd-G_3uSd3GhJ_8KI5b2e8oVuMYxXA5UfJ-NaigOk60/exec",
+      "status_code": 200,
+      "final_url": "https://script.googleusercontent.com/macros/echo?user_content_key=AUkAhnRUyofdJ7cnHuaDFWGCf3bJqAGlnI9k27PEtNBl2KgbUd5uMZ-qDYllDjesifhVF2nuqWOVaTLbfnefmBpQCdC0pSMajpz3Mxt93MAGJvJF1FDQt3bMgD3mSP0gafu0Ryki-dxvzm3Mn0-urhs0qngKQ_7ASeMIhytgxd_BuuxXSatKMLdQ2jpwr5UqWn1u-U-A_pqyfJbohLj0UHkkpFZKzWfrP407owiJkhz1STf-iPLwGOxwxy-r1OJ5OsWuR6lKcqih32HAwOfMvkpKobc_uEKDYQ&lib=MI5pefXjuknrwsqhSDyq_orCelqghh4iM",
+      "content_type": "application/json; charset=utf-8",
+      "body_peek": "{\"ok\":false,\"error\":\"No valid action (use action=sendEmailVerification or action=processDigitalSignatureEvents on GET, or POST JSON for email verification).\"}",
+      "probed_at": "2026-05-28T21:47:52.167487+00:00"
+    }
+  },
+  "source_files": [
+    "telegram_webhook_listener.gs",
+    "register_member_digital_signatures_telegram.gs"
+  ]
+}

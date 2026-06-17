@@ -1,0 +1,16 @@
+{
+  "scriptId": "1NpHrKJW8Q4suu6-f5gXQcbjHqUZtGOG-KcIf81M1GG8lDShm5-fLphD2",
+  "name": "TBC \u2014 confirm display name in GAS UI for 1NpHrKJW8Q4s\u2026",
+  "owner_email": "garyjob@agroverse.shop",
+  "post_push_hooks": [],
+  "candidate_cache_refresh_hooks": [],
+  "deployments": {
+    "head": "TBC \u2014 list every /exec URL for this scriptId in pre-flight"
+  },
+  "source_files": [
+    "process_retail_field_reports_telegram_logs.gs",
+    "process_store_adds_telegram_logs.gs",
+    "process_partner_check_in_telegram_logs.gs",
+    "process_partner_add_telegram_logs.gs"
+  ]
+}

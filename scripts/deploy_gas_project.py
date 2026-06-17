@@ -77,15 +77,13 @@ def list_projects() -> list[str]:
 
 
 def find_manifest_for(sid: str) -> dict | None:
-    """Return the first project block (with owner_email) that references sid."""
-    for mpath in sorted(PROJECTS.glob("*/manifest.json")):
+    """Return the project manifest from google_app_scripts/<sid>/manifest.json, if it exists."""
+    mpath = PROJECTS / sid / "manifest.json"
+    if mpath.is_file():
         try:
-            data = json.loads(mpath.read_text(encoding="utf-8"))
+            return json.loads(mpath.read_text(encoding="utf-8"))
         except Exception:
-            continue
-        for proj in data.get("projects", []):
-            if proj.get("scriptId") == sid:
-                return proj
+            pass
     return None
 
 
@@ -193,7 +191,7 @@ def main() -> int:
     proj = find_manifest_for(sid)
     owner_email = (proj.get("owner_email") or "").strip().lower() if proj else ""
     files = sorted(f.name for f in project_dir.iterdir() if f.is_file()
-                   and f.name not in (".clasp.json", "appsscript.json", "Version.gs"))
+                   and f.name not in (".clasp.json", "appsscript.json", "Version.gs", "manifest.json", ".claspignore"))
     print(f"  owner_email:  {owner_email or '?'}")
     print(f"  project dir:  {project_dir.relative_to(ROOT)}")
     print(f"  files:        {files}")

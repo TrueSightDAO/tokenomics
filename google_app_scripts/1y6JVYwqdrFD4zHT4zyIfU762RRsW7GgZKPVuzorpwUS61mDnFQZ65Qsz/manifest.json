@@ -1,0 +1,13 @@
+{
+  "scriptId": "1y6JVYwqdrFD4zHT4zyIfU762RRsW7GgZKPVuzorpwUS61mDnFQZ65Qsz",
+  "name": "TBC \u2014 confirm display name in GAS UI for 1y6JVYwqdrFD\u2026",
+  "owner_email": "garyjob@agroverse.shop",
+  "post_push_hooks": [],
+  "candidate_cache_refresh_hooks": [],
+  "deployments": {
+    "head": "TBC \u2014 list every /exec URL for this scriptId in pre-flight"
+  },
+  "source_files": [
+    "web_app.gs"
+  ]
+}

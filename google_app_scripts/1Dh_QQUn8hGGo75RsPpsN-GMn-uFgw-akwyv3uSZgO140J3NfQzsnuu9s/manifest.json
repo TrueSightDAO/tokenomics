@@ -1,0 +1,21 @@
+{
+  "scriptId": "1Dh_QQUn8hGGo75RsPpsN-GMn-uFgw-akwyv3uSZgO140J3NfQzsnuu9s",
+  "name": "TBC \u2014 confirm display name in GAS UI for 1Dh_QQUn8hGG\u2026",
+  "owner_email": "garyjob@agroverse.shop",
+  "post_push_hooks": [],
+  "candidate_cache_refresh_hooks": [],
+  "deployments": {
+    "head": "TBC \u2014 list every /exec URL for this scriptId in pre-flight",
+    "probe_mR5Z7BIg": {
+      "url": "https://script.google.com/macros/s/AKfycbzgNstwRX1dWo17Dxny0t1ipJ6yLX02bTD_cKRuHr5RPJPemNVTj25mFhKo4UmR5Z7BIg/exec",
+      "status_code": 200,
+      "final_url": "https://script.googleusercontent.com/macros/echo?user_content_key=AUkAhnTCzaKlPhSxLtj4c5vhGTpnfHKN8c2ymFf2Kn3xsqF43XZYp0scUZsg2S35KwgvtiPbeKgOVUbZgI-fybsB_fYTrFtR-KrHqjuiqys0US08xGeE0oB6r84YY1mSPlUiByTzQJvdUUklRJZxk5JQsKPSJZa23pwk0xreFvNBmigpR10hDHL1SPRFm5NOaPympKVOQ1UXlR0p0BUFVrnu6tP6rBAmybNfko33LvHnqgMQL2v-_5PEwIuXTHOEAEqQT9WI8GBo_JJAyZoLzEoCGw_Xze6VgQ&lib=MKM-ys3QLIYL0l3jIaEw5NY7EDSP_SR0z",
+      "content_type": "application/json; charset=utf-8",
+      "body_peek": "{\"success\":false,\"error\":\"Invalid mode. Use: list_open_proposals, fetch_proposal, or provide signature parameter\"}",
+      "probed_at": "2026-05-28T21:48:17.280648+00:00"
+    }
+  },
+  "source_files": [
+    "proposal_manager.gs"
+  ]
+}

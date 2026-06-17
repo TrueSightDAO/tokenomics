@@ -1,0 +1,31 @@
+{
+  "scriptId": "19Wag9x-sjbLVgIsPh2vj90ZG7Rgq2iGaVOomAeAvtg6CdZKJHLZ9AJrC",
+  "name": "TBC \u2014 confirm display name in GAS UI for 19Wag9x-sjbL\u2026",
+  "owner_email": "garyjob@agroverse.shop",
+  "post_push_hooks": [],
+  "candidate_cache_refresh_hooks": [
+    {
+      "handler_functions": [
+        "notifyTreasuryCachePublisher_"
+      ],
+      "action_strings": [],
+      "mirror_code_path": "google_app_scripts/19Wag9x-sjbLVgIsPh2vj90ZG7Rgq2iGaVOomAeAvtg6CdZKJHLZ9AJrC/Code.js",
+      "consumer_callers_with_known_url": []
+    }
+  ],
+  "deployments": {
+    "head": "TBC \u2014 list every /exec URL for this scriptId in pre-flight",
+    "probe_Fud2bOEw": {
+      "url": "https://script.google.com/macros/s/AKfycbwYBlFigSSPJKkI-F2T3dSsdLnvvBi2SCGF1z2y1k95YzA5HBrJVyMo6InTA9Fud2bOEw/exec",
+      "status_code": 200,
+      "final_url": "https://script.googleusercontent.com/macros/echo?user_content_key=AUkAhnTsWKdG6VoVhXH-xUkgrpM77ctQYp6dJZUu9hhGuYla5HohMC1OBFAvsegVxvKx_aYlMpIjrpCJMClQ7J-aBS5sFSrRcKYmv1cJ9KSBY20q2yR9fQJvullJOyJIOTsDj5mIY1Kjw068SGH_k8Sr1Uox5NxLaYVB-mZJ3xdKHEa1Lo3D3y9IC3-LkzeZHBaui6hhpgRUiDYcVsBq9Q2UrxTvKlZRb6Tx4wA39AIOBWCuydeB-pnY4sqR_xkfhvgtDbEEqIFQtA3hQruB_ycxx4foaeuA_Q&lib=M1l7hCRALj9aE3XqowsM-Zo7EDSP_SR0z",
+      "content_type": "text/plain; charset=utf-8",
+      "body_peek": "\u2139\ufe0f No valid action specified. Expected: ?action=parseAndProcessTelegramLogs",
+      "probed_at": "2026-05-28T21:47:37.757142+00:00"
+    }
+  },
+  "source_files": [
+    "telegram_webhook_listener.gs",
+    "tdg_expenses_processing.gs"
+  ]
+}

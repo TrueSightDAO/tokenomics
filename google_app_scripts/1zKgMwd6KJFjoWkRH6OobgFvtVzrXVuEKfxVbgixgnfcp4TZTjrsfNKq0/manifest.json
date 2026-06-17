@@ -1,0 +1,21 @@
+{
+  "scriptId": "1zKgMwd6KJFjoWkRH6OobgFvtVzrXVuEKfxVbgixgnfcp4TZTjrsfNKq0",
+  "name": "TBC \u2014 confirm display name in GAS UI for 1zKgMwd6KJFj\u2026",
+  "owner_email": "admin@truesight.me",
+  "post_push_hooks": [],
+  "candidate_cache_refresh_hooks": [],
+  "deployments": {
+    "head": "TBC \u2014 list every /exec URL for this scriptId in pre-flight",
+    "probe_v5lN6sLQ": {
+      "url": "https://script.google.com/macros/s/AKfycbwbtBlxkK0TzwLGnwUNQ_INfvLFvTRli-31r-b51Tnx4c-xlwMoqwT5sKFmfZv5lN6sLQ/exec",
+      "status_code": 200,
+      "final_url": "https://script.google.com/macros/s/AKfycbwbtBlxkK0TzwLGnwUNQ_INfvLFvTRli-31r-b51Tnx4c-xlwMoqwT5sKFmfZv5lN6sLQ/exec",
+      "content_type": "text/html; charset=utf-8",
+      "body_peek": "<!DOCTYPE html><html><head><link rel=\"shortcut icon\" href=\"//ssl.gstatic.com/docs/script/images/favicon.ico\"><title>Error</title><style type=\"text/css\" nonce=\"ISq_Fti_mrtGNrY7d4rf1A\">body {background-color: #fff; margin: 0; padding: 0;}.err",
+      "probed_at": "2026-05-28T21:47:51.062582+00:00"
+    }
+  },
+  "source_files": [
+    "register_member_digital_signatures_email.gs"
+  ]
+}

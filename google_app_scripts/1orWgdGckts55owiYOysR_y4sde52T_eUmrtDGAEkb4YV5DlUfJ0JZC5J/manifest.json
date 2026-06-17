@@ -1,0 +1,22 @@
+{
+  "scriptId": "1orWgdGckts55owiYOysR_y4sde52T_eUmrtDGAEkb4YV5DlUfJ0JZC5J",
+  "name": "TBC \u2014 confirm display name in GAS UI for 1orWgdGckts5\u2026",
+  "owner_email": "garyjob@agroverse.shop",
+  "post_push_hooks": [],
+  "candidate_cache_refresh_hooks": [
+    {
+      "handler_functions": [
+        "notifyTreasuryCachePublisher_"
+      ],
+      "action_strings": [],
+      "mirror_code_path": "google_app_scripts/1orWgdGckts55owiYOysR_y4sde52T_eUmrtDGAEkb4YV5DlUfJ0JZC5J/Code.js",
+      "consumer_callers_with_known_url": []
+    }
+  ],
+  "deployments": {
+    "head": "TBC \u2014 list every /exec URL for this scriptId in pre-flight"
+  },
+  "source_files": [
+    "capital_injection_processing.gs"
+  ]
+}
