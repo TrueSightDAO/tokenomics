@@ -5,10 +5,8 @@ la_token_market_making_python/.env
 jupyter.log
 python_scripts/jupyter.log
 **/.ipynb_checkpoints/
-# Ignore Python bytecode caches in our LATOKEN client
+# Ignore Python bytecode caches
 la_token_market_making_python/__pycache__/
-# Ignore local environment file for python_scripts
-python_scripts/**/.env
 
 # macOS system files
 .DS_Store
@@ -19,22 +17,8 @@ token.json
 **/credentials.json
 **/token.json
 
-# Apps Script sources that typically embed API keys / secrets (basename contains "credential(s)")
+# Apps Script sources that embed API keys / secrets (basename contains "credential(s)")
 google_app_scripts/**/*redential*.gs
-
-# Clasp mirror pulls — never commit script sources (tokens, JWTs, bot keys; includes Code.js, Credentials.js, etc.)
-clasp_mirrors/**/*.js
-# Regenerated on every clasp clone/pull; not needed in git
-clasp_mirrors/**/appsscript.json
-
-# Per-mirror deploy audit stubs: copy from google_app_scripts/* or run scripts/ensure_clasp_version_gs.mjs
-clasp_mirrors/**/Version.gs
-
-# Clasp-generated filenames in thematic folder only — canonical copies live under clasp_mirrors/<scriptId>/
-google_app_scripts/**/Code.js
-google_app_scripts/**/appsscript.json
-# Canonical clasp manifest for freight ingest (scopes only; no secrets)
-!google_app_scripts/seacoast_freight_quotation_ingest/appsscript.json
 google_app_scripts/**/Credentials*.js
 
 # Schema validation output
