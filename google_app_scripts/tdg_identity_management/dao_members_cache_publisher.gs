@@ -238,14 +238,14 @@ function publishDaoMembersCacheToGithub_(opts) {
     if (email && !entry.email) {
       entry.email = email;
     }
-    // Public key (col B = index 1)
-    const pk = String(row[1] || '').trim();
+    // Public key (col E = index 4)
+    const pk = String(row[4] || '').trim();
     if (pk) {
       entry.public_keys.push({
         public_key: pk,
-        status: String(row[2] || '').trim().toUpperCase() || 'ACTIVE',
-        created_at: formatTimestamp_(row[3]),
-        last_active_at: formatTimestamp_(row[4]),
+        status: String(row[3] || '').trim().toUpperCase() || 'ACTIVE',
+        created_at: formatTimestamp_(row[1]),
+        last_active_at: formatTimestamp_(row[2]),
       });
     }
   });
