@@ -41,6 +41,8 @@ const LEDGER_URL_COL = 11; // Column L - Ledger URL
 
 /** Telegram Chat Logs column S (Governor): YES = global ledger authority (Edgar). 0-based index 18. */
 const TELEGRAM_GOVERNOR_COL = 18;
+/** Telegram Chat Logs column T (Is Sentinel): TRUE = AI agent with governor-equivalent operational privileges (Edgar). 0-based index 19. */
+const TELEGRAM_SENTINEL_COL = 19;
 
 function normalizeAuthName_(name) {
   return (name == null ? '' : String(name))
@@ -59,6 +61,12 @@ function isTelegramGovernorYes_(telegramRow) {
   return String(telegramRow && telegramRow[TELEGRAM_GOVERNOR_COL] != null ? telegramRow[TELEGRAM_GOVERNOR_COL] : '')
     .trim()
     .toUpperCase() === 'YES';
+}
+
+function isTelegramSentinelTrue_(telegramRow) {
+  return String(telegramRow && telegramRow[TELEGRAM_SENTINEL_COL] != null ? telegramRow[TELEGRAM_SENTINEL_COL] : '')
+    .trim()
+    .toUpperCase() === 'TRUE';
 }
 
 /** PEM or raw SPKI between My Digital Signature and Request Transaction ID (DApp submit format). */
@@ -168,12 +176,13 @@ function isGovernorApproved_(approvedBy) {
 }
 
 /**
- * Inventory Movement column N (STATUS): NEW if governor or ACTIVE signer matches warehouse manager,
+ * Inventory Movement column N (STATUS): NEW if governor, sentinel, or ACTIVE signer matches warehouse manager,
  * signer is a registered DAO governor, or trusted agent submission approved by a governor;
  * unauthorized otherwise (Phase 2 skips non-NEW).
  */
 function inventoryMovementStatusFromTelegramRow_(telegramRow, contribution, warehouseManagerName) {
   if (isTelegramGovernorYes_(telegramRow)) return 'NEW';
+  if (isTelegramSentinelTrue_(telegramRow)) return 'NEW';
   const pk = extractPublicKeyFromSignedContribution_(contribution);
   if (!pk) return 'unauthorized';
   const res = findContributorNameByDigitalSignature_(pk);
