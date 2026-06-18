@@ -109,13 +109,31 @@ function findContributorNameByDigitalSignature_(digitalSignature) {
   }
 }
 
-/** Trusted agent contributor names (autopilot, etc.) that can submit on behalf of governors. */
-const TRUSTED_AGENTS = ['autopilot@agroverse.shop'];
-
-function isTrustedAgent_(contributorName) {
-  return TRUSTED_AGENTS.some(function(agent) {
-    return agent.toLowerCase() === (contributorName || '').toLowerCase();
-  });
+/**
+ * Checks if a contributor name has the Sentinel role in Contributors contact information (Column W).
+ * Sentinels (AI agents) can submit governor-approved inventory movements.
+ */
+function isSentinelByName_(contributorName) {
+  if (!contributorName) return false;
+  try {
+    var spreadsheet = SpreadsheetApp.openById(OFFCHAIN_SPREADSHEET_ID);
+    var sheet = spreadsheet.getSheetByName(CONTRIBUTORS_SHEET_NAME);
+    if (!sheet) return false;
+    var lastRow = sheet.getLastRow();
+    if (lastRow < 5) return false;
+    var data = sheet.getRange(5, 1, lastRow - 4, 23).getValues(); // A5:W(lastRow)
+    var normalizedName = String(contributorName).trim().toLowerCase();
+    for (var i = 0; i < data.length; i++) {
+      var name = String(data[i][0] || '').trim().toLowerCase();
+      if (name === normalizedName) {
+        var isSentinel = String(data[i][22] || '').trim().toUpperCase(); // Column W = index 22
+        return isSentinel === 'TRUE' || isSentinel === 'YES' || isSentinel === '1';
+      }
+    }
+  } catch (e) {
+    Logger.log('Sentinel lookup failed: ' + e.message);
+  }
+  return false;
 }
 
 /**
@@ -193,8 +211,8 @@ function inventoryMovementStatusFromTelegramRow_(telegramRow, contribution, ware
 
   if (authNamesMatch_(res.contributorName, warehouseManagerName)) return 'NEW';
 
-  // Agentic trust path: trusted agent (autopilot) + governor-approved
-  if (isTrustedAgent_(res.contributorName)) {
+  // Sentinel trust path: sentinel (AI agent) + governor-approved
+  if (isSentinelByName_(res.contributorName)) {
     const approvedBy = extractApprovedBy_(contribution);
     if (approvedBy && isGovernorApproved_(approvedBy)) return 'NEW';
   }
