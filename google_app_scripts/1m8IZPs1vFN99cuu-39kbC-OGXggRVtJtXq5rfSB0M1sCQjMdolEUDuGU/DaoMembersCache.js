@@ -48,6 +48,7 @@ const DAO_MEMBERS_CACHE_SPREADSHEET_ID =
 const DAO_MEMBERS_CACHE_SIGS_SHEET = 'Contributors Digital Signatures';
 const DAO_MEMBERS_CACHE_VOTING_SHEET = 'Contributors voting weight';
 const DAO_MEMBERS_CACHE_GOVERNORS_SHEET = 'Governors';
+const DAO_MEMBERS_CACHE_CONTACT_SHEET = 'Contributors contact information';
 // Governor names live in column A starting at row 11 (rows 1–10 are header /
 // configuration / equinox-rotation copy). The cell list is auto-populated by
 // formulas elsewhere in the workbook based on the trailing contribution
@@ -170,6 +171,30 @@ function publishDaoMembersCacheToGithub_(opts) {
     });
   }
 
+  // ----- Contributors Contact Information — sentinel flag (col W) -----------
+  // Header is row 3 (Name=col A, Is Sentinel=col W). Data starts at row 4.
+  const contactSheet = ss.getSheetByName(DAO_MEMBERS_CACHE_CONTACT_SHEET);
+  const sentinelsByName = {};
+  if (contactSheet) {
+    const contactLastRow = contactSheet.getLastRow();
+    if (contactLastRow >= 4) {
+      // Columns A(1)..W(23): name, ..., Is Sentinel
+      const contactRows = contactSheet.getRange(4, 1, contactLastRow - 3, 23).getValues();
+      contactRows.forEach(function (row) {
+        const name = String(row[0] || '').trim();
+        if (!name) return;
+        const isSentinel = String(row[22] || '').trim().toUpperCase() === 'TRUE';
+        if (isSentinel) {
+          sentinelsByName[name.toLowerCase()] = true;
+        }
+      });
+    }
+  } else {
+    Logger.log(
+        'Warning: ' + DAO_MEMBERS_CACHE_CONTACT_SHEET + ' tab not found; ' +
+        'no contributors will be flagged as sentinel.');
+  }
+
   // ----- Governors tab — names of currently-elected governors --------------
   // Read column A from row 11 to last-row, lowercase, stash in a Set-like map.
   // The leaderboard is recomputed quarterly (equinoxes / solstices) by the
@@ -224,6 +249,7 @@ function publishDaoMembersCacheToGithub_(opts) {
     const voting = votingByName[k] || {};
     const roles = ['member'];
     if (governorsByName[k]) roles.unshift('governor');
+    if (sentinelsByName[k]) roles.push('sentinel');
     return {
       name: entry.name,
       email: entry.email,                                  // may be null
