@@ -8,7 +8,7 @@
 
 ### **Inventory Movement** / **Scored Expense Submissions** — signer vs manager authorization (GAS)
 
-- **`process_movement_telegram_logs.gs`:** Column **N** (`STATUS`) is **`NEW`** when **Telegram Chat Logs** column **S** (`Governor`) is **`YES`**, or when the **ACTIVE** signer (**Contributors Digital Signatures**) matches **`- Manager Name:`** from the movement payload; otherwise **`unauthorized`**. **`processInventoryMovementToLedgers`** only processes **`NEW`** (skips **`unauthorized`**).
+- **`process_movement_telegram_logs.gs`:** Column **N** (`STATUS`) is **`NEW`** when **Telegram Chat Logs** column **S** (`Governor`) is **`YES`** OR column **T** (`Is Sentinel`) is **`TRUE`**, or when the **ACTIVE** signer (**Contributors Digital Signatures**) matches **`- Manager Name:`** from the movement payload; otherwise **`unauthorized`**. **`processInventoryMovementToLedgers`** only processes **`NEW`** (skips **`unauthorized`**).
 - **`tdg_expenses_processing.gs`:** **Scored Expense Submissions** column **N** — **`Processing Status`**: **`authorized`** under the same governor rule or when **Reporter Name** (column **E**) matches **DAO Member Name** (column **H**); otherwise **`unauthorized`**. **`InsertExpenseRecords`** does not write to ledgers when column **N** is **`unauthorized`** (row is still appended for audit). Legacy scored rows with only columns **A–M** are treated as authorized when inserted into ledgers by older code paths.
 
 ---
@@ -21,7 +21,7 @@
 - **Column S header:** **`Governor`**
 - **Values (Edgar / `sentiment_importer`):** **`YES`** — signer verified and **ACTIVE** **Contributors Digital Signatures** **Contributor Name** matches a value in **Main Ledger** tab **`Governors`** column **A** (case-insensitive). **`NO`** — verified signer not on that list. **Blank** — signature not successful or signer could not be resolved to an **ACTIVE** contributor row.
 - **Operations meaning:** **`YES`** = **global override** for downstream Google Apps Script that processes sales, inventory movement, and expenses from this tab (governors may correct submissions when other members do not update records). **`NO`** / blank = downstream scripts should apply existing signer-vs-inventory scope rules and skip or flag ledger mutations when out of scope.
-- **Implementation:** Edgar appends **19 columns** (**A–S**) on `POST /dao/submit_contribution` and express contribution paths; values are cached server-side from **`Governors`!A2:A** for a short TTL.
+- **Implementation:** Edgar appends **20 columns** (**A–T**) on `POST /dao/submit_contribution` and express contribution paths; column S values are cached server-side from **`Governors`!A2:A** for a short TTL; column T reads **Contributors contact information** column W (`Is Sentinel`).
 
 ---
 
@@ -271,6 +271,7 @@ See [`python_scripts/schema_validation/README.md`](./python_scripts/schema_valid
 | Q | External API call status | String | Status of external API calls |
 | R | External API call response | String | Response from external API |
 | S | Governor | String | **`YES`** / **`NO`** / blank — signer matched **Main Ledger** tab **`Governors`** column **A** at ingest (`YES` = global ledger authority for downstream sales / inventory / expense parsers). See **Recent Changes (2026-04-21)**. |
+| T | Is Sentinel | String | **`TRUE`** / blank — signer's contributor row has `TRUE` in **Contributors contact information** column **W** (`Is Sentinel`). Sentinels (AI agents) get governor-equivalent operational privileges (inventory, sales, QR ops) without governance authority (proposals, votes). Populated by Edgar (`dao_protocol`) at ingest. |
 
 **Note (DApp / Edgar ingest):** For `POST /dao/submit_contribution`, column **P** is populated by Edgar as `success` / `failed` / `no_signature_format` / `error` (and similar). Downstream processors (for example Agroverse QR generation) treat `success` (case-insensitive) as cryptographically verified at ingest. Email onboarding events (`[EMAIL REGISTERED EVENT]`, `[EMAIL VERIFICATION EVENT]`) follow the same ingest path and column **P** semantics.
 
