@@ -20,7 +20,9 @@
  *     `null` if no row has an email yet (older legacy contributors).
  *   - `roles` — string array; always includes "member"; includes "governor" if
  *     the contributor's name appears on the `Governors` tab (auto-derived 4×/year
- *     from the trailing 180-day contribution leaderboard).
+ *     from the trailing 180-day contribution leaderboard); includes "sentinel" if
+ *     the contributor's row in `Contributors contact information` has `TRUE` in
+ *     column W (`Is Sentinel`).
  *   These two fields back the dapp permission model: `permissions.js` resolves
  *   the signed-in RSA → contributor → roles, and gates governor-only UI/actions
  *   (add-contributor, governor chat, act-on-behalf-of-other) accordingly. The
@@ -297,6 +299,9 @@ function publishDaoMembersCacheToGithub_(opts) {
       contributors_with_email: contributors.reduce(function (sum, c) {
         return sum + (c.email ? 1 : 0);
       }, 0),
+      sentinels: contributors.reduce(function (sum, c) {
+        return sum + (c.roles.indexOf('sentinel') >= 0 ? 1 : 0);
+      }, 0),
     },
     dao_totals: daoTotals,
     unjoined_governor_names: unjoinedGovernorNames,
@@ -307,6 +312,7 @@ function publishDaoMembersCacheToGithub_(opts) {
   const commitMessage =
       'chore: refresh dao_members.json (' + snapshot.counts.contributors +
       ' contributors, ' + snapshot.counts.governors + ' governors, ' +
+      snapshot.counts.sentinels + ' sentinels, ' +
       snapshot.counts.contributors_with_email + ' with email, ' +
       snapshot.counts.active_public_keys + ' active keys, trigger=' +
       snapshot.trigger + ')';
