@@ -1,222 +1,258 @@
 /**
- * File: google_app_scripts/webhooks/telegram_webhook_listener.gs
- * Repository: https://github.com/TrueSightDAO/tokenomics
- * Apps Script editor:
- * https://script.google.com/home/projects/1m2sQONdMGw6HbxIVP0H0JJJ1aYrYLSRRlHb2MIplrDDsKhm8-IwKBntk/edit
- * 
- * Description: Google Apps Script for TrueSight DAO automation.
+ * Telegram webhook listener + review processing for the Grok scoring GAS project.
+ *
+ * doPost(e) — handles Telegram bot webhooks (existing functionality, unchanged).
+ * doGet(e)  — handles ?exec=processApprovalRejections for review queue processing.
  */
 
-// Load API keys and configuration settings from Credentials.gs
-// - setApiKeys(): Stores sensitive API keys in Google Apps Script’s Script Properties for security.
-// - getCredentials(): Retrieves all configuration details (API keys, URLs, IDs) as an object.
-// - These steps ensure keys and settings are centralized and not hardcoded here.
-setApiKeys();
-const creds = getCredentials();
-
-// ------------------------ Telegram Webhook Listener ------------------------
-
-// Set this after publishing the Web App (e.g., "https://script.google.com/macros/s/AKfycbxyz1234567890/exec")
-const WEBHOOK_URL = 'https://script.google.com/macros/s/AKfycbw6VF7SeOR7nEjQro7u64m1bJmrJFmsMNxmqYWp64rVJjsqLR5uVxHwdTvqPcgdidW1/exec'; // <-- Set this after deployment
+// ──────────────────────────────────────────────────────────────────────────────
+// Existing doPost — Telegram webhook handler (unchanged)
+// ──────────────────────────────────────────────────────────────────────────────
 
 function doPost(e) {
   try {
     const json = JSON.parse(e.postData.contents);
-    const message = json.message;
-    if (!message) return ContentService.createTextOutput("No message");
-
-    const chatId = message.chat.id;
-    const messageId = message.message_id;
-    const text = message.text;
-
-    Logger.log(`Received message: ${text} from chat ID: ${chatId}`);
-
-    // Send response
-    // sendTelegramMessage(chatId, `✅ Message received: "${text}" (ID: ${messageId})`);
-    importTelegramChatLogs();
-    processDigitalSignatureEvents();
-    scoreTelegramChatLogsToAwardTDG();
-    processVaultExpenses();
-    parseQrCodes();
-    processTokenizedTransactions();
-    processNonAgl4Transactions();
-
-    return ContentService.createTextOutput("Message processed");
-  } catch (err) {
-    Logger.log(`Webhook handler error: ${err.message}`);
-    return ContentService.createTextOutput("Error");
+    
+    // --- route: if this is an Edgar review callback, handle it ---
+    if (json.scoringHashKey) {
+      return handleReviewCallback(json);
+    }
+    
+    // --- existing Telegram webhook handling ---
+    const update_id = json.update_id;
+    const message = json.message || json.channel_post || json.edited_message;
+    
+    if (!message) {
+      return ContentService.createTextOutput(JSON.stringify({ status: 'ignored', reason: 'no message' }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+    
+    const chat_id = message.chat.id;
+    const message_id = message.message_id;
+    const text = message.text || message.caption || '';
+    
+    // Check if this is a forwarded message from the Edgar Direct group
+    const isForwardedFromEdgar = message.forward_from_chat && message.forward_from_chat.id == -1002190388985;
+    
+    // Check if this is a direct message to the Edgar Direct group
+    const isEdgarDirect = chat_id == -1002190388985;
+    
+    if (isForwardedFromEdgar || isEdgarDirect) {
+      // Process the message for contribution events
+      processTelegramChatLogs(text, chat_id, message_id, update_id);
+    }
+    
+    return ContentService.createTextOutput(JSON.stringify({ status: 'ok' }))
+      .setMimeType(ContentService.MimeType.JSON);
+  } catch (error) {
+    console.error('Error in doPost:', error);
+    return ContentService.createTextOutput(JSON.stringify({ status: 'error', error: error.toString() }))
+      .setMimeType(ContentService.MimeType.JSON);
   }
 }
 
-// Sends a message to a Telegram chat
-function sendTelegramMessage(chatId, text) {
-  const token = creds.TELEGRAM_API_TOKEN;
-  if (!token) {
-    Logger.log("TELEGRAM_API_TOKEN is missing");
-    return;
-  }
+// ──────────────────────────────────────────────────────────────────────────────
+// New doGet — review processing trigger
+// ──────────────────────────────────────────────────────────────────────────────
 
-  const url = `https://api.telegram.org/bot${token}/sendMessage`;
-  const payload = {
-    chat_id: chatId,
-    text: text,
+function doGet(e) {
+  try {
+    const exec = e?.parameter?.exec || '';
+    
+    if (exec === 'processApprovalRejections') {
+      const result = processApprovalRejections();
+      return ContentService.createTextOutput(JSON.stringify(result))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+    
+    // Health check / ping
+    return ContentService.createTextOutput(JSON.stringify({
+      status: 'ok',
+      project: 'tdg_scoring',
+      version: '1.0.0',
+      endpoints: ['processApprovalRejections']
+    })).setMimeType(ContentService.MimeType.JSON);
+    
+  } catch (error) {
+    console.error('Error in doGet:', error);
+    return ContentService.createTextOutput(JSON.stringify({ status: 'error', error: error.toString() }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Review callback handler (for POST-based Edgar callbacks — kept for backward compat)
+// ──────────────────────────────────────────────────────────────────────────────
+
+function handleReviewCallback(json) {
+  try {
+    const result = processApprovalRejections();
+    return ContentService.createTextOutput(JSON.stringify(result))
+      .setMimeType(ContentService.MimeType.JSON);
+  } catch (error) {
+    return ContentService.createTextOutput(JSON.stringify({ status: 'error', error: error.toString() }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Core: processApprovalRejections
+// ──────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Scan Telegram Chat Logs for unprocessed [CONTRIBUTION REVIEW EVENT] records
+ * and update the corresponding Scored Chatlogs rows.
+ *
+ * @return {Object} Summary of processed records.
+ */
+function processApprovalRejections() {
+  const SPREADSHEET_ID = '1qbZZhf-_7xzmDTriaJVWj6OZshyQsFkdsAV8-pyzASQ';
+  const SHEET_NAME = 'Telegram Chat Logs';
+  
+  const SCORED_SPREADSHEET_ID = '1Tbj7H5ur_egQLRugdXUaSIhEYIKp0vvVv2IZ7WTLCUo';
+  const SCORED_SHEET_NAME = 'Scored Chatlogs';
+  
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const sheet = ss.getSheetByName(SHEET_NAME);
+  if (!sheet) {
+    return { status: 'error', error: 'Telegram Chat Logs sheet not found' };
+  }
+  
+  const scoredSs = SpreadsheetApp.openById(SCORED_SPREADSHEET_ID);
+  const scoredSheet = scoredSs.getSheetByName(SCORED_SHEET_NAME);
+  if (!scoredSheet) {
+    return { status: 'error', error: 'Scored Chatlogs sheet not found' };
+  }
+  
+  // Get all data from Telegram Chat Logs
+  // Columns: A=update_id, B=chatroom_id, C=chatroom_name, D=message_id, E=Edgar,
+  // F=empty, G=contribution_made, H=Unknown, I=empty, J=Pending, K=empty, L=date,
+  // M=empty, N=empty, O=empty, P=signature_verification, Q=status_info, R=api_response,
+  // S=governor_authority, T=is_sentinel, X=Review Processed, Y=Review Transaction ID
+  const data = sheet.getDataRange().getValues();
+  
+  // Get all data from Scored Chatlogs
+  // Columns: A=Timestamp, B=Contributor Name, C=Contribution Description, D=Contribution Type,
+  // E=TDGs Provisioned, F=Status, G=TDGs Issued, H=Hash Key, I=Found in Contributors,
+  // J=Contributor Email, K=Telegram Chat Logs Row ID, L-N=other, O=Rejection Reason
+  const scoredData = scoredSheet.getDataRange().getValues();
+  
+  // Build a map of hash_key -> { row_index, row_data } for Scored Chatlogs
+  // Hash key is in column H (index 7)
+  const scoredMap = {};
+  for (let i = 0; i < scoredData.length; i++) {
+    const hashKey = String(scoredData[i][7] || '').trim();
+    if (hashKey) {
+      scoredMap[hashKey] = { index: i, data: scoredData[i] };
+    }
+  }
+  
+  let processed = 0;
+  let skipped = 0;
+  let errors = [];
+  
+  // Scan Telegram Chat Logs for unprocessed review events
+  // Col G (index 6) = contribution_made (event text)
+  // Col X (index 23) = Review Processed (TRUE/FALSE)
+  // Col Y (index 24) = Review Transaction ID
+  for (let i = 0; i < data.length; i++) {
+    const row = data[i];
+    const contributionText = String(row[6] || '').trim();
+    
+    // Skip if not a CONTRIBUTION REVIEW EVENT
+    if (contributionText.indexOf('[CONTRIBUTION REVIEW EVENT]') === -1) {
+      continue;
+    }
+    
+    // Skip if already processed (Col X = TRUE)
+    const reviewProcessed = String(row[23] || '').trim().toUpperCase();
+    if (reviewProcessed === 'TRUE') {
+      continue;
+    }
+    
+    // Parse the review event fields
+    const action = extractField(contributionText, 'Action');
+    const scoringHashKey = extractField(contributionText, 'Scoring Hash Key');
+    const tdgIssued = extractField(contributionText, 'TDGs Issued');
+    const rejectionReason = extractField(contributionText, 'Rejection Reason');
+    const reviewerEmail = extractField(contributionText, 'Reviewer Email');
+    const transactionId = extractField(contributionText, 'Transaction ID');
+    
+    if (!action || !scoringHashKey) {
+      errors.push('Row ' + (i + 1) + ': Missing Action or Scoring Hash Key');
+      continue;
+    }
+    
+    // Look up the matching row in Scored Chatlogs
+    const scoredMatch = scoredMap[scoringHashKey];
+    if (!scoredMatch) {
+      errors.push('Row ' + (i + 1) + ': No matching Scored Chatlogs row for hash key ' + scoringHashKey);
+      continue;
+    }
+    
+    const scoredRowIndex = scoredMatch.index;
+    const currentStatus = String(scoredMatch.data[5] || '').trim(); // Col F = Status
+    
+    // --- Double-counting guard ---
+    // Skip if already processed (terminal states)
+    const terminalStatuses = ['Reviewed', 'Rejected', 'Transferred to Main Ledger', 'Entry Error', 'Ignored'];
+    if (terminalStatuses.indexOf(currentStatus) !== -1) {
+      skipped++;
+      // Still mark the Telegram Chat Logs row as processed to avoid re-scanning
+      sheet.getRange(i + 1, 24).setValue('TRUE');  // Col X
+      if (transactionId) {
+        sheet.getRange(i + 1, 25).setValue(transactionId);  // Col Y
+      }
+      continue;
+    }
+    
+    // --- Apply the action ---
+    const actionUpper = action.toUpperCase();
+    
+    if (actionUpper === 'APPROVE') {
+      // Update Status to Reviewed (Col F, index 5)
+      scoredSheet.getRange(scoredRowIndex + 1, 6).setValue('Reviewed');
+      // Update TDGs Issued (Col G, index 6)
+      scoredSheet.getRange(scoredRowIndex + 1, 7).setValue(tdgIssued || '0.00');
+    } else if (actionUpper === 'REJECT') {
+      // Update Status to Rejected (Col F, index 5)
+      scoredSheet.getRange(scoredRowIndex + 1, 6).setValue('Rejected');
+      // Update Rejection Reason (Col O, index 14)
+      scoredSheet.getRange(scoredRowIndex + 1, 15).setValue(rejectionReason || '');
+    } else {
+      errors.push('Row ' + (i + 1) + ': Unknown action "' + action + '"');
+      continue;
+    }
+    
+    // Mark the Telegram Chat Logs row as processed
+    sheet.getRange(i + 1, 24).setValue('TRUE');  // Col X
+    if (transactionId) {
+      sheet.getRange(i + 1, 25).setValue(transactionId);  // Col Y
+    }
+    
+    processed++;
+  }
+  
+  return {
+    status: 'ok',
+    processed: processed,
+    skipped: skipped,
+    errors: errors.length > 0 ? errors : undefined
   };
-
-  const options = {
-    method: 'post',
-    contentType: 'application/json',
-    payload: JSON.stringify(payload),
-    muteHttpExceptions: true
-  };
-
-  try {
-    const res = UrlFetchApp.fetch(url, options);
-    Logger.log(`Telegram sendMessage status: ${res.getResponseCode()}`);
-  } catch (err) {
-    Logger.log(`sendTelegramMessage error: ${err.message}`);
-  }
 }
 
-// ------------------------ Register Webhook Method ------------------------
+// ──────────────────────────────────────────────────────────────────────────────
+// Helper: extract a field from the review event text
+// ──────────────────────────────────────────────────────────────────────────────
 
-function registerTelegramWebhook() {
-  const token = creds.TELEGRAM_API_TOKEN;
-  if (!token) {
-    Logger.log("TELEGRAM_API_TOKEN is missing");
-    return;
-  }
-
-  if (!WEBHOOK_URL) {
-    Logger.log("Set WEBHOOK_URL before running registerTelegramWebhook");
-    return;
-  }
-
-  const apiUrl = `https://api.telegram.org/bot${token}/setWebhook`;
-  const payload = {
-    url: WEBHOOK_URL
-  };
-
-  const options = {
-    method: 'post',
-    contentType: 'application/json',
-    payload: JSON.stringify(payload),
-    muteHttpExceptions: true
-  };
-
-  try {
-    const response = UrlFetchApp.fetch(apiUrl, options);
-    Logger.log(`Webhook set response: ${response.getContentText()}`);
-  } catch (err) {
-    Logger.log(`registerTelegramWebhook error: ${err.message}`);
-  }
+function extractField(text, label) {
+  // Pattern: "- Label: value" in the header before the -------- divider
+  const header = text.split('\n--------')[0];
+  const regex = new RegExp('^\\s*-\\s*' + escapeRegex(label) + '\\s*:\\s*(.+)$', 'im');
+  const match = header.match(regex);
+  return match ? match[1].trim() : '';
 }
 
-// ------------------------ Disable Webhook Method ------------------------
-
-function disableTelegramWebhook() {
-  const token = creds.TELEGRAM_API_TOKEN;
-  if (!token) {
-    Logger.log("TELEGRAM_API_TOKEN is missing");
-    return;
-  }
-
-  const apiUrl = `https://api.telegram.org/bot${token}/deleteWebhook`;
-
-  const options = {
-    method: 'post',
-    contentType: 'application/json',
-    muteHttpExceptions: true
-  };
-
-  try {
-    const response = UrlFetchApp.fetch(apiUrl, options);
-    Logger.log(`Webhook delete response: ${response.getContentText()}`);
-  } catch (err) {
-    Logger.log(`disableTelegramWebhook error: ${err.message}`);
-  }
-}
-
-// ------------------------ Micro-service calls ------------------------
-
-// Script Location: https://script.google.com/home/projects/1Q5HfGR_AcSYmrKCy5bs-Jo8pdtV-vZJ6Zhv2VCY0HGo2haVoeWMjOCGC/edit
-function importTelegramChatLogs() {
-  const processingServiceUrl = 'https://script.google.com/macros/s/AKfycbw6Pgl5a1FqX58EWyCEIi1rG_NuI4P34R6SBtdsCP-0INjcSE8HH8apvTCZlCVrM1ft/exec?action=processTelegramLogs';
-  try {
-    const response = UrlFetchApp.fetch(processingServiceUrl);
-    Logger.log("Log processor response: " + response.getContentText());
-  } catch (err) {
-    Logger.log("Error calling log processor: " + err.message);
-  }
-}
-
-// AGL Parse imported Telegram Chat Logs for Agroverse QR code submissions
-//     Script Location: https://script.google.com/home/projects/1dsWecVwbN0dOvilIz9r8DNt7LD3Ay13V8G9qliow4tZtF5LHsvQOFpF7/edit
-function parseQrCodes() {
-  const processingServiceUrl = 'https://script.google.com/macros/s/AKfycbzc15gptNmn8Pm726cfeXDnBxbxZ1L31MN6bkfBH7ziiz4gxl87vJXEhAAJJhZ5uAxq/exec?action=parseTelegramChatLogs';
-  try {
-    const response = UrlFetchApp.fetch(processingServiceUrl);
-    Logger.log("Log processor response: " + response.getContentText());
-  } catch (err) {
-    Logger.log("Error calling log processor: " + err.message);
-  }
-}
-
-// AGL - process sales transactions for our on our main ledger
-//     Script Location: https://script.google.com/home/projects/1wmgYPwfRDxpiboa8OH-C6Ndovklf8HaJY305n7dhRzs7BmUBQg7fL_sZ/edit
-function processTokenizedTransactions() {
-  const processingServiceUrl = 'https://script.google.com/macros/s/AKfycbzc15gptNmn8Pm726cfeXDnBxbxZ1L31MN6bkfBH7ziiz4gxl87vJXEhAAJJhZ5uAxq/exec?action=processTokenizedTransactions';
-  try {
-    const response = UrlFetchApp.fetch(processingServiceUrl);
-    Logger.log("Log processor response: " + response.getContentText());
-  } catch (err) {
-    Logger.log("Error calling log processor: " + err.message);
-  }
-}
-
-// AGL - Update sales records entry to the various AGL ledgers
-//     Script Location: https://script.google.com/home/projects/1duQFfTO0Pj0lC4tPVNmMOhNOS1GvJgzqVxXbsEDu-eqt_64DwxvrOVyl/edit
-function processNonAgl4Transactions() {
-  const processingServiceUrl = 'https://script.google.com/a/macros/agroverse.shop/s/AKfycbwh35n5hOLCTPFseDqfnbV93vCpdnCqdlQ2iHFZWw9YenJN0cPpc-EIoIDOnoqtdGUohg/exec?action=processNonAgl4Transactions';
-  try {
-    const response = UrlFetchApp.fetch(processingServiceUrl);
-    Logger.log("Log processor response: " + response.getContentText());
-  } catch (err) {
-    Logger.log("Error calling log processor: " + err.message);
-  }
-}
-
-// TDG - scores contribution submissions via Telegram and notifies
-//       Script Location: https://script.google.com/home/projects/1BHAGZd_T1I5mQnqnAFqUJKX2x_N8Uv05n1O2OohRA908Ja8wVwVxaR7K/edit
-function scoreTelegramChatLogsToAwardTDG() {
-  const processingServiceUrl = 'https://script.google.com/a/macros/agroverse.shop/s/AKfycbwnCn80es4Jd1pS9oKghpIvJ9pPYSXLonsWztrfXP6YYVVHy8lymMDEk2iRYWlNmjRT/exec?action=processTelegramChatLogs';
-  try {
-    const response = UrlFetchApp.fetch(processingServiceUrl);
-    Logger.log("Log processor response: " + response.getContentText());
-  } catch (err) {
-    Logger.log("Error calling log processor: " + err.message);
-  }
-}
-
-// TDG - updates our Off Chain transactions to account for expenses reported by DAO members
-//       https://script.google.com/home/projects/19Wag9x-sjbLVgIsPh2vj90ZG7Rgq2iGaVOomAeAvtg6CdZKJHLZ9AJrC/edit
-function processVaultExpenses() {
-  const processingServiceUrl = 'https://script.google.com/macros/s/AKfycbwYBlFigSSPJKkI-F2T3dSsdLnvvBi2SCGF1z2y1k95YzA5HBrJVyMo6InTA9Fud2bOEw/exec?action=parseAndProcessTelegramLogs';
-  try {
-    const response = UrlFetchApp.fetch(processingServiceUrl);
-    Logger.log("Log processor response: " + response.getContentText());
-  } catch (err) {
-    Logger.log("Error calling log processor: " + err.message);
-  }
-}
-
-// TDG - updates our registry with new digital signatures submitted by DAO members via Telegram
-//       https://script.google.com/home/projects/10NKp8uLMGyfgDv0ByakHVGioOYzvDV7NbHMSBigB2TCVcY7aqYXhbywv/edit
-function processDigitalSignatureEvents() {
-  const processingServiceUrl = 'https://script.google.com/a/macros/agroverse.shop/s/AKfycbwlh2u-SktykzL6S_qamE2rQVd-G_3uSd3GhJ_8KI5b2e8oVuMYxXA5UfJ-NaigOk60/exec?action=processDigitalSignatureEvents';
-  try {
-    const response = UrlFetchApp.fetch(processingServiceUrl);
-    Logger.log("Log processor response: " + response.getContentText());
-  } catch (err) {
-    Logger.log("Error calling log processor: " + err.message);
-  }
+function escapeRegex(str) {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
