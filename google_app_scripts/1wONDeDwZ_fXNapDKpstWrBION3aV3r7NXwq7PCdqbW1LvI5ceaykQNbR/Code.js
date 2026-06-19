@@ -935,8 +935,8 @@ function processTelegramChatLogsToInventoryMovement() {
       Logger.log('No data in Telegram Chat Logs');
       return;
     }
-    // Read through column S (19) for Edgar Governor flag (YES/NO) on Telegram Chat Logs
-    const telegramData = telegramSheet.getRange(1, 1, telegramLastRow, 19).getValues(); // Columns A–S
+    // Read through column T (20) for Edgar Governor (S) + Sentinel (T) flags on Telegram Chat Logs
+    const telegramData = telegramSheet.getRange(1, 1, telegramLastRow, 20).getValues(); // Columns A–T
 
     // Prepare array to collect new rows for batch insertion
     const newRows = [];
