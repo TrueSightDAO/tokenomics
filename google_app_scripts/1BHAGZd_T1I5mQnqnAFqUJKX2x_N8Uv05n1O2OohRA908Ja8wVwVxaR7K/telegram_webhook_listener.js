@@ -177,16 +177,17 @@ function processApprovalRejections() {
   const data = sheet.getDataRange().getValues();
   
   // Get all data from Scored Chatlogs
-  // Columns: A=Timestamp, B=Contributor Name, C=Contribution Description, D=Contribution Type,
-  // E=TDGs Provisioned, F=Status, G=TDGs Issued, H=Hash Key, I=Found in Contributors,
+  // Scored Chatlogs real columns (header row 3): A=Contributor Name, B=Project Name,
+  // C=Contribution Made, D=Rubric classification, E=TDGs Provisioned, F=Status,
+  // G=TDGs Issued, H=Status date, I=Existing Contributor, J=Reporter Name, K=Scoring Hash Key (idx 10).
   // J=Contributor Email, K=Telegram Chat Logs Row ID, L-N=other, O=Rejection Reason
   const scoredData = scoredSheet.getDataRange().getValues();
   
   // Build a map of hash_key -> { row_index, row_data } for Scored Chatlogs
-  // Hash key is in column H (index 7)
+  // Scoring Hash Key is in column K (index 10) — matches generate_review_cache.py + the transfer script.
   const scoredMap = {};
   for (let i = 0; i < scoredData.length; i++) {
-    const hashKey = String(scoredData[i][7] || '').trim();
+    const hashKey = String(scoredData[i][10] || '').trim();
     if (hashKey) {
       scoredMap[hashKey] = { index: i, data: scoredData[i] };
     }
