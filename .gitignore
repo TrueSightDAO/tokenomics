@@ -1,6 +1,9 @@
 /venv/*
 /.env
 la_token_market_making_python/.env
+# Nested .env files anywhere (root /.env above is anchored and misses subdirectories,
+# e.g. python_scripts/schema_validation/.env which leaked once). Keep .env.example tracked.
+**/.env
 # Ignore Jupyter logs and checkpoints
 jupyter.log
 python_scripts/jupyter.log
@@ -20,6 +23,9 @@ token.json
 # Apps Script sources that embed API keys / secrets (basename contains "credential(s)")
 google_app_scripts/**/*redential*.gs
 google_app_scripts/**/Credentials.js
+# Defensive: the ".gs.js" double-extension variant slipped past the rule above once
+# (Credentials.gs.js leaked the Wix token). Catch any *Credential* .gs.js too.
+google_app_scripts/**/*redential*.gs.js
 !google_app_scripts/**/Credentials.sample.js
 
 # Schema validation output
