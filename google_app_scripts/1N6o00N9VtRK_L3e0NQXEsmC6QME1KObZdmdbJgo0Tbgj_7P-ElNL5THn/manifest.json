@@ -1,14 +1,20 @@
 {
   "scriptId": "1N6o00N9VtRK_L3e0NQXEsmC6QME1KObZdmdbJgo0Tbgj_7P-ElNL5THn",
-  "name": "TBC \u2014 confirm display name in GAS UI for 1N6o00N9VtRK\u2026",
+  "name": "QR Code Generation — Telegram log processor + single-QR registration",
   "owner_email": "garyjob@agroverse.shop",
   "post_push_hooks": [],
   "candidate_cache_refresh_hooks": [],
   "deployments": {
-    "head": "TBC \u2014 list every /exec URL for this scriptId in pre-flight"
+    "head": "AKfycbxtOS1OE3zd01IxfQ0Oo-Qurq0KSz15V9VFgVaZAWA (@HEAD — login-walled, do NOT use for anonymous calls)",
+    "web_app": "AKfycby8m5XEuFLyw4plNnN-_lciS8aRRP1C3VrvuqN3V3dy0hYsn92T01Icer7Qwi2NTMMN (@8 — ANYONE_ANONYMOUS web app; /exec?action=processQRCodeGenerationTelegramLogs | registerSingleQRCode)"
+  },
+  "webapp": {
+    "executeAs": "USER_DEPLOYING",
+    "access": "ANYONE_ANONYMOUS",
+    "note": "appsscript.json MUST keep this webapp block or clasp deployments stop serving /exec (Page Not Found). Only VERSIONED deployments are anonymous; @HEAD stays login-walled even with ANYONE_ANONYMOUS."
   },
   "source_files": [
-    "Version.gs",
-    "process_qr_code_generation_telegram_logs.gs"
+    "Version.js",
+    "process_qr_code_generation_telegram_logs.js"
   ]
 }

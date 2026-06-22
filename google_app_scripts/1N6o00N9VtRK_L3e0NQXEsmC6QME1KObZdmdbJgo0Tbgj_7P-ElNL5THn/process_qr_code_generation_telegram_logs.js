@@ -50,6 +50,10 @@ const TELEGRAM_LOG_READ_LAST_COL = 18;
 /** Short label for QR Code Generation column L when ingest signature was not `success` */
 const QR_GEN_STATUS_SIG_FAILED = 'NOT PROCESSED — sig verify failed';
 
+/** register_single_qr_code variables */
+const REGISTER_QR_SHEET_NAME = 'Agroverse QR codes';
+const REGISTER_QR_VALID_STATUSES = ['MINTED', 'SAMPLE', 'SOLD', 'ON CONSIGNMENT', 'EXPENSED', 'ACTIVE'];
+
 function isTelegramSignatureVerificationSuccess_(cell) {
   return cell != null && String(cell).trim().toLowerCase() === 'success';
 }
@@ -335,12 +339,33 @@ function processQRCodeGenerationTelegramLogs() {
 
   const processedMessageIds = getProcessedMessageIds(qrCodeGenerationTab);
 
+  // --- Watermark: start scanning from the row after the last processed Telegram Update ID ---
+  let scanStartRow = 2; // default: scan from row 2 (first data row)
+  const qrGenLastRow = qrCodeGenerationTab.getLastRow();
+  if (qrGenLastRow >= 2) {
+    const lastUpdateId = qrCodeGenerationTab.getRange(qrGenLastRow, 1).getValue();
+    if (lastUpdateId) {
+      // Find this Update ID in Telegram Chat Logs column A
+      const lastTgRow = telegramLogTab.getLastRow();
+      if (lastTgRow >= 2) {
+        const tgColA = telegramLogTab.getRange(2, 1, lastTgRow - 1, 1).getValues().flat();
+        for (let i = tgColA.length - 1; i >= 0; i--) {
+          if (String(tgColA[i]) === String(lastUpdateId)) {
+            scanStartRow = i + 3; // +2 for header offset + 1 for next row
+            break;
+          }
+        }
+      }
+    }
+  }
+
   const lastRow = telegramLogTab.getLastRow();
-  if (lastRow < 2) {
-    Logger.log("No data in Telegram Chat Logs tab");
+  if (lastRow < scanStartRow) {
+    Logger.log("No new rows to scan in Telegram Chat Logs (last row " + lastRow + ", scan from " + scanStartRow + ")");
     return;
   }
-  const dataRange = telegramLogTab.getRange(2, 1, lastRow - 1, TELEGRAM_LOG_READ_LAST_COL).getValues();
+  Logger.log("Scanning Telegram Chat Logs from row " + scanStartRow + " to " + lastRow);
+  const dataRange = telegramLogTab.getRange(scanStartRow, 1, lastRow - scanStartRow + 1, TELEGRAM_LOG_READ_LAST_COL).getValues();
 
   const contributorsLastRow = contributorsTab.getLastRow();
   const contributorsData = contributorsLastRow > 1 ? contributorsTab.getRange(2, 1, contributorsLastRow - 1, 5).getValues() : [];
@@ -1643,16 +1668,22 @@ function findExistingQRCodeGenerationRow(messageId) {
 function doGet(e) {
   try {
     const action = e && e.parameter && e.parameter.action != null ? String(e.parameter.action).trim() : '';
+    
     if (action === 'processQRCodeGenerationTelegramLogs') {
       processQRCodeGenerationTelegramLogs();
       return ContentService.createTextOutput(
         JSON.stringify({ status: 'success', message: 'processQRCodeGenerationTelegramLogs executed' })
       ).setMimeType(ContentService.MimeType.JSON);
     }
+    
+    if (action === 'registerSingleQRCode') {
+      return handleRegisterSingleQRCode(e.parameter);
+    }
+    
     return ContentService.createTextOutput(
       JSON.stringify({
         status: 'error',
-        message: 'Unknown or missing action. Use ?action=processQRCodeGenerationTelegramLogs'
+        message: 'Unknown or missing action. Use ?action=processQRCodeGenerationTelegramLogs or ?action=registerSingleQRCode'
       })
     ).setMimeType(ContentService.MimeType.JSON);
   } catch (err) {
@@ -1660,4 +1691,162 @@ function doGet(e) {
       JSON.stringify({ status: 'error', message: err && err.message ? err.message : String(err) })
     ).setMimeType(ContentService.MimeType.JSON);
   }
+}
+
+// ===== Single QR Code Registration (merged from register_single_qr_code.gs) =====
+
+function handleRegisterSingleQRCode(params) {
+  var qrCode = params.qr_code ? String(params.qr_code).trim() : '';
+  if (!qrCode) {
+    return jsonResponse_({ status: 'error', message: 'Missing required parameter: qr_code' }, 400);
+  }
+  
+  var landingPage = params.landing_page ? String(params.landing_page).trim() : '';
+  if (!landingPage) {
+    return jsonResponse_({ status: 'error', message: 'Missing required parameter: landing_page' }, 400);
+  }
+  
+  var farmName = params.farm_name ? String(params.farm_name).trim() : '';
+  if (!farmName) {
+    return jsonResponse_({ status: 'error', message: 'Missing required parameter: farm_name' }, 400);
+  }
+  
+  var state = params.state ? String(params.state).trim() : '';
+  var country = params.country ? String(params.country).trim() : '';
+  var year = params.year ? String(params.year).trim() : '';
+  var currency = params.currency ? String(params.currency).trim() : '';
+  var manager = params.manager ? String(params.manager).trim() : '';
+  var creationDate = params.creation_date ? String(params.creation_date).trim() : '';
+  
+  var status = params.status ? String(params.status).trim().toUpperCase() : 'SAMPLE';
+  if (REGISTER_QR_VALID_STATUSES.indexOf(status) === -1) {
+    return jsonResponse_({ 
+      status: 'error', 
+      message: 'Invalid status: ' + status + '. Valid values: ' + REGISTER_QR_VALID_STATUSES.join(', ') 
+    }, 400);
+  }
+  
+  var spreadsheet = SpreadsheetApp.openByUrl(AGROVERSE_QR_SPREADSHEET_URL);
+  var sheet = spreadsheet.getSheetByName(REGISTER_QR_SHEET_NAME);
+  if (!sheet) {
+    return jsonResponse_({ status: 'error', message: 'Sheet not found: ' + REGISTER_QR_SHEET_NAME }, 500);
+  }
+  
+  var lastRow = sheet.getLastRow();
+  if (lastRow >= 2) {
+    var existingCodes = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
+    for (var i = 0; i < existingCodes.length; i++) {
+      var existing = existingCodes[i][0] ? String(existingCodes[i][0]).trim() : '';
+      if (existing === qrCode) {
+        return jsonResponse_({ 
+          status: 'error', 
+          message: 'QR code already exists: ' + qrCode,
+          qr_code: qrCode,
+          existing_row: i + 2
+        }, 409);
+      }
+    }
+  }
+  
+  var today = creationDate || Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyyMMdd');
+  var qrCodeLocation = 'https://github.com/TrueSightDAO/tokenomics/tree/main/python_scripts/agroverse_qr_code_generator/package_qr_codes/compiled_' + 
+    sanitizeFilename_(farmName) + '_' + qrCode + '.png';
+  
+  var newRow = [
+    qrCode,
+    landingPage,
+    landingPage,
+    status,
+    farmName,
+    state,
+    country,
+    year,
+    currency,
+    today,
+    qrCodeLocation,
+    '',
+    '',
+    '',
+    '',
+    '',
+    '',
+    '',
+    '',
+    '25',
+    manager,
+    ''
+  ];
+  
+  var insertRow = sheet.getLastRow() + 1;
+  sheet.getRange(insertRow, 1, 1, newRow.length).setValues([newRow]);
+  SpreadsheetApp.flush();
+  
+  var webhookResult = triggerSingleQRGitHubWebhook_(qrCode, farmName, status, manager);
+  
+  Logger.log('Registered QR code: ' + qrCode + ' at row ' + insertRow + 
+             ' (webhook: ' + (webhookResult.success ? 'OK' : 'FAILED: ' + webhookResult.message) + ')');
+  
+  return jsonResponse_({ 
+    status: 'success', 
+    message: 'QR code registered successfully',
+    qr_code: qrCode,
+    row: insertRow,
+    webhook_triggered: webhookResult.success,
+    webhook_message: webhookResult.message
+  }, 200);
+}
+
+function triggerSingleQRGitHubWebhook_(qrCode, farmName, status, manager) {
+  try {
+    var githubToken = getGitHubToken();
+    if (!githubToken) {
+      return { success: false, message: 'GitHub token not configured' };
+    }
+    
+    var payload = {
+      event_type: 'qr-code-single-generation',
+      client_payload: {
+        qr_code: qrCode,
+        farm_name: farmName || '',
+        status: status || 'SAMPLE',
+        manager: manager || '',
+        timestamp: new Date().toISOString()
+      }
+    };
+    
+    var url = 'https://api.github.com/repos/' + GITHUB_REPO + '/dispatches';
+    var options = {
+      method: 'post',
+      headers: {
+        'Authorization': 'token ' + githubToken,
+        'Accept': 'application/vnd.github.v3+json',
+        'Content-Type': 'application/json',
+        'User-Agent': 'GoogleAppsScript-SingleQRGenerator'
+      },
+      payload: JSON.stringify(payload),
+      muteHttpExceptions: true
+    };
+    
+    var response = UrlFetchApp.fetch(url, options);
+    var responseCode = response.getResponseCode();
+    
+    if (responseCode === 204) {
+      return { success: true, message: 'GitHub webhook triggered for QR: ' + qrCode };
+    } else {
+      return { success: false, message: 'HTTP ' + responseCode + ': ' + response.getContentText().substring(0, 200) };
+    }
+    
+  } catch (err) {
+    return { success: false, message: err && err.message ? err.message : String(err) };
+  }
+}
+
+function sanitizeFilename_(s) {
+  return String(s).replace(/[^A-Za-z0-9._-]/g, '_');
+}
+
+function jsonResponse_(data, statusCode) {
+  var output = ContentService.createTextOutput(JSON.stringify(data));
+  output.setMimeType(ContentService.MimeType.JSON);
+  return output;
 }
