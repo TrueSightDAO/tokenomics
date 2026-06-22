@@ -58,26 +58,71 @@ function doPost(e) {
 function doGet(e) {
   try {
     const exec = e?.parameter?.exec || '';
-    
+    const action = e?.parameter?.action || '';
+
+    // PR4 — review queue write-back
     if (exec === 'processApprovalRejections') {
       const result = processApprovalRejections();
       return ContentService.createTextOutput(JSON.stringify(result))
         .setMimeType(ContentService.MimeType.JSON);
     }
-    
+
+    // Legacy manual trigger — preserved from the former doGet in
+    // grok_scoring_for_telegram_and_whatsapp_logs.js (merged here so doGet is defined once).
+    if (action === 'processTelegramChatLogs') {
+      try {
+        Logger.log('Webhook triggered: processing Telegram logs');
+        processTelegramChatLogs();
+        return ContentService.createTextOutput('✅ Telegram logs processed');
+      } catch (err) {
+        Logger.log('Error in processTelegramLogs: ' + err.message);
+        return ContentService.createTextOutput('❌ Error: ' + err.message);
+      }
+    }
+
     // Health check / ping
     return ContentService.createTextOutput(JSON.stringify({
       status: 'ok',
       project: 'tdg_scoring',
       version: '1.0.0',
-      endpoints: ['processApprovalRejections']
+      endpoints: ['processApprovalRejections', 'processTelegramChatLogs']
     })).setMimeType(ContentService.MimeType.JSON);
-    
+
   } catch (error) {
     console.error('Error in doGet:', error);
     return ContentService.createTextOutput(JSON.stringify({ status: 'error', error: error.toString() }))
       .setMimeType(ContentService.MimeType.JSON);
   }
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Safety-net cron — time-based trigger for processApprovalRejections
+// ──────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Idempotent installer for the review-processing safety-net trigger.
+ * Run ONCE from the Apps Script editor (or via clasp run) after deploy.
+ *
+ * Edgar normally calls ?exec=processApprovalRejections immediately after each
+ * approval/rejection — but DAO_PROTOCOL_GAS_REVIEW_WEBHOOK_URL may be unset, or a
+ * callback may fail. This time-driven trigger guarantees unprocessed
+ * [CONTRIBUTION REVIEW EVENT] rows still get written back within ~15 min.
+ * Safe to re-run: removes any existing processApprovalRejections triggers first.
+ *
+ * @return {Object} summary of what was installed.
+ */
+function installReviewProcessingTrigger() {
+  const FN = 'processApprovalRejections';
+  let removed = 0;
+  ScriptApp.getProjectTriggers().forEach(function (t) {
+    if (t.getHandlerFunction() === FN) {
+      ScriptApp.deleteTrigger(t);
+      removed++;
+    }
+  });
+  ScriptApp.newTrigger(FN).timeBased().everyMinutes(15).create();
+  Logger.log('installReviewProcessingTrigger: removed ' + removed + ' old trigger(s), installed 1 (every 15 min).');
+  return { status: 'ok', removed: removed, installed: 1, everyMinutes: 15 };
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
