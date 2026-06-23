@@ -270,6 +270,13 @@ function processApprovalRejections() {
     const actionUpper = action.toUpperCase();
     
     if (actionUpper === 'APPROVE') {
+      // Correct the contributor (Col A, column 1) to the reviewed name when the event provides
+      // one. This is what resolves a RESOLVE FAILED / FALSE row: the reviewer-selected name is
+      // written back so the transfer script can validate it against Contributors. For an
+      // already-resolved row the provided name equals Col A, so this is a safe no-op.
+      if (reviewContributor) {
+        scoredSheet.getRange(scoredRowIndex + 1, 1).setValue(reviewContributor);
+      }
       // Update Status to Reviewed (Col F, index 5)
       scoredSheet.getRange(scoredRowIndex + 1, 6).setValue('Reviewed');
       // Update TDGs Issued (Col G, index 6)
