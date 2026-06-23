@@ -183,14 +183,19 @@ function processApprovalRejections() {
   // J=Contributor Email, K=Telegram Chat Logs Row ID, L-N=other, O=Rejection Reason
   const scoredData = scoredSheet.getDataRange().getValues();
   
-  // Build a map of hash_key -> { row_index, row_data } for Scored Chatlogs
-  // Scoring Hash Key is in column K (index 10) — matches generate_review_cache.py + the transfer script.
-  const scoredMap = {};
+  // A Scoring Hash Key (Col K, index 10) identifies the source scoring event, NOT a single
+  // row — a multi-contributor "split" contribution produces one row per contributor, all
+  // sharing the hash. So key the lookup by (hash + Contributor Name (Col A)) to target the
+  // exact contributor's row, and keep a hash-only fallback for events that omit the name.
+  const SEP = '\x1f';
+  const scoredByHashContrib = {};   // "hash\x1fcontributorName" -> { index, data }
+  const scoredByHash = {};          // "hash" -> first matching { index, data } (fallback)
   for (let i = 0; i < scoredData.length; i++) {
     const hashKey = String(scoredData[i][10] || '').trim();
-    if (hashKey) {
-      scoredMap[hashKey] = { index: i, data: scoredData[i] };
-    }
+    if (!hashKey) continue;
+    const contribName = String(scoredData[i][0] || '').trim();  // Col A = Contributor Name
+    scoredByHashContrib[hashKey + SEP + contribName] = { index: i, data: scoredData[i] };
+    if (!(hashKey in scoredByHash)) scoredByHash[hashKey] = { index: i, data: scoredData[i] };
   }
   
   let processed = 0;
@@ -229,10 +234,19 @@ function processApprovalRejections() {
       continue;
     }
     
-    // Look up the matching row in Scored Chatlogs
-    const scoredMatch = scoredMap[scoringHashKey];
+    // Look up the matching row in Scored Chatlogs by (hash + Contributor Name), so a split
+    // contribution's approval lands on the right person's row. Fall back to hash-only when
+    // the event omits the name (older clients).
+    const reviewContributor = (extractField(contributionText, 'Contributor Name') || '').trim();
+    let scoredMatch = null;
+    if (reviewContributor) {
+      scoredMatch = scoredByHashContrib[scoringHashKey + SEP + reviewContributor] || null;
+    }
     if (!scoredMatch) {
-      errors.push('Row ' + (i + 1) + ': No matching Scored Chatlogs row for hash key ' + scoringHashKey);
+      scoredMatch = scoredByHash[scoringHashKey] || null;
+    }
+    if (!scoredMatch) {
+      errors.push('Row ' + (i + 1) + ': No matching Scored Chatlogs row for hash key ' + scoringHashKey + (reviewContributor ? (' / contributor ' + reviewContributor) : ''));
       continue;
     }
     
