@@ -245,7 +245,7 @@ class BatchWebhookHandler:
                 qr_code_value=zip_file_name.replace('.zip', ''),
                 qr_image_path=zip_file_path,
                 commit_message=f"Add batch QR codes zip file: {zip_file_name} [skip ci]",
-                target_repo='TrueSightDAO/qr_codes',
+                target_repo='TrueSightDAO/lineage-assets',  # qr_codes archived 2026-06-11
                 target_path=f'batch_files/{zip_file_name}'
             )
             
