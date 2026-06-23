@@ -75,7 +75,7 @@ jobs:
     - name: Generate Batch QR Codes
       env:
         QR_CODE_REPOSITORY_TOKEN: ${{ secrets.QR_CODE_REPOSITORY_TOKEN }}
-        GITHUB_REPOSITORY: TrueSightDAO/qr_codes
+        GITHUB_REPOSITORY: TrueSightDAO/lineage-assets
         GDRIVE_KEY: ${{ secrets.GDRIVE_KEY }}
       run: |
         # Change to the agroverse_qr_code_web_service directory

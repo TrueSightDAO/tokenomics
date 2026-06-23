@@ -29,11 +29,13 @@ const QR_GEN_TELEGRAM_MAIN_WORKBOOK_URL = 'https://docs.google.com/spreadsheets/
 const AGROVERSE_QR_SPREADSHEET_URL = 'https://docs.google.com/spreadsheets/d/1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU/edit?gid=472328231#gid=472328231'; // Agroverse QR codes spreadsheet - PRODUCTION
 
 const CONTRIBUTORS_SIGNATURES_URL = 'https://docs.google.com/spreadsheets/d/1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU/edit?gid=577022511#gid=577022511'; // Contributors Digital Signatures spreadsheet
-/** Public blob path for single-QR PNGs in qr_codes repo (unique name vs qr_code_generator.gs in multi-file deployments). */
-const QR_GEN_TELEGRAM_GITHUB_BLOB_BASE_URL = 'https://github.com/TrueSightDAO/qr_codes/blob/main/'; // GitHub repository URL
-const ZIP_FILE_DOWNLOAD_BASE_URL = 'https://raw.githubusercontent.com/TrueSightDAO/qr_codes/main/batch_files/'; // Base URL for zip file downloads
+/** Public blob path for serialized-QR PNGs. Canonical home is lineage-assets/pngs/ (qr_codes was
+ *  archived/read-only 2026-06-11; uploads there 403'd). The batch workflow derives the upload repo+path
+ *  from this column-K URL via parse_github_url, so this constant is the single source of truth. */
+const QR_GEN_TELEGRAM_GITHUB_BLOB_BASE_URL = 'https://github.com/TrueSightDAO/lineage-assets/blob/main/pngs/'; // GitHub repository URL
+const ZIP_FILE_DOWNLOAD_BASE_URL = 'https://raw.githubusercontent.com/TrueSightDAO/lineage-assets/main/batch_files/'; // Base URL for zip file downloads
 /** Commits that add batch zips land in this repo (not the tokenomics dispatch repo) */
-const QR_CODES_ZIP_GITHUB_REPO = 'TrueSightDAO/qr_codes';
+const QR_CODES_ZIP_GITHUB_REPO = 'TrueSightDAO/lineage-assets';
 const QR_CODES_ZIP_BATCH_PREFIX = 'batch_files/';
 
 // Tab names

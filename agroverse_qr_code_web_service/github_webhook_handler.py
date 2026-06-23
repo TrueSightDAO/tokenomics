@@ -34,7 +34,7 @@ try:
 except ImportError:
     GITHUB_TOKEN = os.environ.get('QR_CODE_REPOSITORY_TOKEN')
 
-GITHUB_REPOSITORY = 'TrueSightDAO/qr_codes'
+GITHUB_REPOSITORY = 'TrueSightDAO/lineage-assets'  # qr_codes archived 2026-06-11; canonical PNG home is lineage-assets/pngs/ (fallback only — target repo+path are derived from column-K URL via parse_github_url)
 # Use to_upload directory for temporary file storage
 GITHUB_WORKSPACE = os.path.join(os.getcwd(), 'to_upload')
 
