@@ -676,8 +676,14 @@ function submitVote(prNumber, voteText) {
       };
     }
     
-    // Check if this signature already voted
-    const existingVote = findExistingVote(prNumber, voteData.signature, config);
+    // Look up contributor name for this signature
+    const contributorName = lookupContributorName(voteData.signature);
+
+    // Build signature→name map for dedup
+    const signatureNameMap = buildSignatureToNameMap();
+
+    // Check if this contributor (by signature or by name) already voted
+    const existingVote = findExistingVote(prNumber, voteData.signature, contributorName, config, signatureNameMap);
     
     if (existingVote) {
       // Mark existing vote as superseded
@@ -1056,7 +1062,7 @@ function parseVoteSubmission(voteText) {
 /**
  * Finds existing vote comment by digital signature
  */
-function findExistingVote(prNumber, signature, config) {
+function findExistingVote(prNumber, signature, contributorName, config, signatureNameMap) {
   try {
     const url = `https://api.github.com/repos/${config.githubOwner}/${config.githubRepo}/issues/${prNumber}/comments`;
     const response = UrlFetchApp.fetch(url, {
@@ -1071,8 +1077,22 @@ function findExistingVote(prNumber, signature, config) {
     const comments = JSON.parse(response.getContentText());
     
     for (const comment of comments) {
+      // Check by exact signature match (same key)
       if (comment.body.includes(`My Digital Signature: ${signature}`)) {
         return { commentId: comment.id, body: comment.body };
+      }
+      
+      // Check by contributor name match (same person, different key)
+      if (contributorName && signatureNameMap) {
+        const existingSigMatch = comment.body.match(/My Digital Signature:\s*([A-Za-z0-9+/=]+)/);
+        if (existingSigMatch) {
+          const existingSignature = existingSigMatch[1];
+          const existingName = signatureNameMap.get(existingSignature);
+          if (existingName && existingName === contributorName) {
+            Logger.log(`Found existing vote from same contributor "${contributorName}" with different key`);
+            return { commentId: comment.id, body: comment.body };
+          }
+        }
       }
     }
     
@@ -1173,9 +1193,12 @@ function getVoteCount(prNumber, config) {
     const comments = JSON.parse(response.getContentText());
     let yesVotes = 0;
     let noVotes = 0;
-    const latestVotes = new Map(); // signature -> {vote, timestamp}
+    const latestVotes = new Map(); // contributor→name or signature → {vote, timestamp}
     
-    // First pass: collect all votes and find the latest for each signature
+    // Build signature→name lookup map once for dedup
+    const signatureNameMap = buildSignatureToNameMap();
+    
+    // First pass: collect all votes and find the latest for each contributor
     for (const comment of comments) {
       // Skip tabulation comments
       if (comment.body.includes('## 📊 Voting Tabulation')) {
@@ -1197,16 +1220,19 @@ function getVoteCount(prNumber, config) {
           const vote = voteMatch[1].toUpperCase();
           const timestamp = new Date(comment.created_at);
           
-          // Keep only the latest vote for each signature
-          if (!latestVotes.has(signature) || timestamp > latestVotes.get(signature).timestamp) {
-            latestVotes.set(signature, { vote, timestamp });
+          // Use contributor name as dedup key if available, otherwise use signature
+          const dedupKey = signatureNameMap.get(signature) || signature;
+          
+          // Keep only the latest vote for each contributor
+          if (!latestVotes.has(dedupKey) || timestamp > latestVotes.get(dedupKey).timestamp) {
+            latestVotes.set(dedupKey, { vote, timestamp });
           }
         }
       }
     }
     
     // Second pass: count the latest votes
-    for (const [signature, voteData] of latestVotes) {
+    for (const [dedupKey, voteData] of latestVotes) {
       if (voteData.vote === 'YES') {
         yesVotes++;
       } else if (voteData.vote === 'NO') {
@@ -3242,6 +3268,36 @@ function lookupContributorName(digitalSignature) {
     Logger.log(`❌ Error looking up contributor: ${error.message}`);
     return null;
   }
+}
+
+/**
+ * Builds a Map of digital signature → contributor name from the Contributors Digital Signatures sheet.
+ * This is a bulk lookup so multiple dedup checks don't hit the sheet repeatedly.
+ * @return {Map<string, string>} Map where key = public key (trimmed), value = contributor name
+ */
+function buildSignatureToNameMap() {
+  const map = new Map();
+  try {
+    const spreadsheetId = '1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU';
+    const spreadsheet = SpreadsheetApp.openById(spreadsheetId);
+    const sheet = spreadsheet.getSheetByName('Contributors Digital Signatures');
+    
+    if (!sheet) {
+      return map;
+    }
+    
+    const data = sheet.getDataRange().getValues();
+    for (let i = 1; i < data.length; i++) {
+      const name = data[i][0]; // Column A
+      const sig = data[i][4]; // Column E
+      if (sig && sig.trim() && name && name.trim()) {
+        map.set(sig.trim(), name.trim());
+      }
+    }
+  } catch (error) {
+    Logger.log(`❌ Error building signature→name map: ${error.message}`);
+  }
+  return map;
 }
 
 /**
