@@ -268,34 +268,53 @@ function processApprovalRejections() {
     
     // --- Apply the action ---
     const actionUpper = action.toUpperCase();
-    
-    if (actionUpper === 'APPROVE') {
-      // Correct the contributor (Col A, column 1) to the reviewed name when the event provides
-      // one. This is what resolves a RESOLVE FAILED / FALSE row: the reviewer-selected name is
-      // written back so the transfer script can validate it against Contributors. For an
-      // already-resolved row the provided name equals Col A, so this is a safe no-op.
-      if (reviewContributor) {
-        scoredSheet.getRange(scoredRowIndex + 1, 1).setValue(reviewContributor);
+
+    // Helper: always clear data validation before writing, then re-apply.
+    function safeSetValue(sht, row, col, value) {
+      const range = sht.getRange(row, col);
+      const dv = range.getDataValidation();
+      try { if (dv) range.setDataValidation(null); } catch (_) {}
+      try {
+        range.setValue(value);
+      } catch (e) {
+        throw new Error('setValue(' + row + ',' + col + ') failed: ' + e.message);
+      } finally {
+        try { if (dv) range.setDataValidation(dv); } catch (_) {}
       }
-      // Update Status to Reviewed (Col F, index 5)
-      scoredSheet.getRange(scoredRowIndex + 1, 6).setValue('Reviewed');
-      // Update TDGs Issued (Col G, index 6)
-      scoredSheet.getRange(scoredRowIndex + 1, 7).setValue(tdgIssued || '0.00');
-    } else if (actionUpper === 'REJECT') {
-      // Update Status to Rejected (Col F, index 5)
-      scoredSheet.getRange(scoredRowIndex + 1, 6).setValue('Rejected');
-      // Update Rejection Reason (Col O, index 14)
-      scoredSheet.getRange(scoredRowIndex + 1, 15).setValue(rejectionReason || '');
-    } else {
-      errors.push('Row ' + (i + 1) + ': Unknown action "' + action + '"');
+    }
+    
+    try {
+      if (actionUpper === 'APPROVE') {
+        if (reviewContributor) {
+          safeSetValue(scoredSheet, scoredRowIndex + 1, 1, reviewContributor);
+          // Also fix Col I (found_in_contributors) so the transfer script
+          // doesn't skip this row. Set to "TRUE" since the governor/sentinel
+          // has explicitly approved this contributor.
+          if (String(scoredMatch.data[8] || '').trim() !== 'TRUE') {
+            safeSetValue(scoredSheet, scoredRowIndex + 1, 9, 'TRUE');
+          }
+        }
+        safeSetValue(scoredSheet, scoredRowIndex + 1, 6, 'Reviewed');
+        safeSetValue(scoredSheet, scoredRowIndex + 1, 7, tdgIssued || '0.00');
+      } else if (actionUpper === 'REJECT') {
+        safeSetValue(scoredSheet, scoredRowIndex + 1, 6, 'Rejected');
+        safeSetValue(scoredSheet, scoredRowIndex + 1, 15, rejectionReason || '');
+      } else {
+        errors.push('Row ' + (i + 1) + ': Unknown action "' + action + '"');
+        continue;
+      }
+    } catch (writeErr) {
+      errors.push('Row ' + (i + 1) + ': Write failed for hash ' + scoringHashKey + ': ' + writeErr.message);
       continue;
     }
     
     // Mark the Telegram Chat Logs row as processed
-    sheet.getRange(i + 1, 24).setValue('TRUE');  // Col X
-    if (transactionId) {
-      sheet.getRange(i + 1, 25).setValue(transactionId);  // Col Y
-    }
+    try {
+      sheet.getRange(i + 1, 24).setValue('TRUE');  // Col X
+      if (transactionId) {
+        sheet.getRange(i + 1, 25).setValue(transactionId);  // Col Y
+      }
+    } catch (_) {}
     
     processed++;
   }

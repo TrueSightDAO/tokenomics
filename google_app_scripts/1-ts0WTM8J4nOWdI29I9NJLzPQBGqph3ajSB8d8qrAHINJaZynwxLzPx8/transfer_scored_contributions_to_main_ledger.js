@@ -10,27 +10,10 @@
 /**
  * Google Apps Script to transfer records from "Scored Chatlogs" sheet to "Ledger history" sheet
  * based on hash_key matching and specific conditions.
+ *
+ * NOTE: Constants (ORIGIN_SPREADSHEET_ID, DESTINATION_SHEET_NAME, etc.) are
+ * declared in Code.js — both files share the same GAS global scope.
  */
-
-// Variable declarations
-const ORIGIN_SPREADSHEET_ID = '1Tbj7H5ur_egQLRugdXUaSIhEYIKp0vvVv2IZ7WTLCUo';
-const ORIGIN_SHEET_NAME = 'Scored Chatlogs';
-
-
-// Sandbox
-// const DESTINATION_SPREADSHEET_ID = '1F90Sq6jSfj8io0RmiUwdydzuWXOZA9siXHWDsj9ItTo';
-
-// Production
-const DESTINATION_SPREADSHEET_ID = '1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU';
-
-const DESTINATION_SHEET_NAME = 'Ledger history';
-const CONTRIBUTORS_SHEET_NAME = 'Contributors contact information';
-const REVIEWED_STATUS = 'Reviewed';
-const COMPLETED_STATUS = 'Successfully Completed / Full Provision Awarded';
-const TRANSFERRED_STATUS = 'Transferred to Main Ledger';
-const ERROR_STATUS = 'Entry Error';
-const ERROR_CONTRIBUTOR_NOT_FOUND = 'Entry Error - Contributor Not Found';
-const IGNORED_STATUS = 'Ignored';
 
 /**
  * Transfers a row from the origin sheet to the destination sheet based on hash_key.

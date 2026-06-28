@@ -10,6 +10,45 @@
  * based on hash_key matching and specific conditions.
  */
 
+function doGet(e) {
+  const limit = parseInt(e?.parameter?.limit || '0') || 0;
+  const schedule = e?.parameter?.schedule || '';
+
+  // Schedule a one-shot trigger to run the transfer asynchronously.
+  // Web requests timeout before large transfers finish.
+  if (schedule === '1') {
+    ScriptApp.newTrigger('transferBatch_')
+      .timeBased()
+      .after(30 * 1000) // fire in 30 seconds
+      .create();
+    return ContentService.createTextOutput(JSON.stringify({
+      status: 'scheduled', message: 'Transfer trigger set — will fire in ~30s'
+    })).setMimeType(ContentService.MimeType.JSON);
+  }
+
+  if (e?.parameter?.ping) {
+    return ContentService.createTextOutput(JSON.stringify({status:'ok'}))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+
+  return ContentService.createTextOutput(JSON.stringify(processAllReviewedRows(limit)))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+/** Trigger wrapper — processes a batch then re-schedules if more remain. */
+function transferBatch_() {
+  const result = processAllReviewedRows(25);
+  Logger.log('Transfer batch: ' + JSON.stringify(result));
+  if (result && result.processed > 0) {
+    ScriptApp.newTrigger('transferBatch_')
+      .timeBased()
+      .after(30 * 1000)
+      .create();
+  } else {
+    Logger.log('Transfer complete — no more Reviewed rows.');
+  }
+}
+
 // Variable declarations
 const ORIGIN_SPREADSHEET_ID = '1Tbj7H5ur_egQLRugdXUaSIhEYIKp0vvVv2IZ7WTLCUo';
 const ORIGIN_SHEET_NAME = 'Scored Chatlogs';
@@ -251,45 +290,122 @@ function transferRowByHashKey(hash_key) {
  * Fetches all rows from the origin sheet where Column F is "Reviewed" and processes each row individually.
  * Processes by row index instead of hash key to handle duplicate hash keys correctly.
  */
-function processAllReviewedRows() {
-  Logger.log('Starting to process all rows with "Reviewed" status in Column F.');
+function processAllReviewedRows(limit = 0) {
+  Logger.log('Starting to process all rows with "Reviewed" status in Column F' + (limit > 0 ? ' (limit: ' + limit + ')' : '') + '.');
   try {
-    // Open the origin spreadsheet
+    // Open ALL spreadsheets once
     const originSpreadsheet = SpreadsheetApp.openById(ORIGIN_SPREADSHEET_ID);
     const originSheet = originSpreadsheet.getSheetByName(ORIGIN_SHEET_NAME);
+    const destinationSpreadsheet = SpreadsheetApp.openById(DESTINATION_SPREADSHEET_ID);
+    const destinationSheet = destinationSpreadsheet.getSheetByName(DESTINATION_SHEET_NAME);
+    const contributorsSheet = destinationSpreadsheet.getSheetByName(CONTRIBUTORS_SHEET_NAME);
 
-    // Get data from origin sheet
+    // Pre-load all data ONCE
     const originData = originSheet.getDataRange().getValues();
-    let processedCount = 0;
+    const contributorsData = contributorsSheet.getDataRange().getValues();
+    const destData = destinationSheet.getDataRange().getValues();
+    const destLastRow = destData.length + 1; // 1-based row for appending
 
-    // Iterate through rows by index, starting from index 1 to skip header
+    // Build contributor lookup maps once
+    const contributorsByName = {};
+    const contributorsByHandle = {};
+    for (let c = 1; c < contributorsData.length; c++) {
+      const name = contributorsData[c][0];
+      if (!name) continue;
+      contributorsByName[name] = true;
+      const handle = contributorsData[c][7];
+      if (handle) contributorsByHandle[handle] = name;
+    }
+
+    // Build destination dedup map (hash_key -> exists)
+    const destExists = {};
+    for (let d = 1; d < destData.length; d++) {
+      const hk = String(destData[d][8] || '').trim();
+      if (hk) destExists[hk] = true;
+    }
+
+    let processedCount = 0;
+    let nextDestRow = destLastRow;
+
     for (let i = 1; i < originData.length; i++) {
-      const status = originData[i][5]; // Column F (index 5)
-      const hash_key = originData[i][10]; // Column K (index 10)
-      const columnI = originData[i][8]; // Column I (index 8)
+      const status = String(originData[i][5] || '').trim(); // Col F
+      const hash_key = String(originData[i][10] || '').trim(); // Col K
+      const columnI = String(originData[i][8] || '').trim(); // Col I
       
-      // Skip rows where Column I is "RESOLVE FAILED"
-      if (columnI === 'RESOLVE FAILED') {
-        Logger.log(`Skipping row ${i + 1} with hash_key ${hash_key}: Column I is "RESOLVE FAILED"`);
+      if (columnI === 'RESOLVE FAILED' && status !== REVIEWED_STATUS) continue;
+      if (status !== REVIEWED_STATUS || !hash_key) continue;
+
+      // Already transferred?
+      const statusFresh = String(originSheet.getRange(i + 1, 6).getValue()).trim();
+      if (statusFresh === TRANSFERRED_STATUS || statusFresh === IGNORED_STATUS) continue;
+
+      // Get row data
+      const rowData = originData[i];
+      const tdgIssued = rowData[6]; // Col G
+      const valueG = parseFloat(tdgIssued) || 0;
+
+      // If TDG = 0, mark as Ignored
+      if (valueG === 0) {
+        originSheet.getRange(i + 1, 6).setValue(IGNORED_STATUS);
         continue;
       }
-      
-      // Process rows with "Reviewed" status that have a hash key
-      if (status === REVIEWED_STATUS && hash_key) {
-        Logger.log(`Found reviewed row ${i + 1} with hash_key: ${hash_key}`);
-        // Process by row index instead of hash key to handle duplicates
-        transferRowByIndex(i + 1); // Convert to 1-based row index
-        processedCount++;
+
+      // Prevent duplicate ledger entries
+      if (destExists[hash_key]) {
+        Logger.log('Skipping row ' + (i + 1) + ': hash_key ' + hash_key + ' already in destination ledger');
+        originSheet.getRange(i + 1, 6).setValue(TRANSFERRED_STATUS);
+        continue;
       }
+
+      // Resolve contributor name
+      let contributorName = rowData[0];
+      if (!contributorsByName[contributorName]) {
+        const handle = contributorName.startsWith('@') ? contributorName.slice(1) : contributorName;
+        const handleWithAt = '@' + handle;
+        if (contributorsByHandle[handle]) contributorName = contributorsByHandle[handle];
+        else if (contributorsByHandle[handleWithAt]) contributorName = contributorsByHandle[handleWithAt];
+        else {
+          Logger.log('Skipping row ' + (i + 1) + ': contributor not found for ' + contributorName);
+          originSheet.getRange(i + 1, 6).setValue(ERROR_CONTRIBUTOR_NOT_FOUND);
+          continue;
+        }
+      }
+
+      // Write to destination ledger
+      const contributionDate = String(rowData[8] || '').trim(); // Col I (date)
+      const contributionMade = rowData[2]; // Col C
+      const reporterName = rowData[9]; // Col J
+      const projectName = rowData[1]; // Col B
+
+      destinationSheet.getRange(nextDestRow, 1, 1, 9).setValues([[
+        contributionDate,
+        contributorName,
+        contributionMade,
+        '', // blank
+        tdgIssued,
+        'Scored Chatlogs',
+        reporterName,
+        projectName,
+        hash_key,
+      ]]);
+      destExists[hash_key] = true;
+      nextDestRow++;
+
+      // Mark origin as transferred
+      originSheet.getRange(i + 1, 6).setValue(TRANSFERRED_STATUS);
+      // Write destination row number to Col M (Main Ledger Row Number)
+      originSheet.getRange(i + 1, 13).setValue(nextDestRow - 1);
+
+      processedCount++;
+      if (limit > 0 && processedCount >= limit) break;
     }
 
-    Logger.log(`Processed ${processedCount} rows with "Reviewed" status.`);
-    if (processedCount === 0) {
-      Logger.log('No rows found with "Reviewed" status.');
-    }
+    Logger.log('Transferred ' + processedCount + ' rows to main ledger.');
+    return { status: 'ok', processed: processedCount };
   } catch (e) {
-    Logger.log(`Error in processAllReviewedRows: ${e.message}`);
-    Logger.log(`Stack trace: ${e.stack}`);
+    Logger.log('Error in processAllReviewedRows: ' + e.message);
+    Logger.log('Stack trace: ' + e.stack);
+    return { status: 'error', error: e.message };
   }
 }
 
