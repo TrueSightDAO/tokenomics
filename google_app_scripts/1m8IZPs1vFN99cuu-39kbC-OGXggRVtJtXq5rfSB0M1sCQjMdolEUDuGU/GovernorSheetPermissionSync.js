@@ -10,10 +10,10 @@
  *
  * Rule:
  *   Eligible editor = in Contributors contact information, has email,
- *                     NOT marked Is Sentinel (col W), AND is on the Governors tab.
- *   ADD:    eligible governors not currently editors
- *   REMOVE: current editors who are NOT eligible governors
- *   NEVER:  the spreadsheet owner
+ *                     AND is EITHER a governor OR a sentinel.
+ *   ADD:    eligible contributors not currently editors
+ *   REMOVE: current editors who are NOT eligible (neither governor nor sentinel)
+ *   NEVER:  the spreadsheet owner and sentinels
  *
  * Sources:
  *   - Governors tab: col A, rows 11+ (gid=842148543)
@@ -121,7 +121,7 @@ function syncGovernorEditors_(opts) {
   }
 
   // 2. Read Contact sheet: name (A), email (D), Is Sentinel (W, index 22)
-  //    Build: eligibleEmails = { email → name } for non-sentinel governors with email
+  //    Eligible = (governor OR sentinel) AND has email
   var contactSheet = ss.getSheetByName(SYNC_CONTACT_SHEET);
   var eligibleEmails = {}; // lowercase email → { name, sentinel }
   var allContactEmails = {}; // ALL emails with names (for logging removed entries)
@@ -139,11 +139,10 @@ function syncGovernorEditors_(opts) {
 
         allContactEmails[email] = name;
 
-        if (isSentinel) return; // sentinels are never eligible
+        var isGovernor = governorNamesLower.hasOwnProperty(name.toLowerCase());
 
-        // Only governors are eligible
-        if (governorNamesLower.hasOwnProperty(name.toLowerCase())) {
-          eligibleEmails[email] = name;
+        if (isGovernor || isSentinel) {
+          eligibleEmails[email] = { name: name, sentinel: isSentinel };
         }
       });
     }
@@ -171,38 +170,36 @@ function syncGovernorEditors_(opts) {
   var toAdd = [];
   var toRemove = [];
 
-  // ADD: eligible governor emails not currently editors
+  // ADD: eligible governor/sentinel emails not currently editors
   Object.keys(eligibleEmails).forEach(function (email) {
     if (!currentEditors.hasOwnProperty(email)) {
-      toAdd.push({ email: email, name: eligibleEmails[email] });
+      var entry = eligibleEmails[email];
+      var label = entry.sentinel ? 'sentinel' : 'governor';
+      toAdd.push({ email: email, name: entry.name, label: label });
     }
   });
 
-  // REMOVE: current editors who are NOT eligible governors and NOT the owner
+  // REMOVE: current editors who are NOT eligible AND NOT sentinel AND NOT owner
   Object.keys(currentEditors).forEach(function (email) {
     if (email === ownerEmail) return; // never touch owner
 
+    // Check if this email belongs to a sentinel — always keep
+    if (eligibleEmails.hasOwnProperty(email) && eligibleEmails[email].sentinel) return;
+
     if (!eligibleEmails.hasOwnProperty(email)) {
-      // Gather context for the log
-      var reasonParts = [];
       var displayName = allContactEmails[email] || '';
+      var reasonParts = [];
 
       if (!allContactEmails.hasOwnProperty(email)) {
         reasonParts.push('not in Contact sheet');
       } else {
-        // In Contact sheet but not eligible — check why
-        // (either not a governor, or is a sentinel)
-        if (!governorNamesLower.hasOwnProperty(displayName.toLowerCase())) {
-          reasonParts.push('not a governor');
-        }
-        // Check if sentinel (we'd need to re-scan, but we already filtered above)
-        reasonParts.push('ineligible');
+        reasonParts.push('neither governor nor sentinel');
       }
 
       toRemove.push({
         email: email,
         name: displayName,
-        reason: reasonParts.join(', ') || 'not an eligible governor',
+        reason: reasonParts.join(', ') || 'not an eligible editor',
       });
     }
   });
@@ -214,7 +211,7 @@ function syncGovernorEditors_(opts) {
   toAdd.forEach(function (entry) {
     try {
       ss.addEditor(entry.email);
-      logSync_(ss, 'ADD', entry.email, entry.name, 'eligible governor — added as editor');
+      logSync_(ss, 'ADD', entry.email, entry.name, entry.label + ' — added as editor');
       added++;
     } catch (e) {
       logSync_(ss, 'SKIP', entry.email, entry.name, 'addEditor failed: ' + e);
@@ -234,9 +231,8 @@ function syncGovernorEditors_(opts) {
   // Log governors without email in Contact sheet
   Object.keys(governorNamesLower).forEach(function (key) {
     var name = governorNamesLower[key];
-    var hasEligible = false;
-    Object.keys(eligibleEmails).forEach(function (email) {
-      if (eligibleEmails[email].toLowerCase() === key) hasEligible = true;
+    var hasEligible = Object.keys(eligibleEmails).some(function (email) {
+      return eligibleEmails[email].name.toLowerCase() === key;
     });
     if (!hasEligible) {
       // Check if they're in contact sheet at all
