@@ -68,6 +68,12 @@ function doGet(e) {
           return createErrorResponse('PR number is required for fetch_proposal mode');
         }
         return handleFetchProposal(prNumber);
+      case 'update_tabulation':
+        const tabPrNumber = e.parameter.pr_number;
+        if (!tabPrNumber) {
+          return createErrorResponse('PR number is required for update_tabulation mode');
+        }
+        return handleUpdateTabulation(tabPrNumber);
       default:
         return createErrorResponse('Invalid mode. Use: list_open_proposals, fetch_proposal, or provide signature parameter');
     }
@@ -88,6 +94,23 @@ function handleProcessDAppPayloads() {
   } catch (error) {
     Logger.log(`Error in handleProcessDAppPayloads: ${error.message}`);
     return createErrorResponse(`Failed to process DApp payloads: ${error.message}`);
+  }
+}
+
+/**
+ * Handle updating vote tabulation for a specific PR (retroactive dedup after key changes).
+ */
+function handleUpdateTabulation(prNumber) {
+  try {
+    const config = getConfiguration();
+    const tabResult = updateVotingTabulation(prNumber, config);
+    if (!tabResult.success) {
+      return createErrorResponse(`Tabulation update failed: ${tabResult.error}`);
+    }
+    return createSuccessResponse({ prNumber, message: 'Tabulation updated' });
+  } catch (error) {
+    Logger.log(`Error in handleUpdateTabulation: ${error.message}`);
+    return createErrorResponse(`Failed to update tabulation: ${error.message}`);
   }
 }
 
