@@ -6,16 +6,25 @@
  * - Syncs the Main Ledger spreadsheet's editor list to the current governor roster.
  * - Reads governor names from the "Governors" tab, resolves emails from
  *   "Contributors contact information", and adds/removes editors accordingly.
- * - NEVER removes SA (service account) emails or the spreadsheet owner.
+ * - NEVER removes editors unless they were previously ADDED by this very script
+ *   AND are no longer governors. This is safe against unknown SA accounts,
+ *   GitHub Actions bots, GCP service accounts, or manually-shared humans.
+ *
+ * Safety philosophy:
+ *   - ADD:   any governor email not already an editor  → addEditor()
+ *   - REMOVE: only editors previously added BY THIS SCRIPT (tracked in
+ *             Governor Sync Log) who are no longer governors → removeEditor()
+ *   - NEVER remove: the spreadsheet owner, any SA/gserviceaccount, or any
+ *     editor we didn't add ourselves.
  *
  * Sources:
  *   - Governors tab: col A, rows 11+ (gid=842148543)
  *   - Contributors contact information: col A=name, col D=email (gid=1460794618)
  *
  * Triggers:
- *   - Edgar → doGet(?action=sync_governor_editors)  (after governor rotation)
- *   - Daily cron: installGovernorSyncTrigger()         (safety net at 04:00 UTC)
- *   - Manual: syncGovernorEditorsNow()                 (editor smoke-test)
+ *   - Edgar → doGet(?action=sync_governor_editors&secret=...)  (after governor rotation)
+ *   - Daily cron: installGovernorSyncTrigger()                   (safety net at 04:00 UTC)
+ *   - Manual: syncGovernorEditorsNow()                           (editor smoke-test)
  */
 
 // ---------- Constants ----------
@@ -27,44 +36,30 @@ const SYNC_LOG_SHEET = 'Governor Sync Log';
 
 // Governors tab: names in column A starting at row 11
 const SYNC_GOVERNORS_FIRST_ROW = 11;
-const SYNC_GOVERNORS_NAME_COL = 0; // A
 
 // Contact sheet: Name=col A, Email=col D (0-based)
 const SYNC_CONTACT_NAME_COL = 0;  // A
 const SYNC_CONTACT_EMAIL_COL = 3; // D
 
-// Log tab columns (0-based)
-const SYNC_LOG_TIMESTAMP_COL = 0;
-const SYNC_LOG_ACTION_COL = 1;
-const SYNC_LOG_EMAIL_COL = 2;
-const SYNC_LOG_NAME_COL = 3;
-const SYNC_LOG_REASON_COL = 4;
-
 const SYNC_LOCK_TIMEOUT_MS = 60000;
 
-// SA emails script property key (comma-separated list in Project Settings)
-const SYNC_SA_EMAILS_KEY = 'GOVERNOR_SYNC_SA_EMAILS';
-
-// Hard-coded fallback SA emails if script property is not set
-const SYNC_SA_EMAILS_FALLBACK = [
-  'admin@truesight.me',
-  'admin+sophia@truesight.me',
-  'admin+claude@truesight.me',
-  'admin+deepseek@truesight.me',
-  'admin+kimi@truesight.me',
-  'garyjob@gmail.com',
-].join(',');
+/** Patterns that identify an email as a non-human service/automation account.
+ *  These are NEVER removed regardless of governor status. */
+const SA_EMAIL_PATTERNS = [
+  /@.+.iam.gserviceaccount\.com$/i,          // GCP IAM service accounts
+  /@.+.gserviceaccount\.com$/i,              // older GCP service accounts
+  /admin\+/i,                                 // admin+*@truesight.me (agent aliases)
+  /^admin@truesight\.me$/i,                   // master autopilot
+];
 
 
 // ---------- Web app handler ----------
 
 /**
- * Called by doGet in Code.js when ?action=sync_governor_editors.
- * body = { secret } — validated by the caller (Code.js) before routing here.
+ * Called by doGet in Code.js when ?action=sync_governor_editors&secret=...
  */
 function handleSyncGovernorEditorsRequest_(body) {
   try {
-    // Require the same secret as other actions on this web app
     var expected = PropertiesService.getScriptProperties()
         .getProperty('EMAIL_VERIFICATION_SECRET');
     if (!expected || String(body.secret || '') !== String(expected)) {
@@ -185,23 +180,14 @@ function syncGovernorEditors_(opts) {
     }
   });
 
-  // 4. Build protected-accounts set
-  var saProp = PropertiesService.getScriptProperties()
-      .getProperty(SYNC_SA_EMAILS_KEY) || SYNC_SA_EMAILS_FALLBACK;
-  var protectedEmails = {};
-  saProp.split(',').forEach(function (e) {
-    var email = e.trim().toLowerCase();
-    if (email) protectedEmails[email] = true;
-  });
-
-  // Owner is always protected
+  // 4. Get current editors
+  var currentEditors = {};
+  var ownerEmail = '';
   try {
     var owner = ss.getOwner();
-    if (owner) protectedEmails[owner.getEmail().toLowerCase()] = true;
+    if (owner) ownerEmail = owner.getEmail().toLowerCase();
   } catch (_) { /* non-fatal */ }
 
-  // 5. Get current editors
-  var currentEditors = {};
   try {
     var editors = ss.getEditors();
     editors.forEach(function (user) {
@@ -211,7 +197,16 @@ function syncGovernorEditors_(opts) {
     throw new Error('Failed to read current editors: ' + e);
   }
 
-  // 6. Compute diffs
+  // 5. Read log to find which editors were previously added BY THIS SCRIPT.
+  //    Only these are eligible for removal. Everything else is hands-off.
+  var previouslyAdded = readPreviouslyAddedEmails_(ss);
+
+  // 6. Determine who is a service account (never touched)
+  function isServiceAccount(email) {
+    return SA_EMAIL_PATTERNS.some(function (pat) { return pat.test(email); });
+  }
+
+  // 7. Compute diffs
   var toAdd = [];
   var toRemove = [];
 
@@ -222,14 +217,18 @@ function syncGovernorEditors_(opts) {
     }
   });
 
-  // Remove: current editors not governors, not SA, not owner
-  Object.keys(currentEditors).forEach(function (email) {
-    if (!governorEmails.hasOwnProperty(email) && !protectedEmails.hasOwnProperty(email)) {
-      toRemove.push({ email: currentEditors[email] });
+  // Remove: previously-added-by-us editors who are no longer governors
+  previouslyAdded.forEach(function (email) {
+    if (!governorEmails.hasOwnProperty(email) &&
+        currentEditors.hasOwnProperty(email)) {
+      // Extra safety: double-check not SA, not owner
+      if (!isServiceAccount(email) && email !== ownerEmail) {
+        toRemove.push({ email: email });
+      }
     }
   });
 
-  // 7. Apply changes
+  // 8. Apply changes
   var added = 0;
   var removed = 0;
 
@@ -246,7 +245,8 @@ function syncGovernorEditors_(opts) {
   toRemove.forEach(function (entry) {
     try {
       ss.removeEditor(entry.email);
-      logSync_(ss, 'REMOVE', entry.email, '', 'no longer on governor roster');
+      logSync_(ss, 'REMOVE', entry.email, '', 'no longer on governor roster (was added by this script on ' +
+          formatPreviouslyAddedDate_(ss, entry.email) + ')');
       removed++;
     } catch (e) {
       logSync_(ss, 'SKIP', entry.email, '', 'removeEditor failed: ' + e);
@@ -258,11 +258,19 @@ function syncGovernorEditors_(opts) {
     logSync_(ss, 'SKIP', '', name, 'no email found in contact sheet');
   });
 
+  // 9. Report
+  var saCount = Object.keys(currentEditors).filter(isServiceAccount).length;
+  var manualEditors = Object.keys(currentEditors).filter(function (e) {
+    return !isServiceAccount(e) && e !== ownerEmail && !governorEmails.hasOwnProperty(e);
+  });
+
   Logger.log(
     'Governor sync: ' + governorNames.length + ' governors, ' +
     added + ' added, ' + removed + ' removed, ' +
     Object.keys(governorEmails).length + ' with email, ' +
-    skippedNoEmail.length + ' no-email skipped'
+    skippedNoEmail.length + ' no-email skipped, ' +
+    saCount + ' service accounts (untouched), ' +
+    manualEditors.length + ' manual editors (untouched)'
   );
 
   return {
@@ -274,11 +282,68 @@ function syncGovernorEditors_(opts) {
     removed: removed,
     skipped_no_email: skippedNoEmail.length,
     skipped_names: skippedNoEmail,
+    service_accounts_untouched: saCount,
+    manual_editors_untouched: manualEditors.length,
   };
 }
 
 
 // ---------- Helpers ----------
+
+/** Read the log tab to find emails previously ADD-ed by this script.
+ *  Returns a Set of lowercase emails. */
+function readPreviouslyAddedEmails_(ss) {
+  var logSheet = ss.getSheetByName(SYNC_LOG_SHEET);
+  if (!logSheet) return [];
+
+  var lastRow = logSheet.getLastRow();
+  if (lastRow < 2) return []; // header only
+
+  // Read all ADD rows (col B = Action, col C = Email)
+  var data = logSheet.getRange(2, 2, lastRow - 1, 2).getValues();
+  var added = {};
+  var removed = {};
+
+  // Walk chronologically: ADD adds to set, REMOVE removes from set
+  // This handles re-adds (governor leaves and comes back)
+  data.forEach(function (row) {
+    var action = String(row[0] || '').trim().toUpperCase();
+    var email = String(row[1] || '').trim().toLowerCase();
+    if (!email) return;
+    if (action === 'ADD') {
+      added[email] = true;
+      delete removed[email];
+    } else if (action === 'REMOVE') {
+      delete added[email];
+      removed[email] = true;
+    }
+  });
+
+  return Object.keys(added).sort();
+}
+
+/** Find the most recent ADD date for an email from the log. */
+function formatPreviouslyAddedDate_(ss, email) {
+  var logSheet = ss.getSheetByName(SYNC_LOG_SHEET);
+  if (!logSheet) return 'unknown date';
+
+  var lastRow = logSheet.getLastRow();
+  if (lastRow < 2) return 'unknown date';
+
+  // Read backwards to find the most recent ADD
+  var timestamps = logSheet.getRange(2, 1, lastRow - 1, 1).getValues();
+  var actions = logSheet.getRange(2, 2, lastRow - 1, 1).getValues();
+  var emails = logSheet.getRange(2, 3, lastRow - 1, 1).getValues();
+
+  for (var i = emails.length - 1; i >= 0; i--) {
+    var storedEmail = String(emails[i][0] || '').toLowerCase();
+    var action = String(actions[i][0] || '').toUpperCase();
+    if (storedEmail === email.toLowerCase() && action === 'ADD') {
+      return String(timestamps[i][0] || '');
+    }
+  }
+  return 'unknown date';
+}
 
 /** Append a row to the "Governor Sync Log" tab. Creates the tab if absent. */
 function logSync_(ss, action, email, name, reason) {
