@@ -102,10 +102,19 @@ function doGet(e) {
     });
   }
 
+  if (action === 'sync_governor_editors') {
+    // Edgar → GET ?action=sync_governor_editors&secret=...
+    // Syncs Main Ledger editor list to current governor roster.
+    // Implementation lives in GovernorSheetPermissionSync.js.
+    return handleSyncGovernorEditorsRequest_({
+      secret: e.parameter.secret,
+    });
+  }
+
   return ContentService.createTextOutput(
     JSON.stringify({
       ok: false,
-      error: 'No valid action (use action=sendEmailVerification, action=refresh_dao_members_cache, action=apply_permission_change, or action=processContributorAddsFromTelegramChatLogs on GET, or POST JSON for email verification).',
+      error: 'No valid action (use action=sendEmailVerification, action=refresh_dao_members_cache, action=apply_permission_change, action=processContributorAddsFromTelegramChatLogs, or action=sync_governor_editors on GET, or POST JSON for email verification).',
     })
   ).setMimeType(ContentService.MimeType.JSON);
 }
