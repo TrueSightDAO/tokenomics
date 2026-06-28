@@ -175,8 +175,11 @@ function publishDaoMembersCacheToGithub_(opts) {
 
   // ----- Contributors Contact Information — sentinel flag (col W) -----------
   // Header is row 3 (Name=col A, Is Sentinel=col W). Data starts at row 4.
+  // Also captures ALL names so members without registered public keys still
+  // appear in dao_members.json (and therefore the public members.html page).
   const contactSheet = ss.getSheetByName(DAO_MEMBERS_CACHE_CONTACT_SHEET);
   const sentinelsByName = {};
+  const contactAllNames = {}; // lowercased name → original-cased name
   if (contactSheet) {
     const contactLastRow = contactSheet.getLastRow();
     if (contactLastRow >= 4) {
@@ -185,9 +188,11 @@ function publishDaoMembersCacheToGithub_(opts) {
       contactRows.forEach(function (row) {
         const name = String(row[0] || '').trim();
         if (!name) return;
+        const key = name.toLowerCase();
+        contactAllNames[key] = name;
         const isSentinel = String(row[22] || '').trim().toUpperCase() === 'TRUE';
         if (isSentinel) {
-          sentinelsByName[name.toLowerCase()] = true;
+          sentinelsByName[key] = true;
         }
       });
     }
@@ -243,6 +248,16 @@ function publishDaoMembersCacheToGithub_(opts) {
       created_at: formatTimestamp_(row[1]),
       last_active_at: formatTimestamp_(row[2]),
     });
+  });
+
+  // ----- Seed byName with ALL names from the Contact sheet ------------------
+  // Contributors contact information is the authoritative list of every known
+  // DAO member. Merge in any names not already captured from the Signatures
+  // sheet so they still appear in dao_members.json even without keys or email.
+  Object.keys(contactAllNames).forEach(function (key) {
+    if (!byName[key]) {
+      byName[key] = { name: contactAllNames[key], email: null, public_keys: [] };
+    }
   });
 
   // ----- Merge voting weight + governor flag + emit sorted contributors ----
