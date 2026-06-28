@@ -12,7 +12,10 @@
  *   Eligible editor = in Contributors contact information, has email,
  *                     AND is EITHER a governor OR a sentinel.
  *   ADD:    eligible contributors not currently editors
- *   REMOVE: current editors who are NOT eligible (neither governor nor sentinel)
+ *   REMOVE: only editors who ARE in the Contact sheet but NEITHER governor
+ *           nor sentinel (ex-governors who left the roster).
+ *   KEEP:   everyone NOT in the Contact sheet (GCP SAs, external
+ *           collaborators, etc.) — they are never touched.
  *   NEVER:  the spreadsheet owner and sentinels
  *
  * Sources:
@@ -179,29 +182,24 @@ function syncGovernorEditors_(opts) {
     }
   });
 
-  // REMOVE: current editors who are NOT eligible AND NOT sentinel AND NOT owner
+  // REMOVE: current editors who ARE in the Contact sheet but NOT eligible
+  //         (neither governor nor sentinel). Everyone else (GCP SAs,
+  //         external collaborators, people not in Contact sheet) is untouched.
   Object.keys(currentEditors).forEach(function (email) {
     if (email === ownerEmail) return; // never touch owner
 
-    // Check if this email belongs to a sentinel — always keep
-    if (eligibleEmails.hasOwnProperty(email) && eligibleEmails[email].sentinel) return;
+    // Only consider removal if this email is known in the Contact sheet
+    if (!allContactEmails.hasOwnProperty(email)) return; // unknown → keep
 
-    if (!eligibleEmails.hasOwnProperty(email)) {
-      var displayName = allContactEmails[email] || '';
-      var reasonParts = [];
+    // In Contact sheet — check if eligible (sentinel always kept, governor kept while on roster)
+    if (eligibleEmails.hasOwnProperty(email)) return; // eligible → keep
 
-      if (!allContactEmails.hasOwnProperty(email)) {
-        reasonParts.push('not in Contact sheet');
-      } else {
-        reasonParts.push('neither governor nor sentinel');
-      }
-
-      toRemove.push({
-        email: email,
-        name: displayName,
-        reason: reasonParts.join(', ') || 'not an eligible editor',
-      });
-    }
+    // In Contact sheet but NOT eligible → remove
+    toRemove.push({
+      email: email,
+      name: allContactEmails[email],
+      reason: 'in Contact sheet but neither governor nor sentinel',
+    });
   });
 
   // 5. Apply changes
