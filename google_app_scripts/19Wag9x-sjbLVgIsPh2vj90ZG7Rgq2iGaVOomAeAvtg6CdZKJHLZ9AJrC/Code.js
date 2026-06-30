@@ -25,7 +25,7 @@
 // - getCredentials(): Retrieves all configuration details (API keys, URLs, IDs) as an object.
 // - These steps ensure keys and settings are centralized and not hardcoded here.
 setApiKeys();
-const creds = getCredentials();
+var creds = getCredentials();
 
 // Configuration Variables
 const SOURCE_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1qbZZhf-_7xzmDTriaJVWj6OZshyQsFkdsAV8-pyzASQ/edit?gid=0#gid=0';
@@ -485,72 +485,82 @@ function ReporterExist(reporterName) {
 }
 
 /**
+ * Extracts a single field value from an expense message.
+ * Matches "- Field Name: value" lines using the field label, case-insensitive.
+ * Returns null if the field is not found.
+ */
+function _extractField(message, label) {
+  const pattern = new RegExp('- ' + label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ':\\s*(.+?)(?=\\n\\s*-|\\n\\s*$|$)', 'is');
+  const match = message.match(pattern);
+  return match ? match[1].trim() : null;
+}
+
+/**
  * Extracts expense details from a DAO Inventory Expense Event message.
  * 
- * Parses the expense submission message format and extracts all relevant fields including:
- * - DAO Member Name (required)
- * - Target Ledger (optional, new field from expense form)
- * - Latitude/Longitude (optional)
- * - Inventory Type (required, may include ledger prefix like [AGL10] USD)
- * - Inventory Quantity (required)
- * - Description (required)
- * - File attachment details (optional)
- * - Digital signature (optional, for validation)
+ * Order-independent: extracts each field individually by label name, so the
+ * GAS parser is resilient to field reordering by the CLI, DApp, or any
+ * other submission tool.
  * 
  * @param {string} message - The full expense submission message text
- * @return {Object|null} Object containing extracted expense details, or null if parsing fails
- * @return {string} return.daoMemberName - Name of the DAO member who incurred the expense
- * @return {string|null} return.targetLedger - Target ledger name if specified in submission (e.g., "AGL10", "offchain")
- * @return {string|null} return.latitude - GPS latitude if provided
- * @return {string|null} return.longitude - GPS longitude if provided
- * @return {string} return.inventoryType - Type of inventory (may include [ledger name] prefix)
- * @return {number} return.quantity - Quantity of inventory expensed
- * @return {string} return.description - Description of the expense
- * @return {string|null} return.attachedFilename - Original filename if file attached
- * @return {string|null} return.destinationFileLocation - GitHub URL where file should be stored
- * @return {string|null} return.submissionSource - URL of the form that generated the submission
- * @return {string|null} return.digitalSignature - Digital signature for reporter validation
+ * @return {Object|null} Object containing extracted expense details, or null if the event header is missing
  */
 function extractExpenseDetails(message) {
-  // Normalize line endings and trim leading/trailing whitespace
+  // Normalize line endings and trim
   message = message.replace(/\r\n/g, '\n').trim();
   
-  // Updated regex with more flexible whitespace handling and trailing content
-  // Now includes optional "Target Ledger" field
-  // Pattern handles: DAO Member Name, optional Target Ledger, optional Latitude/Longitude, Inventory Type, Quantity, Description, optional file fields
-  const pattern = /\[DAO Inventory Expense Event\]\n\s*- DAO Member Name:\s*(.*?)\n\s*(?:- Target Ledger:\s*(.*?)\n\s*)?(?:- Latitude:\s*(.*?)\n\s*- Longitude:\s*(.*?)\n\s*)?- Inventory Type:\s*(.*?)\n\s*- Inventory Quantity:\s*(\d+\.?\d*)\n\s*- Description:\s*(.*?)(?:\n\s*- Attached Filename:\s*(.*?))?(?:\n\s*- Destination Expense File Location:\s*(.*?))?(?:\n\s*- Submission Source:\s*(.*?))?(?:(?:\n\s*-+\s*\n\s*My Digital Signature:.*?(?:\n\s*Request Transaction ID:.*?)?)?(?:\n\s*This submission was generated using.*?(?:\n\s*Verify submission here:.*?)?)?)?$/i;
-  
-  const match = message.match(pattern);
-  if (!match) {
-    Logger.log(`Regex failed to match message: ${message}`);
-    // Log partial matches for debugging
-    const partialPattern = /\[DAO Inventory Expense Event\].*?(?=\n\s*-|$)/i;
-    Logger.log(`Partial match: ${JSON.stringify(message.match(partialPattern))}`);
+  // Verify this is an expense event
+  if (!/^\[DAO Inventory Expense Event\]/i.test(message)) {
+    Logger.log('Message does not start with [DAO Inventory Expense Event]');
     return null;
   }
   
-  // Extract digital signature if present
+  // Extract digital signature (needed for validation)
   let digitalSignature = null;
-  const sigPattern = /My Digital Signature:\s*([\s\S]*?)(?:\n\s*Request Transaction ID:|This submission was generated using|$)/i;
-  const sigMatch = message.match(sigPattern);
+  const sigMatch = message.match(/My Digital Signature:\s*([\s\S]*?)(?:\n\s*Request Transaction ID:|This submission was generated using|$)/i);
   if (sigMatch) {
     digitalSignature = sigMatch[1].trim();
   }
   
-  // Extract target ledger (match[2]) - may be undefined if not present
-  const targetLedger = match[2] ? match[2].trim() : null;
+  // Extract the body (between event header and --------)
+  const bodyMatch = message.match(/\[DAO Inventory Expense Event\]\n([\s\S]*?)(?:\n\s*-+\s*\n\s*My Digital Signature:|$)/i);
+  const body = bodyMatch ? bodyMatch[1] : message;
+  
+  // Extract fields order-independently
+  const daoMemberName = _extractField(body, 'DAO Member Name') || _extractField(message, 'DAO Member Name');
+  const targetLedger = _extractField(body, 'Target Ledger');
+  const latitude = _extractField(body, 'Latitude');
+  const longitude = _extractField(body, 'Longitude');
+  const inventoryType = _extractField(body, 'Inventory Type') || _extractField(body, 'Item');
+  const quantityStr = _extractField(body, 'Inventory Quantity') || _extractField(body, 'Cost');
+  const description = _extractField(body, 'Description');
+  const attachedFilename = _extractField(body, 'Attached Filename');
+  const destinationFileLocation = _extractField(body, 'Destination Expense File Location');
+  const submissionSource = _extractField(body, 'Submission Source');
+  
+  // Validate required fields
+  if (!daoMemberName || !inventoryType || !quantityStr || !description) {
+    Logger.log(`Missing required fields: daoMemberName=${!!daoMemberName}, inventoryType=${!!inventoryType}, quantity=${!!quantityStr}, description=${!!description}`);
+    return null;
+  }
+  
+  const quantity = parseFloat(quantityStr);
+  if (isNaN(quantity)) {
+    Logger.log(`Invalid quantity: ${quantityStr}`);
+    return null;
+  }
   
   return {
-    daoMemberName: match[1].trim(),
-    targetLedger: targetLedger, // New field: Target Ledger from expense form
-    latitude: match[3] ? match[3].trim() : null,
-    longitude: match[4] ? match[4].trim() : null,
-    inventoryType: match[5].trim(),
-    quantity: parseFloat(match[6]),
-    description: match[7].trim(),
-    attachedFilename: match[8] ? match[8].trim() : null,
-    destinationFileLocation: match[9] ? match[9].trim() : null,
-    submissionSource: match[10] ? match[10].trim() : null,
+    daoMemberName: daoMemberName,
+    targetLedger: targetLedger,
+    latitude: latitude,
+    longitude: longitude,
+    inventoryType: inventoryType,
+    quantity: quantity,
+    description: description,
+    attachedFilename: attachedFilename,
+    destinationFileLocation: destinationFileLocation,
+    submissionSource: submissionSource,
     digitalSignature: digitalSignature
   };
 }

@@ -291,120 +291,93 @@ function transferRowByHashKey(hash_key) {
  * Processes by row index instead of hash key to handle duplicate hash keys correctly.
  */
 function processAllReviewedRows(limit = 0) {
-  Logger.log('Starting to process all rows with "Reviewed" status in Column F' + (limit > 0 ? ' (limit: ' + limit + ')' : '') + '.');
+  Logger.log('Starting transfer' + (limit > 0 ? ' (limit: ' + limit + ')' : '') + '.');
   try {
-    // Open ALL spreadsheets once
-    const originSpreadsheet = SpreadsheetApp.openById(ORIGIN_SPREADSHEET_ID);
-    const originSheet = originSpreadsheet.getSheetByName(ORIGIN_SHEET_NAME);
-    const destinationSpreadsheet = SpreadsheetApp.openById(DESTINATION_SPREADSHEET_ID);
-    const destinationSheet = destinationSpreadsheet.getSheetByName(DESTINATION_SHEET_NAME);
-    const contributorsSheet = destinationSpreadsheet.getSheetByName(CONTRIBUTORS_SHEET_NAME);
+    const originSS = SpreadsheetApp.openById(ORIGIN_SPREADSHEET_ID);
+    const originSheet = originSS.getSheetByName(ORIGIN_SHEET_NAME);
+    const destSS = SpreadsheetApp.openById(DESTINATION_SPREADSHEET_ID);
+    const destSheet = destSS.getSheetByName(DESTINATION_SHEET_NAME);
+    const contribSheet = destSS.getSheetByName(CONTRIBUTORS_SHEET_NAME);
 
-    // Pre-load all data ONCE
+    // --- Pre-load everything in 3 batch reads ---
     const originData = originSheet.getDataRange().getValues();
-    const contributorsData = contributorsSheet.getDataRange().getValues();
-    const destData = destinationSheet.getDataRange().getValues();
-    const destLastRow = destData.length + 1; // 1-based row for appending
+    const contribData = contribSheet.getDataRange().getValues();
+    const destData = destSheet.getDataRange().getValues();
 
-    // Build contributor lookup maps once
-    const contributorsByName = {};
-    const contributorsByHandle = {};
-    for (let c = 1; c < contributorsData.length; c++) {
-      const name = contributorsData[c][0];
-      if (!name) continue;
-      contributorsByName[name] = true;
-      const handle = contributorsData[c][7];
-      if (handle) contributorsByHandle[handle] = name;
+    // --- Build lookups in-memory ---
+    const contribByName = {};
+    const contribByHandle = {};
+    for (let c = 1; c < contribData.length; c++) {
+      const nm = contribData[c][0]; if (!nm) continue;
+      contribByName[nm] = true;
+      const h = contribData[c][7]; if (h) contribByHandle[h] = nm;
     }
-
-    // Build destination dedup map (hash_key -> exists)
-    const destExists = {};
+    const destHashSeen = {};
     for (let d = 1; d < destData.length; d++) {
       const hk = String(destData[d][8] || '').trim();
-      if (hk) destExists[hk] = true;
+      if (hk) destHashSeen[hk] = true;
     }
 
+    // --- Single pass: compute everything in-memory ---
+    // Process newest-first. Commit origin status + destination row immediately
+    // per row: if interrupted, the next run skips already-transferred rows.
     let processedCount = 0;
-    let nextDestRow = destLastRow;
+    let destAppendRow = destData.length + 1;
 
-    for (let i = 1; i < originData.length; i++) {
-      const status = String(originData[i][5] || '').trim(); // Col F
-      const hash_key = String(originData[i][10] || '').trim(); // Col K
-      const columnI = String(originData[i][8] || '').trim(); // Col I
-      
-      if (columnI === 'RESOLVE FAILED' && status !== REVIEWED_STATUS) continue;
+    for (let i = originData.length - 1; i >= 1; i--) {
+      const status = String(originData[i][5] || '').trim();
+      const hash_key = String(originData[i][10] || '').trim();
+      const colI = String(originData[i][8] || '').trim();
+
+      if (colI === 'RESOLVE FAILED' && status !== REVIEWED_STATUS) continue;
       if (status !== REVIEWED_STATUS || !hash_key) continue;
 
-      // Already transferred?
-      const statusFresh = String(originSheet.getRange(i + 1, 6).getValue()).trim();
-      if (statusFresh === TRANSFERRED_STATUS || statusFresh === IGNORED_STATUS) continue;
+      const tdg = parseFloat(originData[i][6]) || 0;
 
-      // Get row data
-      const rowData = originData[i];
-      const tdgIssued = rowData[6]; // Col G
-      const valueG = parseFloat(tdgIssued) || 0;
-
-      // If TDG = 0, mark as Ignored
-      if (valueG === 0) {
+      if (tdg === 0) {
         originSheet.getRange(i + 1, 6).setValue(IGNORED_STATUS);
         continue;
       }
-
-      // Prevent duplicate ledger entries
-      if (destExists[hash_key]) {
-        Logger.log('Skipping row ' + (i + 1) + ': hash_key ' + hash_key + ' already in destination ledger');
+      if (destHashSeen[hash_key]) {
         originSheet.getRange(i + 1, 6).setValue(TRANSFERRED_STATUS);
         continue;
       }
 
-      // Resolve contributor name
-      let contributorName = rowData[0];
-      if (!contributorsByName[contributorName]) {
-        const handle = contributorName.startsWith('@') ? contributorName.slice(1) : contributorName;
-        const handleWithAt = '@' + handle;
-        if (contributorsByHandle[handle]) contributorName = contributorsByHandle[handle];
-        else if (contributorsByHandle[handleWithAt]) contributorName = contributorsByHandle[handleWithAt];
+      let contribName = originData[i][0];
+      if (!contribByName[contribName]) {
+        const h = contribName.startsWith('@') ? contribName.slice(1) : contribName;
+        if (contribByHandle[h]) contribName = contribByHandle[h];
+        else if (contribByHandle['@' + h]) contribName = contribByHandle['@' + h];
         else {
-          Logger.log('Skipping row ' + (i + 1) + ': contributor not found for ' + contributorName);
           originSheet.getRange(i + 1, 6).setValue(ERROR_CONTRIBUTOR_NOT_FOUND);
           continue;
         }
       }
 
-      // Write to destination ledger
-      const contributionDate = String(rowData[8] || '').trim(); // Col I (date)
-      const contributionMade = rowData[2]; // Col C
-      const reporterName = rowData[9]; // Col J
-      const projectName = rowData[1]; // Col B
-
-      destinationSheet.getRange(nextDestRow, 1, 1, 9).setValues([[
-        contributionDate,
-        contributorName,
-        contributionMade,
-        '', // blank
-        tdgIssued,
+      destSheet.getRange(destAppendRow, 1, 1, 9).setValues([[
+        String(originData[i][8] || '').trim(),
+        contribName,
+        originData[i][2],
+        '',
+        originData[i][6],
         'Scored Chatlogs',
-        reporterName,
-        projectName,
+        originData[i][9],
+        originData[i][1],
         hash_key,
       ]]);
-      destExists[hash_key] = true;
-      nextDestRow++;
-
-      // Mark origin as transferred
+      destHashSeen[hash_key] = true;
       originSheet.getRange(i + 1, 6).setValue(TRANSFERRED_STATUS);
-      // Write destination row number to Col M (Main Ledger Row Number)
-      originSheet.getRange(i + 1, 13).setValue(nextDestRow - 1);
-
+      originSheet.getRange(i + 1, 13).setValue(destAppendRow);
+      destAppendRow++;
       processedCount++;
+
       if (limit > 0 && processedCount >= limit) break;
     }
 
-    Logger.log('Transferred ' + processedCount + ' rows to main ledger.');
+    Logger.log('Transferred ' + processedCount + ' rows.');
     return { status: 'ok', processed: processedCount };
   } catch (e) {
-    Logger.log('Error in processAllReviewedRows: ' + e.message);
-    Logger.log('Stack trace: ' + e.stack);
+    Logger.log('Error: ' + e.message + ' stack: ' + e.stack);
     return { status: 'error', error: e.message };
   }
 }

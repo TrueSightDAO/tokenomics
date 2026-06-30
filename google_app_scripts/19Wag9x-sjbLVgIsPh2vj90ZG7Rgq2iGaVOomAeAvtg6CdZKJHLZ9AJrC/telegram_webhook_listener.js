@@ -12,7 +12,7 @@
 // - getCredentials(): Retrieves all configuration details (API keys, URLs, IDs) as an object.
 // - These steps ensure keys and settings are centralized and not hardcoded here.
 setApiKeys();
-const creds = getCredentials();
+var creds = getCredentials();
 
 // ------------------------ Telegram Webhook Listener ------------------------
 
