@@ -1,0 +1,9 @@
+garyjob@agroverse.shop
+# This script is owned by garyjob@agroverse.shop.
+# To push/deploy, swap clasp credentials:
+#   cp /home/ubuntu/.clasprc-gary.json /home/ubuntu/.clasprc.json
+#   clasp push
+#   cp /home/ubuntu/.clasprc-admin.json /home/ubuntu/.clasprc.json
+#
+# The default .clasprc.json is admin@truesight.me and does NOT have access.
+# See clasp_mirrors/README.md for the full credential-switching protocol.
