@@ -1938,15 +1938,18 @@ Logger.log("Treasury Yield : " + treasuryYield);
 
 // Method to get the daily TDG buy-back budget
 function getDailyTdgBuyBackBudget() {
-  var options = getWixRequestHeader();
-  var request_url = "https://www.wixapis.com/wix-data/v2/items/" + getWixDailyTdgBuyBackBudgetDataItemId() + "?dataCollectionId=" + getWixDataCollectionId();  
-  Logger.log(request_url)
-  Logger.log(options)
-  var response = UrlFetchApp.fetch(request_url, options);
-  var content = response.getContentText();
-  var response_obj = JSON.parse(content);  
-  Logger.log("Daily TDG Buy Back Budget on Wix: " + response_obj.dataItem.data.exchangeRate);  
-  return response_obj.dataItem.data.exchangeRate;
+  // Computed locally (Wix deprecated 2026-06-16). Same formula used by
+  // syncAllPerformanceStatistics() for the TDG_DAILY_BUY_BACK_BUDGET stat:
+  //   dailyBudget = (past 30d sales / 30) * min(assetPerTdg, 1 - treasuryYield/100)
+  var assetPerTdg = calculateAssetPerIssuedTdg();
+  var treasuryYield = getUSTreasuryYield();
+  var dailySalesAverage = get30DaysSales() / 30;
+  var adjustedPrice = Math.min(assetPerTdg, 1 - treasuryYield / 100);
+  var dailyBudget = dailySalesAverage * adjustedPrice;
+  Logger.log("Daily TDG Buy Back Budget (computed locally): " + dailyBudget +
+    " [assetPerTdg=" + assetPerTdg + ", treasuryYield=" + treasuryYield +
+    ", dailySalesAvg=" + dailySalesAverage + "]");
+  return dailyBudget;
 }
 
 /**
@@ -3204,7 +3207,7 @@ function diagnosePerformanceStatistics() {
     }
     
     try {
-      var assetPerTdg = getAssetPerIssuedTdgBalanceOnWix ? getAssetPerIssuedTdgBalanceOnWix() : calculateAssetPerIssuedTdg();
+      var assetPerTdg = calculateAssetPerIssuedTdg();
       var treasuryYield = getUSTreasuryYield();
       var dailySalesAverage = sales30Days / 30;
       var adjustedPrice = Math.min(assetPerTdg, 1 - treasuryYield / 100);
