@@ -49,7 +49,10 @@ PROVISION_LABEL = 'USD - provisions for voting rights cash out'
 # Column indices in off chain asset balance (0-based)
 BAL_COL_ASSET = 0
 BAL_COL_BALANCE = 1
-BAL_COL_VALUE = 3
+# Reserve value is read from column B (balance), matching the GAS
+# getBuyBackReserveFromOffChainBalance() reader that powers BUY_BACK_RESERVE
+# and the homepage stat card. (Column D is a derived USD-value that can drift.)
+BAL_COL_VALUE = 1
 
 # Column indices in offchain transactions (0-based)
 TX_COL_DATE = 0
