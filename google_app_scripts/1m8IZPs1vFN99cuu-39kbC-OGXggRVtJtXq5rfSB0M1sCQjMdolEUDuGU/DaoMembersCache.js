@@ -281,8 +281,20 @@ function publishDaoMembersCacheToGithub_(opts) {
   // off-chain + USDT vault + AGL holdings) using any active public key as a
   // probe. Emitted at snapshot root so consumers like dapp/tdg_balance.js can
   // render USD values without hitting GAS on every page load.
-  const probeKey = (contributors[0] && contributors[0].public_keys[0] &&
-      contributors[0].public_keys[0].public_key) || null;
+  //
+  // Scan for the FIRST contributor that actually has a public key — contributors
+  // are sorted by name, and the alphabetical first (e.g. "@_H4N5") frequently has
+  // an empty public_keys[] (members who never registered a signature). Using
+  // contributors[0] blindly yielded a null probeKey → null dao_totals → every
+  // DApp page fell back to the slow assetVerify call for the TDG badge.
+  let probeKey = null;
+  for (let pi = 0; pi < contributors.length; pi++) {
+    const pks = contributors[pi] && contributors[pi].public_keys;
+    if (pks && pks.length && pks[0].public_key) {
+      probeKey = pks[0].public_key;
+      break;
+    }
+  }
   const daoTotals = probeKey ? fetchDaoTotalsViaAssetVerify_(probeKey) : null;
 
   // Surface the raw governor snapshot so ops can spot governor-tab names that
