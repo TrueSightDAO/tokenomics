@@ -269,7 +269,7 @@ See [`python_scripts/schema_validation/README.md`](./python_scripts/schema_valid
 | O | Telegram File IDs | String | Comma-separated file IDs from Telegram |
 | P | Edgar Signature Verification | String | Signature verification status |
 | Q | External API call status | String | Status of external API calls |
-| R | External API call response | String | Response from external API |
+| R | Processor Dedup Marker | String | **Event-processor dedup gate.** GAS handlers scan column G for their event tag and skip rows where column R already has a marker matching their event type. Convention: `PROCESSED:<EVENT_TYPE_KEY>`. Examples: `PROCESSED:VOTING_RIGHTS_REQUEST`, `PROCESSED:VOTING_RIGHTS_SETTLEMENT`, `PROCESSED:REPACKAGING_SETTLEMENT`. **Do NOT reuse this column for other purposes** — it is the single source of truth for whether a downstream GAS processor has already handled a Telegram Chat Logs row. Legacy note: column was previously labeled "External API call response" but this is no longer accurate.
 | S | Governor | String | **`YES`** / **`NO`** / blank — signer matched **Main Ledger** tab **`Governors`** column **A** at ingest (`YES` = global ledger authority for downstream sales / inventory / expense parsers). See **Recent Changes (2026-04-21)**. |
 | T | Is Sentinel | String | **`TRUE`** / blank — signer's contributor row has `TRUE` in **Contributors contact information** column **W** (`Is Sentinel`). Sentinels (AI agents) get governor-equivalent operational privileges (inventory, sales, QR ops) without governance authority (proposals, votes). Populated by Edgar (`dao_protocol`) at ingest. |
 
