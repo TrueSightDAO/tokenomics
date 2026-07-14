@@ -1,10 +1,20 @@
 # TrueSight DAO - Google Sheets Schema Documentation
 
-> **Last Updated:** 2026-04-22
+> **Last Updated:** 2026-07-13
 > 
 > This document provides a consolidated reference for all Google Sheets used across TrueSight DAO's Google Apps Scripts. Use this as a central schema reference when making code changes.
 
-## 📝 Recent Changes (2026-04-22)
+## 📝 Recent Changes (2026-07-13)
+
+### **Stripe Social Media Checkout ID** — subscription renewal columns R/S/T
+
+- **Column R — `Invoice ID`**: Stripe invoice ID for subscription renewal payments (`in_xxx`). Blank for one-time checkouts.
+- **Column S — `Payment Intent ID`**: Stripe payment intent ID for subscription renewals (`pi_xxx`). Blank for one-time checkouts.
+- **Column T — `Payment Type`**: `subscription_renewal` for renewal rows, blank for legacy/one-time rows.
+- **Existing columns O/P/Q unchanged**: O = Tracking Notification Sent, P = Ledger Routed, Q = Environment.
+- **Webhook + poller**: `handleStripeWebhook()` now handles `invoice.paid` events; `syncStripeOrdersForEnvironment()` polls `/v1/invoices?status=paid` with 7-day lookback.
+
+---
 
 ### **Inventory Movement** / **Scored Expense Submissions** — signer vs manager authorization (GAS)
 
@@ -1369,8 +1379,12 @@ See [`python_scripts/schema_validation/README.md`](./python_scripts/schema_valid
 | L | Stripe Transaction Fee | Number | Stripe processing fee |
 | M | Shipping Provider | String | Shipping carrier |
 | N | Tracking Number | String | Package tracking number |
-| O | Tracking Notification Sent | String | Email notification status |
-| P | Agroverse QR code | String | **Legacy / single-item only.** Serialized Agroverse QR id linked to this checkout. Cannot represent multi-item sessions (single cell, single QR). Superseded by **`Agroverse QR codes` column Z** (`Stripe Session ID`), which puts the FK on the many-side. Still written for backward compat; lookups should prefer column Z and fall back to P. |
+| O | Tracking Notification Sent | String | Email notification status ("Yes" when sent) |
+| P | Ledger Routed | String | Ledger routing status |
+| Q | Environment | String | Environment (production/development) |
+| R | Invoice ID | String | Stripe invoice ID for subscription renewals (`in_xxx`) |
+| S | Payment Intent ID | String | Stripe payment intent ID for subscription renewals (`pi_xxx`) |
+| T | Payment Type | String | `one_time`, `subscription_renewal`, or blank (legacy) |
 
 **Used by:**
 - Stripe order processing and tracking
