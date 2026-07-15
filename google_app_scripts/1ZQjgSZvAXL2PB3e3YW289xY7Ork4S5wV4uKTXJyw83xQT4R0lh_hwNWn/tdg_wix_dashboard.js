@@ -1996,6 +1996,37 @@ function doGet(e) {
         .setMimeType(ContentService.MimeType.JSON);
     }
 
+    if (type === 'sync_treasury' || type === 'sync-treasury') {
+      // Lightweight sync of just USD_TREASURY_BALANCE to the Performance
+      // Statistics sheet. Uses the same formula as syncAllPerformanceStatistics()
+      // (off-chain assets + USDT vault + AGL investment holdings) but skips
+      // all other stats — avoids the 30s GAS timeout that full sync hits
+      // when iterating all AGL ledgers for sales data.
+      //
+      // Returns the new value as JSON so the caller (e.g. landing page
+      // backend) can confirm the write succeeded.
+      var offChain = getOffChainAssetValue();
+      var usdtVault = getUSDTBalanceInVault();
+      var aglEquity = getInvestmentHoldingsInAGL();
+      var treasuryBalance = offChain + usdtVault + aglEquity;
+      updatePerformanceStatistic("USD_TREASURY_BALANCE", treasuryBalance, "USD");
+      // Also warm the treasury breakdown cache so /treasury stays fast
+      var breakdown = computeTreasuryBreakdown();
+      cacheTreasuryBreakdown(breakdown);
+      return ContentService.createTextOutput(JSON.stringify({
+        timestamp: new Date().toISOString(),
+        status: 'ok',
+        stat: 'USD_TREASURY_BALANCE',
+        value: treasuryBalance,
+        components: {
+          off_chain_assets_usd: offChain,
+          usdt_vault_usd: usdtVault,
+          agl_equity_usd: aglEquity
+        },
+        note: 'Only USD_TREASURY_BALANCE was synced (lightweight). Use action=triggerSync for a full sync of all stats.'
+      })).setMimeType(ContentService.MimeType.JSON);
+    }
+
     if (type === 'recalculate_aum') {
       // Operator escape hatch: trigger calculateAUM() out-of-band AND
       // overwrite the Performance Statistics 'AUM' cell (the same thing
