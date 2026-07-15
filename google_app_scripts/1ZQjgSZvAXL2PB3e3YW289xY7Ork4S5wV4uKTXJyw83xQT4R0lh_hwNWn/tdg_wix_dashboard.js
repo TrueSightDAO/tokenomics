@@ -5,65 +5,67 @@
  * https://script.google.com/home/projects/1rLl94jQ9tDYdRvudnP0prPY5SEjvM07R4gPs6-vRyZEpSJhUqbiE3CZY/edit
  * 
  * Description: Updates Performance Statistics (formerly Wix dashboard metrics) including treasury balance, TDG issuance, and exchange rates.
- * 
- * NOTE: Wix integration is deprecated. This script now updates Google Sheets "Performance Statistics" directly.
+ *
+ * NOTE: Wix integration has been fully removed (2026-07). All values are computed locally
+ * and written directly to Google Sheets "Performance Statistics" — no external dashboard dependency.
+ * Several functions keep their historical "...OnWix" names for time-based trigger continuity
+ * (Apps Script triggers bind to function names; renaming would silently orphan the trigger).
  * LATOKEN API calls are disabled (on hold) to prevent 503 errors.
  */
 
 /**
  * TDG Wix Dashboard - TrueSight DAO Asset Management and Tokenomics Automation
- * 
+ *
  * This Google Apps Script manages the complete tokenomics and asset tracking system for TrueSight DAO.
  * It integrates multiple data sources and automates critical financial operations.
- * 
+ *
  * KEY FEATURES:
  * - Asset Management: Tracks off-chain assets, USDT vault balance, and AGL investment holdings
  * - Tokenomics Calculations: Calculates asset per TDG, voting rights, and buy-back budgets
- * - Performance Statistics: Updates Google Sheets "Performance Statistics" tab (Wix integration deprecated)
- * - Performance Statistics Sync: Automatically syncs Wix updates to Google Sheet "Performance Statistics" tab
+ * - Performance Statistics: Updates Google Sheets "Performance Statistics" tab directly (no Wix)
  * - Web Service: Exposes doGet endpoint to return Performance Statistics as JSON for index.html
  * - Transaction Automation: Creates daily buy-back provisions and recurring tokenizations
- * - Multi-Source Data: Integrates Wix APIs, Solana blockchain, and Google Sheets
- * 
+ * - Multi-Source Data: Integrates Solana blockchain, US Treasury, and Google Sheets
+ *
  * MAIN FUNCTIONS:
- * - updateTotalDAOAssetOnWix(): Updates total DAO asset value on Wix
+ * - updateTotalDAOAssetOnWix(): Updates total DAO asset value in Performance Statistics
  * - updateAssetPerIssuedTdg(): Calculates and updates asset per TDG ratio
  * - getDailyTdgBuyBackBudget(): Creates daily buy-back transaction pairs
  * - getInvestmentHoldingsInAGL(): Calculates total AGL investment holdings
- * - update30DaysSalesOnWix(): Updates 30-day sales data on Wix
+ * - update30DaysSalesOnWix(): Updates 30-day sales data in Performance Statistics
  * - doGet(): Web service endpoint returning Performance Statistics as JSON
- * - updatePerformanceStatistic(): Syncs Wix updates to Performance Statistics sheet
- * 
+ * - updatePerformanceStatistic(): Writes a single stat to the Performance Statistics sheet
+ *
  * DAILY AUTOMATION:
  * - Daily buy-back budget calculation and transaction creation
  * - Asset value updates and tokenomics recalculation
  * - Treasury yield monitoring and adjustment
- * - Automatic sync of Wix updates to Performance Statistics sheet
- * 
+ * - Automatic sync of all stats to Performance Statistics sheet
+ *
  * WEB SERVICE DEPLOYMENT:
  * - Deploy as web app: Publish > Deploy as web app
  * - Set "Execute as: Me" and "Who has access: Anyone, even anonymous"
  * - Web service URL: https://script.google.com/macros/s/AKfycbzlfOBo9UqKOh7jIqGcmbPAMM1RxCbsJHb-UV_vM6VbvK_HSdT44KyGbbXIeo-_Ovfy/exec
  * - Use this URL in index.html to fetch Performance Statistics
- * 
+ *
  * DATA SOURCES:
  * - Google Sheets: Ledger history, off-chain transactions, asset balances, Performance Statistics
  * - Solana Blockchain: USDT vault balance monitoring
  * - US Treasury: Real-time yield data for calculations
- * 
+ *
  * DEPRECATED/DISABLED:
- * - Wix APIs: Deprecated (no longer using Wix)
+ * - Wix APIs: Removed (2026-07) — see NOTE above
  * - LATOKEN API: Disabled (on hold - see tokenomics/README.md)
- * 
+ *
  * SPREADSHEET STRUCTURE:
  * - "Ledger history": TDG token issuance and voting rights tracking
  * - "offchain transactions": All off-chain financial transactions
  * - "off chain asset balance": Current asset valuations
- * - "Performance Statistics": Synced copy of Wix ExchangeRate collection values
+ * - "Performance Statistics": All tokenomics stats, computed locally and written directly
  * - "Recurring Transactions": Automated recurring tokenization rules
- * 
- * KEYWORDS: TDG, TrueSight DAO, tokenomics, asset management, buy-back, voting rights, 
- *           Wix integration, Solana, USDT vault, treasury yield, AGL investments,
+ *
+ * KEYWORDS: TDG, TrueSight DAO, tokenomics, asset management, buy-back, voting rights,
+ *           Solana, USDT vault, treasury yield, AGL investments,
  *           Performance Statistics, web service, JSON API
  */
 
@@ -72,14 +74,10 @@
 function getCredentials() {
   var props = PropertiesService.getScriptProperties();
   return {
-    WIX_API_KEY: props.getProperty('WIX_API_KEY'),
     QUICKNODE_API_KEY: props.getProperty('QUICKNODE_API_KEY')
   };
 }
 const creds = getCredentials();
-
-// Wix API key for authentication with Wix APIs
-var wixAccessToken = creds.WIX_API_KEY;
 
 // QuickNode API key for accessing Solana blockchain data
 var quickNodeApiKey = creds.QUICKNODE_API_KEY;
@@ -1016,15 +1014,11 @@ function updateAumBreakdown() {
 }
 
 /**
- * Updates the total DAO asset value on Wix, including off-chain assets, USDT vault balance, and AGL investment holdings.
- * NOTE: This function also updates Performance Statistics directly (even if Wix is not used).
+ * Updates the total DAO asset value in Performance Statistics.
+ * Historical name retained for trigger continuity (Wix retired — see updateUSD_TREASURY_BALANCE()).
  */
 function updateTotalDAOAssetOnWix() {
-  var full_asset_value = getOffChainAssetValue() + getUSDTBalanceInVault() + getInvestmentHoldingsInAGL();
-  Logger.log("Full amount of Asset in USD value managed off chain: " + full_asset_value);      
-
-  setAssetBalanceOnWix(full_asset_value);
-  getAssetBalanceOnWix();
+  return updateUSD_TREASURY_BALANCE();
 }
 
 /**
@@ -1195,130 +1189,19 @@ function getUSDTBalanceInVault() {
   }
 }  
 
-function getAssetBalanceOnWix() {
-  var options = getWixRequestHeader();
-  var request_url = "https://www.wixapis.com/wix-data/v2/items/" + getWixAssetBalanceDataItemId() + "?dataCollectionId=" + getWixDataCollectionId();  
-  var response = UrlFetchApp.fetch(request_url, options);
-  var content = response.getContentText();
-  var response_obj = JSON.parse(content);  
-  // Logger.log(response_obj);  
-  Logger.log("Asset balance record on Wix: " + response_obj.dataItem.data.exchangeRate);  
-}
-
-
-function setAssetBalanceOnWix( latest_asset_balance) {
-  // NOTE: If you're not using Wix, you can skip the Wix update and just update Performance Statistics
-  // by calling updatePerformanceStatistic() directly, or use updateUSD_TREASURY_BALANCE() instead
-  
-  // Update Wix (only if using Wix)
-  try {
-    var options = getWixRequestHeader();  
-    var payload = {
-      "dataCollectionId": "ExchangeRate",
-      "dataItem": {
-        "data": {
-          "description": "USD_TREASURY_BALANCE",
-          "_id": getWixAssetBalanceDataItemId(),
-          "_owner": "0e2cde5f-b353-468b-9f4e-36835fc60a0e",
-          "exchangeRate": latest_asset_balance,
-          "currency": "USD"
-        }
-      }
-    }
-
-    options.payload = JSON.stringify(payload);
-    options.method = 'PUT';
-
-    var request_url = "https://www.wixapis.com/wix-data/v2/items/" + getWixAssetBalanceDataItemId();  
-    var response = UrlFetchApp.fetch(request_url, options);
-    var content = response.getContentText();
-    var response_obj = JSON.parse(content);  
-    Logger.log("Updated Wix (if using Wix): " + latest_asset_balance);
-  } catch (e) {
-    Logger.log("⚠️  Wix update failed (this is OK if not using Wix): " + e.message);
-  }
-
-  // ALWAYS sync to Performance Statistics sheet (regardless of Wix)
-  updatePerformanceStatistic("USD_TREASURY_BALANCE", latest_asset_balance, "USD");
-}
-
-function getTDGIssuedOnWix() {
-  var options = getWixRequestHeader();
-  var request_url = "https://www.wixapis.com/wix-data/v2/items/" + getWixTDGIssuedTdgDataItemId() + "?dataCollectionId=" + getWixDataCollectionId();  
-  var response = UrlFetchApp.fetch(request_url, options);
-  var content = response.getContentText();
-  var response_obj = JSON.parse(content);  
-  // Logger.log(response_obj);  
-  Logger.log("TDG issued record on Wix: " + response_obj.dataItem.data.exchangeRate);  
-}
-
+/**
+ * Updates TDG_ISSUED in Performance Statistics.
+ * Historical name retained for trigger continuity (Wix retired).
+ */
 function setTDGIssuedOnWix() {
   var tdg_issed = getTdgTokensIssued();
-
-  var options = getWixRequestHeader();  
-  var payload = {
-    "dataCollectionId": "ExchangeRate",
-    "dataItem": {
-      "data": {
-        "description": "TDG_ISSUED",
-        "_id": getWixTDGIssuedTdgDataItemId(),
-        "_owner": "0e2cde5f-b353-468b-9f4e-36835fc60a0e",
-        "exchangeRate": tdg_issed,
-        "currency": "TDG"
-      }
-    }
-  }
-
-  options.payload = JSON.stringify(payload);
-  options.method = 'PUT';
-
-  // Logger.log("The Final Payload");
-  // Logger.log(options);
-
-  var request_url = "https://www.wixapis.com/wix-data/v2/items/" + getWixTDGIssuedTdgDataItemId();  
-  var response = UrlFetchApp.fetch(request_url, options);
-  var content = response.getContentText();
-  var response_obj = JSON.parse(content);  
-  // Logger.log(response_obj);  
-
-  // Sync to Performance Statistics sheet
   updatePerformanceStatistic("TDG_ISSUED", tdg_issed, "TDG");
 }
 
-function getWixTDGIssuedTdgDataItemId() {
-  return "4088e994-2c06-42a8-a1cf-8cd77ee73203";
-}
-
-function getWixRequestHeader() {
-  var options = {
-    //  "async": true,
-    //  "crossDomain": true,
-     "method" : "GET",
-     "headers" : {
-        "Content-Type" : "application/json",
-        "Authorization" : wixAccessToken,
-        "wix-account-id" : "0e2cde5f-b353-468b-9f4e-36835fc60a0e",
-        "wix-site-id": "d45a189f-d0cc-48de-95ee-30635a95385f"
-      //  "cache-control": "no-cache"
-     }
-  };
-
-  return options;
-}
-
-function getWixDataCollectionId() {
-  return "ExchangeRate";
-}
-
-function getWixAssetBalanceDataItemId() {
-  return "a0e7364c-716d-49f3-a795-647d2686a22b";
-}
-
 function updateAssetPerIssuedTdg() {
-  getAssetPerIssuedTdgBalanceOnWix();  
   var calculated_asset_per_issued_tdg = calculateAssetPerIssuedTdg();
-  setAssetPerIssuedTdgBalanceOnWix(calculated_asset_per_issued_tdg);
-  getAssetPerIssuedTdgBalanceOnWix();  
+  updatePerformanceStatistic("ASSET_PER_TDG_ISSUED", calculated_asset_per_issued_tdg, "USD");
+  return calculated_asset_per_issued_tdg;
 }
 
 function calculateAssetPerIssuedTdg() {
@@ -1337,107 +1220,6 @@ function calculateAssetPerIssuedTdg() {
   return asset_per_circulated_voting_right;
 }
 
-function getAssetPerIssuedTdgBalanceOnWix() {
-  var options = getWixRequestHeader();
-  var request_url = "https://www.wixapis.com/wix-data/v2/items/" + getWixAssetPerIssuedTdgDataItemId() + "?dataCollectionId=" + getWixDataCollectionId();  
-  var response = UrlFetchApp.fetch(request_url, options);
-  var content = response.getContentText();
-  var response_obj = JSON.parse(content);  
-  // Logger.log(response_obj);  
-  Logger.log("Asset per issued TDG on Wix: " + response_obj.dataItem.data.exchangeRate);
-  return response_obj.dataItem.data.exchangeRate;
-}
-
-
-function setAssetPerIssuedTdgBalanceOnWix( calculated_asset_per_issued_tdg) {
-  var options = getWixRequestHeader();  
-  var payload = {
-    "dataCollectionId": "ExchangeRate",
-    "dataItem": {
-      "data": {
-        "description": "ASSET_PER_TDG_ISSUED",
-        "_id": getWixAssetPerIssuedTdgDataItemId(),
-        "_owner": "0e2cde5f-b353-468b-9f4e-36835fc60a0e",
-        "exchangeRate": calculated_asset_per_issued_tdg,
-        "currency": "USD"
-      }
-    }
-  }
-
-  options.payload = JSON.stringify(payload);
-  options.method = 'PUT';
-
-  // Logger.log("The Final Payload");
-  // Logger.log(options);
-
-  var request_url = "https://www.wixapis.com/wix-data/v2/items/" + getWixAssetPerIssuedTdgDataItemId();  
-  var response = UrlFetchApp.fetch(request_url, options);
-  var content = response.getContentText();
-  var response_obj = JSON.parse(content);  
-  // Logger.log(response_obj);  
-
-  // Sync to Performance Statistics sheet
-  updatePerformanceStatistic("ASSET_PER_TDG_ISSUED", calculated_asset_per_issued_tdg, "USD");
-}
-
-function getWixAssetPerIssuedTdgDataItemId() {
-  return "9b04879b-f06a-419a-9ad3-520ad60ea972";
-}
-
-
-
-
-
-// Add this constant for the new DataItemID (unchanged)
-function getWix30DaysSalesDataItemId() {
-  return "956fdb46-bc8d-4c71-8e67-79813effbab3";
-}
-
-// Method to get 30 days sales from Wix (unchanged)
-function get30DaysSalesOnWix() {
-  var options = getWixRequestHeader();
-  var request_url = "https://www.wixapis.com/wix-data/v2/items/" + getWix30DaysSalesDataItemId() + "?dataCollectionId=" + getWixDataCollectionId();  
-  var response = UrlFetchApp.fetch(request_url, options);
-  var content = response.getContentText();
-  var response_obj = JSON.parse(content);  
-  Logger.log("30 Days Sales record on Wix: " + response_obj.dataItem.data.exchangeRate);  
-  return response_obj.dataItem.data.exchangeRate;
-}
-
-// Method to set 30 days sales on Wix
-// latest_30days_sales should be ecosystem sales (all ledgers) for display
-function set30DaysSalesOnWix(latest_30days_sales) {
-  var options = getWixRequestHeader();  
-  var payload = {
-    "dataCollectionId": "ExchangeRate",
-    "dataItem": {
-      "data": {
-        "description": "PAST_30_DAYS_SALES",
-        "_id": getWix30DaysSalesDataItemId(),
-        "_owner": "0e2cde5f-b353-468b-9f4e-36835fc60a0e",
-        "exchangeRate": latest_30days_sales,
-        "currency": "USD"
-      }
-    }
-  }
-
-  options.payload = JSON.stringify(payload);
-  options.method = 'PUT';
-
-  var request_url = "https://www.wixapis.com/wix-data/v2/items/" + getWix30DaysSalesDataItemId();  
-  var response = UrlFetchApp.fetch(request_url, options);
-  var content = response.getContentText();
-  var response_obj = JSON.parse(content);  
-  Logger.log("Updated 30 Days Sales on Wix: " + latest_30days_sales);
-  
-  // Sync to Performance Statistics sheet (ecosystem sales - all ledgers)
-  updatePerformanceStatistic("PAST_30_DAYS_SALES", latest_30days_sales, "USD");
-  
-  // Also save DAO revenue (main ledger only) for buy-back budget calculation
-  var daoRevenue = get30DaysSales(); // Main ledger only
-  updatePerformanceStatistic("PAST_30_DAYS_DAO_REVENUE", daoRevenue, "USD");
-  Logger.log("Updated PAST_30_DAYS_DAO_REVENUE: " + daoRevenue);
-}
 
 // Method to get 30 days sales from Google Sheet (simple version using F1)
 function get30DaysSales() {
@@ -1475,16 +1257,17 @@ function get30DaysSalesWithQuery() {
   return total;
 }
 
-// Example usage function
+/**
+ * Updates PAST_30_DAYS_SALES (ecosystem) and PAST_30_DAYS_DAO_REVENUE (main ledger)
+ * in Performance Statistics. Historical name retained for trigger continuity (Wix retired).
+ */
 function update30DaysSalesOnWix() {
   // Use all-ledgers version for ecosystem sales display
   var ecosystemSales = get30DaysSalesFromAllLedgers();
   var daoRevenue = get30DaysSales(); // Main ledger only for DAO revenue
-  
-  set30DaysSalesOnWix(ecosystemSales);
-  // Also save DAO revenue separately
+
+  updatePerformanceStatistic("PAST_30_DAYS_SALES", ecosystemSales, "USD");
   updatePerformanceStatistic("PAST_30_DAYS_DAO_REVENUE", daoRevenue, "USD");
-  get30DaysSalesOnWix();
 }
 
 /**
@@ -1820,29 +1603,6 @@ function getTdgUsdtPriceLaToken() {
   */
 }
 
-/**
- * Retrieve the TDG to USDC exchange rate from Wix.
- * @return {number} The TDG to USDC exchange rate stored on Wix.
- */
-function getTdgUsdcPriceOnWix() {
-  var options = getWixRequestHeader();
-  var request_url = "https://www.wixapis.com/wix-data/v2/items/" + getWixTdgUsdcPriceDataItemId() + "?dataCollectionId=" + getWixDataCollectionId();  
-  var response = UrlFetchApp.fetch(request_url, options);
-  var content = response.getContentText();
-  var response_obj = JSON.parse(content);  
-  Logger.log("TDG to USDC exchange rate on Wix: " + response_obj.dataItem.data.exchangeRate);  
-  return response_obj.dataItem.data.exchangeRate;
-}
-
-/**
- * Get the DataItemId for the TDG to USDC exchange rate.
- * @return {string} The DataItemId for the TDG/USDC exchange rate.
- */
-function getWixTdgUsdcPriceDataItemId() {
-  return "8edde502-ac79-4e66-ab2d-8ebb99108665";
-}
-
-
 function getUSTreasuryYield() {
   var treasury_yield_url = "https://home.treasury.gov/resource-center/data-chart-center/interest-rates/pages/xml?data=daily_treasury_yield_curve&field_tdr_date_value=" + new Date().getFullYear();
   Logger.log(treasury_yield_url);
@@ -1884,18 +1644,17 @@ function getUSTreasuryYield() {
 
 
 
-// Constant for the new DataItemID
-function getWixDailyTdgBuyBackBudgetDataItemId() {
-  return "8f1c08f2-5ff8-4c40-8aee-4f5519e6b8a1";
-}
-
-// Method to calculate and set the daily TDG buy-back budget
+/**
+ * Calculates and syncs the daily TDG buy-back budget to Performance Statistics.
+ * Historical name retained for trigger continuity (Wix retired 2026-06-16 —
+ * same formula/inputs as the sibling getDailyTdgBuyBackBudget(), computed locally).
+ */
 function setDailyTdgBuyBackBudget() {
   // Calculate the budget using the provided formula
   var last30DaysSales = get30DaysSales();
-  var assetPerIssuedTdg = getAssetPerIssuedTdgBalanceOnWix();
+  var assetPerIssuedTdg = calculateAssetPerIssuedTdg();
   var treasuryYield = getUSTreasuryYield();
-  
+
   // Formula: (Last 30 days sales / 30) * min(Asset Per Issued TDG, 1 - Treasury yield)
   // Using asset per issued TDG instead of market price ensures buy-back budget reflects
   // the intrinsic value backed by DAO assets rather than speculative market pricing
@@ -1905,35 +1664,12 @@ function setDailyTdgBuyBackBudget() {
   var dailyBudget = dailySalesAverage * adjustedPrice;
 
   Logger.log("Adjusted Price: " + adjustedPrice);
-Logger.log("Treasury Yield : " + treasuryYield);  
+  Logger.log("Treasury Yield : " + treasuryYield);
   Logger.log("Treasury Yield Maximum : " + (1 - treasuryYield/100));
 
-  
-  var options = getWixRequestHeader();  
-  var payload = {
-    "dataCollectionId": "ExchangeRate",
-    "dataItem": {
-      "data": {
-        "description": "TDG_DAILY_BUY_BACK_BUDGET",
-        "_id": getWixDailyTdgBuyBackBudgetDataItemId(),
-        "_owner": "0e2cde5f-b353-468b-9f4e-36835fc60a0e",
-        "exchangeRate": dailyBudget,
-        "currency": "USD"
-      }
-    }
-  }
-
-  options.payload = JSON.stringify(payload);
-  options.method = 'PUT';
-
-  var request_url = "https://www.wixapis.com/wix-data/v2/items/" + getWixDailyTdgBuyBackBudgetDataItemId();  
-  var response = UrlFetchApp.fetch(request_url, options);
-  var content = response.getContentText();
-  var response_obj = JSON.parse(content);  
-  Logger.log("Updated Daily TDG Buy Back Budget on Wix: " + dailyBudget);
-  
   // Sync to Performance Statistics sheet
   updatePerformanceStatistic("TDG_DAILY_BUY_BACK_BUDGET", dailyBudget, "USD");
+  return dailyBudget;
 }
 
 // Method to get the daily TDG buy-back budget
@@ -2020,7 +1756,7 @@ function createDailyTdgBuyBackTransactions() {
     // Get the current date in YYYYMMDD format
     var currentDate = Utilities.formatDate(new Date(), 'GMT', 'yyyyMMdd');
     
-    // Get the daily buy-back budget from Wix
+    // Get the daily buy-back budget (computed locally, see getDailyTdgBuyBackBudget())
     var buyBackBudget = getDailyTdgBuyBackBudget();
     
     if (!buyBackBudget || buyBackBudget <= 0) {
@@ -2103,51 +1839,14 @@ function createDailyTdgBuyBackTransactions() {
   }
 }
 
-// Constant for the US Treasury Yield DataItemID
-function getWixUSTreasuryYieldDataItemId() {
-  return "7e8efc84-f212-47ac-a37e-2f32f29c76e0";
-}
-
-// Method to set the US Treasury yield on Wix
+/**
+ * Updates USD_TREASURY_YIELD_1_MONTH in Performance Statistics.
+ * Historical name retained for trigger continuity (Wix retired).
+ */
 function setUSTreasuryYieldOnWix() {
   var treasuryYield = getUSTreasuryYield();
-  
-  var options = getWixRequestHeader();  
-  var payload = {
-    "dataCollectionId": "ExchangeRate",
-    "dataItem": {
-      "data": {
-        "description": "USD_TREASURY_YIELD_1_MONTH",
-        "_id": getWixUSTreasuryYieldDataItemId(),
-        "_owner": "0e2cde5f-b353-468b-9f4e-36835fc60a0e",
-        "exchangeRate": treasuryYield,
-        "currency": "%"
-      }
-    }
-  }
-
-  options.payload = JSON.stringify(payload);
-  options.method = 'PUT';
-
-  var request_url = "https://www.wixapis.com/wix-data/v2/items/" + getWixUSTreasuryYieldDataItemId();  
-  var response = UrlFetchApp.fetch(request_url, options);
-  var content = response.getContentText();
-  var response_obj = JSON.parse(content);  
-  Logger.log("Updated US Treasury Yield on Wix: " + treasuryYield);
-  
-  // Sync to Performance Statistics sheet
   updatePerformanceStatistic("USD_TREASURY_YIELD_1_MONTH", treasuryYield, "%");
-}
-
-// Method to get the US Treasury yield from Wix
-function getUSTreasuryYieldOnWix() {
-  var options = getWixRequestHeader();
-  var request_url = "https://www.wixapis.com/wix-data/v2/items/" + getWixUSTreasuryYieldDataItemId() + "?dataCollectionId=" + getWixDataCollectionId();  
-  var response = UrlFetchApp.fetch(request_url, options);
-  var content = response.getContentText();
-  var response_obj = JSON.parse(content);  
-  Logger.log("US Treasury Yield on Wix: " + response_obj.dataItem.data.exchangeRate);  
-  return response_obj.dataItem.data.exchangeRate;
+  return treasuryYield;
 }
 
 /**
@@ -2209,7 +1908,7 @@ function updatePerformanceStatistic(key, value, currency) {
     
   } catch (error) {
     Logger.log("⚠️  Error updating Performance Statistics: " + error.message);
-    // Don't throw - allow Wix update to succeed even if sheet update fails
+    // Don't throw - a sheet write failure shouldn't crash the calling cron function
   }
 }
 
