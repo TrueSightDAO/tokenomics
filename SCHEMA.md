@@ -1242,6 +1242,43 @@ See [`python_scripts/schema_validation/README.md`](./python_scripts/schema_valid
 
 ---
 
+##### Sheet: `Currencies`
+**Purpose:** Master catalog of all currencies (products, ingredients, packaging, and raw materials) tracked by the DAO. Each row is a distinct SKU / inventory item with its unit cost, physical properties, and customs codes.
+
+**Sheet URL:** https://docs.google.com/spreadsheets/d/1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU/edit#gid=0
+
+**Header Row:** 1
+
+| Column | Name | Type | Description |
+|--------|------|------|-------------|
+| A | Currencies | String | Item / product name |
+| B | Price in USD | Number | Unit cost in USD |
+| C | Serializable | String | Whether the item is serialized (TRUE / blank) |
+| D | Product Image | String | URL to product image |
+| E | landing_page | String | Landing page URL |
+| F | ledger | String | Associated ledger URL |
+| G | farm name | String | Source farm name |
+| H | state | String | State/region of origin |
+| I | country | String | Country of origin |
+| J | Year | String | Harvest year |
+| K | Unit Weight (grams) | Number | Weight per unit in grams |
+| L | Unit Weight (ounces) | Number | Weight per unit in ounces |
+| M | SKU Product ID | String | Product SKU identifier |
+| N | Raw request text | String | Original repackaging / creation request |
+| O | Composition JSON | String | URL to composition breakdown JSON |
+| P | Inventory Type | String | Inventory category (e.g. "Cacao Nib", "Chocolate Bar", "Cacao Bean", "Bulk") |
+| Q | Sale Type | String | Sale type (e.g. "Retail Ready", "Bulk") |
+| R | GTIN | String | Global Trade Item Number (barcode) |
+| S | HS Code | String | International Harmonized System code (6-digit) |
+| T | HTS Code | String | US Harmonized Tariff Schedule code (8–10 digit, includes statistical suffix for US customs) |
+
+**Used by:**
+- Product and pricing management
+- [`tdg_inventory_management/web_app.gs`](https://github.com/TrueSightDAO/tokenomics/blob/main/google_app_scripts/tdg_inventory_management/web_app.gs) — `getCurrenciesUnitCostMap_()` reads column A + column B
+- Repackaging and inventory scripts
+
+---
+
 ##### Sheet: `Contributor Staking`
 **Purpose:** Tracks TDG staking by contributors
 
