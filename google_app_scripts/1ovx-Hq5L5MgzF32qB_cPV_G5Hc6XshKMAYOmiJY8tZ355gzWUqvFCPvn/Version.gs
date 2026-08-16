@@ -17,6 +17,7 @@ var CLASP_MIRROR_LAST_CLASP_PUSH_UTC = '2026-05-11T03:30:00Z';
  * Newest first. Keep lines short; link PRs/commits in git instead of pasting secrets.
  */
 var CLASP_MIRROR_CHANGELOG =
+  '2026-08-16 — SYNC (live→repo): committed production clasp pull (agroverse_shop_checkout.js + create_subscription_checkout_session.js); removed stale placeholder Code.js + old .gs. Subscription renewal sync (invoice.paid) now mirrored in git.\n' +
   '2026-05-11 — Added createLedgerCheckoutSession (generic [LEDGER_ID]-prefixed Stripe Checkout for any managed ledger; first user: capoeira.agroverse.shop → TBM). See agentic_ai_context/STRIPE_LEDGER_ROUTING.md Flow 4.\n' +
   '2026-04-12 — Added default Version.gs for clasp deploy audit trail (tokenomics).\n';
 
