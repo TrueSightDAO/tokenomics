@@ -3082,8 +3082,66 @@ function saveSubscriptionPaymentToSheet(invoice, subscription, originalSessionId
 
     sheet.appendRow(row);
     Logger.log('Subscription renewal saved: invoice ' + invoice.id + ' for ' + customerName + ' $' + totalAmount.toFixed(2));
+
+    // Send notification email to admin (non-critical - order is already saved)
+    try {
+      sendSubscriptionRenewalNotificationEmail(invoice, customerName, customerEmail, itemsPurchased, totalQuantity, totalAmount, shippingCost, currency, originalSessionId);
+    } catch (emailError) {
+      Logger.log('Error sending subscription renewal notification email (non-critical): ' + emailError.toString());
+    }
   } catch (error) {
     Logger.log('Error saving subscription payment: ' + error.toString());
+    throw error;
+  }
+}
+
+/**
+ * Send email notification to admin for a subscription renewal payment.
+ */
+function sendSubscriptionRenewalNotificationEmail(invoice, customerName, customerEmail, itemsPurchased, totalQuantity, amountTotal, shippingCost, currency, originalSessionId) {
+  try {
+    var currencySymbol = currency === 'USD' ? '$' : (currency + ' ');
+    var paymentDate = new Date(invoice.created * 1000).toLocaleString();
+
+    var subject = 'Subscription Renewal: ' + customerName + ' - ' + currencySymbol + amountTotal.toFixed(2);
+
+    var body = 'Subscription renewal payment received!\n\n' +
+      '=== PAYMENT DETAILS ===\n' +
+      'Payment Date: ' + paymentDate + '\n' +
+      'Invoice ID: ' + invoice.id + '\n' +
+      'Payment Intent ID: ' + (invoice.payment_intent || 'N/A') + '\n' +
+      'Original Checkout Session: ' + (originalSessionId || 'N/A') + '\n' +
+      'Payment Status: ' + (invoice.status || 'N/A') + '\n\n' +
+
+      '=== CUSTOMER INFORMATION ===\n' +
+      'Name: ' + customerName + '\n' +
+      'Email: ' + customerEmail + '\n\n' +
+
+      '=== ORDER ITEMS ===\n' +
+      itemsPurchased + '\n' +
+      'Total Quantity: ' + totalQuantity + '\n\n' +
+
+      '=== PRICING BREAKDOWN ===\n' +
+      'Subtotal: ' + currencySymbol + (amountTotal - shippingCost).toFixed(2) + '\n' +
+      'Shipping: ' + currencySymbol + shippingCost.toFixed(2) + '\n' +
+      'Total: ' + currencySymbol + amountTotal.toFixed(2) + '\n\n' +
+
+      '=== LINKS ===\n' +
+      'Invoice: https://dashboard.stripe.com/invoices/' + invoice.id + '\n' +
+      'Payment: https://dashboard.stripe.com/payments/' + (invoice.payment_intent || '') + '\n\n' +
+
+      '---\n' +
+      'This is an automated notification from Agroverse Shop.';
+
+    MailApp.sendEmail({
+      to: 'garyjob@agroverse.shop',
+      subject: subject,
+      body: body
+    });
+
+    Logger.log('Subscription renewal notification email sent to garyjob@agroverse.shop');
+  } catch (error) {
+    Logger.log('Error sending subscription renewal notification email: ' + error.toString());
     throw error;
   }
 }
