@@ -266,6 +266,29 @@ All webhooks are triggered via Sidekiq background jobs from Edgar after submissi
 
 ---
 
+### 7. Tree Planting Link Processing Webhook (NEW)
+
+**Webhook URL:** `YOUR_TREE_PLANTING_LINK_WEBHOOK_URL` *(To be set after deployment)*
+
+**Action:** `processTreePlantingLinksFromTelegramChatLogs`
+
+**Triggered by:** `[TREE PLANTING LINK EVENT]` submissions (governor-only)
+
+**Function:** Links a Sunmint tree-planting submission to a sold Agroverse QR code — see `agentic_ai_context/plans/SUNMINT_TREE_QR_LINKING_PLAN.md`.
+
+**GitHub Location:**
+- [`google_app_scripts/agroverse_qr_codes/process_tree_planting_link.gs`](https://github.com/TrueSightDAO/tokenomics/blob/main/google_app_scripts/agroverse_qr_codes/process_tree_planting_link.gs)
+
+**Configuration:**
+- Set in `dao_protocol`'s env as `DAO_PROTOCOL_WEBHOOK_TREE_PLANTING_LINK`
+
+**Usage:**
+- Updates Column D (status → `ASSIGNED_TO_TREE`), N/O/P/R (planting evidence), X (notification sent date) in "Agroverse QR codes"
+- Updates Column M (status → `LINKED`), R/S (linked QR + timestamp) in "SunMint Tree Planting"
+- Appends the ledger fulfillment pair to the resolved managed ledger's "Transactions" tab
+
+---
+
 ## Cron-Triggered Functions
 
 These functions run on a schedule (via Google Apps Script time-driven triggers) as a backup to webhook processing. They process any unprocessed records from "Telegram Chat Logs".
@@ -370,6 +393,24 @@ These functions run on a schedule (via Google Apps Script time-driven triggers) 
 
 ---
 
+### 7. Tree Planting Link Processing Cron (NEW)
+
+**Function:** `processTreePlantingLinkCron()` (in `process_tree_planting_link.gs`)
+
+**Schedule:** *(To be set - recommended: every 5-15 minutes)*
+
+**Purpose:** Backup processing for `[TREE PLANTING LINK EVENT]` submissions
+
+**GitHub Location:**
+- [`google_app_scripts/agroverse_qr_codes/process_tree_planting_link.gs`](https://github.com/TrueSightDAO/tokenomics/blob/main/google_app_scripts/agroverse_qr_codes/process_tree_planting_link.gs)
+
+**Setup:**
+1. Deploy the script as a web app (same deployment as `process_qr_code_updates.gs` — same GAS project)
+2. Set up a time-driven trigger for `processTreePlantingLinkCron`
+3. Recommended interval: Every 5-15 minutes
+
+---
+
 ## Webhook Deployment URLs
 
 ### How to Deploy a Google Apps Script as a Web App
@@ -411,6 +452,26 @@ https://script.google.com/macros/s/<DEPLOYMENT_ID>/exec
 **Endpoint Used:** `POST /dao/submit_contribution`
 
 **Event Type:** `[QR CODE UPDATE EVENT]`
+
+---
+
+### Tree Planting Link Module (NEW)
+
+**File:** [`dapp_beta/link_tree_planting.html`](https://github.com/TrueSightDAO/dapp_beta/blob/main/link_tree_planting.html)
+
+**Description:** Governor-only web interface to link a Sunmint tree-planting submission to a sold Agroverse QR code. Gated via `window.Permissions.requireRole('tree_planting.link')` (client-side UX gate — the GAS handler enforces the same rule server-side against the `Governors` tab).
+
+**Features:**
+- Chronological list of sold QR codes pending a tree link (governor-key-gated GAS read endpoint)
+- Chronological list of pending Sunmint tree-planting submissions (governor-key-gated GAS read endpoint)
+- Pick one of each, confirm, sign
+- Digital signature authentication (same RSA-keypair-in-localStorage flow as other DApp pages)
+
+**Endpoint Used:** `POST /dao/submit_contribution`
+
+**Event Type:** `[TREE PLANTING LINK EVENT]`
+
+**CLI equivalent:** `python -m truesight_dao_client.modules.link_tree_planting`
 
 ---
 
