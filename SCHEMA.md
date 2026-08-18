@@ -546,14 +546,17 @@ See [`python_scripts/schema_validation/README.md`](./python_scripts/schema_valid
 | J | Submitted Name | String | Name submitted for the tree |
 | K | Latitude | String | GPS latitude |
 | L | Longitude | String | GPS longitude |
-| M | Status | String | Processing status |
+| M | Status | String | Processing status: `NEW` (default on ingest) → `LINKED` (once a governor links this submission to a QR code, see column R/S below) |
 | N | Specie | String | Tree species |
-| O | Notarization URL | String | Notarization document URL |
+| O | GitHub Commit URL | String | Commit URL for the photo mirrored to `TrueSightDAO/sunmint` `images/` (corrected 2026-08-18 — previously documented as "Notarization URL"; the actual `appendRow` order in `process_tree_planting_telegram_logs.gs` writes the GitHub commit URL here) |
 | P | Cost of Tree | Number | Cost per tree |
 | Q | Tree Planting Time | String | Time of planting |
+| R | Linked QR Code | String | QR code this submission was linked to (NEW - added 2026-08-18). Written by `process_tree_planting_link.gs` on `[TREE PLANTING LINK EVENT]`; presence = idempotency marker (rows with R set are skipped on re-run). |
+| S | Linked At | String | ISO 8601 UTC timestamp of the link (NEW - added 2026-08-18). Written alongside column R. |
 
 **Used by:**
-- [`process_tree_planting_telegram_logs.gs`](https://github.com/TrueSightDAO/tokenomics/blob/main/google_app_scripts/sunmint_tree_planting/process_tree_planting_telegram_logs.gs) - Processes tree planting submissions
+- [`process_tree_planting_telegram_logs.gs`](https://github.com/TrueSightDAO/tokenomics/blob/main/google_app_scripts/sunmint_tree_planting/process_tree_planting_telegram_logs.gs) - Processes tree planting submissions from `[TREE PLANTING EVENT]`; also serves the governor-only read endpoint `?list_new=true&governor_key=...` (added 2026-08-18 — this project had no `doGet` at all before)
+- [`process_tree_planting_link.gs`](https://github.com/TrueSightDAO/tokenomics/blob/main/google_app_scripts/agroverse_qr_codes/process_tree_planting_link.gs) - Reads `Status=NEW` rows and writes columns M/R/S on `[TREE PLANTING LINK EVENT]` (lives in a different GAS project — the `Agroverse QR codes` mirror — since it needs to write both sheets in one execution)
 
 ---
 
@@ -894,13 +897,18 @@ See [`python_scripts/schema_validation/README.md`](./python_scripts/schema_valid
 | T | Price | Number | Price |
 | U | Manager \nName | String | Manager / operator name for serialized labels; batch generation sets this from signed **Manager Name** (defaults to signer when omitted) |
 | V | Ledger Name | String | Associated ledger name (NEW - added 2025-12-26) |
+| W | Sold Date | Date | Stamped whenever **status** transitions to `SOLD` (NEW - added 2026-08-18). Not the same as column J (QR *creation* date). Written by `process_qr_code_updates.gs`'s New Status branch and by the sale-processing scripts (`process_sales_telegram_logs.gs` / its identical `Parse Telegram ChatLogs.gs` pair). Source of the chronological ordering for the tree-planting-link governor picker (below). |
+| X | Tree Planted Notification Sent Date | Date | Stamped by `process_tree_planting_link.gs` after emailing the QR owner that their tree has been planted (NEW - added 2026-08-18). Mirrors column M's onboarding-email pattern, kept as a separate column since it's a different email. |
 | Z | Stripe Session ID | String | **PRIMARY link** to `Stripe Social Media Checkout ID` column C for this purchase. Multi-item-safe: one Stripe session → many QR codes, so the FK lives on the "many" side (each QR row). Written by `process_qr_code_updates.gs` on `[QR CODE UPDATE EVENT]` with a Stripe block. Preferred over legacy `Stripe Social Media Checkout ID` column P for lookups. |
 
+**Status enum (column D):** `SCHEDULED_FOR_MINTING`, `MINTED`, `WAREHOUSED`, `ON CONSIGNMENT`, `CACAO CIRCLE`, `LOST`, `SOLD`, `EXPENSED`, `ASSIGNED_TO_TREE`, `GIFT` (validated in `process_qr_code_updates.gs`). `ASSIGNED_TO_TREE` is set by `process_tree_planting_link.gs` when a governor links a sold QR to a planted-tree submission (see `SUNMINT_TREE_QR_LINKING_PLAN.md`) — treated as "sold" everywhere `SOLD` is (landing-page tree count, `list=true`/`list_with_members=true` availability pickers) so it neither regresses the public count nor becomes re-sellable.
+
 **Used by:**
-- [`process_sales_telegram_logs.gs`](https://github.com/TrueSightDAO/tokenomics/blob/main/google_app_scripts/tdg_inventory_management/process_sales_telegram_logs.gs) - Validates QR codes during sales processing
+- [`process_sales_telegram_logs.gs`](https://github.com/TrueSightDAO/tokenomics/blob/main/google_app_scripts/tdg_inventory_management/process_sales_telegram_logs.gs) - Validates QR codes during sales processing; stamps column W on sale
 - [`web_app.gs`](https://github.com/TrueSightDAO/tokenomics/blob/main/google_app_scripts/tdg_inventory_management/web_app.gs) - API for QR code queries and management
 - [`process_qr_code_generation_telegram_logs.gs`](https://github.com/TrueSightDAO/tokenomics/blob/main/google_app_scripts/tdg_inventory_management/process_qr_code_generation_telegram_logs.gs) - Creates and registers new QR codes
-- [`process_qr_code_updates.gs`](https://github.com/TrueSightDAO/tokenomics/blob/main/google_app_scripts/agroverse_qr_codes/process_qr_code_updates.gs) - Writes column Z (Stripe Session ID) on `[QR CODE UPDATE EVENT]`; uses `QR Code Update` tracking tab (gid=408450426) for dedup — does **not** read/write column J of `Telegram Chat Logs`
+- [`process_qr_code_updates.gs`](https://github.com/TrueSightDAO/tokenomics/blob/main/google_app_scripts/agroverse_qr_codes/process_qr_code_updates.gs) - Writes column Z (Stripe Session ID) on `[QR CODE UPDATE EVENT]`; uses `QR Code Update` tracking tab (gid=408450426) for dedup — does **not** read/write column J of `Telegram Chat Logs`. Also stamps column W on `New Status: SOLD`.
+- [`process_tree_planting_link.gs`](https://github.com/TrueSightDAO/tokenomics/blob/main/google_app_scripts/agroverse_qr_codes/process_tree_planting_link.gs) - Processes `[TREE PLANTING LINK EVENT]`: writes columns D/N/O/P/R/X on link, reads column C (ledger) to resolve the managed ledger for the fulfillment entry, column V (Ledger Name) is not used for resolution (column C's `truesight.me/sunmint/<name>` URL is — see `Shipment Ledger Listing` below)
 
 ---
 

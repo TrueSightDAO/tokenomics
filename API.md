@@ -485,6 +485,32 @@ Request Transaction ID: {signature_hash}
 
 **Attachments**: Document or photo to be notarized
 
+### 9. Tree Planting Link
+
+**Governor-only.** Links a Sunmint tree-planting submission (`SunMint Tree Planting` sheet, Status `NEW`)
+to a sold `Agroverse QR codes` row (status `SOLD`) — flips the QR to `ASSIGNED_TO_TREE`, copies the
+planting evidence onto the QR row, books the ledger fulfillment entry, and emails the QR owner. Rejected
+server-side (logged, no writes) if the signer isn't in the `Governors` tab. See
+`agentic_ai_context/plans/SUNMINT_TREE_QR_LINKING_PLAN.md`.
+
+**Format**:
+```
+[TREE PLANTING LINK EVENT]
+- QR Code: {qr_code}
+- SunMint Submission Message ID: {telegram_message_id}
+- Updated by: {governor_name}
+- Submission Source: {source_url}
+--------
+
+My Digital Signature: {public_key}
+
+Request Transaction ID: {signature_hash}
+```
+
+**Attachments**: None.
+
+**DApp:** `dapp.truesight.me/link_tree_planting.html`. **CLI:** `python -m truesight_dao_client.modules.link_tree_planting`.
+
 ## Request Verification
 
 All requests can be verified using the verification endpoint at `https://dapp.truesight.me/verify_request.html`.
