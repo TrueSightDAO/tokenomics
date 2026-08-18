@@ -104,9 +104,9 @@ function doOptionsWebLedger_(e) {
  *
  * Expects either:
  * - 'qr_code' and 'email_address' query parameters for updating email.
- * - 'list=true' query parameter to return QR codes where column D is NOT 'SOLD' (includes MINTED, CONSIGNMENT, etc.).
+ * - 'list=true' query parameter to return QR codes where column D is NOT 'SOLD' or 'ASSIGNED_TO_TREE' (includes MINTED, CONSIGNMENT, etc.).
  * - 'list_all=true' query parameter to return ALL QR codes including SOLD status.
- * - 'list_with_members=true' query parameter to return QR codes with details where column D is NOT 'SOLD'.
+ * - 'list_with_members=true' query parameter to return QR codes with details where column D is NOT 'SOLD' or 'ASSIGNED_TO_TREE'.
  * - 'lookup=true&qr_code=...' returns ledger details plus stripe_session_id and tracking_number when a row
  *   in 'Stripe Social Media Checkout ID' has column P equal to the QR code (Session in C, Shipping M, Tracking N; newest row wins).
  * - 'list_unassigned_stripe_sessions=true' returns { items: [{ stripe_session_id, shipping_provider, tracking_number }] }
@@ -180,10 +180,10 @@ function doGetWebLedger_(e) {
       var dataRange = sheet.getRange(DATA_START_ROW, 1, lastRow - DATA_START_ROW + 1, 4).getValues();
       var availableQrCodes = [];
 
-      // Filter rows where column D (index 3) is NOT 'SOLD' (include MINTED, CONSIGNMENT, and all other statuses)
+      // Filter rows where column D (index 3) is NOT 'SOLD' or 'ASSIGNED_TO_TREE' (include MINTED, CONSIGNMENT, and all other statuses)
       for (var i = 0; i < dataRange.length; i++) {
         var status = (dataRange[i][3] || '').toString().toUpperCase().trim();
-        if (status !== 'SOLD') {
+        if (status !== 'SOLD' && status !== 'ASSIGNED_TO_TREE') {
           availableQrCodes.push(dataRange[i][0]); // QR code from column A
         }
       }
@@ -208,10 +208,10 @@ function doGetWebLedger_(e) {
       var dataRange = sheet.getRange(DATA_START_ROW, 1, lastRow - DATA_START_ROW + 1, 21).getValues();
       var availableQrCodesWithMembers = [];
 
-      // Filter rows where column D (index 3) is NOT 'SOLD' (include MINTED, CONSIGNMENT, and all other statuses)
+      // Filter rows where column D (index 3) is NOT 'SOLD' or 'ASSIGNED_TO_TREE' (include MINTED, CONSIGNMENT, and all other statuses)
       for (var i = 0; i < dataRange.length; i++) {
         var status = (dataRange[i][3] || '').toString().toUpperCase().trim();
-        if (status !== 'SOLD') {
+        if (status !== 'SOLD' && status !== 'ASSIGNED_TO_TREE') {
           var qrCode = dataRange[i][0]; // Column A
           var ledgerShortcut = dataRange[i][2] || ''; // Column C (index 2)
           var currency = dataRange[i][8] || ''; // Column I (index 8)
