@@ -42,6 +42,17 @@ var LIST_PARAM = 'list';
 var LIST_ALL_PARAM = 'list_all';
 var LIST_WITH_MEMBERS_PARAM = 'list_with_members';
 var LOOKUP_PARAM = 'lookup';
+/**
+ * GET list_sold_pending_tree=true&governor_key=... — governor-only. Returns QR codes where column D is
+ * 'SOLD', column L (Owner Email) is non-empty, and column N (Tree Planting Date) is empty — i.e. sold
+ * pledges not yet linked to a planted tree. Sorted by column W (Sold Date) descending (most recent
+ * first). Gated by GOVERNOR_READ_KEY (Script Property) since the response includes owner emails.
+ * Part of the Sunmint tree-planting -> QR linking roadmap
+ * (agentic_ai_context/plans/SUNMINT_TREE_QR_LINKING_PLAN.md, PR3).
+ */
+var LIST_SOLD_PENDING_TREE_PARAM = 'list_sold_pending_tree';
+var GOVERNOR_KEY_PARAM = 'governor_key';
+var GOVERNOR_READ_KEY_PROPERTY = 'GOVERNOR_READ_KEY';
 /** GET list_unassigned_stripe_sessions=true — Stripe Session IDs not yet assigned via column Z of "Agroverse QR codes" (or legacy column P); optional for_qr_code also includes the session already linked to that QR */
 var LIST_UNASSIGNED_STRIPE_SESSIONS_PARAM = 'list_unassigned_stripe_sessions';
 var FOR_QR_CODE_PARAM = 'for_qr_code';
@@ -114,10 +125,27 @@ function doOptionsWebLedger_(e) {
  *   QR in P (for DApp prefill). shipping_provider (col M) and tracking_number (col N) are included so the DApp /
  *   dao_client can prefill those fields when an operator picks a session, without a second round trip.
  * - 'list_contributor_names=true' returns { status, names: string[] } from **Contributors Digital Signatures** (batch QR manager dropdown).
+ * - 'list_sold_pending_tree=true&governor_key=...' (governor-only, see GOVERNOR_READ_KEY_PROPERTY) returns
+ *   { status, items: [{ qr_code, owner_email, sold_date, ledger_name }] } for SOLD QRs with an owner email
+ *   and no Tree Planting Date yet, sorted by Sold Date descending.
  *
  * @param {Object} e Event object containing parameters.
  * @return {ContentService.TextOutput} JSON response with results or error.
  */
+/**
+ * Governor-only gate for read endpoints that expose PII (owner emails). Compares the request's
+ * governor_key parameter against the GOVERNOR_READ_KEY Script Property. Returns true only when both
+ * are non-empty and match — an unset property fails closed (nothing is treated as authorized).
+ * @param {Object} e Event object.
+ * @return {boolean}
+ */
+function isAuthorizedGovernorReadRequest_(e) {
+  var expected = PropertiesService.getScriptProperties().getProperty(GOVERNOR_READ_KEY_PROPERTY);
+  if (!expected) return false;
+  var provided = getQueryParam_(e, GOVERNOR_KEY_PARAM);
+  return !!provided && provided === expected;
+}
+
 function doGetWebLedger_(e) {
   try {
     if (isTruthyQueryParam_(getQueryParam_(e, LIST_CONTRIBUTOR_NAMES_PARAM))) {
@@ -230,6 +258,53 @@ function doGetWebLedger_(e) {
       return createCORSResponse({
         status: 'success',
         items: availableQrCodesWithMembers
+      });
+    }
+
+    // Check if the request is for the governor-only "sold, pending tree link" chronological list
+    if (isTruthyQueryParam_(getQueryParam_(e, LIST_SOLD_PENDING_TREE_PARAM))) {
+      if (!isAuthorizedGovernorReadRequest_(e)) {
+        return createCORSResponse({
+          status: 'error',
+          message: 'Unauthorized: missing or invalid governor_key'
+        });
+      }
+
+      var lastRow = sheet.getLastRow();
+      if (lastRow < DATA_START_ROW) {
+        return createCORSResponse({ status: 'success', items: [] });
+      }
+
+      // Columns needed: A qr_code, D status, L Owner Email, N Tree Planting Date, V Ledger Name, W Sold Date
+      var dataRange = sheet.getRange(DATA_START_ROW, 1, lastRow - DATA_START_ROW + 1, 23).getValues();
+      var pendingItems = [];
+
+      for (var i = 0; i < dataRange.length; i++) {
+        var row = dataRange[i];
+        var status = (row[3] || '').toString().toUpperCase().trim();
+        var ownerEmail = (row[11] || '').toString().trim();
+        var treePlantingDate = row[13];
+        if (status === 'SOLD' && ownerEmail && !treePlantingDate) {
+          pendingItems.push({
+            qr_code: row[0],
+            owner_email: ownerEmail,
+            ledger_name: row[21] || '',
+            sold_date: row[22] instanceof Date ? row[22].toISOString() : (row[22] || '')
+          });
+        }
+      }
+
+      // Sort by sold_date descending (most recently sold first); items without a Sold Date sort last.
+      pendingItems.sort(function (a, b) {
+        if (!a.sold_date && !b.sold_date) return 0;
+        if (!a.sold_date) return 1;
+        if (!b.sold_date) return -1;
+        return a.sold_date < b.sold_date ? 1 : (a.sold_date > b.sold_date ? -1 : 0);
+      });
+
+      return createCORSResponse({
+        status: 'success',
+        items: pendingItems
       });
     }
 
@@ -1956,6 +2031,7 @@ function shouldRouteToWebLedger_(e) {
   if (isTruthyQueryParam_(getQueryParam_(e, LIST_CONTRIBUTOR_NAMES_PARAM))) return true;
   if (isTruthyQueryParam_(getQueryParam_(e, LIST_UNASSIGNED_STRIPE_SESSIONS_PARAM))) return true;
   if (p[LIST_ALL_PARAM] === 'true' || p[LIST_PARAM] === 'true' || p[LIST_WITH_MEMBERS_PARAM] === 'true') return true;
+  if (isTruthyQueryParam_(getQueryParam_(e, LIST_SOLD_PENDING_TREE_PARAM))) return true;
   if (p[LOOKUP_PARAM] === 'true') return true;
   if (p[QR_CODE_PARAM] && p[EMAIL_ADDRESS_PARAM]) return true;
   return false;

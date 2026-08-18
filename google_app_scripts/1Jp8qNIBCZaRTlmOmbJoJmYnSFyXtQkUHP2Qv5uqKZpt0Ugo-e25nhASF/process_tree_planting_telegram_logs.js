@@ -385,3 +385,100 @@ function processTelegramLogs() {
     }
   });
 }
+
+// ========== Governor-only read endpoint (PR3, Sunmint tree-planting -> QR linking roadmap) ==========
+// agentic_ai_context/plans/SUNMINT_TREE_QR_LINKING_PLAN.md
+//
+// No doGet existed in this project before this addition. Column indices below mirror the
+// "SunMint Tree Planting" header row written in processTelegramLogs() above.
+const SUNMINT_STATUS_MESSAGE_ID_COL = 3;  // Column D (0-based) — Telegram Message ID, stable dedup key
+const SUNMINT_STATUS_DATE_COL = 6;        // Column G (0-based) — Status date / planting date (YYYYMMDD)
+const SUNMINT_PHOTO_URL_COL = 8;          // Column I (0-based) — Photo of Tree Planted
+const SUNMINT_SUBMITTED_NAME_COL = 9;     // Column J (0-based) — Submitted Name
+const SUNMINT_LATITUDE_COL = 10;          // Column K (0-based)
+const SUNMINT_LONGITUDE_COL = 11;         // Column L (0-based)
+const SUNMINT_STATUS_COL = 12;            // Column M (0-based) — Status ("NEW", "LINKED" from PR4 onward)
+const SUNMINT_SPECIES_COL = 13;           // Column N (0-based) — Specie
+const GOVERNOR_READ_KEY_PROPERTY = 'GOVERNOR_READ_KEY';
+
+/**
+ * Governor-only gate — same convention as qr_code_web_service.js's isAuthorizedGovernorReadRequest_.
+ * This is a separate GAS project (clasp mirrors can't share code), hence the duplicated ~6 lines.
+ */
+function isAuthorizedGovernorReadRequest_(e) {
+  const expected = PropertiesService.getScriptProperties().getProperty(GOVERNOR_READ_KEY_PROPERTY);
+  if (!expected) return false;
+  const provided = e && e.parameter ? e.parameter['governor_key'] : '';
+  return !!provided && provided === expected;
+}
+
+/**
+ * GET ?list_new=true&governor_key=... — governor-only. Returns SunMint Tree Planting submissions with
+ * Status "NEW" (not yet linked to a QR code), sorted by Status date (planting date) ascending — oldest
+ * unlinked submission first. Gated by GOVERNOR_READ_KEY since the response includes contributor names
+ * and GPS coordinates.
+ */
+function doGet(e) {
+  const action = e && e.parameter ? e.parameter['list_new'] : '';
+  if (action !== 'true') {
+    return ContentService.createTextOutput(JSON.stringify({
+      status: 'error',
+      message: 'No valid action specified. Use ?list_new=true&governor_key=...'
+    })).setMimeType(ContentService.MimeType.JSON);
+  }
+
+  if (!isAuthorizedGovernorReadRequest_(e)) {
+    return ContentService.createTextOutput(JSON.stringify({
+      status: 'error',
+      message: 'Unauthorized: missing or invalid governor_key'
+    })).setMimeType(ContentService.MimeType.JSON);
+  }
+
+  try {
+    const sheet = SpreadsheetApp.openById(creds.SHEET_ID);
+    const sunMintTab = sheet.getSheetByName(sunMintTabName);
+    if (!sunMintTab) {
+      return ContentService.createTextOutput(JSON.stringify({ status: 'success', items: [] }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+
+    const lastRow = sunMintTab.getLastRow();
+    if (lastRow < 2) {
+      return ContentService.createTextOutput(JSON.stringify({ status: 'success', items: [] }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+
+    const data = sunMintTab.getRange(2, 1, lastRow - 1, 17).getValues();
+    const items = [];
+    for (let i = 0; i < data.length; i++) {
+      const row = data[i];
+      const status = (row[SUNMINT_STATUS_COL] || '').toString().trim().toUpperCase();
+      if (status !== 'NEW') continue;
+      const statusDate = row[SUNMINT_STATUS_DATE_COL];
+      items.push({
+        telegram_message_id: row[SUNMINT_STATUS_MESSAGE_ID_COL],
+        planting_date: statusDate instanceof Date ? statusDate.toISOString() : (statusDate || ''),
+        photo_url: row[SUNMINT_PHOTO_URL_COL] || '',
+        submitted_name: row[SUNMINT_SUBMITTED_NAME_COL] || '',
+        latitude: row[SUNMINT_LATITUDE_COL] || '',
+        longitude: row[SUNMINT_LONGITUDE_COL] || '',
+        species: row[SUNMINT_SPECIES_COL] || ''
+      });
+    }
+
+    // Sort by planting_date ascending (oldest unlinked submission first); blanks sort last.
+    items.sort(function (a, b) {
+      if (!a.planting_date && !b.planting_date) return 0;
+      if (!a.planting_date) return 1;
+      if (!b.planting_date) return -1;
+      return a.planting_date < b.planting_date ? -1 : (a.planting_date > b.planting_date ? 1 : 0);
+    });
+
+    return ContentService.createTextOutput(JSON.stringify({ status: 'success', items: items }))
+      .setMimeType(ContentService.MimeType.JSON);
+  } catch (err) {
+    Logger.log(`doGet(list_new) error: ${err.message}`);
+    return ContentService.createTextOutput(JSON.stringify({ status: 'error', message: err.message }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+}
