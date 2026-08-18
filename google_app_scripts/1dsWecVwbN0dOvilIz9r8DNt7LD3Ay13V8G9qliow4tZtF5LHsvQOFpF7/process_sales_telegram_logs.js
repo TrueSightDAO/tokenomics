@@ -202,6 +202,7 @@ const TELEGRAM_HANDLE_COL_CONTRIBUTORS = 7; // Column H (Telegram Handle)
 const QR_CODE_COL = 0; // Column A
 const VALUE_COL = 2; // Column C
 const STATUS_COL = 3; // Column D
+const SOLD_DATE_COL = 22; // Column W (Sold Date) — stamped whenever status transitions to SOLD
 const INVENTORY_TYPE_COL = 8; // Column I
 
 /**
@@ -401,7 +402,9 @@ function updateAgroverseQrStatus(qrCode) {
       if (agroverseData[i][QR_CODE_COL] === qrCode) {
         // Update Column D (index 3) to "SOLD"
         agroverseSheet.getRange(i + 1, STATUS_COL + 1).setValue('SOLD');
-        Logger.log(`Updated QR code ${qrCode} to SOLD in Agroverse QR codes sheet`);
+        // Stamp Column W (index 22) with the sale date
+        agroverseSheet.getRange(i + 1, SOLD_DATE_COL + 1).setValue(new Date());
+        Logger.log(`Updated QR code ${qrCode} to SOLD in Agroverse QR codes sheet, stamped Sold Date`);
         return true;
       }
     }

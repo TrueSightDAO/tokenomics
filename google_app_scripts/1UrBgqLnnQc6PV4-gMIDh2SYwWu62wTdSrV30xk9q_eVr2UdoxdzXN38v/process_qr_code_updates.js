@@ -45,6 +45,7 @@ const QR_CODE_COL = 0; // Column A (qr_code)
 const STATUS_COL_DEST = 3; // Column D (status)
 const EMAIL_COL_DEST = 11; // Column L (Owner Email)
 const MANAGER_COL_DEST = 20; // Column U (Manager Name)
+const SOLD_DATE_COL_DEST = 22; // Column W (Sold Date) — stamped whenever status transitions to SOLD
 const STRIPE_SESSION_COL_DEST = 25; // Column Z (Stripe Session ID)
 
 // Event marker
@@ -267,6 +268,10 @@ function processQrCodeUpdatesFromTelegramChatLogs() {
           // Update status (Column D, index 3)
           destSheet.getRange(qrCodeRowIndex, STATUS_COL_DEST + 1).setValue(extracted.status);
           Logger.log(`Row ${rowNumber}: Updated status for QR code "${extracted.qrCode}" to "${extracted.status}"`);
+          if (extracted.status === 'SOLD') {
+            destSheet.getRange(qrCodeRowIndex, SOLD_DATE_COL_DEST + 1).setValue(new Date());
+            Logger.log(`Row ${rowNumber}: Stamped Sold Date (column W) for QR code "${extracted.qrCode}"`);
+          }
           updatesMade = true;
         }
 
