@@ -114,7 +114,20 @@ function doGet(e) {
     }
   }
 
-  return ContentService.createTextOutput("ℹ️ No valid action specified. Use ?action=processQrCodeUpdatesFromTelegramChatLogs");
+  // [TREE PLANTING LINK EVENT] webhook — handler defined in process_tree_planting_link.js (same
+  // project/global scope). See SUNMINT_TREE_QR_LINKING_PLAN.md PR4/PR5.
+  if (action === 'processTreePlantingLinksFromTelegramChatLogs') {
+    try {
+      Logger.log("Webhook triggered: processing tree planting links from Telegram Chat Logs");
+      const result = processTreePlantingLinksFromTelegramChatLogs();
+      return ContentService.createTextOutput(`✅ Tree planting links processed: ${result.processed} linked, ${result.rejected} rejected, ${result.errors} errors`);
+    } catch (err) {
+      Logger.log("Error in processTreePlantingLinksFromTelegramChatLogs: " + err.message);
+      return ContentService.createTextOutput("❌ Error: " + err.message);
+    }
+  }
+
+  return ContentService.createTextOutput("ℹ️ No valid action specified. Use ?action=processQrCodeUpdatesFromTelegramChatLogs or ?action=processTreePlantingLinksFromTelegramChatLogs");
 }
 
 /**
