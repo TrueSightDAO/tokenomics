@@ -546,7 +546,7 @@ See [`python_scripts/schema_validation/README.md`](./python_scripts/schema_valid
 | J | Submitted Name | String | Name submitted for the tree |
 | K | Latitude | String | GPS latitude |
 | L | Longitude | String | GPS longitude |
-| M | Status | String | Processing status: `NEW` (default on ingest) → `LINKED` (once a governor links this submission to a QR code, see column R/S below) |
+| M | Status | String | Processing status: `NEW` (default on ingest) → `LINKED` (governor linked to a sold QR via `[TREE PLANTING LINK EVENT]`, see column R/S below) or `INVALID` (governor rejected the submission via `[TREE PLANTING REJECT EVENT]`) |
 | N | Specie | String | Tree species |
 | O | GitHub Commit URL | String | Commit URL for the photo mirrored to `TrueSightDAO/sunmint` `images/` (corrected 2026-08-18 — previously documented as "Notarization URL"; the actual `appendRow` order in `process_tree_planting_telegram_logs.gs` writes the GitHub commit URL here) |
 | P | Cost of Tree | Number | Cost per tree |
