@@ -498,3 +498,69 @@ function processTreePlantingLinkCron() {
     throw error;
   }
 }
+
+/**
+ * doPost — direct ingestion webhook for [TREE PLANTING LINK EVENT].
+ *
+ * WHY: the canonical ingestion path is "post the event message in the DAO Telegram group → the bot
+ * scrapes it into the Telegram Chat Logs sheet → processTreePlantingLinksFromTelegramChatLogs() picks
+ * it up". But the bot feed has been dead since 2024 (no rows appended since update ~469024790 /
+ * msg ~3542), so CLI/API submissions (Edgar) are accepted but never reach the sheet the handler reads.
+ * This webhook closes that gap: it accepts a signed event directly, appends a properly-formatted row
+ * to the Telegram Chat Logs sheet (same column layout the processor reads), and then runs the existing
+ * processor — so a governor-signed submission via the CLI/API path is ingested exactly as if it had
+ * been posted in the group.
+ *
+ * SECURITY: mirrors the server-side governor enforcement of the processor itself — the request must
+ * carry the signed event text, and the signature must resolve (via the Contributors Digital Signatures
+ * tab) to a contributor whose name is in the Governors tab (column A). Anonymous callers get 401.
+ * Idempotent: the processor's tracking tab dedup (by source row number) prevents double-processing.
+ *
+ * Request (POST, JSON): { "message": "<full [TREE PLANTING LINK EVENT] text incl. My Digital Signature>" }
+ * Response: { "status": "ok"|"error", "processed": n, "rejected": n, ... } — same shape as the processor.
+ */
+function doPost(e) {
+  try {
+    var body = {};
+    if (e && e.postData && e.postData.contents) {
+      try { body = JSON.parse(e.postData.contents); } catch (err) { body = {}; }
+    }
+    var message = (body.message || '').toString();
+
+    if (!message || message.indexOf(TREE_PLANTING_LINK_EVENT_MARKER) === -1) {
+      return ContentService.createTextOutput(JSON.stringify({
+        status: 'error', reason: 'missing [TREE PLANTING LINK EVENT] message'
+      })).setMimeType(ContentService.MimeType.JSON);
+    }
+
+    // Validate the signer is a governor before ingesting (same enforcement as the processor).
+    var parsed = extractTreePlantingLinkInfo_(message);
+    var contributorName = parsed.updatedBy ||
+      resolveContributorNameFromPublicSignature_(parsed.publicSignature);
+    if (!isGovernorByName_(contributorName)) {
+      return ContentService.createTextOutput(JSON.stringify({
+        status: 'error', reason: 'signer is not a governor', contributor: contributorName
+      })).setMimeType(ContentService.MimeType.JSON);
+    }
+
+    // Append a properly-formatted row to the Telegram Chat Logs sheet (the processor's only input).
+    // Column layout matches process_qr_code_updates.js: A=update id, B=chat id, C=chat name,
+    // D=message id, E=sender name, F=(unused), G=Contribution Made (message body).
+    var sourceSpreadsheet = SpreadsheetApp.openByUrl(SOURCE_SHEET_URL);
+    var sourceSheet = sourceSpreadsheet.getSheetByName(SOURCE_SHEET_NAME);
+    if (!sourceSheet) throw new Error('Sheet "' + SOURCE_SHEET_NAME + '" not found');
+    var fakeUpdateId = 'WEBHOOK-' + new Date().getTime();
+    sourceSheet.appendRow([fakeUpdateId, '', '', '', contributorName, '', message]);
+
+    // Run the existing processor — it will pick up the row we just appended.
+    var result = processTreePlantingLinksFromTelegramChatLogs();
+    result.status = 'ok';
+    result.ingestedRow = fakeUpdateId;
+    return ContentService.createTextOutput(JSON.stringify(result))
+      .setMimeType(ContentService.MimeType.JSON);
+  } catch (err) {
+    return ContentService.createTextOutput(JSON.stringify({
+      status: 'error', reason: err.message
+    })).setMimeType(ContentService.MimeType.JSON);
+  }
+}
