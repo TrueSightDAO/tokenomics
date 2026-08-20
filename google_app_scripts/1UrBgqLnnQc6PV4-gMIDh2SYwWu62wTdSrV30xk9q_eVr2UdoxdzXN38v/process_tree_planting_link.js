@@ -21,6 +21,7 @@
  */
 
 const TREE_PLANTING_LINK_EVENT_MARKER = '[TREE PLANTING LINK EVENT]';
+const TREE_PLANTING_REJECT_EVENT_MARKER = '[TREE PLANTING REJECT EVENT]';
 
 // ----- Column indices (0-based) on "Agroverse QR codes" not already declared in process_qr_code_updates.js -----
 const TPL_LEDGER_URL_COL = 2;             // Column C (ledger) — e.g. https://truesight.me/sunmint/bec
@@ -176,7 +177,7 @@ function normalizeTreePlantingLinkMessage_(raw) {
  * @return {{qrCode: string, sunmintMessageId: string, updatedBy: string, publicSignature: string}}
  */
 function extractTreePlantingLinkInfo_(message) {
-  const result = { qrCode: '', sunmintMessageId: '', updatedBy: '', publicSignature: '' };
+  const result = { qrCode: '', sunmintMessageId: '', updatedBy: '', publicSignature: '', reason: '' };
   try {
     const m = normalizeTreePlantingLinkMessage_(message);
 
@@ -191,6 +192,9 @@ function extractTreePlantingLinkInfo_(message) {
 
     const sigMatch = m.match(/My Digital Signature:\s*([^\n]+)/i);
     if (sigMatch) result.publicSignature = sigMatch[1].trim();
+
+    const reasonMatch = m.match(/-\s+Reason:\s*([^\n]+)/i);
+    if (reasonMatch) result.reason = reasonMatch[1].trim();
   } catch (e) {
     Logger.log('extractTreePlantingLinkInfo_ error: ' + e.message);
   }
@@ -345,6 +349,38 @@ function processTreePlantingLinksFromTelegramChatLogs() {
         Logger.log(`Row ${rowNumber}: signer "${contributorName || '(unresolved)'}" is not a governor — rejecting`);
         recordOutcome('REJECTED', 'Signer is not a registered governor');
         result.rejected++;
+        continue;
+      }
+
+      // [TREE PLANTING REJECT EVENT] path — a governor marks a NEW SunMint submission INVALID.
+      // No QR status change, no ledger booking, no owner email: an invalid submission must not
+      // touch the sold QR it was being considered against.
+      if (message.includes(TREE_PLANTING_REJECT_EVENT_MARKER)) {
+        const sunmintRejectData = sunmintSheet.getDataRange().getValues();
+        let sunmintRejectRowIndex = -1;
+        for (let kr = 1; kr < sunmintRejectData.length; kr++) {
+          if ((sunmintRejectData[kr][TPL_SUNMINT_MESSAGE_ID_COL] || '').toString().trim() === parsed.sunmintMessageId) {
+            sunmintRejectRowIndex = kr + 1;
+            break;
+          }
+        }
+        if (sunmintRejectRowIndex === -1) {
+          Logger.log(`Row ${rowNumber}: REJECT — SunMint submission "${parsed.sunmintMessageId}" not found`);
+          recordOutcome('REJECTED', 'SunMint submission not found (reject path)');
+          result.rejected++;
+          continue;
+        }
+        const sunmintRejectStatus = (sunmintRejectData[sunmintRejectRowIndex - 1][TPL_SUNMINT_STATUS_COL] || '').toString().trim().toUpperCase();
+        if (sunmintRejectStatus !== 'NEW') {
+          Logger.log(`Row ${rowNumber}: REJECT — SunMint submission status is "${sunmintRejectStatus}", only NEW can be invalidated`);
+          recordOutcome('REJECTED', `SunMint submission status is "${sunmintRejectStatus}", expected NEW (reject path)`);
+          result.rejected++;
+          continue;
+        }
+        sunmintSheet.getRange(sunmintRejectRowIndex, TPL_SUNMINT_STATUS_COL + 1).setValue('INVALID');
+        recordOutcome('REJECTED', parsed.reason || 'Marked invalid by governor');
+        result.processed++;
+        Logger.log(`Row ${rowNumber}: marked SunMint submission "${parsed.sunmintMessageId}" INVALID (governor: ${contributorName}, reason: ${parsed.reason || 'n/a'})`);
         continue;
       }
 
