@@ -88,6 +88,44 @@ function isGovernorByName_(contributorName) {
 }
 
 /**
+ * Sentinel check — reads the "Contributors contact information" tab (column A = name, column W = "Is Sentinel")
+ * on the main ledger spreadsheet. Sentinels are governor-equivalent operational agents without voting rights
+ * (see OPEN_FOLLOWUPS.md "Sentinel graduation framework"; 6 sentinels flagged TRUE: Sophia Truesight, Claude
+ * Anthropic, Kimi Moon, Deep Seek, Open Ai, truesight-autopilot). Governor OR sentinel = authorized operator.
+ * @param {string} contributorName
+ * @return {boolean}
+ */
+function isSentinelByName_(contributorName) {
+  if (!contributorName) return false;
+  try {
+    const spreadsheet = SpreadsheetApp.openByUrl(DESTINATION_SHEET_URL);
+    const sheet = spreadsheet.getSheetByName('Contributors contact information');
+    if (!sheet) return false;
+    const data = sheet.getDataRange().getValues();
+    for (let i = 0; i < data.length; i++) {
+      const name = String(data[i][0] || '').trim();
+      if (name.toLowerCase() === String(contributorName).toLowerCase()) {
+        const flag = String(data[i][22] || '').trim().toUpperCase(); // Column W
+        return flag === 'TRUE';
+      }
+    }
+  } catch (e) {
+    Logger.log('isSentinelByName_ lookup failed: ' + e.message);
+  }
+  return false;
+}
+
+/**
+ * Authorized operator = governor OR sentinel (plan §0: "a governor (or Sophia / an authorized LLM agent,
+ * signing as themselves)").
+ * @param {string} contributorName
+ * @return {boolean}
+ */
+function isAuthorizedOperator_(contributorName) {
+  return isGovernorByName_(contributorName) || isSentinelByName_(contributorName);
+}
+
+/**
  * Resolves a contributor's name from their RSA public signature, matching against
  * "Contributors Digital Signatures" (column A = name, column E = public signature) — same lookup used
  * by process_tree_planting_telegram_logs.js.
@@ -344,11 +382,13 @@ function processTreePlantingLinksFromTelegramChatLogs() {
         continue;
       }
 
-      // Governor check — reject silently-logged, no partial writes, if the signer isn't a governor.
+      // Authorized-operator check (governor OR sentinel) — reject silently-logged, no partial writes,
+      // if the signer isn't authorized. Sentinel support added per Gary 2026-08-20 (plan §0: governor or
+      // Sophia / an authorized LLM agent, signing as themselves).
       const contributorName = resolveContributorNameFromPublicSignature_(parsed.publicSignature);
-      if (!contributorName || !isGovernorByName_(contributorName)) {
-        Logger.log(`Row ${rowNumber}: signer "${contributorName || '(unresolved)'}" is not a governor — rejecting`);
-        recordOutcome('REJECTED', 'Signer is not a registered governor');
+      if (!contributorName || !isAuthorizedOperator_(contributorName)) {
+        Logger.log(`Row ${rowNumber}: signer "${contributorName || '(unresolved)'}" is not an authorized operator (governor/sentinel) — rejecting`);
+        recordOutcome('REJECTED', 'Signer is not a registered governor or sentinel');
         result.rejected++;
         continue;
       }
