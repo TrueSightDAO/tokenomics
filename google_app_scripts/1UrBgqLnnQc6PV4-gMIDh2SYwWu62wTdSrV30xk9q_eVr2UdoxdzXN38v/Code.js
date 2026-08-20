@@ -113,7 +113,18 @@ function doGet(e) {
     }
   }
 
-  return ContentService.createTextOutput("ℹ️ No valid action specified. Use ?action=processQrCodeUpdatesFromTelegramChatLogs");
+  if (action === 'processTreePlantingLinkCron') {
+    try {
+      Logger.log("Webhook triggered: processing tree-planting link/reject events from Telegram Chat Logs");
+      const result = processTreePlantingLinksFromTelegramChatLogs();
+      return ContentService.createTextOutput(`✅ Tree-planting events processed: ${result.processed} processed, ${result.skipped} skipped, ${result.errors} errors`);
+    } catch (err) {
+      Logger.log("Error in processTreePlantingLinkCron: " + err.message);
+      return ContentService.createTextOutput("❌ Error: " + err.message);
+    }
+  }
+
+  return ContentService.createTextOutput("ℹ️ No valid action specified. Use ?action=processQrCodeUpdatesFromTelegramChatLogs or ?action=processTreePlantingLinkCron");
 }
 
 /**
