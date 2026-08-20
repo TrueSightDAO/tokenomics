@@ -29,7 +29,7 @@ const TPL_TREE_PLANTING_DATE_COL = 13;    // Column N
 const TPL_LATITUDE_COL = 14;              // Column O
 const TPL_LONGITUDE_COL = 15;             // Column P
 const TPL_PHOTO_COL = 17;                 // Column R (Tree Seedling Photo URL)
-const TPL_NOTIFICATION_SENT_COL = 23;     // Column X (Tree Planted Notification Sent Date)
+const TPL_NOTIFICATION_SENT_COL = 27;     // Column AB (Tree Planted Notification Sent Date) — moved off column X (2026-08-20): live sheet col X is 'Review Click Through Date' (review workflow), so the stamp must not land there. AA/AB are free columns (grid max 28).
 
 // ----- Column indices (0-based) on "SunMint Tree Planting" -----
 const TPL_SUNMINT_MESSAGE_ID_COL = 3;     // Column D — Telegram Message ID (stable key)
@@ -213,7 +213,7 @@ function extractTreePlantingLinkInfo_(message) {
  * @param {string} plantingDate
  * @param {string} photoUrl
  */
-function sendTreePlantedNotificationEmail_(qrSheet, qrRowIndex, qrCode, ownerEmail, plantingDate, photoUrl) {
+function sendTreePlantedNotificationEmail_(qrSheet, qrRowIndex, qrCode, ownerEmail, plantingDate, photoUrl, latitude, longitude) {
   try {
     const subject = `Your Sunmint tree (${qrCode}) has been planted`;
     const lookupUrl = `https://truesight.me/qr/?id=${encodeURIComponent(qrCode)}`;
@@ -221,6 +221,7 @@ function sendTreePlantedNotificationEmail_(qrSheet, qrRowIndex, qrCode, ownerEma
       `Good news — the tree behind your Sunmint pledge (QR code ${qrCode}) has been planted.`,
       '',
       `Planting date: ${plantingDate || 'N/A'}`,
+      (latitude && longitude) ? `Location: ${latitude}, ${longitude}` : '',
       photoUrl ? `Photo: ${photoUrl}` : '',
       '',
       `View the full record: ${lookupUrl}`,
@@ -463,7 +464,8 @@ function processTreePlantingLinksFromTelegramChatLogs() {
       if (ownerEmail) {
         sendTreePlantedNotificationEmail_(
           qrSheet, qrRowIndex, parsed.qrCode, ownerEmail,
-          sunmintRow[TPL_SUNMINT_STATUS_DATE_COL] || '', sunmintRow[TPL_SUNMINT_PHOTO_COL] || ''
+          sunmintRow[TPL_SUNMINT_STATUS_DATE_COL] || '', sunmintRow[TPL_SUNMINT_PHOTO_COL] || '',
+          sunmintRow[TPL_SUNMINT_LATITUDE_COL] || '', sunmintRow[TPL_SUNMINT_LONGITUDE_COL] || ''
         );
       } else {
         Logger.log(`Row ${rowNumber}: QR "${parsed.qrCode}" has no Owner Email — notification skipped`);

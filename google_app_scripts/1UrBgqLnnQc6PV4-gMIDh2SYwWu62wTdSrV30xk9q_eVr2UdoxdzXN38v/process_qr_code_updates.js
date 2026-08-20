@@ -45,7 +45,7 @@ const QR_CODE_COL = 0; // Column A (qr_code)
 const STATUS_COL_DEST = 3; // Column D (status)
 const EMAIL_COL_DEST = 11; // Column L (Owner Email)
 const MANAGER_COL_DEST = 20; // Column U (Manager Name)
-const SOLD_DATE_COL_DEST = 22; // Column W (Sold Date) — stamped whenever status transitions to SOLD
+const SOLD_DATE_COL_DEST = 27; // Column AA (Sold Date) — moved off column W (2026-08-20): live sheet col W is 'Review Email Sent Date' (review workflow), so the stamp must not land there. AA is a free column (grid max 28).
 const STRIPE_SESSION_COL_DEST = 25; // Column Z (Stripe Session ID)
 
 // Event marker
