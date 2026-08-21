@@ -202,7 +202,7 @@ const TELEGRAM_HANDLE_COL_CONTRIBUTORS = 7; // Column H (Telegram Handle)
 const QR_CODE_COL = 0; // Column A
 const VALUE_COL = 2; // Column C
 const STATUS_COL = 3; // Column D
-const SOLD_DATE_COL = 22; // Column W (Sold Date) — stamped whenever status transitions to SOLD
+const SOLD_DATE_COL = 26; // Column AA (Sold Date) — stamped whenever status transitions to SOLD
 const INVENTORY_TYPE_COL = 8; // Column I
 
 /**
