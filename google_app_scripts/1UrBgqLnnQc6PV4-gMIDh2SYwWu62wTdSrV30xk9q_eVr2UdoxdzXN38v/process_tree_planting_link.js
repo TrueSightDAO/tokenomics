@@ -215,7 +215,7 @@ function normalizeTreePlantingLinkMessage_(raw) {
  * @return {{qrCode: string, sunmintMessageId: string, updatedBy: string, publicSignature: string}}
  */
 function extractTreePlantingLinkInfo_(message) {
-  const result = { qrCode: '', sunmintMessageId: '', updatedBy: '', publicSignature: '', reason: '' };
+  const result = { qrCode: '', sunmintMessageId: '', updatedBy: '', publicSignature: '', reason: '', requestTransactionId: '' };
   try {
     const m = normalizeTreePlantingLinkMessage_(message);
 
@@ -233,6 +233,9 @@ function extractTreePlantingLinkInfo_(message) {
 
     const reasonMatch = m.match(/-\s+Reason:\s*([^\n]+)/i);
     if (reasonMatch) result.reason = reasonMatch[1].trim();
+
+    const txidMatch = m.match(/Request Transaction ID:\s*([^\n]+)/i);
+    if (txidMatch) result.requestTransactionId = txidMatch[1].trim();
   } catch (e) {
     Logger.log('extractTreePlantingLinkInfo_ error: ' + e.message);
   }
@@ -569,9 +572,9 @@ function doPost(e) {
     }
     var message = (body.message || '').toString();
 
-    if (!message || message.indexOf(TREE_PLANTING_LINK_EVENT_MARKER) === -1) {
+    if (!message || (message.indexOf(TREE_PLANTING_LINK_EVENT_MARKER) === -1 && message.indexOf(TREE_PLANTING_REJECT_EVENT_MARKER) === -1)) {
       return ContentService.createTextOutput(JSON.stringify({
-        status: 'error', reason: 'missing [TREE PLANTING LINK EVENT] message'
+        status: 'error', reason: 'missing [TREE PLANTING LINK EVENT] or [TREE PLANTING REJECT EVENT] message'
       })).setMimeType(ContentService.MimeType.JSON);
     }
 
@@ -579,19 +582,40 @@ function doPost(e) {
     var parsed = extractTreePlantingLinkInfo_(message);
     var contributorName = parsed.updatedBy ||
       resolveContributorNameFromPublicSignature_(parsed.publicSignature);
-    if (!isGovernorByName_(contributorName)) {
+    if (!isAuthorizedOperator_(contributorName)) {
       return ContentService.createTextOutput(JSON.stringify({
-        status: 'error', reason: 'signer is not a governor', contributor: contributorName
+        status: 'error', reason: 'signer is not an authorized operator (governor or sentinel)', contributor: contributorName
       })).setMimeType(ContentService.MimeType.JSON);
     }
 
     // Append a properly-formatted row to the Telegram Chat Logs sheet (the processor's only input).
     // Column layout matches process_qr_code_updates.js: A=update id, B=chat id, C=chat name,
     // D=message id, E=sender name, F=(unused), G=Contribution Made (message body).
+    // Idempotency: derive the update id from the event's Request Transaction ID so a retry
+    // (double-click / network retry) can't append a second row and double-book a LINK.
+    var txid = parsed.requestTransactionId || new Date().getTime();
+    var fakeUpdateId = 'WEBHOOK-' + txid;
+
     var sourceSpreadsheet = SpreadsheetApp.openByUrl(SOURCE_SHEET_URL);
     var sourceSheet = sourceSpreadsheet.getSheetByName(SOURCE_SHEET_NAME);
     if (!sourceSheet) throw new Error('Sheet "' + SOURCE_SHEET_NAME + '" not found');
-    var fakeUpdateId = 'WEBHOOK-' + new Date().getTime();
+
+    // Skip if this transaction was already ingested (tracking tab col B holds the update id).
+    var trackingSheet = sourceSpreadsheet.getSheetByName(TPL_TRACKING_TAB);
+    if (trackingSheet) {
+      var trackingValues = trackingSheet.getDataRange().getValues();
+      for (var i = 1; i < trackingValues.length; i++) {
+        if ((trackingValues[i][1] || '').toString() === fakeUpdateId) {
+          var dupResult = processTreePlantingLinksFromTelegramChatLogs();
+          dupResult.status = 'ok';
+          dupResult.duplicate = true;
+          dupResult.ingestedRow = fakeUpdateId;
+          return ContentService.createTextOutput(JSON.stringify(dupResult))
+            .setMimeType(ContentService.MimeType.JSON);
+        }
+      }
+    }
+
     sourceSheet.appendRow([fakeUpdateId, '', '', '', contributorName, '', message]);
 
     // Run the existing processor — it will pick up the row we just appended.
