@@ -361,7 +361,7 @@ function processTreePlantingLinksFromTelegramChatLogs() {
     if (processedRowNumbers.has(rowNumber)) continue;
 
     const message = (row[MESSAGE_COL] || '').toString();
-    if (!message.includes(TREE_PLANTING_LINK_EVENT_MARKER)) continue;
+    if (!message.includes(TREE_PLANTING_LINK_EVENT_MARKER) && !message.includes(TREE_PLANTING_REJECT_EVENT_MARKER)) continue;
 
     const telegramUpdateId = (row[TELEGRAM_UPDATE_ID_COL] || '').toString();
 
