@@ -6,6 +6,12 @@ self-contained project — the files in the folder ARE what gets deployed.
 No sync, no mapping, no mirror layer.  ``clasp push --force`` runs directly
 from the project folder.
 
+CONVENTION (governor directive 2026-08-20): **pull first, always.** Every push
+runs ``clasp pull`` immediately beforehand, then checks for git drift in the
+project folder. If the pull reveals live != git HEAD (un-pushed production
+work), the deploy ABORTS unless --allow-drift is passed. Never clobber
+production accidentally.
+
 Usage:
     scripts/deploy_gas_project.py <scriptId>                 # dry-run
     scripts/deploy_gas_project.py <scriptId> --push          # clasp push
@@ -112,6 +118,47 @@ def run_clasp_push(project_dir: Path, dry_run: bool) -> bool:
 
 # ── post-push hooks ─────────────────────────────────────────────────────────
 
+def run_clasp_pull(project_dir: Path) -> bool:
+    print(f"             cd {project_dir.relative_to(ROOT)} && clasp pull")
+    try:
+        r = subprocess.run(["clasp", "pull"], cwd=project_dir,
+            capture_output=True, text=True, check=False)
+        for line in (r.stdout or "").splitlines():
+            print(f"             | {line}")
+        if r.returncode != 0:
+            for line in (r.stderr or "").splitlines():
+                print(f"             ! {line}")
+            return False
+        return True
+    except FileNotFoundError:
+        print("  X clasp not installed (or not on PATH)")
+        return False
+
+
+def check_drift(project_dir: Path) -> list[str]:
+    """git status of the project folder after pull. Non-empty = live != git HEAD."""
+    rel = project_dir.relative_to(ROOT)
+    r = subprocess.run(["git", "status", "--short", "--", str(rel)],
+        cwd=ROOT, capture_output=True, text=True, check=False)
+    return [l for l in (r.stdout or "").splitlines() if l.strip()]
+
+
+def check_credentials_present(project_dir: Path) -> list[str]:
+    """A project that calls setApiKeys()/getCredentials() must ship a Credentials.js.
+
+    2026-08-21 incident: clasp push from a folder missing the live-only, gitignored
+    Credentials.js deleted it from the live project -> ReferenceError: setApiKeys is
+    not defined on every function (incl. the real sales webhook). This gate refuses to
+    push unless the local folder actually contains the credential file, so a deploy can
+    never silently delete live credentials again.
+    """
+    creds = [p for p in project_dir.iterdir()
+             if p.is_file() and p.name.lower().startswith('credentials') and p.suffix.lower() in ('.js', '.gs')]
+    if creds:
+        return []
+    return [f"no Credentials.js/.gs in {project_dir.relative_to(ROOT)} (setApiKeys/getCredentials depend on it)"]
+
+
 def run_post_push_hooks(project: dict, dry_run: bool) -> bool:
     hooks = project.get("post_push_hooks") or []
     candidates = project.get("candidate_cache_refresh_hooks") or []
@@ -164,6 +211,10 @@ def main() -> int:
     ap.add_argument("--list", action="store_true", help="list all projects")
     ap.add_argument("--allow-identity-mismatch", action="store_true",
                     help="push even when clasp identity != owner_email")
+    ap.add_argument("--allow-drift", action="store_true",
+                    help="push even when clasp pull reveals drift from git HEAD (DANGEROUS)")
+    ap.add_argument("--allow-missing-credentials", action="store_true",
+                    help="push even when Credentials.js is absent from the local folder (DANGEROUS)")
     args = ap.parse_args()
 
     if args.list:
@@ -214,7 +265,34 @@ def main() -> int:
         else:
             print(f"\n! identity mismatch (dry-run):{msg}")
 
+    # Pull first (CONVENTION: never clobber production) + drift gate
+    print("\n--- clasp pull (convention: pull first) ---")
+    if args.push:
+        if not run_clasp_pull(project_dir):
+            print("  X clasp pull failed \u2014 aborting deploy (do not push over an unpullable project)")
+            return 1
+        drift = check_drift(project_dir)
+        if drift:
+            print("  ! DRIFT after pull \u2014 live project differs from git HEAD:")
+            for line in drift:
+                print(f"      {line}")
+            if args.allow_drift:
+                print("  ! --allow-drift set \u2014 pushing anyway (DANGEROUS)")
+            else:
+                print("  X refusing to push \u2014 un-pushed production work exists.")
+                print("    Resolve the drift (commit/reconcile) or pass --allow-drift to override.")
+                return 1
+        else:
+            print("  ok \u2014 live project matches git HEAD (no drift)")
+
     # Push
+    if not args.allow_missing_credentials:
+        missing = check_credentials_present(project_dir)
+        if missing:
+            for m in missing:
+                print(f"  X {m}")
+            print("  X refusing to push - add Credentials.js (or --allow-missing-credentials to override)")
+            return 1
     print("\n--- clasp push ---")
     if not run_clasp_push(project_dir, dry_run=dry_run):
         return 1
