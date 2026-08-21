@@ -143,6 +143,22 @@ def check_drift(project_dir: Path) -> list[str]:
     return [l for l in (r.stdout or "").splitlines() if l.strip()]
 
 
+def check_credentials_present(project_dir: Path) -> list[str]:
+    """A project that calls setApiKeys()/getCredentials() must ship a Credentials.js.
+
+    2026-08-21 incident: clasp push from a folder missing the live-only, gitignored
+    Credentials.js deleted it from the live project -> ReferenceError: setApiKeys is
+    not defined on every function (incl. the real sales webhook). This gate refuses to
+    push unless the local folder actually contains the credential file, so a deploy can
+    never silently delete live credentials again.
+    """
+    creds = [p for p in project_dir.iterdir()
+             if p.is_file() and p.name.lower().startswith('credentials') and p.suffix.lower() in ('.js', '.gs')]
+    if creds:
+        return []
+    return [f"no Credentials.js/.gs in {project_dir.relative_to(ROOT)} (setApiKeys/getCredentials depend on it)"]
+
+
 def run_post_push_hooks(project: dict, dry_run: bool) -> bool:
     hooks = project.get("post_push_hooks") or []
     candidates = project.get("candidate_cache_refresh_hooks") or []
@@ -197,6 +213,8 @@ def main() -> int:
                     help="push even when clasp identity != owner_email")
     ap.add_argument("--allow-drift", action="store_true",
                     help="push even when clasp pull reveals drift from git HEAD (DANGEROUS)")
+    ap.add_argument("--allow-missing-credentials", action="store_true",
+                    help="push even when Credentials.js is absent from the local folder (DANGEROUS)")
     args = ap.parse_args()
 
     if args.list:
@@ -268,6 +286,13 @@ def main() -> int:
             print("  ok \u2014 live project matches git HEAD (no drift)")
 
     # Push
+    if not args.allow_missing_credentials:
+        missing = check_credentials_present(project_dir)
+        if missing:
+            for m in missing:
+                print(f"  X {m}")
+            print("  X refusing to push - add Credentials.js (or --allow-missing-credentials to override)")
+            return 1
     print("\n--- clasp push ---")
     if not run_clasp_push(project_dir, dry_run=dry_run):
         return 1
