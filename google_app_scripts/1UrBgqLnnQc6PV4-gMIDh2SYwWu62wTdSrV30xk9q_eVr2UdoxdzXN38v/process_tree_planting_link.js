@@ -696,3 +696,35 @@ function doPost(e) {
     })).setMimeType(ContentService.MimeType.JSON);
   }
 }
+
+/**
+ * Authorize MailApp for this script.
+ *
+ * Run this function once from the Apps Script editor (select authorizeMailApp from
+ * the function dropdown, then click Run). This triggers the OAuth consent screen
+ * granting the script.send_mail scope (plus the project's other scopes). Without
+ * this grant, every MailApp.sendEmail / getRemainingDailyQuota call throws
+ * "You do not have permission to call MailApp... Required permissions:
+ * https://www.googleapis.com/auth/script.send_mail".
+ *
+ * Public (no doGet/doPost routing needed): it exists so an editor user can click
+ * Run -> authorizeMailApp and complete the authorization flow in one step.
+ *
+ * @return {string} A JSON string with the daily quota, or the error if not authorized.
+ */
+function authorizeMailApp() {
+  try {
+    var emailQuota = MailApp.getRemainingDailyQuota();
+    return JSON.stringify({
+      status: 'ok',
+      quotaRemaining: emailQuota,
+      message: 'MailApp is authorized. Remaining daily quota: ' + emailQuota
+    });
+  } catch (err) {
+    return JSON.stringify({
+      status: 'error',
+      error: err.message,
+      hint: 'Run this function from the editor and approve the OAuth consent screen to grant script.send_mail.'
+    });
+  }
+}
