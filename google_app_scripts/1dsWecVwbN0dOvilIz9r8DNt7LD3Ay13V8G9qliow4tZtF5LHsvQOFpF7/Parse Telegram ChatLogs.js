@@ -521,7 +521,7 @@ function parseSalesEvent(message) {
     const soldBy = (soldByLine ? soldByLine[1] : '').toString().trim();
     const cashProceedsCollectedBy = (cashProceedsLine ? cashProceedsLine[1] : '').toString().trim();
     
-    if (qrCode && salePrice) {
+    if (qrCode && salePrice !== '') {
       Logger.log(`[SALES EVENT] parsed successfully: QR=${qrCode}, Price=${salePrice}`);
       return {
         qrCode,
