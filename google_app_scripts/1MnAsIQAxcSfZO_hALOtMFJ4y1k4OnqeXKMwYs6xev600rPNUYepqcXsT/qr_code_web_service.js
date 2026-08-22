@@ -1844,6 +1844,13 @@ function testSendEmail() {
  *     (this also fires the standard "Notify me on trigger failure" email if enabled).
  */
 function processBatch() {
+  // Self-healing hourly trigger (sibling convention: processDonationMintsFromTelegramChatLogs /
+  // processProgramRegistrationsFromTelegramChatLogs both self-install from within the processor).
+  // Guarantees onboarding emails don't depend on a UI trigger or a manual Run. Idempotent: no-ops
+  // if a processBatch trigger already exists. Wrapped in try so the scan work proceeds even if the
+  // first run lacks trigger-install permission.
+  try { ensureProcessBatchHourlyTriggerInstalled_(); } catch (e) { Logger.log('ensureProcessBatchHourlyTriggerInstalled_ failed: ' + e.message); }
+
   const sheet = SpreadsheetApp.openByUrl(SUBSCRIPTION_NOTIFICATION_WORKBOOK_URL).getSheetByName(SHEET_NAME);
   const data = sheet.getDataRange().getValues();
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -1955,6 +1962,25 @@ function processBatch() {
       ' and the Apps Script Executions log for details.'
     );
   }
+}
+
+/** Hourly safety-net cron for the onboarding-email batch sender — idempotent self-installer.
+ *  Mirrors ensureDonationMintHourlyTriggerInstalled_ / the program-registration equivalent in
+ *  this same project. Called from processBatch itself so the trigger is guaranteed to exist
+ *  after the first run (whether that came from a manual Run, a webhook, or a UI trigger).
+ *  Re-runs are no-ops thanks to the existence check. */
+function ensureProcessBatchHourlyTriggerInstalled_() {
+  var existing = ScriptApp.getProjectTriggers();
+  for (var i = 0; i < existing.length; i++) {
+    if (existing[i].getHandlerFunction() === 'processBatch') {
+      return;
+    }
+  }
+  ScriptApp.newTrigger('processBatch')
+    .timeBased()
+    .everyHours(1)
+    .create();
+  Logger.log('ensureProcessBatchHourlyTriggerInstalled_: installed hourly trigger.');
 }
 
 /**
