@@ -1875,7 +1875,11 @@ function processBatch() {
 
     // Build one tracking link per QR code; join with line break for multiple items
     const trackingLinksHtml = items
-      .map(item => `<a href="${item.baseUrl}?qr_code=${encodeURIComponent(item.qrCode)}">${item.qrCode}</a>`)
+      .map(item => {
+        const sep = (item.baseUrl || '').includes('?') ? '&' : '?';
+        const href = `${item.baseUrl}${sep}qr_code=${encodeURIComponent(item.qrCode)}`;
+        return `<a href="${href}">${item.qrCode}</a>`;
+      })
       .join('<br>');
 
     body = body.replace('{{TRACKING_LINK}}', trackingLinksHtml);
