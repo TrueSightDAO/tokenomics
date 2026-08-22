@@ -266,7 +266,7 @@ function extractTreePlantingLinkInfo_(message) {
  * @param {string} plantingDate
  * @param {string} photoUrl
  */
-function sendTreePlantedNotificationEmail_(qrSheet, qrRowIndex, qrCode, ownerEmail, plantingDate, photoUrl, latitude, longitude) {
+function sendTreePlantedNotificationEmail_(qrSheet, qrRowIndex, qrCode, ownerEmail, plantingDate, photoUrl, latitude, longitude, rethrowOnError) {
   try {
     const subject = `Your Sunmint tree (${qrCode}) has been planted`;
     const lookupUrl = `https://truesight.me/qr/?id=${encodeURIComponent(qrCode)}`;
@@ -289,6 +289,10 @@ function sendTreePlantedNotificationEmail_(qrSheet, qrRowIndex, qrCode, ownerEma
     // Don't let a mail failure roll back the already-committed sheet/ledger writes — log and move on.
     // The row's blank column X is itself the signal that notification still needs a manual retry.
     Logger.log(`sendTreePlantedNotificationEmail_ failed for QR ${qrCode}: ${e.message}`);
+    // Re-send path (rethrowOnError=true) surfaces the REAL MailApp error to the caller (the doGet
+    // action) instead of a false "✅ ok" — the governor's diagnostic found this error was being
+    // swallowed silently. The LINK flow keeps best-effort semantics (rethrowOnError unset/false).
+    if (rethrowOnError) throw e;
   }
 }
 
@@ -328,7 +332,7 @@ function resendTreePlantedNotification_(qrCode) {
   const latitude = row[TPL_LATITUDE_COL] || '';
   const longitude = row[TPL_LONGITUDE_COL] || '';
   const photoUrl = row[TPL_PHOTO_COL] || '';
-  sendTreePlantedNotificationEmail_(qrSheet, qrRowIndex, qrCode, ownerEmail, plantingDate, photoUrl, latitude, longitude);
+  sendTreePlantedNotificationEmail_(qrSheet, qrRowIndex, qrCode, ownerEmail, plantingDate, photoUrl, latitude, longitude, true);
   return { status: 'ok', message: `Notification re-sent to ${ownerEmail} for QR ${qrCode}` };
 }
 
