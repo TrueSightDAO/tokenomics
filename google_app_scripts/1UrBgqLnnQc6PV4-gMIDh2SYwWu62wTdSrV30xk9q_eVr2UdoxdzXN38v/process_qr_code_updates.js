@@ -127,6 +127,22 @@ function doGet(e) {
     }
   }
 
+
+  // [RESEND TREE-PLANTED NOTIFICATION] isolated action — sends ONLY the owner notification for an
+  // already-linked QR (status ASSIGNED_TO_TREE). Does NOT touch the ledger (the fulfillment pair is
+  // already booked at link time); re-running the LINK processor would double-book. Guarded by QR state
+  // so it cannot fire for unlinked rows or spam arbitrary rows. See SUNMINT_TREE_QR_LINKING_PLAN.md.
+  if (action === 'resendTreePlantedNotification') {
+    try {
+      const qrCode = String(e.parameter?.qrCode || '').trim();
+      const result = resendTreePlantedNotification_(qrCode);
+      return ContentService.createTextOutput(result);
+    } catch (err) {
+      Logger.log("Error in resendTreePlantedNotification: " + err.message);
+      return ContentService.createTextOutput("❌ Error: " + err.message);
+    }
+  }
+
   return ContentService.createTextOutput("ℹ️ No valid action specified. Use ?action=processQrCodeUpdatesFromTelegramChatLogs or ?action=processTreePlantingLinksFromTelegramChatLogs");
 }
 
@@ -637,3 +653,40 @@ function patchStripeDataForTelegramRows8093To8097() {
   Logger.log(`Patch complete: ${patchCount} tracking row(s) updated.`);
 }
 
+
+
+/**
+ * Isolated re-send of the tree-planted owner notification for one already-linked QR.
+ * Guard: QR must be ASSIGNED_TO_TREE (linked + planted). Reads real stored values from the
+ * QR row (written by the LINK at link time) and calls sendTreePlantedNotificationEmail_,
+ * which sends the email and stamps col AB (Tree Planted Notification Sent Date) on success.
+ * NO ledger writes here — the fulfillment pair is already booked by the LINK processor.
+ *
+ * @param {string} qrCode The QR code to re-notify
+ * @return {string} Human-readable outcome
+ */
+function resendTreePlantedNotification_(qrCode) {
+  if (!qrCode) return '❌ Missing qrCode parameter';
+  const ss = SpreadsheetApp.openByUrl(DESTINATION_SHEET_URL);
+  const sheet = ss.getSheetByName(DESTINATION_SHEET_NAME);
+  const values = sheet.getDataRange().getValues();
+  let rowIndex = -1;
+  for (let i = 0; i < values.length; i++) {
+    if (String(values[i][0]).trim() === qrCode) { rowIndex = i + 1; break; }
+  }
+  if (rowIndex < 0) return '❌ QR not found: ' + qrCode;
+  const row = values[rowIndex - 1];
+  const status = String(row[STATUS_COL_DEST] || '').trim();
+  if (status !== 'ASSIGNED_TO_TREE') {
+    return '❌ QR status is "' + status + '", expected ASSIGNED_TO_TREE — refusing (no re-send for unlinked rows).';
+  }
+  const ownerEmail = String(row[11] || '').trim();          // col L
+  if (!ownerEmail) return '❌ No Owner Email on the QR row — nothing to notify.';
+  const plantingDate = String(row[13] || '').trim();        // col N
+  const latitude = String(row[14] || '').trim();            // col O
+  const longitude = String(row[15] || '').trim();           // col P
+  const photoUrl = String(row[17] || '').trim();            // col R
+  sendTreePlantedNotificationEmail_(sheet, rowIndex, qrCode, ownerEmail, plantingDate, photoUrl, latitude, longitude);
+  return '✅ Tree-planted notification sent to ' + ownerEmail + ' for QR ' + qrCode +
+         ' (status ' + status + '; col AB stamped by sendTreePlantedNotificationEmail_).';
+}
