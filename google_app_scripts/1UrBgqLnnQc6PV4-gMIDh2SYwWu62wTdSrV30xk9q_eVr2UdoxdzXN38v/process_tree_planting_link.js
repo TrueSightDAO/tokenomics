@@ -328,8 +328,28 @@ function resendTreePlantedNotification_(qrCode) {
   const latitude = row[TPL_LATITUDE_COL] || '';
   const longitude = row[TPL_LONGITUDE_COL] || '';
   const photoUrl = row[TPL_PHOTO_COL] || '';
-  sendTreePlantedNotificationEmail_(qrSheet, qrRowIndex, qrCode, ownerEmail, plantingDate, photoUrl, latitude, longitude);
-  return { status: 'ok', message: `Notification re-sent to ${ownerEmail} for QR ${qrCode}` };
+  // Send DIRECTLY (no swallowing wrapper) so a real MailApp failure propagates to the doGet
+  // handler's try/catch and surfaces as the ACTUAL error, instead of a false "✅ ok". Same
+  // content as sendTreePlantedNotificationEmail_ builds. Quota reported to rule out exhaustion.
+  const quotaBefore = MailApp.getRemainingDailyQuota();
+  const subject = `Your Sunmint tree (${qrCode}) has been planted`;
+  const lookupUrl = `https://truesight.me/qr/?id=${encodeURIComponent(qrCode)}`;
+  const bodyLines = [
+    `Good news \u2014 the tree behind your Sunmint pledge (QR code ${qrCode}) has been planted.`,
+    '',
+    `Planting date: ${plantingDate || 'N/A'}`,
+    (latitude && longitude) ? `Location: ${latitude}, ${longitude}` : '',
+    photoUrl ? `Photo: ${photoUrl}` : '',
+    '',
+    `View the full record: ${lookupUrl}`,
+    '',
+    'Thank you for supporting Amazon rainforest restoration with TrueSight DAO.'
+  ].filter(function (l) { return l !== null && l !== undefined; });
+  // NO try/catch around the send \u2014 let the doGet handler's try/catch report the real error.
+  MailApp.sendEmail({ to: ownerEmail, subject: subject, body: bodyLines.join('\n') });
+  // Stamp the notification-sent date ONLY on genuine success (sendEmail didn't throw).
+  qrSheet.getRange(qrRowIndex, TPL_NOTIFICATION_SENT_COL + 1).setValue(new Date());
+  return { status: 'ok', message: `Notification re-sent to ${ownerEmail} for QR ${qrCode} (MailApp remaining quota: ${quotaBefore})` };
 }
 
 /**
