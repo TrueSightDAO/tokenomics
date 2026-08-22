@@ -50,6 +50,17 @@ const TPL_TRANSACTIONS_TAB = 'Transactions';                  // on the resolved
 const TPL_TRACKING_TAB = 'Tree Planting Link';                // lives on SOURCE_SHEET_URL's spreadsheet
 const TPL_LEDGER_URL_PREFIX = 'https://truesight.me/sunmint/';
 
+// ----- Main-DAO-ledger special case (AGL4) -----
+// AGL4 is the ONE managed ledger whose sale-time "Cacao Tree To Be Planted" liability is booked on the
+// MAIN DAO ledger's "offchain transactions" tab (spreadsheet 1GE7PUq-...), NOT on its own sub-ledger
+// (1Uo5p3-...) — see sales_update_main_dao_offchain_ledger.js processTokenizedTransactions(), which
+// special-cases agroverseValue === 'https://agroverse.shop/agl4', and sales_update_managed_agl_ledgers.js
+// processNonAgl4Transactions(), which explicitly SKIPS agl4. The tree-planting fulfillment must therefore
+// discharge AGL4 liabilities on the same main-ledger tab, with the same contributor/item pattern.
+const TPL_AGL4_LEDGER_URL = 'https://agroverse.shop/agl4';     // the exact ledger URL the sale-time booker keys on
+const TPL_MAIN_DAO_LEDGER_URL = 'https://docs.google.com/spreadsheets/d/1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU/edit'; // main DAO ledger
+const TPL_MAIN_DAO_OFFCHAIN_TAB = 'offchain transactions';     // main-ledger tab that holds the agl4 sale-time liability
+
 const TPL_TRACKING_HEADERS = [
   'Row Number',
   'Telegram Update ID',
@@ -289,19 +300,32 @@ function sendTreePlantedNotificationEmail_(qrSheet, qrRowIndex, qrCode, ownerEma
  * @param {string} contributorName
  * @return {boolean} true if the pair was appended
  */
-function appendTreePlantingLedgerFulfillment_(transactionsSpreadsheetUrl, message, contributorName) {
+function appendTreePlantingLedgerFulfillment_(transactionsSpreadsheetUrl, message, contributorName, ledgerUrl) {
   try {
-    const spreadsheet = SpreadsheetApp.openByUrl(transactionsSpreadsheetUrl);
-    const sheet = spreadsheet.getSheetByName(TPL_TRANSACTIONS_TAB);
+    // AGL4 discharges on the MAIN DAO ledger's offchain tab (where its sale-time liability lives),
+    // not on its own sub-ledger — mirrors sales_update_main_dao_offchain_ledger.js.
+    const isAgl4 = (ledgerUrl || '').toString().trim() === TPL_AGL4_LEDGER_URL;
+    const spreadsheet = SpreadsheetApp.openByUrl(isAgl4 ? TPL_MAIN_DAO_LEDGER_URL : transactionsSpreadsheetUrl);
+    const sheet = spreadsheet.getSheetByName(isAgl4 ? TPL_MAIN_DAO_OFFCHAIN_TAB : TPL_TRANSACTIONS_TAB);
     if (!sheet) {
-      Logger.log(`appendTreePlantingLedgerFulfillment_: no "${TPL_TRANSACTIONS_TAB}" tab in ${transactionsSpreadsheetUrl}`);
+      Logger.log(`appendTreePlantingLedgerFulfillment_: no "${isAgl4 ? TPL_MAIN_DAO_OFFCHAIN_TAB : TPL_TRANSACTIONS_TAB}" tab in ${isAgl4 ? TPL_MAIN_DAO_LEDGER_URL : transactionsSpreadsheetUrl}`);
       return false;
     }
     const today = new Date();
-    const rows = [
-      [today, message, contributorName, -1, 'Cacao Tree To Be Planted', 'Liability'],
-      [today, message, contributorName, 1, 'Cacao Tree Planted', 'Asset']
-    ];
+    let rows;
+    if (isAgl4) {
+      // 7-column shape matching the main-ledger sale-time rows (Sales Date, message, contributor,
+      // amount, category, '', TRUE). Contributor matches the sale-time liability row exactly.
+      rows = [
+        [today, message, 'SunMint Tree Planting Contract - agl4', -1, 'Cacao Tree To Be Planted', '', true],
+        [today, message, 'SunMint Tree Planting Contract - agl4', 1, 'Cacao Tree Planted', '', true]
+      ];
+    } else {
+      rows = [
+        [today, message, contributorName, -1, 'Cacao Tree To Be Planted', 'Liability'],
+        [today, message, contributorName, 1, 'Cacao Tree Planted', 'Asset']
+      ];
+    }
     const lastRow = sheet.getLastRow();
     sheet.getRange(lastRow + 1, 1, rows.length, rows[0].length).setValues(rows);
     return true;
@@ -498,7 +522,7 @@ function processTreePlantingLinksFromTelegramChatLogs() {
       sunmintSheet.getRange(sunmintRowIndex, TPL_SUNMINT_LINKED_AT_COL + 1).setValue(new Date().toISOString());
 
       // 3. Ledger fulfillment (transactionsUrl already resolved + validated above, before any writes).
-      const ledgerBooked = appendTreePlantingLedgerFulfillment_(transactionsUrl, message, contributorName);
+      const ledgerBooked = appendTreePlantingLedgerFulfillment_(transactionsUrl, message, contributorName, ledgerUrl);
 
       // 4. Owner notification (best-effort; failures don't roll back the writes above).
       if (ownerEmail) {
