@@ -293,6 +293,46 @@ function sendTreePlantedNotificationEmail_(qrSheet, qrRowIndex, qrCode, ownerEma
 }
 
 /**
+ * Manually re-sends the tree-planted notification email for an already-linked QR code, using the
+ * row's already-committed values — does NOT touch the ledger or re-run any LINK validation, so it's
+ * safe to invoke standalone when the original best-effort send (inside the LINK flow above) silently
+ * failed or never fired. Guarded to ASSIGNED_TO_TREE rows only, so it can't be used to fabricate a
+ * "planted" notification for a QR that was never actually linked.
+ * @param {string} qrCode
+ * @return {{status: string, message: string}}
+ */
+function resendTreePlantedNotification_(qrCode) {
+  const qrSpreadsheet = SpreadsheetApp.openByUrl(DESTINATION_SHEET_URL);
+  const qrSheet = qrSpreadsheet.getSheetByName(DESTINATION_SHEET_NAME);
+  const data = qrSheet.getDataRange().getValues();
+  let qrRowIndex = -1;
+  for (let i = 1; i < data.length; i++) {
+    if ((data[i][QR_CODE_COL] || '').toString().trim() === qrCode) {
+      qrRowIndex = i + 1;
+      break;
+    }
+  }
+  if (qrRowIndex === -1) {
+    return { status: 'error', message: `QR "${qrCode}" not found` };
+  }
+  const row = data[qrRowIndex - 1];
+  const status = (row[STATUS_COL_DEST] || '').toString().trim().toUpperCase();
+  if (status !== 'ASSIGNED_TO_TREE') {
+    return { status: 'error', message: `QR "${qrCode}" status is "${status}", expected ASSIGNED_TO_TREE` };
+  }
+  const ownerEmail = (row[EMAIL_COL_DEST] || '').toString().trim();
+  if (!ownerEmail) {
+    return { status: 'error', message: `QR "${qrCode}" has no Owner Email` };
+  }
+  const plantingDate = row[TPL_TREE_PLANTING_DATE_COL] || '';
+  const latitude = row[TPL_LATITUDE_COL] || '';
+  const longitude = row[TPL_LONGITUDE_COL] || '';
+  const photoUrl = row[TPL_PHOTO_COL] || '';
+  sendTreePlantedNotificationEmail_(qrSheet, qrRowIndex, qrCode, ownerEmail, plantingDate, photoUrl, latitude, longitude);
+  return { status: 'ok', message: `Notification re-sent to ${ownerEmail} for QR ${qrCode}` };
+}
+
+/**
  * Appends the ledger fulfillment pair to the resolved managed ledger's Transactions tab:
  *   -1 "Cacao Tree To Be Planted" (Liability)  — discharges the sale-time obligation
  *   +1 "Cacao Tree Planted"       (Asset)      — Gary, 2026-08-18: fulfilled pledge is a countable asset,
