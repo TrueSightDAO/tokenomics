@@ -127,7 +127,25 @@ function doGet(e) {
     }
   }
 
-  return ContentService.createTextOutput("ℹ️ No valid action specified. Use ?action=processQrCodeUpdatesFromTelegramChatLogs or ?action=processTreePlantingLinksFromTelegramChatLogs");
+  // One-off re-send of the tree-planted notification email — handler defined in
+  // process_tree_planting_link.js (same project/global scope). Does not touch the ledger or
+  // re-run LINK validation; only re-sends using the QR row's already-committed values. Guarded
+  // to ASSIGNED_TO_TREE rows in resendTreePlantedNotification_ itself.
+  if (action === 'resendTreePlantedNotification') {
+    const qrCode = (e.parameter && e.parameter.qr_code || '').toString().trim();
+    if (!qrCode) {
+      return ContentService.createTextOutput("❌ Error: missing qr_code parameter");
+    }
+    try {
+      const result = resendTreePlantedNotification_(qrCode);
+      return ContentService.createTextOutput((result.status === 'ok' ? "✅ " : "❌ ") + result.message);
+    } catch (err) {
+      Logger.log("Error in resendTreePlantedNotification: " + err.message);
+      return ContentService.createTextOutput("❌ Error: " + err.message);
+    }
+  }
+
+  return ContentService.createTextOutput("ℹ️ No valid action specified. Use ?action=processQrCodeUpdatesFromTelegramChatLogs, ?action=processTreePlantingLinksFromTelegramChatLogs, or ?action=resendTreePlantedNotification&qr_code=<code>");
 }
 
 /**
