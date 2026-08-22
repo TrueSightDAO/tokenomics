@@ -162,9 +162,15 @@ function getSoldRowsCount() {
   var sheet = spreadsheet.getSheetByName(sheetName);
   var data = sheet.getDataRange().getValues();
   
-  // Assuming Column D (index 3) is 'status'
-  var soldCount = data.slice(1).filter(row => row[3] === "SOLD" || row[3] === "ASSIGNED_TO_TREE").length; // Skip header row
-  Logger.log("Total SOLD Rows (Agroverse QR codes): " + soldCount);
+  // Assuming Column D (index 3) is 'status'. Column A (index 0) is 'qr_code' —
+  // exclude anything with "TEST" in the code so QA/E2E fixtures (UAT_TEST_*,
+  // E2E_TEST_*, etc.) never inflate this public-facing stat, even while they
+  // transiently pass through SOLD/ASSIGNED_TO_TREE during a test run.
+  var soldCount = data.slice(1).filter(row =>
+    (row[3] === "SOLD" || row[3] === "ASSIGNED_TO_TREE") &&
+    String(row[0]).toUpperCase().indexOf("TEST") === -1
+  ).length; // Skip header row
+  Logger.log("Total SOLD Rows (Agroverse QR codes, excluding TEST fixtures): " + soldCount);
   return soldCount;
 }
 
