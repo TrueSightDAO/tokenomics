@@ -285,10 +285,12 @@ function sendTreePlantedNotificationEmail_(qrSheet, qrRowIndex, qrCode, ownerEma
     MailApp.sendEmail({ to: ownerEmail, subject: subject, body: bodyLines.join('\n') });
     qrSheet.getRange(qrRowIndex, TPL_NOTIFICATION_SENT_COL + 1).setValue(new Date());
     Logger.log(`Sent tree-planted notification to ${ownerEmail} for QR ${qrCode}`);
+    return true;
   } catch (e) {
     // Don't let a mail failure roll back the already-committed sheet/ledger writes — log and move on.
     // The row's blank column X is itself the signal that notification still needs a manual retry.
     Logger.log(`sendTreePlantedNotificationEmail_ failed for QR ${qrCode}: ${e.message}`);
+    return false;
   }
 }
 
@@ -591,8 +593,9 @@ function processTreePlantingLinksFromTelegramChatLogs() {
       const ledgerBooked = appendTreePlantingLedgerFulfillment_(transactionsUrl, message, contributorName, ledgerUrl);
 
       // 4. Owner notification (best-effort; failures don't roll back the writes above).
+      let emailSent = false;
       if (ownerEmail) {
-        sendTreePlantedNotificationEmail_(
+        emailSent = sendTreePlantedNotificationEmail_(
           qrSheet, qrRowIndex, parsed.qrCode, ownerEmail,
           sunmintRow[TPL_SUNMINT_STATUS_DATE_COL] || '', sunmintRow[TPL_SUNMINT_PHOTO_COL] || '',
           sunmintRow[TPL_SUNMINT_LATITUDE_COL] || '', sunmintRow[TPL_SUNMINT_LONGITUDE_COL] || ''
@@ -601,7 +604,13 @@ function processTreePlantingLinksFromTelegramChatLogs() {
         Logger.log(`Row ${rowNumber}: QR "${parsed.qrCode}" has no Owner Email — notification skipped`);
       }
 
-      recordOutcome('LINKED', ledgerBooked ? 'OK' : 'Ledger fulfillment not booked — see log');
+      let outcome = 'OK';
+      if (!ledgerBooked) {
+        outcome = 'Ledger fulfillment not booked — see log';
+      } else if (ownerEmail && !emailSent) {
+        outcome = 'Email notification failed — see log';
+      }
+      recordOutcome('LINKED', outcome);
       result.processed++;
       Logger.log(`Row ${rowNumber}: linked QR "${parsed.qrCode}" to SunMint submission "${parsed.sunmintMessageId}" (governor: ${contributorName})`);
 
