@@ -163,7 +163,7 @@ function getSoldRowsCount() {
   var data = sheet.getDataRange().getValues();
   
   // Assuming Column D (index 3) is 'status'
-  var soldCount = data.slice(1).filter(row => row[3] === "SOLD" || row[3] === "ASSIGNED_TO_TREE").length; // Skip header row
+  var soldCount = data.slice(1).filter(row => row[3] === "SOLD" || row[3] === "ASSIGNED_TO_TREE" || row[3] === "TREE_PLANTING_FUNDS_TRANSFERRED").length; // Skip header row
   Logger.log("Total SOLD Rows (Agroverse QR codes): " + soldCount);
   return soldCount;
 }

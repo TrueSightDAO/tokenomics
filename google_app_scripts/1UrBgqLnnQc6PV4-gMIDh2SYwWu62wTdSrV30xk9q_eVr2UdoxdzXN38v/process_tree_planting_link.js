@@ -531,9 +531,9 @@ function processTreePlantingLinksFromTelegramChatLogs() {
       }
       const qrRow = qrData[qrRowIndex - 1];
       const qrStatus = (qrRow[STATUS_COL_DEST] || '').toString().trim().toUpperCase();
-      if (qrStatus !== 'SOLD') {
-        Logger.log(`Row ${rowNumber}: QR "${parsed.qrCode}" status is "${qrStatus}", expected SOLD`);
-        recordOutcome('REJECTED', `QR status is "${qrStatus}", expected SOLD`);
+      if (qrStatus !== 'SOLD' && qrStatus !== 'TREE_PLANTING_FUNDS_TRANSFERRED') {
+        Logger.log(`Row ${rowNumber}: QR "${parsed.qrCode}" status is "${qrStatus}", expected SOLD or TREE_PLANTING_FUNDS_TRANSFERRED`);
+        recordOutcome('REJECTED', `QR status is "${qrStatus}", expected SOLD or TREE_PLANTING_FUNDS_TRANSFERRED`);
         result.rejected++;
         continue;
       }

@@ -211,7 +211,7 @@ function doGetWebLedger_(e) {
       // Filter rows where column D (index 3) is NOT 'SOLD' or 'ASSIGNED_TO_TREE' (include MINTED, CONSIGNMENT, and all other statuses)
       for (var i = 0; i < dataRange.length; i++) {
         var status = (dataRange[i][3] || '').toString().toUpperCase().trim();
-        if (status !== 'SOLD' && status !== 'ASSIGNED_TO_TREE') {
+        if (status !== 'SOLD' && status !== 'ASSIGNED_TO_TREE' && status !== 'TREE_PLANTING_FUNDS_TRANSFERRED') {
           availableQrCodes.push(dataRange[i][0]); // QR code from column A
         }
       }
@@ -239,7 +239,7 @@ function doGetWebLedger_(e) {
       // Filter rows where column D (index 3) is NOT 'SOLD' or 'ASSIGNED_TO_TREE' (include MINTED, CONSIGNMENT, and all other statuses)
       for (var i = 0; i < dataRange.length; i++) {
         var status = (dataRange[i][3] || '').toString().toUpperCase().trim();
-        if (status !== 'SOLD' && status !== 'ASSIGNED_TO_TREE') {
+        if (status !== 'SOLD' && status !== 'ASSIGNED_TO_TREE' && status !== 'TREE_PLANTING_FUNDS_TRANSFERRED') {
           var qrCode = dataRange[i][0]; // Column A
           var ledgerShortcut = dataRange[i][2] || ''; // Column C (index 2)
           var currency = dataRange[i][8] || ''; // Column I (index 8)
@@ -284,11 +284,12 @@ function doGetWebLedger_(e) {
         var status = (row[3] || '').toString().toUpperCase().trim();
         var ownerEmail = (row[11] || '').toString().trim();
         var treePlantingDate = row[13];
-        if (status === 'SOLD' && ownerEmail && !treePlantingDate) {
+        if ((status === 'SOLD' || status === 'TREE_PLANTING_FUNDS_TRANSFERRED') && ownerEmail && !treePlantingDate) {
           pendingItems.push({
             qr_code: row[0],
             owner_email: ownerEmail,
             ledger_name: row[21] || '',
+            status: status,
             sold_date: row[22] instanceof Date ? row[22].toISOString() : (row[22] || '')
           });
         }
