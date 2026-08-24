@@ -110,7 +110,7 @@ function findContributorNameByDigitalSignature_(digitalSignature) {
 }
 
 /** Trusted agent contributor names (autopilot, etc.) that can submit on behalf of governors. */
-const TRUSTED_AGENTS = ['autopilot@agroverse.shop'];
+const TRUSTED_AGENTS = ['autopilot@agroverse.shop', 'admin+sophia@truesight.me', 'Sophia Truesight'];
 
 function isTrustedAgent_(contributorName) {
   return TRUSTED_AGENTS.some(function(agent) {
