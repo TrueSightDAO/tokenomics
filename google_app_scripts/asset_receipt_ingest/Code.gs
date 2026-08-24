@@ -123,8 +123,17 @@ function processAssetReceiptsFromTelegramChatLogs_() {
     // Dedup: skip if already in audit tab
     if (knownIds[updateId]) continue;
 
-    // Only process [ASSET RECEIPT EVENT]
-    if (colG.indexOf('[ASSET RECEIPT EVENT]') === -1) continue;
+    // Only process rows whose FIRST non-empty line carries the [ASSET RECEIPT EVENT] tag.
+    // Anchored to the start: a bare substring search anywhere in the text false-matches
+    // e.g. [CONTRIBUTION EVENT] rows that merely mention the tag in prose
+    // (zombie SKIPPED rows for update_id Edgar_20260507024609_005).
+    var firstNonEmptyLine = '';
+    var msgLines = String(colG).split('\n');
+    for (var li = 0; li < msgLines.length; li++) {
+      var ln = String(msgLines[li]).trim();
+      if (ln) { firstNonEmptyLine = ln; break; }
+    }
+    if (firstNonEmptyLine.indexOf('[ASSET RECEIPT EVENT]') === -1) continue;
 
     try {
       var fields = parseAssetReceiptFields_(colG);
@@ -189,7 +198,8 @@ function processAssetReceiptsFromTelegramChatLogs_() {
 
     } catch (err) {
       errors.push('Row ' + (i + 1) + ' (update_id=' + updateId + '): ' + err.message);
-      auditSheet.appendRow([updateId, new Date().toISOString(), fields.currency || '', fields.amount || '', fields.fund_handler || '', '', 'ERROR: ' + err.message]);
+      var flds = fields || {};
+      auditSheet.appendRow([updateId, new Date().toISOString(), flds.currency || '', flds.amount || '', flds.fund_handler || '', '', 'ERROR: ' + err.message]);
       knownIds[updateId] = true;
     }
   }
@@ -204,18 +214,20 @@ function processAssetReceiptsFromTelegramChatLogs_() {
 
 /**
  * Load known update_ids from the audit tab into a lookup object.
- * Column A = update_id. Only "OK" status rows block re-processing.
+ * Column A = update_id. Any logged status (OK, SKIPPED:*, ERROR:*) blocks re-processing.
  */
 function loadKnownIds_(auditSheet) {
   var lastRow = auditSheet.getLastRow();
   var ids = {};
   if (lastRow < 2) return ids;
-  // Read col A (update_id) and col G (status) — only "OK" rows block re-processing
+  // Read col A (update_id) and col G (status). ANY logged status blocks re-processing
+  // (OK, SKIPPED:*, ERROR:*) so a permanently malformed/mismatched row cannot re-log
+  // on every single run.
   var data = auditSheet.getRange(1, 1, lastRow, 7).getValues();
   for (var i = 1; i < data.length; i++) {
     var uid = String(data[i][0] || '').trim();
     var status = String(data[i][6] || '').trim();
-    if (uid && status === 'OK') ids[uid] = true;
+    if (uid && status) ids[uid] = true;
   }
   return ids;
 }
