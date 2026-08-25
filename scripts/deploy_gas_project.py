@@ -31,6 +31,7 @@ CLASPRC = Path(os.environ.get("CLASPRC_PATH") or os.path.expanduser("~/.clasprc.
 
 # ── clasp identity resolution ──────────────────────────────────────────────
 
+
 def resolve_clasp_identity() -> tuple[str | None, str | None]:
     """Return (email, error) of the active clasp account."""
     if not CLASPRC.is_file():
@@ -46,26 +47,39 @@ def resolve_clasp_identity() -> tuple[str | None, str | None]:
     if not (client_id and client_secret and refresh_token):
         return None, "clasprc missing client_id/secret/refresh_token"
     try:
-        data = urllib.parse.urlencode({
-            "client_id": client_id, "client_secret": client_secret,
-            "refresh_token": refresh_token, "grant_type": "refresh_token",
-        }).encode("utf-8")
-        req = urllib.request.Request("https://oauth2.googleapis.com/token", data=data,
-            headers={"Content-Type": "application/x-www-form-urlencoded"})
+        data = urllib.parse.urlencode(
+            {
+                "client_id": client_id,
+                "client_secret": client_secret,
+                "refresh_token": refresh_token,
+                "grant_type": "refresh_token",
+            }
+        ).encode("utf-8")
+        req = urllib.request.Request(
+            "https://oauth2.googleapis.com/token",
+            data=data,
+            headers={"Content-Type": "application/x-www-form-urlencoded"},
+        )
         resp = json.loads(urllib.request.urlopen(req, timeout=10).read())
         access = resp.get("access_token")
         if not access:
             return None, f"no access_token: {resp}"
-        info = json.loads(urllib.request.urlopen(
-            urllib.request.Request("https://www.googleapis.com/oauth2/v3/userinfo",
-                headers={"Authorization": f"Bearer {access}"}),
-            timeout=10).read())
+        info = json.loads(
+            urllib.request.urlopen(
+                urllib.request.Request(
+                    "https://www.googleapis.com/oauth2/v3/userinfo",
+                    headers={"Authorization": f"Bearer {access}"},
+                ),
+                timeout=10,
+            ).read()
+        )
         return (info.get("email") or None), None
     except Exception as e:
         return None, str(e)
 
 
 # ── project discovery ──────────────────────────────────────────────────────
+
 
 def list_projects() -> list[str]:
     """Return sorted list of scriptIds that have a .clasp.json."""
@@ -89,14 +103,20 @@ def find_manifest_for(sid: str) -> dict | None:
 
 # ── clasp push ──────────────────────────────────────────────────────────────
 
+
 def run_clasp_push(project_dir: Path, dry_run: bool) -> bool:
     if dry_run:
         print(f"  [DRY-RUN]  cd {project_dir.relative_to(ROOT)} && clasp push --force")
         return True
     print(f"             cd {project_dir.relative_to(ROOT)} && clasp push --force")
     try:
-        r = subprocess.run(["clasp", "push", "--force"], cwd=project_dir,
-            capture_output=True, text=True, check=False)
+        r = subprocess.run(
+            ["clasp", "push", "--force"],
+            cwd=project_dir,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
         for line in (r.stdout or "").splitlines():
             print(f"             | {line}")
         if r.returncode != 0:
@@ -112,11 +132,14 @@ def run_clasp_push(project_dir: Path, dry_run: bool) -> bool:
 
 # ── post-push hooks ─────────────────────────────────────────────────────────
 
+
 def run_post_push_hooks(project: dict, dry_run: bool) -> bool:
     hooks = project.get("post_push_hooks") or []
     candidates = project.get("candidate_cache_refresh_hooks") or []
     if candidates and not hooks:
-        print(f"  ! {len(candidates)} candidate hook(s) not fired (promote to post_push_hooks)")
+        print(
+            f"  ! {len(candidates)} candidate hook(s) not fired (promote to post_push_hooks)"
+        )
     if not hooks:
         print("  (no post_push_hooks)")
         return True
@@ -128,10 +151,17 @@ def run_post_push_hooks(project: dict, dry_run: bool) -> bool:
         label = hook.get("label") or f"hook #{i}"
         if not url:
             print(f"  X hook '{label}' missing url")
-            ok = False; continue
+            ok = False
+            continue
         if isinstance(body, dict):
-            body = {k: (os.environ.get(v[1:], "") if isinstance(v, str) and v.startswith("$") else v)
-                    for k, v in body.items()}
+            body = {
+                k: (
+                    os.environ.get(v[1:], "")
+                    if isinstance(v, str) and v.startswith("$")
+                    else v
+                )
+                for k, v in body.items()
+            }
         body_bytes = None
         headers = {"User-Agent": "tokenomics-deploy/1"}
         if body is not None:
@@ -139,12 +169,15 @@ def run_post_push_hooks(project: dict, dry_run: bool) -> bool:
             headers["Content-Type"] = "application/json"
         if dry_run:
             preview = f"{method} {url}"
-            if body: preview += f" body={json.dumps(body)[:120]}"
+            if body:
+                preview += f" body={json.dumps(body)[:120]}"
             print(f"  [DRY-RUN]  {label}: {preview}")
             continue
         print(f"             {label}: {method} {url}")
         try:
-            req = urllib.request.Request(url, data=body_bytes, method=method, headers=headers)
+            req = urllib.request.Request(
+                url, data=body_bytes, method=method, headers=headers
+            )
             with urllib.request.urlopen(req, timeout=30) as resp:
                 print(f"             -> HTTP {resp.status}")
         except Exception as e:
@@ -155,15 +188,26 @@ def run_post_push_hooks(project: dict, dry_run: bool) -> bool:
 
 # ── main ────────────────────────────────────────────────────────────────────
 
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("scriptId", nargs="?", help="GAS scriptId to deploy")
     ap.add_argument("--push", action="store_true", help="actually clasp push")
-    ap.add_argument("--with-hooks", action="store_true", help="fire post_push_hooks (with --push)")
+    ap.add_argument(
+        "--with-hooks", action="store_true", help="fire post_push_hooks (with --push)"
+    )
     ap.add_argument("--no-hooks", action="store_true", help="skip hooks explicitly")
     ap.add_argument("--list", action="store_true", help="list all projects")
-    ap.add_argument("--allow-identity-mismatch", action="store_true",
-                    help="push even when clasp identity != owner_email")
+    ap.add_argument(
+        "--allow-identity-mismatch",
+        action="store_true",
+        help="push even when clasp identity != owner_email",
+    )
+    ap.add_argument(
+        "--lease-id",
+        default="",
+        help="upstream DEPLOY_PUSH_SOP lease (skip ledger — tool owns it)",
+    )
     args = ap.parse_args()
 
     if args.list:
@@ -186,12 +230,25 @@ def main() -> int:
 
     dry_run = not args.push
     fire_hooks = args.push and args.with_hooks and not args.no_hooks
-    print(f"=== deploy_gas_project  scriptId={sid}  dry_run={dry_run}  fire_hooks={fire_hooks} ===\n")
+    print(
+        f"=== deploy_gas_project  scriptId={sid}  dry_run={dry_run}  fire_hooks={fire_hooks} ===\n"
+    )
 
     proj = find_manifest_for(sid)
     owner_email = (proj.get("owner_email") or "").strip().lower() if proj else ""
-    files = sorted(f.name for f in project_dir.iterdir() if f.is_file()
-                   and f.name not in (".clasp.json", "appsscript.json", "Version.gs", "manifest.json", ".claspignore"))
+    files = sorted(
+        f.name
+        for f in project_dir.iterdir()
+        if f.is_file()
+        and f.name
+        not in (
+            ".clasp.json",
+            "appsscript.json",
+            "Version.gs",
+            "manifest.json",
+            ".claspignore",
+        )
+    )
     print(f"  owner_email:  {owner_email or '?'}")
     print(f"  project dir:  {project_dir.relative_to(ROOT)}")
     print(f"  files:        {files}")
@@ -204,19 +261,92 @@ def main() -> int:
         print(f"  clasp:        (unresolved — {identity_err})")
 
     if owner_email and active_email and active_email.lower() != owner_email:
-        msg = (f"\nX identity mismatch — refusing to push.\n"
-               f"    owner:  {owner_email}\n    clasp:  {active_email}\n"
-               f"  Override with --allow-identity-mismatch.")
+        msg = (
+            f"\nX identity mismatch — refusing to push.\n"
+            f"    owner:  {owner_email}\n    clasp:  {active_email}\n"
+            f"  Override with --allow-identity-mismatch."
+        )
         if args.push and not args.allow_identity_mismatch:
-            print(msg); return 1
+            print(msg)
+            return 1
         elif args.push:
             print(f"\n! --allow-identity-mismatch set; pushing anyway:{msg}")
         else:
             print(f"\n! identity mismatch (dry-run):{msg}")
 
+    # DEPLOY_PUSH_SOP Phase 2: soft-lock lease before any real push.
+    # The autopilot tool (gas_deploy_project.py) acquires the lease itself and
+    # passes --lease-id; when set, upstream owns the ledger and we skip.
+    # Without it (direct LLM run), acquire our own lease + record after.
+    lease_id = args.lease_id or ""
+    ledger = None
+    if args.push and not lease_id:
+        import deploy_ledger as ledger_mod  # sibling in scripts/
+
+        ledger = ledger_mod
+        lease = ledger.check_lease("clasp", sid)
+        if lease.get("status") == "blocked":
+            me = os.environ.get("DEPLOY_LEDGER_AGENT", "sophia")
+            try:
+                now = __import__("datetime").datetime.now(
+                    __import__("datetime").timezone.utc
+                )
+                same_agent_fresh = (
+                    all(
+                        l.get("agent") == me
+                        and 0
+                        <= (
+                            now
+                            - __import__("datetime").datetime.fromisoformat(
+                                l.get("started_at_utc", "").replace("Z", "+00:00")
+                            )
+                        ).total_seconds()
+                        < 180
+                        for l in lease.get("leases", [])
+                    )
+                    if lease.get("leases")
+                    else False
+                )
+            except Exception:
+                same_agent_fresh = False
+            if same_agent_fresh:
+                print(
+                    "  ! live lease owned by this agent's upstream tool — skipping ledger (not closing)"
+                )
+                ledger = None
+            else:
+                print(
+                    f"X DEPLOY_PUSH_SOP: live lease blocks this push: {lease.get('leases')}"
+                )
+                print("  (another agent is mid-push on this scriptId — TTL 30 min)")
+                return 1
+        elif lease.get("status") == "error":
+            print(f"  ! deploy ledger unavailable (fail-open): {lease.get('reason')}")
+        else:
+            acq = ledger.acquire_lease(
+                "clasp", sid, f"deploy_gas_project.py {sid} --push"
+            )
+            if acq.get("status") == "success":
+                lease_id = acq.get("lease_id", "")
+                print(f"  DEPLOY_PUSH_SOP: acquired lease {lease_id}")
+            else:
+                print(f"  ! lease acquire failed (fail-open): {acq.get('error')}")
+
     # Push
-    print("\n--- clasp push ---")
     if not run_clasp_push(project_dir, dry_run=dry_run):
+        if args.push and lease_id and ledger is not None:
+            rec = ledger.append_deploy_record(
+                agent=os.environ.get("DEPLOY_LEDGER_AGENT", "sophia"),
+                target_type="clasp",
+                target_id=sid,
+                action=f"deploy_gas_project.py {sid} --push",
+                result="failure",
+                evidence_url="",
+                lease_id=lease_id,
+                notes="clasp push failed (DEPLOY_PUSH_SOP Phase 2)",
+            )
+            print(f"  deploy_ledger: {rec}")
+            ledger.close_lease(lease_id)
         return 1
 
     # Hooks
@@ -233,6 +363,24 @@ def main() -> int:
                 print("  (--with-hooks not passed)")
     else:
         print("\n  (no manifest entry — hooks skipped)")
+
+    # DEPLOY_PUSH_SOP Phase 2: append audit record + close the lease (only
+    # when we own it — upstream tool records/closes its own).
+    if args.push and lease_id and ledger is not None:
+        rec = ledger.append_deploy_record(
+            agent=os.environ.get("DEPLOY_LEDGER_AGENT", "sophia"),
+            target_type="clasp",
+            target_id=sid,
+            action=f"deploy_gas_project.py {sid} --push",
+            result="success",
+            evidence_url=f"https://github.com/TrueSightDAO/tokenomics/tree/main/google_app_scripts/{sid}",
+            lease_id=lease_id,
+            notes="direct LLM-run deploy (DEPLOY_PUSH_SOP Phase 2)",
+        )
+        print(f"  deploy_ledger: {rec}")
+        ledger.close_lease(lease_id)
+        if rec.get("status") != "success":
+            print(f"  ! deploy record append failed (non-fatal): {rec.get('error')}")
 
     print("\n=== done ===")
     return 0
