@@ -17,6 +17,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import subprocess
 import sys
 import urllib.error
@@ -189,6 +190,75 @@ def run_post_push_hooks(project: dict, dry_run: bool) -> bool:
 # ── main ────────────────────────────────────────────────────────────────────
 
 
+
+def repoint_deployment(
+    project_dir: Path, deployment_id: str, description: str, dry_run: bool
+) -> tuple[bool, str]:
+    """Bump a version and repoint an existing pinned deployment at it.
+
+    Root cause of stale GAS serving: clasp push only updates @HEAD; a
+    pinned web-app deployment keeps serving its old captured version. This
+    runs `clasp version` then `clasp deploy --deploymentId <id> -V <n>`
+    so the live /exec URL follows the freshly pushed code. Returns
+    (ok, version); version is the new version number on success.
+    """
+    if not deployment_id:
+        return True, ""
+    if dry_run:
+        print(
+            f"  [DRY-RUN]  clasp version {description!r} && "
+            f"clasp deploy --deploymentId {deployment_id} -V <new> -d {description!r}"
+        )
+        return True, "dry-run"
+    try:
+        r = subprocess.run(
+            ["clasp", "version", description],
+            cwd=project_dir,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        for line in (r.stdout or "").splitlines():
+            print(f"             | {line}")
+        if r.returncode != 0:
+            print(f"  X clasp version exited {r.returncode}")
+            for line in (r.stderr or "").splitlines():
+                print(f"             ! {line}")
+            return False, ""
+        m = re.search(r"Created version (\d+)", r.stdout or "")
+        version = m.group(1) if m else ""
+        if not version:
+            print("  X could not parse new version from clasp version output")
+            return False, ""
+        d = subprocess.run(
+            [
+                "clasp",
+                "deploy",
+                "--deploymentId",
+                deployment_id,
+                "-V",
+                version,
+                "-d",
+                description,
+            ],
+            cwd=project_dir,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        for line in (d.stdout or "").splitlines():
+            print(f"             | {line}")
+        if d.returncode != 0:
+            print(f"  X clasp deploy exited {d.returncode}")
+            for line in (d.stderr or "").splitlines():
+                print(f"             ! {line}")
+            return False, ""
+        return True, version
+    except FileNotFoundError:
+        print("  X clasp not installed (or not on PATH)")
+        return False, ""
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("scriptId", nargs="?", help="GAS scriptId to deploy")
@@ -207,6 +277,16 @@ def main() -> int:
         "--lease-id",
         default="",
         help="upstream DEPLOY_PUSH_SOP lease (skip ledger — tool owns it)",
+    )
+    ap.add_argument(
+        "--deployment-id",
+        default="",
+        help="repoint this pinned deployment at the new code (clasp version + clasp deploy -i)",
+    )
+    ap.add_argument(
+        "--deploy-description",
+        default="",
+        help="version/description label for the repoint (default: auto)",
     )
     args = ap.parse_args()
 
@@ -339,7 +419,8 @@ def main() -> int:
                 agent=os.environ.get("DEPLOY_LEDGER_AGENT", "sophia"),
                 target_type="clasp",
                 target_id=sid,
-                action=f"deploy_gas_project.py {sid} --push",
+                action=f"deploy_gas_project.py {sid} --push"
+            + (f" + repoint {args.deployment_id} @{deploy_version}" if args.deployment_id else ""),
                 result="failure",
                 evidence_url="",
                 lease_id=lease_id,
@@ -364,6 +445,17 @@ def main() -> int:
     else:
         print("\n  (no manifest entry — hooks skipped)")
 
+    # Pinned-deployment repoint (root cause of stale GAS serving): after a
+    # successful push, bump a version and repoint the requested deployment.
+    deploy_version = ""
+    if args.deployment_id:
+        print("\n--- pinned deployment repoint ---")
+        ok_repoint, deploy_version = repoint_deployment(
+            project_dir, args.deployment_id, args.deploy_description or f"deploy_gas_project {sid} push", dry_run
+        )
+        if not ok_repoint:
+            return 1
+
     # DEPLOY_PUSH_SOP Phase 2: append audit record + close the lease (only
     # when we own it — upstream tool records/closes its own).
     if args.push and lease_id and ledger is not None:
@@ -371,7 +463,8 @@ def main() -> int:
             agent=os.environ.get("DEPLOY_LEDGER_AGENT", "sophia"),
             target_type="clasp",
             target_id=sid,
-            action=f"deploy_gas_project.py {sid} --push",
+            action=f"deploy_gas_project.py {sid} --push"
+            + (f" + repoint {args.deployment_id} @{deploy_version}" if args.deployment_id else ""),
             result="success",
             evidence_url=f"https://github.com/TrueSightDAO/tokenomics/tree/main/google_app_scripts/{sid}",
             lease_id=lease_id,
