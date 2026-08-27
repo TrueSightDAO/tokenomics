@@ -312,6 +312,10 @@ function findPairedContributionUnitCost_(logData, i, fundHandler, quantity) {
 /**
  * Parse minimal fields from a [CONTRIBUTION EVENT] text: Contributor + USD Amount.
  * Only USD-typed contributions pair with asset receipts (R$ purchase converted to USD).
+ *
+ * NB: Edgar renders the contributors field as "Contributor(s):" — the parenthesized
+ * label is normalized to 'contributors' before matching, so the paired-contribution
+ * unit-cost lookup actually works against live log rows.
  */
 function parseContributionFields_(text) {
   var f = { contributor: null, amount: null };
@@ -321,7 +325,7 @@ function parseContributionFields_(text) {
     if (!line) continue;
     var match = line.match(/^-\s*([A-Za-z][A-Za-z0-9_\s()\/-]*):\s*(.*)$/);
     if (!match) continue;
-    var label = match[1].trim().toLowerCase();
+    var label = match[1].trim().toLowerCase().replace(/[()]/g, '');
     var value = match[2].trim();
     if (label === 'type' && value.toLowerCase().indexOf('usd') === -1) return f;
     if (label === 'contributors') f.contributor = value;
@@ -365,17 +369,21 @@ function debugStatus_() {
     var lastRow = logsSheet.getLastRow();
     var startRow = Math.max(1, lastRow - 50);
     var data = logsSheet.getRange(startRow, 1, lastRow - startRow + 1, 7).getValues();
-    var matches = [];
+
+    var eventCount = 0;
+    var firstLine = '';
     for (var i = 0; i < data.length; i++) {
-      var colG = String(data[i][6] || '');
-      if (colG.indexOf('[ASSET RECEIPT EVENT]') >= 0) {
-        matches.push({
-          row: startRow + i,
-          update_id: String(data[i][0] || ''),
-          preview: colG.substring(0, 200)
-        });
+      var g = String(data[i][6] || '');
+      var lines = g.split('\n');
+      for (var li = 0; li < lines.length; li++) {
+        if (String(lines[li]).trim()) { firstLine = String(lines[li]).trim(); break; }
       }
+      if (firstLine.indexOf('[ASSET RECEIPT EVENT]') === 0) eventCount++;
     }
+
+    var auditLastRow = auditSheet ? auditSheet.getLastRow() : 0;
+    var currenciesLastRow = currenciesSheet ? currenciesSheet.getLastRow() : 0;
+    var offchainLastRow = offchainSheet ? offchainSheet.getLastRow() : 0;
 
     return jsonResponse_({
       status: 'ok',
@@ -384,12 +392,12 @@ function debugStatus_() {
       logs_sheet: sheetLogsName,
       audit_sheet: sheetAuditName,
       last_row: lastRow,
-      asset_receipt_events_found: matches.length,
-      audit_last_row: auditSheet ? auditSheet.getLastRow() : 0,
-      currencies_last_row: currenciesSheet ? currenciesSheet.getLastRow() : 0,
-      offchain_last_row: offchainSheet ? offchainSheet.getLastRow() : 0
+      asset_receipt_events_found: eventCount,
+      audit_last_row: auditLastRow,
+      currencies_last_row: currenciesLastRow,
+      offchain_last_row: offchainLastRow
     });
-  } catch (e) {
-    return jsonResponse_({ status: 'error', error: e.message, ops_ss: opsSsId });
+  } catch (err) {
+    return jsonResponse_({ status: 'error', error: err.message });
   }
 }
