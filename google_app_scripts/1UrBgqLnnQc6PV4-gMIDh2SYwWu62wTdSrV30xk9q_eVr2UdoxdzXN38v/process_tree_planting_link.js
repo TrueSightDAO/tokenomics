@@ -504,9 +504,9 @@ function processTreePlantingLinksFromTelegramChatLogs() {
           continue;
         }
         const sunmintRejectStatus = (sunmintRejectData[sunmintRejectRowIndex - 1][TPL_SUNMINT_STATUS_COL] || '').toString().trim().toUpperCase();
-        if (sunmintRejectStatus !== 'NEW') {
-          Logger.log(`Row ${rowNumber}: REJECT — SunMint submission status is "${sunmintRejectStatus}", only NEW can be invalidated`);
-          recordOutcome('REJECTED', `SunMint submission status is "${sunmintRejectStatus}", expected NEW (reject path)`);
+        if (sunmintRejectStatus !== 'NEW' && sunmintRejectStatus !== 'LINKED') {
+          Logger.log(`Row ${rowNumber}: REJECT — SunMint submission status is "${sunmintRejectStatus}", only NEW or LINKED can be invalidated`);
+          recordOutcome('REJECTED', `SunMint submission status is "${sunmintRejectStatus}", expected NEW or LINKED (reject path)`);
           result.rejected++;
           continue;
         }
@@ -737,3 +737,4 @@ function authorizeMailApp() {
     });
   }
 }
+

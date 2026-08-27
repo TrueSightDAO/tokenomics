@@ -52,6 +52,10 @@ const TGM_TRACKING_HEADERS = [
 const TGM_SUNMINT_TAB = 'SunMint Tree Planting';
 const TGM_SUNMINT_QR_COL = 17;   // Column R (linked QR code, written by process_tree_planting_link.gs)
 const TGM_SUNMINT_SPECIES_COL = 13; // Column N
+const TGM_SUNMINT_LAT_COL = 10;    // Column K
+const TGM_SUNMINT_LNG_COL = 11;    // Column L
+const TGM_SUNMINT_STATUS_COL = 12; // Column M
+const TGM_PROXIMITY_LIMIT_KM = 0.2; // 200 m server-side gate (governors/sentinels exempt)
 
 // ----- GitHub mirror (TrueSightDAO/sunmint — api_only blob/asset store, Contents-API uploads) -----
 const TGM_GITHUB_OWNER = 'TrueSightDAO';
@@ -210,6 +214,48 @@ function mirrorPhotoToGithub_(base64Data, fileName, commitMessage) {
  * Scans SOURCE_SHEET_URL's Telegram Chat Logs, column MESSAGE_COL (defined in process_qr_code_updates.js),
  * for rows containing the marker.
  */
+/** Server-side proximity gate: haversine distance between two lat/lng pairs (km). */
+function tgmHaversineKm_(lat1, lng1, lat2, lng2) {
+  const toRad = function (x) { return (x * Math.PI) / 180; };
+  const R = 6371;
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+  const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+            Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) * Math.sin(dLng / 2);
+  return 2 * R * Math.asin(Math.sqrt(a));
+}
+
+/** Resolves a tree row from the SunMint Tree Planting tab (match by Linked QR Code or Telegram Message ID). */
+function tgmFindSunMintTreeRow_(treeId) {
+  try {
+    const spreadsheet = SpreadsheetApp.openByUrl(SOURCE_SHEET_URL);
+    const sheet = spreadsheet.getSheetByName(TGM_SUNMINT_TAB);
+    if (!sheet) return null;
+    const data = sheet.getDataRange().getValues();
+    const qr = String(treeId || '').trim();
+    for (let i = 1; i < data.length; i++) {
+      const rowQr = String(data[i][TGM_SUNMINT_QR_COL] || '').trim();
+      const rowMsgId = String(data[i][3] || '').trim(); // Column D
+      if (rowQr === qr || rowMsgId === qr) {
+        return {
+          row: i + 1,
+          lat: parseFloat(String(data[i][TGM_SUNMINT_LAT_COL] || '').trim()),
+          lng: parseFloat(String(data[i][TGM_SUNMINT_LNG_COL] || '').trim()),
+          status: String(data[i][TGM_SUNMINT_STATUS_COL] || '').trim().toUpperCase()
+        };
+      }
+    }
+  } catch (e) {
+    Logger.log('tgmFindSunMintTreeRow_ error: ' + e.message);
+  }
+  return null;
+}
+
+/** True if the contributor is a governor or sentinel (exempt from the proximity gate). Shared project scope: defined in process_tree_planting_link.js. */
+function tgmIsOperator_(contributorName) {
+  return isGovernorByName_(contributorName) || isSentinelByName_(contributorName);
+}
+
 function processTreeGrowthMonitoringFromTelegramChatLogs() {
   const spreadsheet = SpreadsheetApp.openByUrl(SOURCE_SHEET_URL);
   const chatLogs = spreadsheet.getSheetByName(SOURCE_SHEET_NAME); // Telegram Chat Logs
@@ -242,6 +288,24 @@ function processTreeGrowthMonitoringFromTelegramChatLogs() {
       }
       const contributorName = resolveContributorNameFromPublicSignature_(info.publicSignature);
 
+      // Server-side gates (mirror of the client UX; the truth lives here):
+      // 1) INVALID trees cannot be measured. 2) Non-operators must be within 200 m of the tree.
+      const treeRow = tgmFindSunMintTreeRow_(info.treeId);
+      if (treeRow && treeRow.status === 'INVALID') {
+        Logger.log('TGM skip (tree INVALID) msgId=' + msgId + ' tree=' + info.treeId);
+        continue;
+      }
+      const operator = tgmIsOperator_(contributorName);
+      if (!operator && treeRow && !isNaN(treeRow.lat) && !isNaN(treeRow.lng) &&
+          !isNaN(parseFloat(info.latitude)) && !isNaN(parseFloat(info.longitude))) {
+        const distKm = tgmHaversineKm_(parseFloat(info.latitude), parseFloat(info.longitude), treeRow.lat, treeRow.lng);
+        if (distKm > TGM_PROXIMITY_LIMIT_KM) {
+          Logger.log('TGM skip (TOO FAR) msgId=' + msgId + ' tree=' + info.treeId +
+                     ' distKm=' + distKm.toFixed(2) + ' signer=' + (contributorName || 'unknown'));
+          continue;
+        }
+      }
+
       // Mirror photos (if present as attachment data — v1 expects URLs already mirrored by the dapp;
       // the mirror step here is a safety net when base64 blobs are present in the payload).
       let closeupUrl = info.closeupUrl;
@@ -261,3 +325,4 @@ function processTreeGrowthMonitoringFromTelegramChatLogs() {
     }
   }
 }
+
