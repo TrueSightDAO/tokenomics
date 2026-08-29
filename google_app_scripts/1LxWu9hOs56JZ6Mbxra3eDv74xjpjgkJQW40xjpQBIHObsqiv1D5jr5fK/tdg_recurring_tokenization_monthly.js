@@ -443,3 +443,29 @@ function debugFetchRecurringTransactions() {
     Logger.log('Error in debugFetchRecurringTransactions: ' + e.message);
   }
 }
+
+/**
+ * Web-app entry point — action-gated trigger for the monthly recurring
+ * tokenization catch-up. REST `:run` on this project hits a Google-side
+ * container error (NOT_FOUND storage read), but the web-execution path
+ * works. Call: <deployment>/exec?action=processRecurringTransactions
+ */
+function doGet(e) {
+  const action = e && e.parameter ? e.parameter.action : null;
+  if (action === 'processRecurringTransactions') {
+    try {
+      processRecurringTransactions();
+      return ContentService.createTextOutput(
+        JSON.stringify({ ok: true, message: 'processRecurringTransactions completed' })
+      ).setMimeType(ContentService.MimeType.JSON);
+    } catch (err) {
+      Logger.log('Error in doGet: ' + err.message);
+      return ContentService.createTextOutput(
+        JSON.stringify({ ok: false, error: err.message })
+      ).setMimeType(ContentService.MimeType.JSON);
+    }
+  }
+  return ContentService.createTextOutput(
+    JSON.stringify({ ok: false, error: 'No valid action (use action=processRecurringTransactions on GET).' })
+  ).setMimeType(ContentService.MimeType.JSON);
+}
