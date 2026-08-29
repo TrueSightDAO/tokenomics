@@ -259,6 +259,100 @@ def repoint_deployment(
         return False, ""
 
 
+# ── pre-push validation (2026-08 collision-class guardrail) ─────────────────
+
+
+def validate_project_files(project_dir: Path, manifest: dict | None) -> list[str]:
+    """Return hard errors that must block a GAS push.
+
+    Apps Script compiles every file in a project into ONE global scope, so
+    duplicate top-level const/let declarations raise a compile-time
+    SyntaxError and every trigger run fails. clasp also refuses folders that
+    contain same-basename .js and .gs files ("Conflicting files found").
+    Both classes silently broke 20+ projects in Aug 2026; this catches them
+    before they reach GAS.
+    """
+    errors: list[str] = []
+    js_files = [
+        f
+        for f in sorted(project_dir.iterdir())
+        if f.is_file()
+        and f.suffix in (".js", ".gs")
+        and f.name not in (".claspignore",)
+    ]
+    # 1. duplicate top-level const/let across files -> SyntaxError in GAS.
+    # Only declarations at brace depth 0 are true globals: Apps Script
+    # compiles all files into ONE global scope, so two files declaring the
+    # same top-level const/let raise a compile-time SyntaxError. Block-scoped
+    # locals inside functions (depth >= 1) are legal and must NOT count.
+    def _top_level_decls(lines: list[str]) -> list[tuple[int, str]]:
+        depth = 0
+        out: list[tuple[int, str]] = []
+        for lineno, line in enumerate(lines, 1):
+            stripped = line.strip()
+            if not stripped or stripped.startswith("//") or stripped.startswith("*"):
+                continue
+            depth_before = depth
+            depth += stripped.count("{") - stripped.count("}")
+            if depth_before == 0:
+                m = re.match(
+                    r"^(const|let)\s+([A-Za-z_$][A-Za-z0-9_$]*)\b", stripped
+                )
+                if m:
+                    out.append((lineno, m.group(2)))
+        return out
+
+    decls: dict[str, list[str]] = {}
+    for f in js_files:
+        try:
+            lines = f.read_text(encoding="utf-8", errors="replace").splitlines()
+        except OSError as e:
+            errors.append(f"unreadable {f.name}: {e}")
+            continue
+        for lineno, name in _top_level_decls(lines):
+            decls.setdefault(name, []).append(f"{f.name}:{lineno}")
+    for name, locs in decls.items():
+        if len(locs) > 1:
+            errors.append(
+                f"duplicate top-level '{name}' at {' and '.join(locs)} "
+                "(Apps Script shares one global scope -> SyntaxError)"
+            )
+    # 2. same-basename .js + .gs -> clasp 'Conflicting files found'
+    by_stem: dict[str, list[str]] = {}
+    for f in js_files:
+        by_stem.setdefault(f.stem, []).append(f.name)
+    for stem, names in by_stem.items():
+        if len(names) > 1:
+            errors.append(
+                f"same-basename clash: {' + '.join(names)} "
+                "(clasp refuses: 'Conflicting files found')"
+            )
+    return errors
+
+
+def warn_if_orphan(project_dir: Path, sid: str) -> None:
+    """Soft warning: scriptId absent from the active clasp account's project
+    list => push will likely fail with 'Requested entity was not found'."""
+    try:
+        r = subprocess.run(
+            ["clasp", "list"],
+            cwd=project_dir,
+            capture_output=True,
+            text=True,
+            timeout=30,
+            check=False,
+        )
+    except Exception:
+        return
+    if sid in (r.stdout or ""):
+        return
+    print(
+        f"  ! scriptId {sid} not found in active clasp account's project list "
+        f"— push may fail with 'Requested entity was not found' "
+        f"(orphan/superseded scriptId?)"
+    )
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("scriptId", nargs="?", help="GAS scriptId to deploy")
@@ -333,6 +427,15 @@ def main() -> int:
     print(f"  project dir:  {project_dir.relative_to(ROOT)}")
     print(f"  files:        {files}")
 
+    # Pre-push validation (2026-08 incident guardrail): refuse to push folders
+    # with collision classes that hard-break GAS deploys.
+    v_errors = validate_project_files(project_dir, proj)
+    for err in v_errors:
+        print(f"  X {err}")
+    if v_errors:
+        print("\nX refusing to push — fix project files first.")
+        return 1
+
     # Identity check
     active_email, identity_err = resolve_clasp_identity()
     if active_email:
@@ -353,6 +456,9 @@ def main() -> int:
             print(f"\n! --allow-identity-mismatch set; pushing anyway:{msg}")
         else:
             print(f"\n! identity mismatch (dry-run):{msg}")
+
+    if args.push:
+        warn_if_orphan(project_dir, sid)
 
     # DEPLOY_PUSH_SOP Phase 2: soft-lock lease before any real push.
     # The autopilot tool (gas_deploy_project.py) acquires the lease itself and
