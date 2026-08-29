@@ -118,7 +118,6 @@ function extractTreeGrowthMonitoringInfo_(message) {
       return match ? match[1].trim() : '';
     };
     result.treeId = grab('Tree ID');
-    result.treeId = grab('Tree ID');
     result.species = grab('Species');
     result.dbh = grab('DBH (cm)');
     result.latitude = grab('Latitude');
