@@ -169,13 +169,21 @@ function processAssetReceiptsFromTelegramChatLogs_() {
       }
 
       // 1) Add Currencies row if not already present
-      if (!findCurrencyRow_(currenciesSheet, currencyName)) {
+      // QA GUARD (2026-08-29): a (Test ...) currency must NEVER create a rate row in
+      // the live Currencies tab — a stray rate multiplies any lingering offchain qty
+      // into phantom treasury value (2026-08-27: $100/unit x qty 100 = ~$10k inflation).
+      // The offchain leg below is still written so ingest QA can verify end-to-end;
+      // per conventions/QA_LIVE_LEDGER_TEST_PROCEDURE.md the test rows are expensed off after.
+      var isTestCurrency = /(\(test| test | test$)/i.test(currencyName);
+      if (!findCurrencyRow_(currenciesSheet, currencyName) && !isTestCurrency) {
         var currenciesLastRow = currenciesSheet.getLastRow();
         currenciesSheet.getRange(currenciesLastRow + 1, 1).setValue(currencyName);
         currenciesSheet.getRange(currenciesLastRow + 1, 2).setValue(unitCost); // col B = Price in USD (per-unit landed cost)
         currencyNamesAdded.push(currencyName);
         sortCurrencies_(currenciesSheet);
         Logger.log('[AssetReceipt] Added Currencies row: ' + currencyName + ' at USD ' + unitCost + '/unit (qty ' + quantity + ')');
+      } else if (isTestCurrency) {
+        Logger.log('[AssetReceipt] QA GUARD: skipped Currencies rate row for test currency "' + currencyName + '" (offchain leg still written for ingest QA)');
       }
 
       // 2) Add positive inventory leg on offchain transactions
