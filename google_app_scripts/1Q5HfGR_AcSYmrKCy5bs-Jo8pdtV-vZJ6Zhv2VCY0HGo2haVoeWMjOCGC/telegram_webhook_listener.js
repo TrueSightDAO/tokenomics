@@ -12,7 +12,7 @@
 // - getCredentials(): Retrieves all configuration details (API keys, URLs, IDs) as an object.
 // - These steps ensure keys and settings are centralized and not hardcoded here.
 setApiKeys();
-const creds = getCredentials();
+const webhookCreds = getCredentials();
 
 // ------------------------ Telegram Webhook Listener ------------------------
 
@@ -50,7 +50,7 @@ function doPost(e) {
 
 // Sends a message to a Telegram chat
 function sendTelegramMessage(chatId, text) {
-  const token = creds.TELEGRAM_API_TOKEN;
+  const token = webhookCreds.TELEGRAM_API_TOKEN;
   if (!token) {
     Logger.log("TELEGRAM_API_TOKEN is missing");
     return;
@@ -80,7 +80,7 @@ function sendTelegramMessage(chatId, text) {
 // ------------------------ Register Webhook Method ------------------------
 
 function registerTelegramWebhook() {
-  const token = creds.TELEGRAM_API_TOKEN;
+  const token = webhookCreds.TELEGRAM_API_TOKEN;
   if (!token) {
     Logger.log("TELEGRAM_API_TOKEN is missing");
     return;
@@ -114,7 +114,7 @@ function registerTelegramWebhook() {
 // ------------------------ Disable Webhook Method ------------------------
 
 function disableTelegramWebhook() {
-  const token = creds.TELEGRAM_API_TOKEN;
+  const token = webhookCreds.TELEGRAM_API_TOKEN;
   if (!token) {
     Logger.log("TELEGRAM_API_TOKEN is missing");
     return;
