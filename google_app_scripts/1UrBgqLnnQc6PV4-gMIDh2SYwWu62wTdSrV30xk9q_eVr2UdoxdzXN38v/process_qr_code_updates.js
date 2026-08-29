@@ -127,6 +127,20 @@ function doGet(e) {
     }
   }
 
+  // [TREE GROWTH MONITORING EVENT] webhook — handler defined in
+  // process_tree_growth_monitoring.gs (same project/global scope). See
+  // agentic_ai_context/plans/SUNMINT_MONITOR_TREE_GROWTH_PLAN.md (P1d).
+  if (action === 'processTreeGrowthMonitoringFromTelegramChatLogs') {
+    try {
+      Logger.log("Webhook triggered: processing tree growth monitoring from Telegram Chat Logs");
+      const result = processTreeGrowthMonitoringFromTelegramChatLogs();
+      return ContentService.createTextOutput(`✅ Tree growth monitoring processed: ${result.processed} recorded, ${result.skipped} skipped, ${result.errors} errors`);
+    } catch (err) {
+      Logger.log("Error in processTreeGrowthMonitoringFromTelegramChatLogs: " + err.message);
+      return ContentService.createTextOutput("❌ Error: " + err.message);
+    }
+  }
+
   // One-off re-send of the tree-planted notification email — handler defined in
   // process_tree_planting_link.js (same project/global scope). Does not touch the ledger or
   // re-run LINK validation; only re-sends using the QR row's already-committed values. Guarded
