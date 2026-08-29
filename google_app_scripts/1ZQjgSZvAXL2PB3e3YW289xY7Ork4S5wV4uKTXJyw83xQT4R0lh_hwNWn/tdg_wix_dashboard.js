@@ -2012,6 +2012,25 @@ function doGet(e) {
       }, null, 2)).setMimeType(ContentService.MimeType.JSON);
     }
 
+    if (type === 'recalculate_treasury') {
+      // Operator escape hatch, mirrors recalculate_aum: trigger
+      // updateUSD_TREASURY_BALANCE() out-of-band AND overwrite the
+      // Performance Statistics 'USD_TREASURY_BALANCE' cell (the same thing
+      // the cron does in its main update loop). This ALSO refreshes the
+      // treasury_breakdown cache as a side effect (same function call), so
+      // both the headline stat and the /treasury page land in sync. Useful
+      // when a source-data fix (e.g. removing bad offchain-transaction rows)
+      // needs to reach the landing-page stat immediately instead of waiting
+      // for the next cron cycle.
+      var newTreasuryBalance = updateUSD_TREASURY_BALANCE();
+      return ContentService.createTextOutput(JSON.stringify({
+        timestamp: new Date().toISOString(),
+        triggered: 'updateUSD_TREASURY_BALANCE',
+        usd_treasury_balance: newTreasuryBalance,
+        note: 'Performance Statistics USD_TREASURY_BALANCE cell + treasury_breakdown cache both refreshed.'
+      }, null, 2)).setMimeType(ContentService.MimeType.JSON);
+    }
+
     if (type === 'aum_debug') {
       // Diagnostic: dump the first 20 rows of cols A..F of a given AGL's
       // Balance sheet so we can see the actual template layout. Use:
