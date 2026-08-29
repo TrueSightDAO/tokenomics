@@ -419,11 +419,29 @@ function isAuthorizedGovernorReadRequest_(e) {
  * and GPS coordinates.
  */
 function doGet(e) {
-  const action = e && e.parameter ? e.parameter['list_new'] : '';
-  if (action !== 'true') {
+  const action = e && e.parameter ? e.parameter['action'] : '';
+  if (action === 'processTreePlantingTelegramLogs') {
+    // dao_protocol dispatch path: process [TREE PLANTING EVENT] rows from Telegram Chat Logs
+    // into the SunMint Tree Planting tab (same as the old time-driven processTelegramLogs()).
+    try {
+      processTelegramLogs();
+      return ContentService.createTextOutput(JSON.stringify({
+        status: 'success',
+        message: '✅ Tree planting processed'
+      })).setMimeType(ContentService.MimeType.JSON);
+    } catch (err) {
+      return ContentService.createTextOutput(JSON.stringify({
+        status: 'error',
+        message: 'Tree planting processing error: ' + err.message
+      })).setMimeType(ContentService.MimeType.JSON);
+    }
+  }
+
+  const listNew = e && e.parameter ? e.parameter['list_new'] : '';
+  if (listNew !== 'true') {
     return ContentService.createTextOutput(JSON.stringify({
       status: 'error',
-      message: 'No valid action specified. Use ?list_new=true&governor_key=...'
+      message: 'No valid action specified. Use ?action=processTreePlantingTelegramLogs or ?list_new=true&governor_key=...'
     })).setMimeType(ContentService.MimeType.JSON);
   }
 
