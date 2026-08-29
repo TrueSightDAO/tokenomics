@@ -56,9 +56,9 @@ const VOTING_SHEET_NAME = 'Contributors voting weight';
 const LEDGER_SHEET_NAME = 'Ledger history';
 const ASSET_SHEET_NAME = 'off chain asset balance';
 const DIGITAL_SIGNATURES_SHEET_NAME = 'Contributors Digital Signatures';
-const creds = getCredentials(); // Assumed to be defined elsewhere
-const WIX_ACCESS_TOKEN = creds.WIX_API_KEY; // Wix API key
-const QUICKNODE_API_KEY = creds.QUICKNODE_API_KEY; // QuickNode API key
+const webAppCreds = getCredentials(); // Assumed to be defined elsewhere
+const WIX_ACCESS_TOKEN = webAppCreds.WIX_API_KEY; // Wix API key
+const QUICKNODE_API_KEY = webAppCreds.QUICKNODE_API_KEY; // QuickNode API key
 const SOLANA_USDT_VAULT_WALLET_ADDRESS = 'BkcbCEnD14C7cYiN6VwpYuGmpVrjfoRwobhQQScBugqQ';
 
 /**
