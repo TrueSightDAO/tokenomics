@@ -269,21 +269,23 @@ function processTreeGrowthMonitoringFromTelegramChatLogs() {
   const processedIds = getProcessedGrowthMessageIds_(tracking);
 
   const lastRow = chatLogs.getLastRow();
-  if (lastRow < 2) return;
+  if (lastRow < 2) return { processed: 0, skipped: 0, errors: 0 };
   const data = chatLogs.getRange(1, 1, lastRow, Math.max(MESSAGE_COL + 1, TELEGRAM_UPDATE_ID_COL + 1)).getValues();
 
+  let processed = 0, skipped = 0, errors = 0;
   for (let i = 1; i < data.length; i++) {
     const updateId = String(data[i][TELEGRAM_UPDATE_ID_COL] || '').trim();
     const message = String(data[i][MESSAGE_COL] || '');
     if (message.indexOf(TREE_GROWTH_MONITORING_EVENT_MARKER) === -1) continue;
 
     const msgId = String(data[i][3] || '').trim(); // Column D = Telegram Message ID (stable dedup key)
-    if (!msgId || processedIds[msgId]) continue;
+    if (!msgId || processedIds[msgId]) { skipped++; continue; }
 
     try {
       const info = extractTreeGrowthMonitoringInfo_(message);
       if (!info.treeId || !info.dbh) {
         Logger.log('TGM skip (missing treeId/dbh) msgId=' + msgId);
+        skipped++;
         continue;
       }
       const contributorName = resolveContributorNameFromPublicSignature_(info.publicSignature);
@@ -293,6 +295,7 @@ function processTreeGrowthMonitoringFromTelegramChatLogs() {
       const treeRow = tgmFindSunMintTreeRow_(info.treeId);
       if (treeRow && treeRow.status === 'INVALID') {
         Logger.log('TGM skip (tree INVALID) msgId=' + msgId + ' tree=' + info.treeId);
+        skipped++;
         continue;
       }
       const operator = tgmIsOperator_(contributorName);
@@ -302,6 +305,7 @@ function processTreeGrowthMonitoringFromTelegramChatLogs() {
         if (distKm > TGM_PROXIMITY_LIMIT_KM) {
           Logger.log('TGM skip (TOO FAR) msgId=' + msgId + ' tree=' + info.treeId +
                      ' distKm=' + distKm.toFixed(2) + ' signer=' + (contributorName || 'unknown'));
+          skipped++;
           continue;
         }
       }
@@ -319,10 +323,13 @@ function processTreeGrowthMonitoringFromTelegramChatLogs() {
         info.publicSignature, contributorName, 'PROCESSED', new Date().toISOString()
       ]);
       processedIds[msgId] = true;
+      processed++;
       Logger.log('TGM processed msgId=' + msgId + ' tree=' + info.treeId + ' dbh=' + info.dbh);
     } catch (e) {
       Logger.log('TGM error msgId=' + msgId + ': ' + e.message);
+      errors++;
     }
   }
+  return { processed: processed, skipped: skipped, errors: errors };
 }
 
