@@ -111,11 +111,13 @@ function extractTreeGrowthMonitoringInfo_(message) {
   };
   try {
     const m = normalizeTreeGrowthMonitoringMessage_(message);
+    const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const grab = (label) => {
-      const re = new RegExp('-\\s+' + label + ':\s*([^\\n]+)', 'i');
+      const re = new RegExp('-\\s+' + escapeRe(label) + ':\s*([^\\n]+)', 'i');
       const match = m.match(re);
       return match ? match[1].trim() : '';
     };
+    result.treeId = grab('Tree ID');
     result.treeId = grab('Tree ID');
     result.species = grab('Species');
     result.dbh = grab('DBH (cm)');
