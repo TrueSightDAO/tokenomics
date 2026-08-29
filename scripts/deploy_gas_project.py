@@ -280,7 +280,28 @@ def validate_project_files(project_dir: Path, manifest: dict | None) -> list[str
         and f.suffix in (".js", ".gs")
         and f.name not in (".claspignore",)
     ]
-    # 1. duplicate top-level const/let across files -> SyntaxError in GAS
+    # 1. duplicate top-level const/let across files -> SyntaxError in GAS.
+    # Only declarations at brace depth 0 are true globals: Apps Script
+    # compiles all files into ONE global scope, so two files declaring the
+    # same top-level const/let raise a compile-time SyntaxError. Block-scoped
+    # locals inside functions (depth >= 1) are legal and must NOT count.
+    def _top_level_decls(lines: list[str]) -> list[tuple[int, str]]:
+        depth = 0
+        out: list[tuple[int, str]] = []
+        for lineno, line in enumerate(lines, 1):
+            stripped = line.strip()
+            if not stripped or stripped.startswith("//") or stripped.startswith("*"):
+                continue
+            depth_before = depth
+            depth += stripped.count("{") - stripped.count("}")
+            if depth_before == 0:
+                m = re.match(
+                    r"^(const|let)\s+([A-Za-z_$][A-Za-z0-9_$]*)\b", stripped
+                )
+                if m:
+                    out.append((lineno, m.group(2)))
+        return out
+
     decls: dict[str, list[str]] = {}
     for f in js_files:
         try:
@@ -288,10 +309,8 @@ def validate_project_files(project_dir: Path, manifest: dict | None) -> list[str
         except OSError as e:
             errors.append(f"unreadable {f.name}: {e}")
             continue
-        for lineno, line in enumerate(lines, 1):
-            m = re.match(r"^(const|let)\s+([A-Za-z_$][A-Za-z0-9_$]*)\b", line.strip())
-            if m:
-                decls.setdefault(m.group(2), []).append(f"{f.name}:{lineno}")
+        for lineno, name in _top_level_decls(lines):
+            decls.setdefault(name, []).append(f"{f.name}:{lineno}")
     for name, locs in decls.items():
         if len(locs) > 1:
             errors.append(
