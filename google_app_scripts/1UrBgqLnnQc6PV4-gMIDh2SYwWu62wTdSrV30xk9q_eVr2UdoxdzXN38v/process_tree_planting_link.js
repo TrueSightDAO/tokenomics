@@ -521,6 +521,29 @@ function processTreePlantingLinksFromTelegramChatLogs() {
         recordOutcome('REJECTED', parsed.reason || 'Marked invalid by governor');
         result.processed++;
         Logger.log(`Row ${rowNumber}: marked SunMint submission "${parsed.sunmintMessageId}" INVALID (governor: ${contributorName}, reason: ${parsed.reason || 'n/a'})`);
+        // Fire an immediate tree-index rebuild so the invalidated tree drops from
+        // trees/index.geojson now, not at the next 06:00 UTC cron (the "tree came
+        // back on reload" complaint). Best-effort: a dispatch failure must never
+        // fail the reject itself — the daily cron remains the safety net.
+        try {
+          const dispatchResp = UrlFetchApp.fetch(
+            'https://api.github.com/repos/' + TGM_GITHUB_OWNER + '/' + TGM_GITHUB_REPO + '/dispatches',
+            {
+              method: 'post',
+              headers: {
+                'Authorization': 'Bearer ' + getGithubToken_(),
+                'Accept': 'application/vnd.github+json',
+                'User-Agent': 'TrueSightDAO-GAS'
+              },
+              payload: JSON.stringify({ event_type: 'tree-index-rebuild' }),
+              contentType: 'application/json',
+              muteHttpExceptions: true
+            }
+          );
+          Logger.log(`Row ${rowNumber}: fired tree-index-rebuild dispatch (HTTP ${dispatchResp.getResponseCode()})`);
+        } catch (e) {
+          Logger.log(`Row ${rowNumber}: tree-index-rebuild dispatch failed (non-fatal): ${e.message}`);
+        }
         continue;
       }
 
