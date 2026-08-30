@@ -491,8 +491,15 @@ function processTreePlantingLinksFromTelegramChatLogs() {
       if (message.includes(TREE_PLANTING_REJECT_EVENT_MARKER)) {
         const sunmintRejectData = sunmintSheet.getDataRange().getValues();
         let sunmintRejectRowIndex = -1;
+        // The monitor page (markTreeInvalid) submits the TREE ID as "SunMint Submission
+        // Message ID" — for Edgar-direct rows that is column A (Telegram Update ID), NOT
+        // column D (Telegram Message ID, the LINK-path key). Match EITHER so rejects for
+        // unlinked trees actually find their row instead of logging "submission not found"
+        // and silently leaving the tree NEW (the "tree came back on reload" bug).
         for (let kr = 1; kr < sunmintRejectData.length; kr++) {
-          if ((sunmintRejectData[kr][TPL_SUNMINT_MESSAGE_ID_COL] || '').toString().trim() === parsed.sunmintMessageId) {
+          const rejectColD = (sunmintRejectData[kr][TPL_SUNMINT_MESSAGE_ID_COL] || '').toString().trim();
+          const rejectColA = (sunmintRejectData[kr][TELEGRAM_UPDATE_ID_COL] || '').toString().trim();
+          if (rejectColD === parsed.sunmintMessageId || rejectColA === parsed.sunmintMessageId) {
             sunmintRejectRowIndex = kr + 1;
             break;
           }
