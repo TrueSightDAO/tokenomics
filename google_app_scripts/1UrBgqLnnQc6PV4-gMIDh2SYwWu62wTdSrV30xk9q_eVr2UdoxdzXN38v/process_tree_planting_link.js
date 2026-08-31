@@ -540,7 +540,15 @@ function processTreePlantingLinksFromTelegramChatLogs() {
               muteHttpExceptions: true
             }
           );
-          Logger.log(`Row ${rowNumber}: fired tree-index-rebuild dispatch (HTTP ${dispatchResp.getResponseCode()})`);
+          const dispatchCode = dispatchResp.getResponseCode();
+          Logger.log(`Row ${rowNumber}: fired tree-index-rebuild dispatch (HTTP ${dispatchCode})`);
+          if (dispatchCode < 200 || dispatchCode >= 300) {
+            // 2xx-only: a 403/401 here means the TGM_GITHUB_TOKEN lacks repo/
+            // Actions:write scope for repository_dispatch. Surface it as an
+            // outcome note so a silent stall can't recur (the daily cron is the
+            // safety net regardless).
+            recordOutcome('REJECTED', `Tree marked INVALID but index rebuild dispatch failed (HTTP ${dispatchCode}) - check TGM_GITHUB_TOKEN scope`);
+          }
         } catch (e) {
           Logger.log(`Row ${rowNumber}: tree-index-rebuild dispatch failed (non-fatal): ${e.message}`);
         }
