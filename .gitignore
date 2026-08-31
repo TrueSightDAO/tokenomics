@@ -31,3 +31,5 @@ google_app_scripts/**/*redential*.gs.js
 # Schema validation output
 python_scripts/schema_validation/discovered_headers.json
 schema_output.txt
+__pycache__
+*.pyc
