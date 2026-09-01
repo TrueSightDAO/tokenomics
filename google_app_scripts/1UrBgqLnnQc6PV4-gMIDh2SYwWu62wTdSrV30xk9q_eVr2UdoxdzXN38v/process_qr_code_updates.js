@@ -155,6 +155,19 @@ function doGet(e) {
     }
   }
 
+  // process_media_retraction.gs (same project/global scope) - soft-invalidates boundary media per the
+  // 3-tier retraction model. See agentic_ai_context/plans/SUNMINT_MEDIA_INVALIDATION_DESIGN.md (PR-B3).
+  if (action === 'processMediaRetractionFromTelegramChatLogs') {
+    try {
+      Logger.log("Webhook triggered: processing media retraction from Telegram Chat Logs");
+      const result = processMediaRetractionFromTelegramChatLogs();
+      return ContentService.createTextOutput(`✅ Media retraction processed: ${result.processed} recorded, ${result.skipped} skipped, ${result.errors} errors`);
+    } catch (err) {
+      Logger.log("Error in processMediaRetractionFromTelegramChatLogs: " + err.message);
+      return ContentService.createTextOutput("❌ Error: " + err.message);
+    }
+  }
+
   // One-off re-send of the tree-planted notification email — handler defined in
   // process_tree_planting_link.js (same project/global scope). Does not touch the ledger or
   // re-run LINK validation; only re-sends using the QR row's already-committed values. Guarded
@@ -173,7 +186,7 @@ function doGet(e) {
     }
   }
 
-  return ContentService.createTextOutput("ℹ️ No valid action specified. Use ?action=processQrCodeUpdatesFromTelegramChatLogs, ?action=processTreePlantingLinksFromTelegramChatLogs, ?action=processTreeGrowthMonitoringFromTelegramChatLogs, ?action=processFarmBoundaryEvidenceFromTelegramChatLogs, or ?action=resendTreePlantedNotification&qr_code=<code>");
+  return ContentService.createTextOutput("ℹ️ No valid action specified. Use ?action=processQrCodeUpdatesFromTelegramChatLogs, ?action=processTreePlantingLinksFromTelegramChatLogs, ?action=processTreeGrowthMonitoringFromTelegramChatLogs, ?action=processFarmBoundaryEvidenceFromTelegramChatLogs, ?action=processMediaRetractionFromTelegramChatLogs, or ?action=resendTreePlantedNotification&qr_code=<code>");
 }
 
 /**
