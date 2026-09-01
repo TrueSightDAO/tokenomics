@@ -141,6 +141,20 @@ function doGet(e) {
     }
   }
 
+  // [FARM BOUNDARY EVIDENCE EVENT] webhook — handler defined in
+  // process_farm_boundary_evidence.gs (same project/global scope). See
+  // agentic_ai_context/plans/SUNMINT_BOUNDARY_SUBMISSION_PLAN.md (PR4).
+  if (action === 'processFarmBoundaryEvidenceFromTelegramChatLogs') {
+    try {
+      Logger.log("Webhook triggered: processing farm boundary evidence from Telegram Chat Logs");
+      const result = processFarmBoundaryEvidenceFromTelegramChatLogs();
+      return ContentService.createTextOutput(`✅ Farm boundary evidence processed: ${result.processed} recorded, ${result.skipped} skipped, ${result.errors} errors`);
+    } catch (err) {
+      Logger.log("Error in processFarmBoundaryEvidenceFromTelegramChatLogs: " + err.message);
+      return ContentService.createTextOutput("❌ Error: " + err.message);
+    }
+  }
+
   // One-off re-send of the tree-planted notification email — handler defined in
   // process_tree_planting_link.js (same project/global scope). Does not touch the ledger or
   // re-run LINK validation; only re-sends using the QR row's already-committed values. Guarded
@@ -159,7 +173,7 @@ function doGet(e) {
     }
   }
 
-  return ContentService.createTextOutput("ℹ️ No valid action specified. Use ?action=processQrCodeUpdatesFromTelegramChatLogs, ?action=processTreePlantingLinksFromTelegramChatLogs, or ?action=resendTreePlantedNotification&qr_code=<code>");
+  return ContentService.createTextOutput("ℹ️ No valid action specified. Use ?action=processQrCodeUpdatesFromTelegramChatLogs, ?action=processTreePlantingLinksFromTelegramChatLogs, ?action=processTreeGrowthMonitoringFromTelegramChatLogs, ?action=processFarmBoundaryEvidenceFromTelegramChatLogs, or ?action=resendTreePlantedNotification&qr_code=<code>");
 }
 
 /**
