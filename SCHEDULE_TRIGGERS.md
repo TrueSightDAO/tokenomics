@@ -189,7 +189,30 @@ Scheduled triggers serve as **backup processing** for webhook-triggered function
 
 ---
 
-### 6. Capital Injection Processing
+### 6. Farm Boundary Evidence Processing
+
+**Function:** `processFarmBoundaryEvidenceFromTelegramChatLogs()`  
+**File:** [`google_app_scripts/1UrBgqLnnQc6PV4-gMIDh2SYwWu62wTdSrV30xk9q_eVr2UdoxdzXN38v/process_farm_boundary_evidence.gs`](https://github.com/TrueSightDAO/tokenomics/blob/main/google_app_scripts/1UrBgqLnnQc6PV4-gMIDh2SYwWu62wTdSrV30xk9q_eVr2UdoxdzXN38v/process_farm_boundary_evidence.gs)
+
+**Recommended Schedule:** Every 60 minutes (hourly)
+
+**Purpose:** Backup processing for `[FARM BOUNDARY EVIDENCE EVENT]` submissions (SunMint plot boundary photos/videos)
+
+**What It Does:**
+- Reads unprocessed farm boundary evidence events from "Telegram Chat Logs" sheet
+- Parses farm name, plot id, boundary type, media URLs, extracted GPS, area, is-new-farm
+- Dedupes by Telegram Message ID via the "Farm Boundary Evidence" tracking tab
+- **Farm upsert**: new farm name auto-creates the row in the SunMint Plots tab (rule 4)
+- Records media URLs + extracted GPS on the plot record; boundary_authority defaults to 'approx'
+- Does NOT book the ledger (evidence accumulates as the plot record)
+
+**Webhook Alternative (primary path — instant):**
+- Edgar dispatch (dao_protocol) → GAS doGet `?action=processFarmBoundaryEvidenceFromTelegramChatLogs`
+- Hourly cron is the fallback for missed webhooks (same pattern as all other processors)
+
+---
+
+### 7. Capital Injection Processing
 
 **Function:** `processCapitalInjectionCron()` (if exists)  
 **File:** [`google_app_scripts/tdg_asset_management/capital_injection_processing.gs`](https://github.com/TrueSightDAO/tokenomics/blob/main/google_app_scripts/tdg_asset_management/capital_injection_processing.gs)
