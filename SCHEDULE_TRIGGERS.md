@@ -316,6 +316,31 @@ All scheduled functions use hash keys for deduplication:
 
 ---
 
+### 7. Media Retraction Processing
+
+**Function:** `processMediaRetractionFromTelegramChatLogs()`  
+**File:** [`google_app_scripts/1UrBgqLnnQc6PV4-gMIDh2SYwWu62wTdSrV30xk9q_eVr2UdoxdzXN38v/process_media_retraction.gs`](https://github.com/TrueSightDAO/tokenomics/blob/main/google_app_scripts/1UrBgqLnnQc6PV4-gMIDh2SYwWu62wTdSrV30xk9q_eVr2UdoxdzXN38v/process_media_retraction.gs)
+
+**Recommended Schedule:** Every 60 minutes (hourly)
+
+**Purpose:** Backup processing for `[MEDIA RETRACTION EVENT]` submissions - soft-invalidates boundary media evidence per the 3-tier retraction model (agentic_ai_context/plans/SUNMINT_MEDIA_INVALIDATION_DESIGN.md)
+
+**What It Does:**
+- Reads unprocessed media retraction events from "Telegram Chat Logs" sheet
+- Parses plot id, media URLs, reason, retractor email, retraction source
+- Dedupes by Telegram Message ID via the "Media Retraction" tracking tab
+- **3-tier permission gate**: sentinel (automated) / signed farmer-lead / governor email -> PROCESSED; otherwise PENDING_GOVERNOR
+- Soft-invalidates: appends retracted URLs to the plot's "Invalidated Media" column, marks status needs_revision when no valid media remain
+- Downstream polygon recalculation excludes invalidated media (extract_plot_gps.py) -> plots/index.geojson regenerated -> impact map
+
+**Trigger Setup (manual, Apps Script UI):**
+- Edit -> Current project's triggers -> Add Trigger
+- Choose function `processMediaRetractionFromTelegramChatLogs`
+- Choose event source "Time-driven" -> "Minutes timer" -> "Every 60 minutes"
+- (Backup to the Edgar -> GAS webhook path, same as the other processors)
+
+---
+
 ## Related Documentation
 
 - [API_ENDPOINTS.md](./API_ENDPOINTS.md) - Webhook endpoints and API documentation
