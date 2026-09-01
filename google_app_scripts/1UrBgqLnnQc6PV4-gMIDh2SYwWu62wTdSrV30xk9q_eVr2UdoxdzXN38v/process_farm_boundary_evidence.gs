@@ -156,13 +156,30 @@ function fbeHeaderIndex_(header, names) {
 }
 
 /**
+ * Auto-generates the next plot id for the plot-first model: PL-<seq> (e.g. PL-001, PL-002...).
+ * Scans existing Plot IDs in the SunMint Plots tab for the highest numeric suffix.
+ */
+function fbeNextPlotId_(sheet) {
+  var max = 0;
+  try {
+    var data = sheet.getDataRange().getValues();
+    for (var i = 1; i < data.length; i++) {
+      var pid = String(data[i][0] || '').trim();
+      var m = pid.match(/^PL-(\d+)$/i);
+      if (m) max = Math.max(max, parseInt(m[1], 10));
+    }
+  } catch (e) { Logger.log('fbeNextPlotId_ error: ' + e.message); }
+  return 'PL-' + String(max + 1).padStart(3, '0');
+}
+
+/**
  * UPSERTS the farm/plot row in the SunMint Plots tab (governor rule 4 — a new farm name auto-creates the
  * record). Writes by header name so the generator's FIELD_COLUMNS matching keeps working. Returns
  * { plotRow, created, header } where header is the 0-based column-name map.
  */
 function fbeUpsertFarm_(farmName, plotId) {
   var farmSlug = fbeFarmSlug_(farmName);
-  if (!farmSlug) return { plotRow: null, created: false, header: null };
+  if (!farmSlug) return { plotRow: null, created: false, header: null, plotId: '' };
   var spreadsheet = SpreadsheetApp.openByUrl(SOURCE_SHEET_URL);
   var sheet = spreadsheet.getSheetByName(FBE_PLOTS_TAB);
   if (!sheet) {
@@ -172,7 +189,7 @@ function fbeUpsertFarm_(farmName, plotId) {
                      'Coordinates', 'Latitude', 'Longitude']);
   }
   var data = sheet.getDataRange().getValues();
-  if (data.length === 0) return { plotRow: null, created: false, header: null };
+  if (data.length === 0) return { plotRow: null, created: false, header: null, plotId: '' };
   var header = data[0];
   var plotCol = fbeHeaderIndex_(header, ['plot id', 'plot']);
   var farmCol = fbeHeaderIndex_(header, ['farm id', 'farm']);
@@ -185,15 +202,16 @@ function fbeUpsertFarm_(farmName, plotId) {
     var rowPlot = String(data[i][plotCol] || '').trim().toLowerCase();
     var rowFarm = String(data[i][farmCol] || '').trim().toLowerCase();
     if ((matchKey && rowPlot === matchKey) || (matchKey && rowFarm === matchKey)) {
-      return { plotRow: i + 1, created: false, header: header };
+      return { plotRow: i + 1, created: false, header: header, plotId: String(data[i][plotCol] || '') };
     }
   }
-  // Create: build a new row aligned to the header, then appendRow (sparse-safe)
+  // Create (PLOT-FIRST): auto-generate a Plot ID, leave Farm ID EMPTY (the farm link is governor
+  // backfill — see plans/SUNMINT_PLOT_FIRST_MODEL.md), Plot Name = the farmer's typed text.
+  // Farm ID is intentionally NOT written here; slug is used only as the dedup hint above.
+  var resolvedPlotId = plotId ? String(plotId).trim() : fbeNextPlotId_(sheet);
   var newRow = [];
-  var farmDisplayCol = fbeHeaderIndex_(header, ['farm id', 'farm']);
   for (var c = 0; c < header.length; c++) newRow.push('');
-  if (plotCol < newRow.length) newRow[plotCol] = plotId || '';
-  if (farmDisplayCol >= 0 && farmDisplayCol < newRow.length) newRow[farmDisplayCol] = farmSlug;
+  if (plotCol < newRow.length) newRow[plotCol] = resolvedPlotId;
   var nameCol = fbeHeaderIndex_(header, ['plot name', 'name', 'site name']);
   if (nameCol >= 0 && nameCol < newRow.length && !newRow[nameCol]) newRow[nameCol] = farmName;
   var statusCol = fbeHeaderIndex_(header, ['status']);
@@ -201,7 +219,7 @@ function fbeUpsertFarm_(farmName, plotId) {
   var baCol = fbeHeaderIndex_(header, ['boundary authority', 'authority']);
   if (baCol >= 0 && baCol < newRow.length) newRow[baCol] = 'approx';
   sheet.appendRow(newRow);
-  return { plotRow: sheet.getLastRow(), created: true, header: header };
+  return { plotRow: sheet.getLastRow(), created: true, header: header, plotId: resolvedPlotId };
 }
 
 
@@ -226,7 +244,7 @@ function processFarmBoundaryEvidenceFromTelegramChatLogs() {
   if (lastRow < 2) return { processed: 0, skipped: 0, errors: 0 };
   var data = chatLogs.getRange(1, 1, lastRow, Math.max(MESSAGE_COL + 1, TELEGRAM_UPDATE_ID_COL + 1)).getValues();
 
-  var processed = 0, skipped = 0, errors = 0;
+  var processed = 0, skipped = 0, errors = 0, changed = false;
   for (var i = 1; i < data.length; i++) {
     var updateId = String(data[i][TELEGRAM_UPDATE_ID_COL] || '').trim();
     var message = String(data[i][MESSAGE_COL] || '');
@@ -257,9 +275,10 @@ function processFarmBoundaryEvidenceFromTelegramChatLogs() {
 
       // Farm upsert (rule 4): new farm name → create farm record
       var upsert = fbeUpsertFarm_(info.farmName, info.plotId);
+      if (upsert.created) changed = true;
 
       tracking.appendRow([
-        updateId, msgId, info.farmName, info.plotId, info.boundaryType || 'approx',
+        updateId, msgId, info.farmName, upsert.plotId || info.plotId, info.boundaryType || 'approx',
         mirroredUrls.join(', '), info.extractedGps, info.areaHa,
         upsert.created ? 'true' : 'false', info.submissionSource || 'web',
         info.publicSignature, contributorName, 'PROCESSED', new Date().toISOString()
@@ -273,5 +292,32 @@ function processFarmBoundaryEvidenceFromTelegramChatLogs() {
       errors++;
     }
   }
+  // Notify GitHub Actions to rebuild plots/farms indexes (repository_dispatch) if a plot row changed.
+  if (changed) pingPlotsIndexRebuild_();
   return { processed: processed, skipped: skipped, errors: errors };
+}
+
+/**
+ * Pings the sunmint repo's 'plots-index-rebuild' repository_dispatch event so GitHub Actions
+ * regenerates plots/index.geojson + farms/index.json after a plot row changed (plot-first model).
+ * Best-effort: requires a GH PAT in Script Properties (FBE_GH_PAT or GH_PAT); logs + returns false on failure.
+ */
+function pingPlotsIndexRebuild_() {
+  try {
+    var props = PropertiesService.getScriptProperties();
+    var token = props.getProperty('FBE_GH_PAT') || props.getProperty('GH_PAT');
+    if (!token) { Logger.log('FBE ping skipped: no GH PAT in Script Properties'); return false; }
+    var res = UrlFetchApp.fetch('https://api.github.com/repos/TrueSightDAO/sunmint/dispatches', {
+      method: 'post',
+      contentType: 'application/json',
+      headers: { 'Authorization': 'Bearer ' + token, 'Accept': 'application/vnd.github+json', 'User-Agent': 'truesight-autopilot' },
+      payload: JSON.stringify({ event_type: 'plots-index-rebuild' }),
+      muteHttpExceptions: true
+    });
+    Logger.log('FBE ping plots-index-rebuild -> ' + res.getResponseCode());
+    return res.getResponseCode() === 204 || res.getResponseCode() === 202;
+  } catch (e) {
+    Logger.log('FBE ping error: ' + e.message);
+    return false;
+  }
 }
