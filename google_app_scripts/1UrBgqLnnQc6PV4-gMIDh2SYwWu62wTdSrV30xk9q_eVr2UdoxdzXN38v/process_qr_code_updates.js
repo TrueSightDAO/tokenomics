@@ -172,6 +172,19 @@ function doGet(e) {
   // process_tree_planting_link.js (same project/global scope). Does not touch the ledger or
   // re-run LINK validation; only re-sends using the QR row's already-committed values. Guarded
   // to ASSIGNED_TO_TREE rows in resendTreePlantedNotification_ itself.
+  // process_plot_invalidation.gs (same project/global scope) - marks a PLOT invalid (governor/sentinel
+  // only, strict allowlist gate). See agentic_ai_context/plans/SUNMINT_PLOT_FIRST_MODEL.md (Unit 2).
+  if (action === 'processPlotInvalidationFromTelegramChatLogs') {
+    try {
+      Logger.log("Webhook triggered: processing plot invalidation from Telegram Chat Logs");
+      const result = processPlotInvalidationFromTelegramChatLogs();
+      return ContentService.createTextOutput(`✅ Plot invalidation processed: ${result.processed} recorded, ${result.skipped} skipped, ${result.errors} errors`);
+    } catch (err) {
+      Logger.log("Error in processPlotInvalidationFromTelegramChatLogs: " + err.message);
+      return ContentService.createTextOutput("❌ Error: " + err.message);
+    }
+  }
+
   if (action === 'resendTreePlantedNotification') {
     const qrCode = (e.parameter && e.parameter.qr_code || '').toString().trim();
     if (!qrCode) {
