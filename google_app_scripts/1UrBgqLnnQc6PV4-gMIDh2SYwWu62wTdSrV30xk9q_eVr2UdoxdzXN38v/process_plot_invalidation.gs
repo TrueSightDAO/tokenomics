@@ -39,7 +39,9 @@ const PI_TRACKING_HEADERS = [
 const PI_PLOTS_TAB = 'SunMint Plots';
 const PI_SHEET_ID = '1qbZZhf-_7xzmDTriaJVWj6OZshyQsFkdsAV8-pyzASQ';
 
-// Script Property holding the comma-separated governor+sentinel email allowlist (set in Project Settings).
+// Auto-derived governor+sentinel allowlist from dao_members.json (treasury-cache repo, refreshed
+// daily + on demand by dao_protocol). Optional static override property for emergencies/offline.
+const PI_DAO_MEMBERS_URL = 'https://raw.githubusercontent.com/TrueSightDAO/treasury-cache/main/dao_members.json';
 const PI_ALLOWLIST_PROP = 'PI_GOVERNOR_SENTINEL_EMAILS';
 
 /** Normalizes a [PLOT INVALIDATION EVENT] message body. */
@@ -102,14 +104,52 @@ function piHeaderIndex_(header, names) {
  * allowlist script property. If the property is unset, this deliberately FAILS CLOSED (no one may
  * invalidate) rather than opening the gate - the governor must configure the property first.
  */
+/**
+ * Fetches the live governor+sentinel email set from dao_members.json (treasury-cache).
+ * Returns [] on any failure (caller falls back to the static override property).
+ */
+function piFetchGovernorSentinelEmails_() {
+  try {
+    var resp = UrlFetchApp.fetch(PI_DAO_MEMBERS_URL, { muteHttpExceptions: true, timeoutSeconds: 20 });
+    if (resp.getResponseCode() !== 200) {
+      Logger.log('PI gate: dao_members fetch HTTP ' + resp.getResponseCode() + ' - falling back.');
+      return [];
+    }
+    var d = JSON.parse(resp.getContentText());
+    var out = [];
+    var contribs = d && Array.isArray(d.contributors) ? d.contributors : [];
+    for (var i = 0; i < contribs.length; i++) {
+      var c = contribs[i] || {};
+      var roles = Array.isArray(c.roles) ? c.roles : [];
+      var isPriv = roles.indexOf('governor') !== -1 || roles.indexOf('sentinel') !== -1;
+      if (isPriv && c.email) out.push(String(c.email).trim().toLowerCase());
+    }
+    Logger.log('PI gate: auto-derived ' + out.length + ' governor/sentinel emails from dao_members.json');
+    return out;
+  } catch (e) {
+    Logger.log('PI gate: dao_members fetch error: ' + e.message + ' - falling back.');
+    return [];
+  }
+}
+
+/**
+ * SERVER-SIDE role gate (governor + sentinel only). AUTO-DERIVED from dao_members.json roles,
+ * keeping the allowlist in sync automatically as roles change (governor decision 2026-09-02).
+ * Falls back to the PI_GOVERNOR_SENTINEL_EMAILS static override property if the live fetch fails.
+ * If BOTH are unavailable, deliberately FAILS CLOSED (no one may invalidate).
+ */
 function piIsGovernorOrSentinel_(email) {
   if (!email) return false;
+  var needle = String(email).trim().toLowerCase();
+  // 1) live auto-derived set (authoritative)
+  var live = piFetchGovernorSentinelEmails_();
+  if (live.length > 0) return live.indexOf(needle) !== -1;
+  // 2) static override property fallback
   var allowRaw = PropertiesService.getScriptProperties().getProperty(PI_ALLOWLIST_PROP);
   if (!allowRaw) {
-    Logger.log('PI gate: allowlist property ' + PI_ALLOWLIST_PROP + ' is NOT set - failing closed.');
+    Logger.log('PI gate: allowlist unavailable (fetch failed + property unset) - failing closed.');
     return false;
   }
-  var needle = String(email).trim().toLowerCase();
   var allow = String(allowRaw).split(',').map(function (s) { return String(s).trim().toLowerCase(); })
     .filter(function (s) { return s.length > 0; });
   return allow.indexOf(needle) !== -1;
