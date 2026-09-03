@@ -91,7 +91,7 @@ function extractFarmBoundaryEvidenceInfo_(message) {
     var m = normalizeFarmBoundaryEvidenceMessage_(message);
     var escapeRe = function (s) { return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); };
     var grab = function (label) {
-      var re = new RegExp('-\\s+' + escapeRe(label) + ':\\s*([^\n]+)', 'i');
+      var re = new RegExp('-\\s+' + escapeRe(label) + ':[ \\t]*([^\n]+)', 'i');
       var match = m.match(re);
       return match ? match[1].trim() : '';
     };
