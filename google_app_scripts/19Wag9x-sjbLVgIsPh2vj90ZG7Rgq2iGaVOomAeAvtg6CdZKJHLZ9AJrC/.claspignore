@@ -1,0 +1,7 @@
+# Protect live secret accessor from clasp push deletion (folder-mirror sync).
+# Incident 2026-09-06: clasp push deleted the editor-only Credentials.gs,
+# breaking @HEAD/@9. Credentials.js now lives in the live project and must
+# never be deleted by a push. Edit it in the Apps Script editor, not via clasp.
+Credentials.gs
+Credentials.js
+Credentials.sample.js
