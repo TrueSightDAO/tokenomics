@@ -398,7 +398,24 @@ function computeExpenseProcessingStatus_(telegramRow, reporterName, daoMemberNam
   if (isTelegramGovernorYesFromRow_(telegramRow)) return 'authorized';
   if (authNamesMatchForExpense_(reporterName, daoMemberName)) return 'authorized';
   if (isGovernorByName_(reporterName)) return 'authorized';
+  if (isAgentFilingForGovernor_(reporterName, daoMemberName)) return 'authorized';
   return 'unauthorized';
+}
+
+/**
+ * DAO agent/autopilot reporters whose signed expense filings are made on behalf of a
+ * DAO member (e.g. Sophia Truesight, the TrueSight autopilot). Normalized lowercase.
+ */
+const DAO_AGENT_REPORTERS_ = ['sophia truesight'];
+
+/**
+ * True when the reporter is a registered DAO agent (autopilot) filing on behalf of a
+ * DAO member who is themselves a registered governor. Least-privilege: an agent may
+ * only authorize expenses for governors who direct the agent, not for arbitrary members.
+ */
+function isAgentFilingForGovernor_(reporterName, daoMemberName) {
+  if (DAO_AGENT_REPORTERS_.indexOf(normalizeAuthName_(reporterName)) === -1) return false;
+  return isGovernorByName_(daoMemberName);
 }
 
 function findContributorByDigitalSignature(digitalSignature) {
