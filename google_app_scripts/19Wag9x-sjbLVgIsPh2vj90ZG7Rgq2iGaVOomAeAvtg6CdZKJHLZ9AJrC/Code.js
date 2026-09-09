@@ -403,18 +403,44 @@ function computeExpenseProcessingStatus_(telegramRow, reporterName, daoMemberNam
 }
 
 /**
- * DAO agent/autopilot reporters whose signed expense filings are made on behalf of a
- * DAO member (e.g. Sophia Truesight, the TrueSight autopilot). Normalized lowercase.
+ * True when the reporter is a registry-backed Sentinel — i.e. their row on the
+ * "Contributors contact information" tab (Main Ledger) has column W ("Is Sentinel")
+ * = TRUE. This is the SAME source dao_members_cache_publisher.gs (DaoMembersCache.js)
+ * reads to emit roles:["member","sentinel"] in dao_members.json, which is what
+ * truesight.me/members.html renders under "Sentinels". Registry-backed rather than a
+ * hardcoded name list, so a new sentinel agent is authorized the moment their sheet
+ * row is flagged — no code change or redeploy needed.
  */
-const DAO_AGENT_REPORTERS_ = ['sophia truesight'];
+function isSentinelByName_(contributorName) {
+  if (!contributorName) return false;
+  try {
+    const spreadsheet = SpreadsheetApp.openByUrl(CONTRIBUTORS_SHEET_URL);
+    const sheet = spreadsheet.getSheetByName(CONTRIBUTORS_SHEET_NAME);
+    if (!sheet) return false;
+    const lastRow = sheet.getLastRow();
+    if (lastRow < 4) return false;
+    // Column A = name, column W (index 22) = Is Sentinel; header row 3, data row 4+.
+    const data = sheet.getRange(4, 1, lastRow - 3, 23).getValues();
+    const target = normalizeAuthName_(contributorName);
+    for (let i = 0; i < data.length; i++) {
+      if (!data[i][0]) continue;
+      if (normalizeAuthName_(String(data[i][0])) !== target) continue;
+      return String(data[i][22] || '').trim().toUpperCase() === 'TRUE';
+    }
+  } catch (e) {
+    Logger.log('Sentinel lookup failed: ' + e.message);
+  }
+  return false;
+}
 
 /**
- * True when the reporter is a registered DAO agent (autopilot) filing on behalf of a
- * DAO member who is themselves a registered governor. Least-privilege: an agent may
- * only authorize expenses for governors who direct the agent, not for arbitrary members.
+ * True when the reporter is a registered Sentinel (autopilot agent) filing on behalf
+ * of a DAO member who is themselves a registered governor. Least-privilege: a sentinel
+ * may only authorize expenses for governors who direct the agent, not for arbitrary
+ * members. Replaces the old hardcoded DAO_AGENT_REPORTERS_ list.
  */
 function isAgentFilingForGovernor_(reporterName, daoMemberName) {
-  if (DAO_AGENT_REPORTERS_.indexOf(normalizeAuthName_(reporterName)) === -1) return false;
+  if (!isSentinelByName_(reporterName)) return false;
   return isGovernorByName_(daoMemberName);
 }
 
