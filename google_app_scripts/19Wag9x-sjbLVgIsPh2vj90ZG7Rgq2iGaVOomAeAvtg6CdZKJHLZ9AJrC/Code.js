@@ -1045,6 +1045,14 @@ function parseDateFromYYYYMMDD(dateStr) {
 }
 
 function parseAndProcessTelegramLogs() {
+  // Idempotency guard 1 (2026-09-09 double-booking fix, Edgar_20260909124022_298): serialize
+  // overlapping runs so a second dispatch can't snapshot col K before the first run appends.
+  const _procLock = LockService.getScriptLock();
+  if (!_procLock.waitLock(30000)) {
+    Logger.log('parseAndProcessTelegramLogs: could not acquire script lock within 30s; aborting to avoid double-processing');
+    return;
+  }
+  try {
   try {
     const sourceSpreadsheet = SpreadsheetApp.openByUrl(SOURCE_SHEET_URL);
     const scoredExpenseSpreadsheet = SpreadsheetApp.openByUrl(SCORED_EXPENSE_SHEET_URL);
@@ -1186,6 +1194,14 @@ function parseAndProcessTelegramLogs() {
           Logger.log(`Row ${i + 1}: Processing Status = unauthorized (reporter is not DAO Member for selected inventory and Governor is not YES)`);
         }
 
+        // Idempotency guard 2: re-verify the hash against a FRESH col-K read right before the
+        // SES append — closes the race where an overlapping run appended after our snapshot.
+        const freshScored = scoredExpenseSheet.getDataRange().getValues();
+        const freshHashKeys = freshScored.slice(1).map(r => r[DEST_HASH_KEY_COL]).filter(k => k);
+        if (freshHashKeys.includes(hashKey)) {
+          Logger.log(`Row ${i + 1}: hash ${hashKey} appeared since snapshot — already scored; skipping (idempotency guard)`);
+          continue;
+        }
         // Prepare row data for Scored Expense Submissions sheet
         // Columns: A=Update ID … M=Target Ledger, N=Processing Status (authorized | unauthorized)
         const rowToAppend = [
@@ -1249,6 +1265,9 @@ function parseAndProcessTelegramLogs() {
     Logger.log(`❌ Error in parseAndProcessTelegramLogs: ${e.message}`);
     Logger.log(`Error stack: ${e.stack || 'No stack trace available'}`);
     throw e; // Re-throw to ensure error is visible
+  }
+  } finally {
+    _procLock.releaseLock();
   }
 }
 
@@ -1318,6 +1337,13 @@ function notifyTreasuryCachePublisher_(trigger) {
 // Test function to process a specific row from the source sheet
 function testParseAndProcessRow() {
   rowNumber = 6772
+  // Idempotency guard (2026-09-09 double-booking fix): serialize overlapping runs.
+  const _testLock = LockService.getScriptLock();
+  if (!_testLock.waitLock(30000)) {
+    Logger.log('testParseAndProcessRow: could not acquire script lock within 30s; aborting');
+    return;
+  }
+  try {
   try {
     // Validate row number
     if (!Number.isInteger(rowNumber) || rowNumber < 2) {
@@ -1482,6 +1508,13 @@ function testParseAndProcessRow() {
 
     const processingStatus = computeExpenseProcessingStatus_(sourceData[i], reporterName, expenseDetails.daoMemberName);
 
+    // Idempotency guard 2: re-verify against a FRESH col-K read right before appending.
+    const freshScored = scoredExpenseSheet.getDataRange().getValues();
+    const freshHashKeys = freshScored.slice(1).map(r => r[DEST_HASH_KEY_COL]).filter(k => k);
+    if (freshHashKeys.includes(hashKey)) {
+      Logger.log(`Row ${rowNumber}: hash ${hashKey} appeared since snapshot — already scored; skipping (idempotency guard)`);
+      return;
+    }
     // Step 6: Append to scored expense sheet
     const rowToAppend = [
       sourceData[i][TELEGRAM_UPDATE_ID_COL], // Column A: Telegram Update ID
@@ -1529,6 +1562,9 @@ function testParseAndProcessRow() {
     Logger.log(`   File Uploads: ${JSON.stringify(fileUploadStatus)}`);
   } catch (e) {
     Logger.log(`Test Failed: Error processing row ${rowNumber}: ${e.message}`);
+  }
+  } finally {
+    _testLock.releaseLock();
   }
 }
 
