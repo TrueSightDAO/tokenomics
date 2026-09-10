@@ -403,7 +403,11 @@ def _clasprc_access_token() -> tuple[str | None, str]:
     except Exception as e:
         return None, f"failed to parse {CLASPRC}: {e}"
     tok = (rc.get("tokens") or {}).get("default") or {}
-    cid, csec, rt = tok.get("client_id"), tok.get("client_secret"), tok.get("refresh_token")
+    cid, csec, rt = (
+        tok.get("client_id"),
+        tok.get("client_secret"),
+        tok.get("refresh_token"),
+    )
     if not (cid and csec and rt):
         return None, "clasprc missing client_id/secret/refresh_token"
     try:
@@ -449,7 +453,9 @@ def fetch_live_project_files(sid: str) -> tuple[list[dict] | None, str]:
     return content.get("files", []), ""
 
 
-def validate_accessor_survivability(project_dir: Path, sid: str) -> tuple[list[str], str]:
+def validate_accessor_survivability(
+    project_dir: Path, sid: str
+) -> tuple[list[str], str]:
     """Block a push that would leave a required secret accessor undefined.
 
     The accessor contract is whatever the tracked Credentials.sample.js
