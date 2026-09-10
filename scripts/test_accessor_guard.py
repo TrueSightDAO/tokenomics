@@ -56,7 +56,11 @@ def test_basename_ignored_matches_live_stem():
 def test_guard_passes_when_live_accessor_present(tmp_path, monkeypatch):
     _mk_project(
         tmp_path,
-        {"Credentials.sample.js": SAMPLE, "Code.js": CALLER, ".claspignore": CLASPIGNORE},
+        {
+            "Credentials.sample.js": SAMPLE,
+            "Code.js": CALLER,
+            ".claspignore": CLASPIGNORE,
+        },
     )
     monkeypatch.setattr(
         dgp,
@@ -71,7 +75,11 @@ def test_guard_passes_when_live_accessor_present(tmp_path, monkeypatch):
 def test_guard_fails_when_live_accessor_missing(tmp_path, monkeypatch):
     _mk_project(
         tmp_path,
-        {"Credentials.sample.js": SAMPLE, "Code.js": CALLER, ".claspignore": CLASPIGNORE},
+        {
+            "Credentials.sample.js": SAMPLE,
+            "Code.js": CALLER,
+            ".claspignore": CLASPIGNORE,
+        },
     )
     monkeypatch.setattr(
         dgp,
