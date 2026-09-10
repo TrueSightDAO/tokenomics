@@ -256,6 +256,13 @@ function processTelegramLogs() {
       const photoUrlMatch = contributionMade.match(/- Photo URL: (.+)$/m);
       const photoUrl = photoUrlMatch ? photoUrlMatch[1].trim() : 'N/A';
 
+      // Evidence gate: a planting with no latitude, no longitude, or no photo cannot be
+      // verified on the map. Mark it INVALID instead of NEW so it never enters
+      // trees/index.geojson as a coordinate-less / photo-less tree.
+      const rowStatus = (latitude === 'N/A' || longitude === 'N/A' || photoUrl === 'N/A')
+        ? 'INVALID'
+        : 'NEW';
+
       // Extract public signature
       const publicSignatureMatch = contributionMade.match(/My Digital Signature: ([^\n]+)/);
       const publicSignature = publicSignatureMatch ? publicSignatureMatch[1].trim() : 'N/A';
@@ -296,7 +303,7 @@ function processTelegramLogs() {
                 contributorName, // J
                 latitude, // K
                 longitude, // L
-                "NEW", // M
+                rowStatus, // M
                 species, // N
                 commitUrl || "N/A", // O
                 cost, // P
@@ -306,7 +313,7 @@ function processTelegramLogs() {
               const treePlantingRowNumber = sunMintTab.getLastRow();
               sendTreePlantingNotification([
                 row[0], row[1], row[2], row[3], row[4], contributionMade, row[11], fileId,
-                photoUrl, contributorName, latitude, longitude, "NEW", species, commitUrl || "N/A",
+                photoUrl, contributorName, latitude, longitude, rowStatus, species, commitUrl || "N/A",
                 cost, plantingTime
               ], treePlantingRowNumber);
 
@@ -363,7 +370,7 @@ function processTelegramLogs() {
             contributorName, // J
             latitude, // K
             longitude, // L
-            "NEW", // M
+            rowStatus, // M
             species, // N
             commitUrl, // O
             cost, // P
@@ -373,7 +380,7 @@ function processTelegramLogs() {
           const treePlantingRowNumber = sunMintTab.getLastRow();
           sendTreePlantingNotification([
             row[0], row[1], row[2], row[3], row[4], contributionMade, row[11], fileId,
-            photoUrl, contributorName, latitude, longitude, "NEW", species, commitUrl,
+            photoUrl, contributorName, latitude, longitude, rowStatus, species, commitUrl,
             cost, plantingTime
           ], treePlantingRowNumber);
 
