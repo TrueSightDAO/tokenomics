@@ -43,6 +43,11 @@ const FBE_TRACKING_HEADERS = [
   'Processed Timestamp'
 ];
 
+// Vocabulary for the SINGLE `plot_type` column (mirrors sunmint/scripts/build_plots_geojson.py
+// VALID_PLOT_TYPES and the SunMint Plots sheet, thread 24326). `maturing` is the walk-observed
+// middle stage; there is deliberately NO separate stage column. Blank = unclassified.
+const FBE_VALID_PLOT_TYPES = ['restoration', 'mature', 'maturing', 'enrichment', 'research', 'nursery', 'infrastructure'];
+
 // ----- SunMint Plots sheet (upsert target = the generator's source of truth, SHEET_ID 1qbZZhf...) -----
 // The farm record is a ROW in the 'SunMint Plots' tab keyed by Farm ID; the boundary submission either
 // finds the farm row (matching plot / farm id) or appends a new one. We write by HEADER NAME so the
@@ -72,7 +77,7 @@ function normalizeFarmBoundaryEvidenceMessage_(message) {
  * - Farm Name: <name>
  * - Plot ID: <optional>
  * - Boundary Type: <approx|gps_walk|car|incra>
- * - Plot Type: <optional: restoration|mature|enrichment|research|nursery|infrastructure>
+ * - Plot Type: <optional: restoration|mature|maturing|enrichment|research|nursery|infrastructure>
  * - Media URLs: <comma-separated>
  * - Extracted GPS: <optional lat,lng list>
  * - Area (ha): <optional>
@@ -101,6 +106,12 @@ function extractFarmBoundaryEvidenceInfo_(message) {
     result.plotId = grab('Plot ID');
     result.boundaryType = grab('Boundary Type');
     result.plotType = grab('Plot Type');
+    // Fail loudly (but non-fatally) on an off-vocabulary Plot Type. The GAS otherwise passes
+    // plot_type through verbatim, so a stage word typed into the type field would sail through silently.
+    if (result.plotType && FBE_VALID_PLOT_TYPES.indexOf(result.plotType.toLowerCase()) === -1) {
+      Logger.log('FBE warn: off-vocabulary Plot Type "' + result.plotType + '" for farm "' + result.farmName +
+        '" (expected one of: ' + FBE_VALID_PLOT_TYPES.join('|') + ')');
+    }
     var mediaRaw = grab('Media URLs');
     if (mediaRaw) {
       result.mediaUrls = mediaRaw.split(',').map(function (u) { return u.trim(); }).filter(function (u) { return u; });
@@ -193,8 +204,10 @@ function fbeUpsertFarm_(farmName, plotId, opts) {
   var sheet = spreadsheet.getSheetByName(FBE_PLOTS_TAB);
   if (!sheet) {
     sheet = spreadsheet.insertSheet(FBE_PLOTS_TAB);
+    // Order mirrors the LIVE SunMint Plots sheet (Boundary Authority at F, Plot Type at G).
+    // Reads match by header NAME, so this only shapes a freshly created tab.
     sheet.appendRow(['Plot ID', 'Farm ID', 'Plot Name', 'Hectares', 'Status',
-                     'Plot Type', 'Boundary Authority', 'Owner', 'Region', 'Verified At', 'Media', 'Notes',
+                     'Boundary Authority', 'Plot Type', 'Owner', 'Region', 'Verified At', 'Media', 'Notes',
                      'Coordinates', 'Latitude', 'Longitude']);
   }
   var data = sheet.getDataRange().getValues();
