@@ -212,6 +212,27 @@ function piMarkPlotInvalid_(plotId, reason, retractorEmail) {
  * pings the plots-index rebuild; appends tracking.
  */
 function processPlotInvalidationFromTelegramChatLogs() {
+  // Serialized via LockService.getScriptLock(): the dedup set is read from the tracking tab and
+  // then appended to, so two concurrent fires (webhook + cron) could both observe an empty set
+  // and each append a tracking row for the same Telegram Message ID (duplicates observed
+  // 2026-09-10, msgId Edgar_20260910031550_315 appended 0.39s apart).
+  var lock = LockService.getScriptLock();
+  if (!lock.tryLock(180000)) {
+    Logger.log('processPlotInvalidationFromTelegramChatLogs: another run is in progress; skipping.');
+    return { processed: 0, skipped: 0, errors: 0 };
+  }
+  try {
+    return piProcessPlotInvalidationLocked_();
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/**
+ * Lock-free body of processPlotInvalidationFromTelegramChatLogs. Callers MUST already hold the
+ * script lock (see the wrapper above) — the read-then-append dedup is only safe while serialized.
+ */
+function piProcessPlotInvalidationLocked_() {
   var spreadsheet = SpreadsheetApp.openByUrl(SOURCE_SHEET_URL);
   var chatLogs = spreadsheet.getSheetByName(SOURCE_SHEET_NAME); // Telegram Chat Logs
   if (!chatLogs) throw new Error('Telegram Chat Logs sheet not found');
