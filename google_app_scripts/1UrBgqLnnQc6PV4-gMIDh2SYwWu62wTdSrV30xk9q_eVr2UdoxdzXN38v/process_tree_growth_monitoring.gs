@@ -258,6 +258,28 @@ function tgmIsOperator_(contributorName) {
 }
 
 function processTreeGrowthMonitoringFromTelegramChatLogs() {
+  // Serialized via LockService.getScriptLock(): the dedup set is read from the tracking tab and
+  // then appended to, so two concurrent fires (webhook + cron) could both observe an empty set
+  // and each append a tracking row for the same Telegram Message ID. Same defect fixed in
+  // process_plot_invalidation.gs (#469) and process_farm_boundary_evidence.gs (#471), where
+  // duplicate tracking rows were observed in production.
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(180000)) {
+    Logger.log('processTreeGrowthMonitoringFromTelegramChatLogs: another run is in progress; skipping.');
+    return { processed: 0, skipped: 0, errors: 0 };
+  }
+  try {
+    return tgmProcessTreeGrowthMonitoringLocked_();
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/**
+ * Lock-free body of processTreeGrowthMonitoringFromTelegramChatLogs. Callers MUST already hold the
+ * script lock (see the wrapper above) -- the read-then-append dedup is only safe while serialized.
+ */
+function tgmProcessTreeGrowthMonitoringLocked_() {
   const spreadsheet = SpreadsheetApp.openByUrl(SOURCE_SHEET_URL);
   const chatLogs = spreadsheet.getSheetByName(SOURCE_SHEET_NAME); // Telegram Chat Logs
   if (!chatLogs) throw new Error('Telegram Chat Logs sheet not found');
