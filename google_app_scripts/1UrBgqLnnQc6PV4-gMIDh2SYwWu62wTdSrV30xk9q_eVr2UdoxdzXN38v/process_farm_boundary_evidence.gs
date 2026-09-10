@@ -77,7 +77,7 @@ function normalizeFarmBoundaryEvidenceMessage_(message) {
  * - Farm Name: <name>
  * - Plot ID: <optional>
  * - Boundary Type: <approx|gps_walk|car|incra>
- * - Plot Type: <optional: restoration|mature|maturing|enrichment|research|nursery|infrastructure>
+ * - Plot Type: <REQUIRED: restoration|mature|maturing|enrichment|research|nursery|infrastructure>
  * - Media URLs: <comma-separated>
  * - Extracted GPS: <optional lat,lng list>
  * - Area (ha): <optional>
@@ -108,6 +108,10 @@ function extractFarmBoundaryEvidenceInfo_(message) {
     result.plotType = grab('Plot Type');
     // Fail loudly (but non-fatally) on an off-vocabulary Plot Type. The GAS otherwise passes
     // plot_type through verbatim, so a stage word typed into the type field would sail through silently.
+    if (!result.plotType) {
+      Logger.log('FBE warn: MISSING required Plot Type for farm "' + result.farmName +
+        '" - expected one of: ' + FBE_VALID_PLOT_TYPES.join('|'));
+    }
     if (result.plotType && FBE_VALID_PLOT_TYPES.indexOf(result.plotType.toLowerCase()) === -1) {
       Logger.log('FBE warn: off-vocabulary Plot Type "' + result.plotType + '" for farm "' + result.farmName +
         '" (expected one of: ' + FBE_VALID_PLOT_TYPES.join('|') + ')');
