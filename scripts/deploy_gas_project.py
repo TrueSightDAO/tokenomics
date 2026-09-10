@@ -330,6 +330,185 @@ def validate_project_files(project_dir: Path, manifest: dict | None) -> list[str
     return errors
 
 
+# ── pre-push live-accessor guard (2026-09-10 ReferenceError incident) ──────
+#
+# Some projects keep a secret accessor file (Credentials.gs / Credentials.js)
+# in the LIVE project only - it is gitignored AND .claspignore'd so a push
+# never deletes it. But nothing guarantees it is actually THERE. A fresh
+# checkout pushes a Code.js that calls setApiKeys()/getCredentials() while no
+# file in the post-push set defines them, so every entry point dies at load
+# with `ReferenceError: setApiKeys is not defined` (incidents 2026-09-06 and
+# 2026-09-10, scriptId 19Wag9x...). This guard models the post-push file set
+# (local sources + live-only files that survive because .claspignore protects
+# them) and refuses the push when a required accessor would be undefined.
+# Fail-open on any live-fetch problem so a hiccup never blocks a real deploy.
+
+ACCESSOR_TEMPLATE_NAME = "Credentials.sample.js"
+
+
+def _top_level_function_names(text: str) -> list[str]:
+    """Return names of `function NAME(...)` declared at brace depth 0.
+
+    Apps Script shares one global scope, so only depth-0 declarations are
+    true globals; nested helpers must not count.
+    """
+    depth = 0
+    names: list[str] = []
+    for line in text.splitlines():
+        stripped = line.strip()
+        if stripped and not stripped.startswith("//") and not stripped.startswith("*"):
+            m = re.match(r"^function\s+([A-Za-z_$][A-Za-z0-9_$]*)\s*\(", stripped)
+            if depth == 0 and m:
+                names.append(m.group(1))
+            depth += stripped.count("{") - stripped.count("}")
+    return names
+
+
+def _read_claspignore(project_dir: Path) -> list[str]:
+    """Return non-comment lines of the project's .claspignore (if any)."""
+    p = project_dir / ".claspignore"
+    if not p.is_file():
+        return []
+    pats: list[str] = []
+    for line in p.read_text(encoding="utf-8", errors="replace").splitlines():
+        line = line.strip()
+        if line and not line.startswith("#"):
+            pats.append(line)
+    return pats
+
+
+def _basename_ignored(name: str, patterns: list[str]) -> bool:
+    """True if a file/project-item name matches a .claspignore pattern.
+
+    clasp strips extensions in the live project (Credentials.js lives as
+    'Credentials'), so compare stems as well as full basenames.
+    """
+    from fnmatch import fnmatch
+
+    stem = name.rsplit(".", 1)[0]
+    for pat in patterns:
+        pbase = os.path.basename(pat.rstrip("/"))
+        pstem = pbase.rsplit(".", 1)[0]
+        if fnmatch(name, pbase) or name == pstem or stem == pstem:
+            return True
+    return False
+
+
+def _clasprc_access_token() -> tuple[str | None, str]:
+    """Return (access_token, error) from the active clasp refresh token."""
+    if not CLASPRC.is_file():
+        return None, f"no clasprc at {CLASPRC}"
+    try:
+        rc = json.loads(CLASPRC.read_text(encoding="utf-8"))
+    except Exception as e:
+        return None, f"failed to parse {CLASPRC}: {e}"
+    tok = (rc.get("tokens") or {}).get("default") or {}
+    cid, csec, rt = tok.get("client_id"), tok.get("client_secret"), tok.get("refresh_token")
+    if not (cid and csec and rt):
+        return None, "clasprc missing client_id/secret/refresh_token"
+    try:
+        data = urllib.parse.urlencode(
+            {
+                "client_id": cid,
+                "client_secret": csec,
+                "refresh_token": rt,
+                "grant_type": "refresh_token",
+            }
+        ).encode("utf-8")
+        resp = json.loads(
+            urllib.request.urlopen(
+                urllib.request.Request(
+                    "https://oauth2.googleapis.com/token",
+                    data=data,
+                    headers={"Content-Type": "application/x-www-form-urlencoded"},
+                ),
+                timeout=10,
+            ).read()
+        )
+        access = resp.get("access_token")
+        return (access, "") if access else (None, f"no access_token: {resp}")
+    except Exception as e:
+        return None, str(e)
+
+
+def fetch_live_project_files(sid: str) -> tuple[list[dict] | None, str]:
+    """Fetch the LIVE project's files via the Apps Script API.
+
+    Returns (files, error); files is None on any failure so the caller can
+    fail OPEN (never block a legitimate push on a token/scope/network issue).
+    """
+    access, err = _clasprc_access_token()
+    if not access:
+        return None, err
+    url = f"https://script.googleapis.com/v1/projects/{sid}/content"
+    try:
+        req = urllib.request.Request(url, headers={"Authorization": f"Bearer {access}"})
+        content = json.loads(urllib.request.urlopen(req, timeout=20).read())
+    except Exception as e:
+        return None, f"{type(e).__name__}: {e}"
+    return content.get("files", []), ""
+
+
+def validate_accessor_survivability(project_dir: Path, sid: str) -> tuple[list[str], str]:
+    """Block a push that would leave a required secret accessor undefined.
+
+    The accessor contract is whatever the tracked Credentials.sample.js
+    declares. Returns (errors, note): non-empty errors must block the push;
+    note is informational (e.g. the fail-open path).
+    """
+    sample = project_dir / ACCESSOR_TEMPLATE_NAME
+    if not sample.is_file():
+        return [], ""
+    try:
+        required = _top_level_function_names(
+            sample.read_text(encoding="utf-8", errors="replace")
+        )
+    except OSError:
+        return [], ""
+    if not required:
+        return [], ""
+
+    local_sources = [
+        f
+        for f in sorted(project_dir.iterdir())
+        if f.is_file()
+        and f.suffix in (".js", ".gs")
+        and f.name != ACCESSOR_TEMPLATE_NAME
+    ]
+    defined: set[str] = set()
+    for f in local_sources:
+        defined.update(
+            _top_level_function_names(f.read_text(encoding="utf-8", errors="replace"))
+        )
+
+    if all(n in defined for n in required):
+        return [], ""  # defined locally - no live dependency
+
+    live, err = fetch_live_project_files(sid)
+    if live is None:
+        return [], f"live accessor check skipped (fail-open): {err}"
+
+    ignore = _read_claspignore(project_dir)
+    for lf in live:
+        if _basename_ignored(lf.get("name") or "", ignore):
+            defined.update(_top_level_function_names(lf.get("source") or ""))
+
+    missing = sorted(n for n in required if n not in defined)
+    if missing:
+        return (
+            [
+                f"required accessor(s) {missing} are declared only by "
+                f"{ACCESSOR_TEMPLATE_NAME} (gitignored) and are absent from both the "
+                f"local sources and the live project's protected files - after this "
+                f"push every entry point would fail with 'ReferenceError: "
+                f"{missing[0]} is not defined'. Restore the live accessor from "
+                f"{ACCESSOR_TEMPLATE_NAME} (Apps Script editor) before pushing."
+            ],
+            "",
+        )
+    return [], ""
+
+
 def warn_if_orphan(project_dir: Path, sid: str) -> None:
     """Soft warning: scriptId absent from the active clasp account's project
     list => push will likely fail with 'Requested entity was not found'."""
@@ -366,6 +545,11 @@ def main() -> int:
         "--allow-identity-mismatch",
         action="store_true",
         help="push even when clasp identity != owner_email",
+    )
+    ap.add_argument(
+        "--skip-accessor-guard",
+        action="store_true",
+        help="push even if the live secret-accessor (Credentials.js) survivability check fails",
     )
     ap.add_argument(
         "--lease-id",
@@ -435,6 +619,23 @@ def main() -> int:
     if v_errors:
         print("\nX refusing to push — fix project files first.")
         return 1
+
+    # Live-accessor survivability guard (2026-09-10 ReferenceError incident):
+    # a gitignored, .claspignore'd secret accessor can silently be ABSENT from
+    # the live project. Model the post-push file set and refuse a push that
+    # would leave a called accessor undefined. Fail-open on live-fetch error.
+    if not args.skip_accessor_guard:
+        a_errors, a_note = validate_accessor_survivability(project_dir, sid)
+        for err in a_errors:
+            print(f"  X {err}")
+        if a_errors:
+            print(
+                "\nX refusing to push — accessor guard "
+                "(override: --skip-accessor-guard)."
+            )
+            return 1
+        if a_note:
+            print(f"  ! {a_note}")
 
     # Identity check
     active_email, identity_err = resolve_clasp_identity()
