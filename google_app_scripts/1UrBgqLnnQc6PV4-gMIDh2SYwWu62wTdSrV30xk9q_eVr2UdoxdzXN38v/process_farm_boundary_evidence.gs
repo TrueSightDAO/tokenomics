@@ -31,6 +31,7 @@ const FBE_TRACKING_HEADERS = [
   'Farm Name',
   'Plot ID',
   'Boundary Type',
+  'Plot Type',
   'Media URLs',
   'Extracted GPS',
   'Area (ha)',
@@ -71,6 +72,7 @@ function normalizeFarmBoundaryEvidenceMessage_(message) {
  * - Farm Name: <name>
  * - Plot ID: <optional>
  * - Boundary Type: <approx|gps_walk|car|incra>
+ * - Plot Type: <optional: restoration|mature|enrichment|research|nursery|infrastructure>
  * - Media URLs: <comma-separated>
  * - Extracted GPS: <optional lat,lng list>
  * - Area (ha): <optional>
@@ -84,7 +86,7 @@ function normalizeFarmBoundaryEvidenceMessage_(message) {
  */
 function extractFarmBoundaryEvidenceInfo_(message) {
   var result = {
-    farmName: '', plotId: '', boundaryType: '', mediaUrls: [], extractedGps: '',
+    farmName: '', plotId: '', boundaryType: '', plotType: '', mediaUrls: [], extractedGps: '',
     areaHa: '', isNewFarm: false, submissionSource: '', publicSignature: '', requestTransactionId: ''
   };
   try {
@@ -98,6 +100,7 @@ function extractFarmBoundaryEvidenceInfo_(message) {
     result.farmName = grab('Farm Name');
     result.plotId = grab('Plot ID');
     result.boundaryType = grab('Boundary Type');
+    result.plotType = grab('Plot Type');
     var mediaRaw = grab('Media URLs');
     if (mediaRaw) {
       result.mediaUrls = mediaRaw.split(',').map(function (u) { return u.trim(); }).filter(function (u) { return u; });
@@ -175,9 +178,15 @@ function fbeNextPlotId_(sheet) {
 /**
  * UPSERTS the farm/plot row in the SunMint Plots tab (governor rule 4 — a new farm name auto-creates the
  * record). Writes by header name so the generator's FIELD_COLUMNS matching keeps working. Returns
- * { plotRow, created, header } where header is the 0-based column-name map.
+ * { plotRow, created, header, plotId } where header is the 0-based column-name map.
+ *
+ * opts (optional): { boundaryType, plotType } — the SUBMITTED values from the boundary-evidence message.
+ * When provided these are written on BOTH the create and the update path, so a submission's evidence
+ * grade (boundary_authority) and role (plot_type) are never dropped. When absent, boundary_authority
+ * defaults to 'approx' and plot_type stays blank (unclassified) — NEVER auto-guessed.
  */
-function fbeUpsertFarm_(farmName, plotId) {
+function fbeUpsertFarm_(farmName, plotId, opts) {
+  opts = opts || {};
   var farmSlug = fbeFarmSlug_(farmName);
   if (!farmSlug) return { plotRow: null, created: false, header: null, plotId: '' };
   var spreadsheet = SpreadsheetApp.openByUrl(SOURCE_SHEET_URL);
@@ -185,7 +194,7 @@ function fbeUpsertFarm_(farmName, plotId) {
   if (!sheet) {
     sheet = spreadsheet.insertSheet(FBE_PLOTS_TAB);
     sheet.appendRow(['Plot ID', 'Farm ID', 'Plot Name', 'Hectares', 'Status',
-                     'Boundary Authority', 'Owner', 'Region', 'Verified At', 'Media', 'Notes',
+                     'Plot Type', 'Boundary Authority', 'Owner', 'Region', 'Verified At', 'Media', 'Notes',
                      'Coordinates', 'Latitude', 'Longitude']);
   }
   var data = sheet.getDataRange().getValues();
@@ -202,6 +211,12 @@ function fbeUpsertFarm_(farmName, plotId) {
     var rowPlot = String(data[i][plotCol] || '').trim().toLowerCase();
     var rowFarm = String(data[i][farmCol] || '').trim().toLowerCase();
     if ((matchKey && rowPlot === matchKey) || (matchKey && rowFarm === matchKey)) {
+      // Existing plot: write the SUBMITTED evidence grade + role if the submission carried them
+      // (previously the update path wrote nothing, so a submitted boundary type was silently lost).
+      var baExistCol = fbeHeaderIndex_(header, ['boundary authority', 'authority']);
+      if (baExistCol >= 0 && opts.boundaryType) sheet.getRange(i + 1, baExistCol + 1).setValue(opts.boundaryType);
+      var ptExistCol = fbeHeaderIndex_(header, ['plot type']);
+      if (ptExistCol >= 0 && opts.plotType) sheet.getRange(i + 1, ptExistCol + 1).setValue(opts.plotType);
       return { plotRow: i + 1, created: false, header: header, plotId: String(data[i][plotCol] || '') };
     }
   }
@@ -217,7 +232,10 @@ function fbeUpsertFarm_(farmName, plotId) {
   var statusCol = fbeHeaderIndex_(header, ['status']);
   if (statusCol >= 0 && statusCol < newRow.length) newRow[statusCol] = 'proposed';
   var baCol = fbeHeaderIndex_(header, ['boundary authority', 'authority']);
-  if (baCol >= 0 && baCol < newRow.length) newRow[baCol] = 'approx';
+  if (baCol >= 0 && baCol < newRow.length) newRow[baCol] = opts.boundaryType || 'approx';
+  // plot_type is written ONLY when the submission carried it; never auto-guessed (blank = unclassified).
+  var ptCol = fbeHeaderIndex_(header, ['plot type']);
+  if (ptCol >= 0 && ptCol < newRow.length && opts.plotType) newRow[ptCol] = opts.plotType;
   sheet.appendRow(newRow);
   return { plotRow: sheet.getLastRow(), created: true, header: header, plotId: resolvedPlotId };
 }
@@ -273,13 +291,15 @@ function processFarmBoundaryEvidenceFromTelegramChatLogs() {
         }
       }
 
-      // Farm upsert (rule 4): new farm name → create farm record
-      var upsert = fbeUpsertFarm_(info.farmName, info.plotId);
+      // Farm upsert (rule 4): new farm name → create farm record. Pass the submitted
+      // boundary type + plot type so they are written on BOTH the create and update paths.
+      var upsert = fbeUpsertFarm_(info.farmName, info.plotId,
+        { boundaryType: info.boundaryType, plotType: info.plotType });
       if (upsert.created) changed = true;
 
       tracking.appendRow([
         updateId, msgId, info.farmName, upsert.plotId || info.plotId, info.boundaryType || 'approx',
-        mirroredUrls.join(', '), info.extractedGps, info.areaHa,
+        info.plotType || '', mirroredUrls.join(', '), info.extractedGps, info.areaHa,
         upsert.created ? 'true' : 'false', info.submissionSource || 'web',
         info.publicSignature, contributorName, 'PROCESSED', new Date().toISOString()
       ]);
