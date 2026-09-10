@@ -1,2 +1,11 @@
 Code.js
 manifest.json
+# Protect live secret accessors from clasp push deletion (folder-mirror sync).
+# Incident 2026-09-06: clasp push deleted an editor-only Credentials.gs in a
+# sibling project, breaking @HEAD/@9. THAT incident did NOT affect this project.
+# Verified 2026-09-24: this project has NO Credentials file, locally or live,
+# so a push here is delete-free. This guard is preventive only.
+# Edit secrets in the Apps Script editor, never via clasp.
+Credentials.gs
+Credentials.js
+Credentials.sample.js
