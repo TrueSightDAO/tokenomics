@@ -42,6 +42,13 @@ function extractPlantingTime(contributionText) {
   return match ? match[1].trim() : 'N/A';
 }
 
+// Helper: extract Plot ID (optional — associates the tree with a SunMint plot, e.g. CR-PA-P2).
+// Returns '' when the submission omits "- Plot ID:", so existing callers are unaffected.
+function extractPlotId(contributionText) {
+  const match = contributionText.match(/- Plot ID: (.+)$/m);
+  return match ? match[1].trim() : '';
+}
+
 // Send Telegram notification
 function sendTreePlantingNotification(rowData, treePlantingRowNumber) {
   Logger.log("Sending tree planting notification");
@@ -197,7 +204,7 @@ function processTelegramLogs() {
   // Create tab if not exists
   if (!sunMintTab) {
     sunMintTab = sheet.insertSheet(sunMintTabName);
-    sunMintTab.getRange("A1:Q1").setValues([[
+    sunMintTab.getRange("A1:T1").setValues([[
       "Telegram Update ID",      // A
       "Chatroom ID",             // B
       "Chatroom Name",           // C
@@ -214,7 +221,10 @@ function processTelegramLogs() {
       "Species",                 // N
       "GitHub Commit URL",       // O
       "Cost",                    // P
-      "Planting Time"            // Q
+      "Planting Time",           // Q
+      "Linked QR Code",          // R (owned by process_tree_planting_link.js)
+      "Linked At",               // S (owned by process_tree_planting_link.js)
+      "Plot ID"                  // T (optional — SunMint plot association)
     ]]);
   }
 
@@ -251,6 +261,7 @@ function processTelegramLogs() {
       const species = extractSpecies(contributionMade);
       const cost = extractCost(contributionMade);
       const plantingTime = extractPlantingTime(contributionMade);
+      const plotId = extractPlotId(contributionMade);
 
       // Extract Photo URL
       const photoUrlMatch = contributionMade.match(/- Photo URL: (.+)$/m);
@@ -307,7 +318,10 @@ function processTelegramLogs() {
                 species, // N
                 commitUrl || "N/A", // O
                 cost, // P
-                plantingTime // Q
+                plantingTime, // Q
+                "", // R (Linked QR Code — written by process_tree_planting_link.js)
+                "", // S (Linked At — written by process_tree_planting_link.js)
+                plotId // T (Plot ID — optional SunMint plot association)
               ]);
 
               const treePlantingRowNumber = sunMintTab.getLastRow();
@@ -374,7 +388,10 @@ function processTelegramLogs() {
             species, // N
             commitUrl, // O
             cost, // P
-            plantingTime // Q
+            plantingTime, // Q
+            "", // R (Linked QR Code — written by process_tree_planting_link.js)
+            "", // S (Linked At — written by process_tree_planting_link.js)
+            plotId // T (Plot ID — optional SunMint plot association)
           ]);
 
           const treePlantingRowNumber = sunMintTab.getLastRow();
@@ -406,6 +423,7 @@ const SUNMINT_LATITUDE_COL = 10;          // Column K (0-based)
 const SUNMINT_LONGITUDE_COL = 11;         // Column L (0-based)
 const SUNMINT_STATUS_COL = 12;            // Column M (0-based) — Status ("NEW", "LINKED" from PR4 onward)
 const SUNMINT_SPECIES_COL = 13;           // Column N (0-based) — Specie
+const SUNMINT_PLOT_ID_COL = 19;           // Column T (0-based) — Plot ID (optional SunMint plot association)
 const GOVERNOR_READ_KEY_PROPERTY = 'GOVERNOR_READ_KEY';
 
 /**
@@ -473,7 +491,7 @@ function doGet(e) {
         .setMimeType(ContentService.MimeType.JSON);
     }
 
-    const data = sunMintTab.getRange(2, 1, lastRow - 1, 17).getValues();
+    const data = sunMintTab.getRange(2, 1, lastRow - 1, 20).getValues();
     const items = [];
     for (let i = 0; i < data.length; i++) {
       const row = data[i];
@@ -487,7 +505,8 @@ function doGet(e) {
         submitted_name: row[SUNMINT_SUBMITTED_NAME_COL] || '',
         latitude: row[SUNMINT_LATITUDE_COL] || '',
         longitude: row[SUNMINT_LONGITUDE_COL] || '',
-        species: row[SUNMINT_SPECIES_COL] || ''
+        species: row[SUNMINT_SPECIES_COL] || '',
+        plot_id: row[SUNMINT_PLOT_ID_COL] || ''
       });
     }
 
