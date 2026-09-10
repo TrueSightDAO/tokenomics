@@ -264,6 +264,27 @@ function fbeUpsertFarm_(farmName, plotId, opts) {
  * Logs, column MESSAGE_COL, for rows containing the marker; mirrors media; upserts the farm; appends tracking.
  */
 function processFarmBoundaryEvidenceFromTelegramChatLogs() {
+  // Serialized via LockService.getScriptLock(): the dedup set is read from the tracking tab and
+  // then appended to, so two concurrent fires (webhook + cron) could both observe an empty set
+  // and each append a tracking row for the same Telegram Message ID. Same defect fixed in
+  // process_plot_invalidation.gs (tokenomics #469), where duplicates were observed in production.
+  var lock = LockService.getScriptLock();
+  if (!lock.tryLock(180000)) {
+    Logger.log('processFarmBoundaryEvidenceFromTelegramChatLogs: another run is in progress; skipping.');
+    return { processed: 0, skipped: 0, errors: 0 };
+  }
+  try {
+    return fbeProcessFarmBoundaryEvidenceLocked_();
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/**
+ * Lock-free body of processFarmBoundaryEvidenceFromTelegramChatLogs. Callers MUST already hold the
+ * script lock (see the wrapper above) -- the read-then-append dedup is only safe while serialized.
+ */
+function fbeProcessFarmBoundaryEvidenceLocked_() {
   var spreadsheet = SpreadsheetApp.openByUrl(SOURCE_SHEET_URL);
   var chatLogs = spreadsheet.getSheetByName(SOURCE_SHEET_NAME); // Telegram Chat Logs
   if (!chatLogs) throw new Error('Telegram Chat Logs sheet not found');
