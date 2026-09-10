@@ -490,7 +490,7 @@ function processTreePlantingLinksFromTelegramChatLogs() {
       // touch the sold QR it was being considered against.
       if (message.includes(TREE_PLANTING_REJECT_EVENT_MARKER)) {
         const sunmintRejectData = sunmintSheet.getDataRange().getValues();
-        let sunmintRejectRowIndex = -1;
+        const sunmintRejectRowIndexes = [];
         // The monitor page (markTreeInvalid) submits the TREE ID as "SunMint Submission
         // Message ID" — for Edgar-direct rows that is column A (Telegram Update ID), NOT
         // column D (Telegram Message ID, the LINK-path key). Match EITHER so rejects for
@@ -500,27 +500,35 @@ function processTreePlantingLinksFromTelegramChatLogs() {
           const rejectColD = (sunmintRejectData[kr][TPL_SUNMINT_MESSAGE_ID_COL] || '').toString().trim();
           const rejectColA = (sunmintRejectData[kr][TELEGRAM_UPDATE_ID_COL] || '').toString().trim();
           if (rejectColD === parsed.sunmintMessageId || rejectColA === parsed.sunmintMessageId) {
-            sunmintRejectRowIndex = kr + 1;
-            break;
+            sunmintRejectRowIndexes.push(kr + 1);
+            // No break: invalidate EVERY row sharing this tree id. A duplicate NEW row
+            // (double-ingestion) is exactly how a rejected tree 'came back on reload' -
+            // first-match-only let the NEW copy survive untouched beside an INVALID twin.
           }
         }
-        if (sunmintRejectRowIndex === -1) {
+        if (sunmintRejectRowIndexes.length === 0) {
           Logger.log(`Row ${rowNumber}: REJECT — SunMint submission "${parsed.sunmintMessageId}" not found`);
           recordOutcome('REJECTED', 'SunMint submission not found (reject path)');
           result.rejected++;
           continue;
         }
-        const sunmintRejectStatus = (sunmintRejectData[sunmintRejectRowIndex - 1][TPL_SUNMINT_STATUS_COL] || '').toString().trim().toUpperCase();
-        if (sunmintRejectStatus !== 'NEW' && sunmintRejectStatus !== 'LINKED') {
-          Logger.log(`Row ${rowNumber}: REJECT — SunMint submission status is "${sunmintRejectStatus}", only NEW or LINKED can be invalidated`);
-          recordOutcome('REJECTED', `SunMint submission status is "${sunmintRejectStatus}", expected NEW or LINKED (reject path)`);
+        const invalidatedRows = [];
+        for (const ri of sunmintRejectRowIndexes) {
+          const st = (sunmintRejectData[ri - 1][TPL_SUNMINT_STATUS_COL] || '').toString().trim().toUpperCase();
+          if (st === 'NEW' || st === 'LINKED') {
+            sunmintSheet.getRange(ri, TPL_SUNMINT_STATUS_COL + 1).setValue('INVALID');
+            invalidatedRows.push(ri);
+          }
+        }
+        if (invalidatedRows.length === 0) {
+          Logger.log(`Row ${rowNumber}: REJECT — all ${sunmintRejectRowIndexes.length} row(s) for "${parsed.sunmintMessageId}" already INVALID; nothing to do`);
+          recordOutcome('REJECTED', 'All SunMint rows for submission already INVALID (reject path)');
           result.rejected++;
           continue;
         }
-        sunmintSheet.getRange(sunmintRejectRowIndex, TPL_SUNMINT_STATUS_COL + 1).setValue('INVALID');
-        recordOutcome('REJECTED', parsed.reason || 'Marked invalid by governor');
+        recordOutcome('REJECTED', parsed.reason || `Marked invalid by governor (rows ${invalidatedRows.join(', ')})`);
         result.processed++;
-        Logger.log(`Row ${rowNumber}: marked SunMint submission "${parsed.sunmintMessageId}" INVALID (governor: ${contributorName}, reason: ${parsed.reason || 'n/a'})`);
+        Logger.log(`Row ${rowNumber}: marked SunMint submission "${parsed.sunmintMessageId}" INVALID on rows ${invalidatedRows.join(', ')} (governor: ${contributorName}, reason: ${parsed.reason || 'n/a'})`);
         // Fire an immediate tree-index rebuild so the invalidated tree drops from
         // trees/index.geojson now, not at the next 06:00 UTC cron (the "tree came
         // back on reload" complaint). Best-effort: a dispatch failure must never
