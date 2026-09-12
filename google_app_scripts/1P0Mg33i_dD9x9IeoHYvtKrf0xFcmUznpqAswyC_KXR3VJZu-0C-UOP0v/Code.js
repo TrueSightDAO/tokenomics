@@ -24,7 +24,8 @@
  * - GET /exec?action=getInventory&sku=<product-id> - Get inventory for specific SKU
  * - GET /exec?action=publishInventorySnapshot&token=<secret> - Push current sheet Column I map to GitHub (raw JSON); requires Script property AGROVERSE_INVENTORY_PUBLISH_SECRET
  * - GET /exec?action=recalculateAndPublishInventory&token=<secret> - Run updateStoreInventory() then publish snapshot
- * - updateStoreInventory() - Calculate and update inventory (run via trigger or manually); on success, publishes snapshot if PAT is set
+ * - GET /exec?action=publishSkuCatalog&token=<secret> - Push the Agroverse SKUs catalog to agroverse-inventory/skus.json
+ * - updateStoreInventory() - Calculate/update inventory; on success publishes store-inventory.json AND skus.json if PAT is set
  * 
  * Web Service API:
  * - Returns JSON format with inventory counts
@@ -47,6 +48,13 @@ const BALANCE_SHEET_NAME = 'Balance';
 // Column indices (0-based for arrays, 1-based for getRange)
 // Agroverse SKUs
 const SKU_PRODUCT_ID_COL = 0; // Column A (Product ID)
+const SKU_PRODUCT_NAME_COL = 1; // Column B (Product Name)
+const SKU_PRICE_USD_COL = 2; // Column C (Price (USD))
+const SKU_WEIGHT_OZ_COL = 3; // Column D (Weight (oz))
+const SKU_CATEGORY_COL = 4; // Column E (Category)
+const SKU_SHIPMENT_COL = 5; // Column F (Shipment)
+const SKU_FARM_COL = 6; // Column G (Farm)
+const SKU_IMAGE_PATH_COL = 7; // Column H (Image Path)
 const SKU_STORE_INVENTORY_COL = 8; // Column I (Store inventory)
 
 // Currencies
@@ -77,6 +85,8 @@ const SCRIPT_PROP_INVENTORY_GITHUB_OWNER = 'AGROVERSE_INVENTORY_GITHUB_OWNER';
 const SCRIPT_PROP_INVENTORY_GITHUB_REPO = 'AGROVERSE_INVENTORY_GITHUB_REPO';
 const SCRIPT_PROP_INVENTORY_GITHUB_BRANCH = 'AGROVERSE_INVENTORY_GITHUB_BRANCH';
 const SCRIPT_PROP_INVENTORY_GITHUB_PATH = 'AGROVERSE_INVENTORY_GITHUB_PATH';
+const SCRIPT_PROP_SKU_CATALOG_GITHUB_PATH = 'AGROVERSE_INVENTORY_GITHUB_SKUS_PATH';
+const SKU_CATALOG_DEFAULT_PATH = 'skus.json';
 
 /**
  * Resolved GitHub target for the public inventory JSON (Contents API).
@@ -90,6 +100,105 @@ function getInventoryGitHubTarget_() {
     branch: p.getProperty(SCRIPT_PROP_INVENTORY_GITHUB_BRANCH) || 'main',
     path: p.getProperty(SCRIPT_PROP_INVENTORY_GITHUB_PATH) || 'store-inventory.json'
   };
+}
+
+/**
+ * Resolved GitHub target for the public SKU catalog JSON (Contents API).
+ * Shares owner/repo/branch with the inventory snapshot; path defaults to skus.json
+ * and is separately overridable so the two files can never collide.
+ * @return {{ owner: string, repo: string, branch: string, path: string }}
+ */
+function getSkuCatalogGitHubTarget_() {
+  const p = PropertiesService.getScriptProperties();
+  return {
+    owner: p.getProperty(SCRIPT_PROP_INVENTORY_GITHUB_OWNER) || 'TrueSightDAO',
+    repo: p.getProperty(SCRIPT_PROP_INVENTORY_GITHUB_REPO) || 'agroverse-inventory',
+    branch: p.getProperty(SCRIPT_PROP_INVENTORY_GITHUB_BRANCH) || 'main',
+    path: p.getProperty(SCRIPT_PROP_SKU_CATALOG_GITHUB_PATH) || SKU_CATALOG_DEFAULT_PATH
+  };
+}
+
+/**
+ * Stable comparison key for one SKU catalog entry (independent of object key order).
+ * @param {Object} s
+ * @return {string}
+ */
+function skuCatalogKey_(s) {
+  return [
+    s.productId, s.productName, s.priceUsd, s.weightOz,
+    s.category, s.shipment, s.farm, s.imagePath, s.storeInventory
+  ].join('|');
+}
+
+/**
+ * Compare two SKU catalog arrays (length + per-entry key).
+ * @param {Array<Object>} a
+ * @param {Array<Object>} b
+ * @return {boolean}
+ */
+function skuCatalogsEqual_(a, b) {
+  const aa = a || [];
+  const bb = b || [];
+  if (aa.length !== bb.length) {
+    return false;
+  }
+  for (let i = 0; i < aa.length; i++) {
+    if (skuCatalogKey_(aa[i]) !== skuCatalogKey_(bb[i])) {
+      return false;
+    }
+  }
+  return true;
+}
+
+/**
+ * Read the full SKU catalog from "Agroverse SKUs" (cols A-H product metadata, col I stock).
+ * Rows without a Product ID are skipped. Source for agroverse-inventory/skus.json.
+ * @return {{ skus: Array<Object>, error: (string|null) }}
+ */
+function readSkuCatalogFromSheet_() {
+  try {
+    const spreadsheet = SpreadsheetApp.openById(MAIN_SPREADSHEET_ID);
+    const sheet = spreadsheet.getSheetByName(SKUS_SHEET_NAME);
+
+    if (!sheet) {
+      return { skus: [], error: `Sheet "${SKUS_SHEET_NAME}" not found` };
+    }
+
+    const lastRow = sheet.getLastRow();
+    if (lastRow < 2) {
+      return { skus: [], error: 'No SKU data found' };
+    }
+
+    const width = SKU_STORE_INVENTORY_COL + 1;
+    const data = sheet.getRange(2, 1, lastRow - 1, width).getValues();
+    const skus = [];
+
+    for (let i = 0; i < data.length; i++) {
+      const row = data[i];
+      const productId = row[SKU_PRODUCT_ID_COL] ? row[SKU_PRODUCT_ID_COL].toString().trim() : '';
+      if (!productId) {
+        continue;
+      }
+      const weight = parseFloat(row[SKU_WEIGHT_OZ_COL]);
+      const stock = parseFloat(row[SKU_STORE_INVENTORY_COL]);
+      skus.push({
+        productId: productId,
+        productName: row[SKU_PRODUCT_NAME_COL] ? row[SKU_PRODUCT_NAME_COL].toString().trim() : '',
+        priceUsd: row[SKU_PRICE_USD_COL] ? row[SKU_PRICE_USD_COL].toString().trim() : '',
+        weightOz: isNaN(weight) ? null : weight,
+        category: row[SKU_CATEGORY_COL] ? row[SKU_CATEGORY_COL].toString().trim() : '',
+        shipment: row[SKU_SHIPMENT_COL] ? row[SKU_SHIPMENT_COL].toString().trim() : '',
+        farm: row[SKU_FARM_COL] ? row[SKU_FARM_COL].toString().trim() : '',
+        imagePath: row[SKU_IMAGE_PATH_COL] ? row[SKU_IMAGE_PATH_COL].toString().trim() : '',
+        storeInventory: isNaN(stock) ? 0 : stock
+      });
+    }
+
+    return { skus: skus, error: null };
+  } catch (err) {
+    Logger.log(`readSkuCatalogFromSheet_: ${err.message}`);
+    return { skus: [], error: err.message };
+  }
 }
 
 /**
@@ -155,12 +264,15 @@ function inventoryMapsEqual_(a, b) {
 }
 
 /**
- * Commit inventory snapshot JSON to TrueSightDAO/agroverse-inventory (or overrides) via Contents API.
- * Uses GET-then-PUT: if the file exists and **inventory** matches the new map, skips PUT (no commit churn on hourly runs).
- * @param {Object.<string, number>} inventoryMap
+ * Commit a JSON snapshot to a GitHub target via the Contents API (GET-then-PUT).
+ * Skips the PUT when the existing file already matches (no commit churn on hourly runs).
+ * @param {{ owner: string, repo: string, branch: string, path: string }} t
+ * @param {Object} payloadObj
+ * @param {string} commitMessage
+ * @param {function(Object): boolean} isUnchanged - predicate over the parsed existing file
  * @return {{ ok: boolean, message: string, sha: (string|undefined), skipped: (boolean|undefined) }}
  */
-function publishInventorySnapshotToGitHub_(inventoryMap) {
+function publishJsonToGitHub_(t, payloadObj, commitMessage, isUnchanged) {
   const pat = PropertiesService.getScriptProperties().getProperty(SCRIPT_PROP_INVENTORY_GITHUB_PAT);
   if (!pat) {
     const msg = 'Script property AGROVERSE_INVENTORY_GIT_REPO_UPDATE_PAT is not set; skip GitHub publish';
@@ -168,13 +280,6 @@ function publishInventorySnapshotToGitHub_(inventoryMap) {
     return { ok: false, message: msg };
   }
 
-  const t = getInventoryGitHubTarget_();
-  const nextInventory = inventoryMap || {};
-  const payloadObj = {
-    generatedAt: new Date().toISOString(),
-    source: 'update_store_inventory',
-    inventory: nextInventory
-  };
   const jsonString = JSON.stringify(payloadObj, null, 2);
   const encoded = Utilities.base64Encode(jsonString, Utilities.Charset.UTF_8);
 
@@ -206,11 +311,11 @@ function publishInventorySnapshotToGitHub_(inventoryMap) {
       try {
         const decoded = Utilities.newBlob(Utilities.base64Decode(body.content.replace(/\s/g, ''))).getDataAsString();
         const prev = JSON.parse(decoded);
-        if (prev && prev.inventory && inventoryMapsEqual_(prev.inventory, nextInventory)) {
-          Logger.log('GitHub snapshot inventory unchanged; skipping PUT');
+        if (isUnchanged && isUnchanged(prev)) {
+          Logger.log('GitHub snapshot unchanged; skipping PUT for ' + t.path);
           return {
             ok: true,
-            message: 'Inventory unchanged; skipped GitHub PUT',
+            message: 'Unchanged; skipped GitHub PUT',
             skipped: true,
             sha: existingSha
           };
@@ -226,7 +331,7 @@ function publishInventorySnapshotToGitHub_(inventoryMap) {
   }
 
   const putBody = {
-    message: 'chore: refresh Agroverse store inventory snapshot',
+    message: commitMessage,
     content: encoded,
     branch: t.branch
   };
@@ -255,8 +360,52 @@ function publishInventorySnapshotToGitHub_(inventoryMap) {
   } catch (err) {
     commitSha = undefined;
   }
-  Logger.log('Published inventory snapshot to ' + t.owner + '/' + t.repo + '/' + t.path);
+  Logger.log('Published snapshot to ' + t.owner + '/' + t.repo + '/' + t.path);
   return { ok: true, message: 'Published', sha: commitSha };
+}
+
+/**
+ * Commit the store inventory snapshot (SKU Product ID -> quantity) to agroverse-inventory.
+ * @param {Object.<string, number>} inventoryMap
+ * @return {{ ok: boolean, message: string, sha: (string|undefined), skipped: (boolean|undefined) }}
+ */
+function publishInventorySnapshotToGitHub_(inventoryMap) {
+  const nextInventory = inventoryMap || {};
+  const payloadObj = {
+    generatedAt: new Date().toISOString(),
+    source: 'update_store_inventory',
+    inventory: nextInventory
+  };
+  return publishJsonToGitHub_(
+    getInventoryGitHubTarget_(),
+    payloadObj,
+    'chore: refresh Agroverse store inventory snapshot',
+    function (prev) {
+      return !!(prev && prev.inventory && inventoryMapsEqual_(prev.inventory, nextInventory));
+    }
+  );
+}
+
+/**
+ * Commit the SKU catalog snapshot (product metadata for the DApp) to agroverse-inventory.
+ * @param {Array<Object>} skuCatalog
+ * @return {{ ok: boolean, message: string, sha: (string|undefined), skipped: (boolean|undefined) }}
+ */
+function publishSkuCatalogToGitHub_(skuCatalog) {
+  const nextSkus = skuCatalog || [];
+  const payloadObj = {
+    generatedAt: new Date().toISOString(),
+    source: 'update_store_inventory',
+    skus: nextSkus
+  };
+  return publishJsonToGitHub_(
+    getSkuCatalogGitHubTarget_(),
+    payloadObj,
+    'chore: refresh Agroverse SKU catalog snapshot',
+    function (prev) {
+      return !!(prev && Array.isArray(prev.skus) && skuCatalogsEqual_(prev.skus, nextSkus));
+    }
+  );
 }
 
 /**
@@ -799,11 +948,21 @@ function updateStoreInventory() {
       Logger.log('Snapshot read after update failed: ' + snapshot.error);
     }
 
+    // Also refresh the SKU catalog snapshot (product metadata) consumed by the DApp.
+    const catalog = readSkuCatalogFromSheet_();
+    let skuPublish = { ok: false, message: 'skipped' };
+    if (!catalog.error) {
+      skuPublish = publishSkuCatalogToGitHub_(catalog.skus);
+    } else {
+      Logger.log('SKU catalog read failed: ' + catalog.error);
+    }
+
     return {
       success: true,
       message: `Updated ${updatedCount} SKUs`,
       updatedCount: updatedCount,
-      githubPublish: publish
+      githubPublish: publish,
+      skuCatalogPublish: skuPublish
     };
 
   } catch (e) {
@@ -893,9 +1052,25 @@ function doGet(e) {
         .setMimeType(ContentService.MimeType.JSON);
     }
 
+    if (action === 'publishSkuCatalog') {
+      if (!verifyPublishToken_(params.token)) {
+        return ContentService.createTextOutput(JSON.stringify({
+          error: 'Unauthorized. Set AGROVERSE_INVENTORY_PUBLISH_SECRET and pass token=<secret>.'
+        })).setMimeType(ContentService.MimeType.JSON);
+      }
+      const cat = readSkuCatalogFromSheet_();
+      if (cat.error) {
+        return ContentService.createTextOutput(JSON.stringify({ error: cat.error }))
+          .setMimeType(ContentService.MimeType.JSON);
+      }
+      const pubSku = publishSkuCatalogToGitHub_(cat.skus);
+      return ContentService.createTextOutput(JSON.stringify(pubSku))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+
     // Default response for unknown actions
     return ContentService.createTextOutput(JSON.stringify({
-      error: 'Invalid action. Use ?action=getInventory, publishInventorySnapshot, or recalculateAndPublishInventory'
+      error: 'Invalid action. Use ?action=getInventory, publishInventorySnapshot, recalculateAndPublishInventory, or publishSkuCatalog'
     })).setMimeType(ContentService.MimeType.JSON);
     
   } catch (error) {
