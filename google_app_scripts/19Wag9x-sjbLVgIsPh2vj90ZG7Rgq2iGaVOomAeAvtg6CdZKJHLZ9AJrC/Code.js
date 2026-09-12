@@ -1047,10 +1047,16 @@ function parseDateFromYYYYMMDD(dateStr) {
 function parseAndProcessTelegramLogs() {
   // Idempotency guard 1 (2026-09-09 double-booking fix, Edgar_20260909124022_298): serialize
   // overlapping runs so a second dispatch can't snapshot col K before the first run appends.
-  const _procLock = LockService.getScriptLock();
-  if (!_procLock.waitLock(30000)) {
+  //
+  // TEMP DISABLED 2026-09-12 (Gary): lock contention made every run abort after 30s
+  // ("could not acquire script lock within 30s"), stalling all expense processing. Flip
+  // _DISABLE_PROC_LOCK back to false to re-enable. Double-booking is still covered by
+  // Idempotency guard 2 below (fresh col-K re-read immediately before the append).
+  const _DISABLE_PROC_LOCK = true;
+  const _procLock = _DISABLE_PROC_LOCK ? null : LockService.getScriptLock();
+  if (_procLock && !_procLock.waitLock(30000)) {
     Logger.log('parseAndProcessTelegramLogs: could not acquire script lock within 30s; aborting to avoid double-processing');
-    return;
+    return { status: 'skipped_lock_contention' };
   }
   try {
   try {
@@ -1267,7 +1273,7 @@ function parseAndProcessTelegramLogs() {
     throw e; // Re-throw to ensure error is visible
   }
   } finally {
-    _procLock.releaseLock();
+    if (_procLock) _procLock.releaseLock();
   }
 }
 
@@ -1290,7 +1296,11 @@ function doGet(e) {
   if (action === 'parseAndProcessTelegramLogs') {
     try {
       Logger.log("Webhook triggered: processing Telegram logs for expense submissions");
-      parseAndProcessTelegramLogs();
+      const procResult = parseAndProcessTelegramLogs();
+      if (procResult && procResult.status === 'skipped_lock_contention') {
+        Logger.log('Webhook skipped: another run holds the script lock; not reporting success.');
+        return ContentService.createTextOutput("⚠️ Skipped: another processing run holds the lock. Retry shortly.");
+      }
       notifyTreasuryCachePublisher_('expense_processing');
       Logger.log("Webhook processing completed successfully");
       return ContentService.createTextOutput("✅ Telegram logs processed successfully. Check execution logs for details.");
