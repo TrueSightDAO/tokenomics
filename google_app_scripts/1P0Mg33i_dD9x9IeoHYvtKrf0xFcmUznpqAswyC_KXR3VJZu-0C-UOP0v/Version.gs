@@ -17,6 +17,7 @@ var CLASP_MIRROR_LAST_CLASP_PUSH_UTC = '2026-04-12T22:00:00Z';
  * Newest first. Keep lines short; link PRs/commits in git instead of pasting secrets.
  */
 var CLASP_MIRROR_CHANGELOG =
+  '2026-09-12 — update_store_inventory: emit agroverse-inventory/skus.json (SKU catalog for DApp); generic publishJsonToGitHub_ + publishSkuCatalog doGet action (thread 27015).\n' +
   '2026-04-12 — Added default Version.gs for clasp deploy audit trail (tokenomics).\n';
 
 /**
