@@ -1,3 +1,20 @@
+# Files in this folder that must NOT be pushed to the Apps Script project.
+#
+# clasp push = updateContent, which REPLACES the project's entire remote file
+# list. Anything not pushed here is DELETED from the live project. So this list
+# must be exactly: [repo-only metadata] + [files that genuinely belong to a
+# different project]. The live project's real file set is:
+#   appsscript.json, Credentials.js, Version.gs, Parse Telegram ChatLogs.js
+#
+# HISTORY: "process_sales_telegram_logs.js" used to be listed here while the
+# live remote file is named "Parse Telegram ChatLogs". The name mismatch meant
+# a push could never ship the parser AND dropped it from HEAD (2026-08-21
+# incident). The file is now correctly named to match the remote, so it must
+# be pushed — never re-add it here under any name.
+
+# Repo-tooling metadata, not an Apps Script file.
 manifest.json
-process_sales_telegram_logs.js
+
+# Copy of a file that belongs to other projects (1duQFfTO… / 1wmgYPwf…), not this
+# one. Pushing it would ADD a stray file to the live project.
 telegram_webhook_listener.js
