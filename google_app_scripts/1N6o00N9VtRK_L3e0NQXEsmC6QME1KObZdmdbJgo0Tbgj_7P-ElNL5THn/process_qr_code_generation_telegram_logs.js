@@ -660,8 +660,17 @@ function createQRCodeRecordsInAgroverse(currencyName, quantity, contributorName,
       throw new Error('Required sheets not found in Agroverse spreadsheet');
     }
     
-    // Find the currency in Currencies sheet
-    const currencyData = findCurrencyInAgroverse(currenciesSheet, currencyName);
+    // Find the currency in Currencies sheet. PR4 (QR_SELF_SERVE_CURRENCY_PLAN):
+    // when it is missing, a [BATCH QR CODE REQUEST] that carries the inline
+    // define-fields auto-defines a QR-ready Currencies row first (never overwrites
+    // an existing row) so a never-seen SKU is a single mint call.
+    let currencyData = findCurrencyInAgroverse(currenciesSheet, currencyName);
+    if (!currencyData) {
+      const requestText = getTelegramSubmissionTextByMessageId_(messageId);
+      if (autoDefineCurrencyIfMissing_(requestText, currencyName)) {
+        currencyData = findCurrencyInAgroverse(currenciesSheet, currencyName);
+      }
+    }
     if (!currencyData) {
       throw new Error(`Currency not found: ${currencyName}`);
     }
@@ -740,6 +749,109 @@ function findCurrencyInAgroverse(sheet, currencyName) {
     }
   }
   return null;
+}
+
+/**
+ * PR4 (QR_SELF_SERVE_CURRENCY_PLAN): fetch the raw submission text (Telegram Chat
+ * Logs col G) for a Telegram message id (col D). Used so a [BATCH QR CODE REQUEST]
+ * can carry inline define-fields for auto-define.
+ *
+ * @param {*} messageId Telegram Chat Logs col D value
+ * @return {string} submission text, or '' when not found
+ */
+function getTelegramSubmissionTextByMessageId_(messageId) {
+  try {
+    const sheet = SpreadsheetApp.openByUrl(QR_GEN_TELEGRAM_MAIN_WORKBOOK_URL)
+      .getSheetByName(telegramLogTabName);
+    if (!sheet) return '';
+    const lastRow = sheet.getLastRow();
+    if (lastRow < 2) return '';
+    const ids = sheet.getRange(2, 4, lastRow - 1, 1).getValues(); // col D
+    const texts = sheet.getRange(2, 7, lastRow - 1, 1).getValues(); // col G
+    const target = String(messageId).trim();
+    for (let i = 0; i < ids.length; i++) {
+      if (String(ids[i][0]).trim() === target) {
+        return texts[i][0] ? String(texts[i][0]) : '';
+      }
+    }
+    return '';
+  } catch (e) {
+    Logger.log('getTelegramSubmissionTextByMessageId_ error: ' + e.message);
+    return '';
+  }
+}
+
+/**
+ * PR4 (QR_SELF_SERVE_CURRENCY_PLAN): auto-define a QR-ready Currencies row from a
+ * [BATCH QR CODE REQUEST] that carries the full define-field set, so a brand-new
+ * SKU is one call (mint) instead of define-then-mint.
+ *
+ * QR-ready gate mirrors the define CLI (plan section 2): writes only when the
+ * request carries Currency (A) + Serializable=TRUE (C) + Landing Page (E),
+ * Ledger (F), Farm Name (G), State (H), Country (I), Year (J). Returns false (no
+ * write) when any is missing, so the existing "Currency not found" behaviour is
+ * preserved for underspecified requests.
+ *
+ * Idempotent: never touches an existing row (same name-based guard the define
+ * handler uses). SKU-backed Serializable inference reuses the define handler's
+ * resolver. Parser + insert + sort are the define handler's own helpers (same
+ * Apps Script project, shared global scope) - single source of truth.
+ *
+ * @param {string} requestText raw [BATCH QR CODE REQUEST] message
+ * @param {string} currencyName currency to define (Currencies col A)
+ * @return {boolean} true iff a new QR-ready row was written
+ */
+function autoDefineCurrencyIfMissing_(requestText, currencyName) {
+  if (!requestText || !currencyName) return false;
+  try {
+    if (currencyDefinitionRecordExists(currencyName)) {
+      return false; // already a row - never overwrite (non-serializable row is out of scope)
+    }
+
+    const details = parseCurrencyDefinitionMessage(String(requestText));
+    details.currency = currencyName; // trust the QR-request name over the re-parse
+
+    // SKU-backed serializable inference (same rule as the define handler).
+    if (details.skuProductId && details.serializable !== 'FALSE') {
+      const inferred = resolveSerializableFromSkuStock_(details.skuProductId);
+      if (inferred !== null) {
+        details.serializable = inferred ? 'TRUE' : 'FALSE';
+      }
+    }
+
+    // QR-ready gate: everything the QR generator needs must be present.
+    const serializable = String(details.serializable || 'TRUE').toUpperCase() === 'TRUE';
+    const required = [
+      details.landingPage, details.ledger, details.farmName,
+      details.state, details.country, details.year
+    ];
+    if (!serializable || required.some(function (v) { return !v; })) {
+      Logger.log('autoDefineCurrencyIfMissing_: "' + currencyName +
+                 '" missing QR-ready fields - not auto-defining');
+      return false;
+    }
+
+    const ok = insertCurrencyDefinitionRecord(details);
+    if (ok) {
+      sortCurrenciesAZ();
+      Logger.log('autoDefineCurrencyIfMissing_: defined QR-ready row for "' + currencyName + '"');
+    }
+    return ok;
+  } catch (e) {
+    Logger.log('autoDefineCurrencyIfMissing_ error: ' + e.message);
+    return false;
+  }
+}
+
+/**
+ * PR4 smoke test (non-destructive): an underspecified request must NOT write a row.
+ * Run from the Apps Script editor; returns true when the gate holds.
+ */
+function testAutoDefineCurrencyIfMissing_gate() {
+  const underspecified = '[BATCH QR CODE REQUEST] - Currency: __PR4_GATE_SMOKE__ - Quantity: 1';
+  const wrote = autoDefineCurrencyIfMissing_(underspecified, '__PR4_GATE_SMOKE__');
+  Logger.log('gate held (no write for underspecified request): ' + (wrote === false));
+  return wrote === false;
 }
 
 // Helper function to generate QR code value
