@@ -403,6 +403,11 @@ function processCurrencyDefinitionsFromTelegramChatLogs() {
       const success = insertCurrencyDefinitionRecord(details);
       if (success) {
         processedCount++;
+        // Terminal status writeback: mark the Telegram Chat Logs row complete so
+        // it is never re-scanned and never left at PROCESSING for a downstream
+        // scorer to mis-stamp. Mirrors updateQRCodeGenerationStatus() in the
+        // sibling QR handler.
+        updateCurrencyDefinitionStatus_(sheet, i + 2, 'Successfully Completed');
       } else {
         skippedCount++;
       }
@@ -416,6 +421,23 @@ function processCurrencyDefinitionsFromTelegramChatLogs() {
     }
   } catch (e) {
     Logger.log('ERROR in processCurrencyDefinitionsFromTelegramChatLogs: ' + e.message);
+  }
+}
+
+/**
+ * Writes a terminal status back to the Telegram Chat Logs row (col J =
+ * TELEGRAM_STATUS_COL + 1) so a processed [CURRENCY DEFINITION EVENT] row is
+ * never re-scanned and never left at PROCESSING for a downstream scorer to
+ * mis-stamp. Mirrors updateQRCodeGenerationStatus() in the sibling QR handler.
+ */
+function updateCurrencyDefinitionStatus_(telegramSheet, rowNumber, status) {
+  try {
+    telegramSheet.getRange(rowNumber, TELEGRAM_STATUS_COL + 1).setValue(status);
+    Logger.log('Row ' + rowNumber + ': status -> ' + status);
+    return true;
+  } catch (e) {
+    Logger.log('Failed to write status for row ' + rowNumber + ': ' + e.message);
+    return false;
   }
 }
 
@@ -479,7 +501,12 @@ function testParseCurrencyDefinitionMessage() {
  * Trigger URL shape:
  *   https://script.google.com/macros/s/<deployment>/exec?action=processCurrencyDefinitionsFromTelegramChatLogs
  */
-function doGet(e) {
+// Deprecated entry point: this file must NOT define doGet — the project's single web-app
+// entry point is doGet() in process_qr_code_generation_telegram_logs.js, which routes
+// ?action=processCurrencyDefinitionsFromTelegramChatLogs back to this handler. Two doGet()
+// definitions in one project resolve to ONE winner (last-defined), silently dropping a router.
+// See PR #480.
+function handleCurrencyDefinitionsWebApp_(e) {
   const action = (e && e.parameter && e.parameter.action) || '';
   Logger.log('doGet called with action: ' + (action || 'none'));
 
