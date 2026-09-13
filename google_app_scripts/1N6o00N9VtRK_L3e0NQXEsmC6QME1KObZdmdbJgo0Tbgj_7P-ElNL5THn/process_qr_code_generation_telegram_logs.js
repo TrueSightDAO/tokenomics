@@ -54,7 +54,7 @@ const QR_GEN_STATUS_SIG_FAILED = 'NOT PROCESSED — sig verify failed';
 
 /** register_single_qr_code variables */
 const REGISTER_QR_SHEET_NAME = 'Agroverse QR codes';
-const REGISTER_QR_VALID_STATUSES = ['MINTED', 'SAMPLE', 'SOLD', 'ON CONSIGNMENT', 'EXPENSED', 'ACTIVE'];
+const REGISTER_QR_VALID_STATUSES = ['MINTED', 'SAMPLE', 'SOLD', 'RESERVED', 'ON CONSIGNMENT', 'EXPENSED', 'ACTIVE'];
 
 function isTelegramSignatureVerificationSuccess_(cell) {
   return cell != null && String(cell).trim().toLowerCase() === 'success';

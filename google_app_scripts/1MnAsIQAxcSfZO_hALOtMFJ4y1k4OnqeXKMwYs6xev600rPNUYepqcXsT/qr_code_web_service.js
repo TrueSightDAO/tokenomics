@@ -211,7 +211,7 @@ function doGetWebLedger_(e) {
       // Filter rows where column D (index 3) is NOT 'SOLD' or 'ASSIGNED_TO_TREE' (include MINTED, CONSIGNMENT, and all other statuses)
       for (var i = 0; i < dataRange.length; i++) {
         var status = (dataRange[i][3] || '').toString().toUpperCase().trim();
-        if (status !== 'SOLD' && status !== 'ASSIGNED_TO_TREE' && status !== 'TREE_PLANTING_FUNDS_TRANSFERRED') {
+        if (status !== 'SOLD' && status !== 'RESERVED' && status !== 'ASSIGNED_TO_TREE' && status !== 'TREE_PLANTING_FUNDS_TRANSFERRED') {
           availableQrCodes.push(dataRange[i][0]); // QR code from column A
         }
       }
@@ -239,7 +239,7 @@ function doGetWebLedger_(e) {
       // Filter rows where column D (index 3) is NOT 'SOLD' or 'ASSIGNED_TO_TREE' (include MINTED, CONSIGNMENT, and all other statuses)
       for (var i = 0; i < dataRange.length; i++) {
         var status = (dataRange[i][3] || '').toString().toUpperCase().trim();
-        if (status !== 'SOLD' && status !== 'ASSIGNED_TO_TREE' && status !== 'TREE_PLANTING_FUNDS_TRANSFERRED') {
+        if (status !== 'SOLD' && status !== 'RESERVED' && status !== 'ASSIGNED_TO_TREE' && status !== 'TREE_PLANTING_FUNDS_TRANSFERRED') {
           var qrCode = dataRange[i][0]; // Column A
           var ledgerShortcut = dataRange[i][2] || ''; // Column C (index 2)
           var currency = dataRange[i][8] || ''; // Column I (index 8)
@@ -2165,7 +2165,7 @@ function handleRegisterSingleQRCode(params) {
   var creationDate = params.creation_date ? String(params.creation_date).trim() : '';
   
   // Validate status
-  var validStatuses = ['MINTED', 'SAMPLE', 'SOLD', 'ON CONSIGNMENT', 'EXPENSED', 'ACTIVE'];
+  var validStatuses = ['MINTED', 'SAMPLE', 'SOLD', 'RESERVED', 'ON CONSIGNMENT', 'EXPENSED', 'ACTIVE'];
   var status = params.status ? String(params.status).trim().toUpperCase() : 'SAMPLE';
   if (validStatuses.indexOf(status) === -1) {
     return { status: 'error', message: 'Invalid status: ' + status + '. Valid values: ' + validStatuses.join(', ') };
