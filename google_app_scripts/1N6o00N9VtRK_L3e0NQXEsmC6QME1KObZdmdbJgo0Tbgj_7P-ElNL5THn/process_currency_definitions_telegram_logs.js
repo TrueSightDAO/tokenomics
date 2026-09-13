@@ -301,6 +301,44 @@ function resolveSerializableFromSkuStock_(skuProductId) {
   }
 }
 
+/**
+ * Looks up the ACTIVE contributor display name for a digital signature.
+ *
+ * Reads the Main Ledger 'Contributors Digital Signatures' tab (col A = Contributor
+ * Name, col D = Status, col E = Digital Signature) - the same lookup the other
+ * Telegram-log processors use. Mirrors
+ * process_movement_telegram_logs.js#findContributorNameByDigitalSignature_.
+ *
+ * @return {{contributorName: string|null, error: string|null}}
+ */
+function findContributorByDigitalSignature(digitalSignature) {
+  try {
+    if (!digitalSignature) {
+      return { contributorName: null, error: 'No digital signature' };
+    }
+    const spreadsheet = SpreadsheetApp.openByUrl(MAIN_LEDGER_URL);
+    const sheet = spreadsheet.getSheetByName(CONTRIBUTORS_SIGNATURES_SHEET);
+    if (!sheet) {
+      return { contributorName: null, error: 'Contributors Digital Signatures sheet not found' };
+    }
+    const data = sheet.getDataRange().getValues();
+    for (let i = 1; i < data.length; i++) {
+      const contributorName = data[i][0];
+      const status = data[i][3];
+      const signature = data[i][4];
+      if (signature && String(signature).trim() === String(digitalSignature).trim()) {
+        if (String(status || '').trim().toUpperCase() === 'ACTIVE') {
+          return { contributorName: contributorName, error: null };
+        }
+        return { contributorName: null, error: 'Signature not ACTIVE' };
+      }
+    }
+    return { contributorName: null, error: 'No matching contributor' };
+  } catch (e) {
+    return { contributorName: null, error: e.message };
+  }
+}
+
 // ============================================================================
 // MAIN PROCESSOR
 // ============================================================================
