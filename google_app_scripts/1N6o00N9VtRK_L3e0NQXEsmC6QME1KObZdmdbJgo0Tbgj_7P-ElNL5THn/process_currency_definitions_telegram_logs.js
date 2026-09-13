@@ -501,7 +501,12 @@ function testParseCurrencyDefinitionMessage() {
  * Trigger URL shape:
  *   https://script.google.com/macros/s/<deployment>/exec?action=processCurrencyDefinitionsFromTelegramChatLogs
  */
-function doGet(e) {
+// Deprecated entry point: this file must NOT define doGet — the project's single web-app
+// entry point is doGet() in process_qr_code_generation_telegram_logs.js, which routes
+// ?action=processCurrencyDefinitionsFromTelegramChatLogs back to this handler. Two doGet()
+// definitions in one project resolve to ONE winner (last-defined), silently dropping a router.
+// See PR #480.
+function handleCurrencyDefinitionsWebApp_(e) {
   const action = (e && e.parameter && e.parameter.action) || '';
   Logger.log('doGet called with action: ' + (action || 'none'));
 

@@ -1682,6 +1682,18 @@ function doGet(e) {
       return handleRegisterSingleQRCode(e.parameter);
     }
     
+    // Currency definition processing lives in process_currency_definitions_telegram_logs.js,
+    // which intentionally does NOT define doGet (this doGet is the project's single web-app
+    // entry point). Delegate so one /exec URL serves both processors. See PR #480.
+    if (action === 'processCurrencyDefinitionsFromTelegramChatLogs') {
+      if (typeof handleCurrencyDefinitionsWebApp_ === 'function') {
+        return handleCurrencyDefinitionsWebApp_(e);
+      }
+      return ContentService.createTextOutput(
+        JSON.stringify({ status: 'error', message: 'Currency definition handler not available in this deployment' })
+      ).setMimeType(ContentService.MimeType.JSON);
+    }
+
     return ContentService.createTextOutput(
       JSON.stringify({
         status: 'error',
