@@ -479,7 +479,7 @@ function testParseCurrencyDefinitionMessage() {
  * Trigger URL shape:
  *   https://script.google.com/macros/s/<deployment>/exec?action=processCurrencyDefinitionsFromTelegramChatLogs
  */
-function doGet(e) {
+function doGetCurrencyDefinition(e) {
   const action = (e && e.parameter && e.parameter.action) || '';
   Logger.log('doGet called with action: ' + (action || 'none'));
 
