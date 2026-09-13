@@ -306,7 +306,7 @@ function resolveSerializableFromSkuStock_(skuProductId) {
 // ============================================================================
 
 /**
- * Scans Telegram Chat Logs for rows with status PROCESSING that contain
+ * Scans Telegram Chat Logs for rows with status Pending that contain
  * [CURRENCY DEFINITION EVENT], validates the digital signature, and inserts
  * a row into the Currencies tab.
  *
@@ -345,10 +345,13 @@ function processCurrencyDefinitionsFromTelegramChatLogs() {
         continue;
       }
 
-      // Only process rows with status PROCESSING
+      // Status gate: dao_protocol's telegram_raw_log appends rows as 'Pending' and this
+      // handler owns J for [CURRENCY DEFINITION EVENT] rows. Accept 'Pending' (+ blank/'NEW'
+      // legacy) exactly like the sibling process_qr_code_updates.js. A 'PROCESSING' value
+      // belongs to the Rails architecture and is never written on this (dao_protocol) path.
       const status = row[TELEGRAM_STATUS_COL] ? String(row[TELEGRAM_STATUS_COL]).trim() : '';
-      if (status !== 'PROCESSING') {
-        Logger.log('Skipping row ' + (i + 2) + ': status is ' + status + ' (not PROCESSING)');
+      if (status !== '' && status !== 'Pending' && status !== 'NEW') {
+        Logger.log('Skipping row ' + (i + 2) + ': status is ' + status + ' (already terminal)');
         skippedCount++;
         continue;
       }
@@ -403,6 +406,9 @@ function processCurrencyDefinitionsFromTelegramChatLogs() {
       const success = insertCurrencyDefinitionRecord(details);
       if (success) {
         processedCount++;
+        // Terminal status writeback: this handler (not the grok scorer) owns J for
+        // [CURRENCY DEFINITION EVENT] rows, so the row is no longer re-pickable.
+        sheet.getRange(i + 2, TELEGRAM_STATUS_COL + 1).setValue('Successfully Completed');
       } else {
         skippedCount++;
       }
