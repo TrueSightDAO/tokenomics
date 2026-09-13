@@ -249,6 +249,27 @@ function doGet(e) {
       }
     }
 
+    if (action === 'processReservationTelegramLogs') {
+      try {
+        Logger.log("Webhook triggered: processing reservation logs");
+        processReservationTelegramLogs();
+        return ContentService.createTextOutput("✅ Reservation logs processed");
+      } catch (err) {
+        Logger.log("Error in processReservationTelegramLogs: " + err.message);
+        return ContentService.createTextOutput("❌ Error: " + err.message);
+      }
+    }
+    if (action === 'processReservationSettlementTelegramLogs') {
+      try {
+        Logger.log("Webhook triggered: processing reservation settlement logs");
+        processReservationSettlementTelegramLogs();
+        return ContentService.createTextOutput("✅ Reservation settlement logs processed");
+      } catch (err) {
+        Logger.log("Error in processReservationSettlementTelegramLogs: " + err.message);
+        return ContentService.createTextOutput("❌ Error: " + err.message);
+      }
+    }
+
     return ContentService.createTextOutput("ℹ️ No valid action specified");
   } finally {
     lock.releaseLock();

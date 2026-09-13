@@ -13,12 +13,13 @@
  */
 
 /** ISO UTC timestamp of the last clasp push for mirrors that include this file */
-var TDG_INVENTORY_LAST_CLASP_PUSH_UTC = '2026-09-13T17:30:00Z';
+var TDG_INVENTORY_LAST_CLASP_PUSH_UTC = '2026-09-13T17:36:39Z';
 
 /**
  * Newest first. Keep lines short; link PRs/commits in git instead of pasting secrets.
  */
 var TDG_INVENTORY_CHANGELOG =
+  '2026-09-13 - RESERVATION feature (unit 3 of RESERVATION_EVENT_SPEC): added "Reservation Telegram Logs.js" (processReservationTelegramLogs - QR -> RESERVED, books the +USD cash leg only, no inventory/liability rows) and "Reservation Settlement Telegram Logs.js" (processReservationSettlementTelegramLogs - books legs 1+3: -1 inventory off holder, +1 Cacao Tree To Be Planted Liability to SunMint Tree Planting Contract - <agl>; QR -> SOLD + Sold Date; notifies via inlined sendTransactionCompletionNotification per Ruled #6). Extended doGet with both actions; resolver resolves agroverse.shop shortcuts via inlined resolveRedirect (thread 26819).\n' +
   '2026-09-13 - REPAIR: renamed repo file process_sales_telegram_logs.js -> \'Parse Telegram ChatLogs.js\' to match the live remote name, synced SOLD_DATE_COL 22->26 (Column AA) from live v14, and removed the parser from .claspignore. Root cause of the 2026-08-21 HEAD deletion: clasp push replaces the whole remote file list, and the name mismatch + ignore rule meant the parser could never ship and got dropped from HEAD (still served by pinned deployment v14). A push from this folder now yields exactly the live 4-file set (thread 26819).\n' +
   '2026-09-13 - Tracked Credentials.js in git (secret-free: seeds REPLACE_ME placeholders + reads Script Properties only) via a targeted .gitignore negation, so a clasp push from this folder can never again delete the live accessor (2026-08-21 incident); bumped Version (thread 26819).\n' +
   '2026-04-30 — updateStripeCheckoutMetadata: validate Stripe session ID format (cs_live_* or cs_test_*) before searching checkout sheet; skips cash/manual sales silently instead of logging "No Stripe row found" (tokenomics).\n' +
