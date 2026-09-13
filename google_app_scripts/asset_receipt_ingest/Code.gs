@@ -5,7 +5,8 @@
  * 1) Scan Telegram Chat Logs col G for unprocessed [ASSET RECEIPT EVENT] rows
  * 2) Dedup against "Asset Receipts" tab on ops spreadsheet (update_id = key)
  * 3) Parse Currency, Amount, Description, Fund Handler from text
- * 4) Create a new Currencies row (col A = Currency name, col B = Price in USD)
+ * 4) Create a new Currencies row (col A = Currency name, col B = Price in USD), or
+ *    fill empty col D (Product Image) / col E (landing_page) on an existing row
  * 5) Sort Currencies tab by col A ascending
  * 6) Create a positive inventory leg on offchain transactions
  * 7) Append audit row to "Asset Receipts" tab (dedup log)
@@ -175,7 +176,8 @@ function processAssetReceiptsFromTelegramChatLogs_() {
       // The offchain leg below is still written so ingest QA can verify end-to-end;
       // per conventions/QA_LIVE_LEDGER_TEST_PROCEDURE.md the test rows are expensed off after.
       var isTestCurrency = /(\(test| test | test$)/i.test(currencyName);
-      if (!findCurrencyRow_(currenciesSheet, currencyName) && !isTestCurrency) {
+      var existingCurrencyRow = findCurrencyRow_(currenciesSheet, currencyName);
+      if (!existingCurrencyRow && !isTestCurrency) {
         var currenciesLastRow = currenciesSheet.getLastRow();
         currenciesSheet.getRange(currenciesLastRow + 1, 1).setValue(currencyName);
         currenciesSheet.getRange(currenciesLastRow + 1, 2).setValue(unitCost); // col B = Price in USD (per-unit landed cost)
@@ -184,6 +186,11 @@ function processAssetReceiptsFromTelegramChatLogs_() {
         Logger.log('[AssetReceipt] Added Currencies row: ' + currencyName + ' at USD ' + unitCost + '/unit (qty ' + quantity + ')');
       } else if (isTestCurrency) {
         Logger.log('[AssetReceipt] QA GUARD: skipped Currencies rate row for test currency "' + currencyName + '" (offchain leg still written for ingest QA)');
+      } else {
+        // Fill-through (existing row): the receipt text may carry '- Product Image:' / '- Landing Page:'
+        // values for an asset whose Currencies row already exists. Write them into EMPTY col D / col E.
+        // Runs as the script owner, so it can write the protected D130 area legitimately; never clobbers.
+        fillEmptyCurrencyCells_(currenciesSheet, existingCurrencyRow, fields);
       }
 
       // 2) Add positive inventory leg on offchain transactions
@@ -241,7 +248,7 @@ function loadKnownIds_(auditSheet) {
 }
 
 function parseAssetReceiptFields_(text) {
-  var fields = { currency: null, amount: null, description: null, fund_handler: null };
+  var fields = { currency: null, amount: null, description: null, fund_handler: null, product_image: null, landing_page: null };
   var body = text.split('--------')[0] || text;
   var lines = body.split('\n');
 
@@ -272,6 +279,12 @@ function parseAssetReceiptFields_(text) {
       case 'fund handler':
         fields.fund_handler = value;
         break;
+      case 'product image':
+        fields.product_image = value;
+        break;
+      case 'landing page':
+        fields.landing_page = value;
+        break;
     }
   }
   return fields;
@@ -292,6 +305,30 @@ function sortCurrencies_(currenciesSheet) {
   if (lastRow < 2) return;
   var lastCol = currenciesSheet.getLastColumn();
   currenciesSheet.getRange(2, 1, lastRow - 1, lastCol).sort(1);
+}
+
+/**
+ * Fill EMPTY Currencies cells on an EXISTING row from receipt labels.
+ * Col D = Product Image, Col E = landing_page. Populated cells are never overwritten.
+ */
+function fillEmptyCurrencyCells_(currenciesSheet, row, fields) {
+  if (!row || !fields) return;
+  var writes = [];
+  if (fields.product_image) writes.push({ col: 4, label: 'Product Image', value: fields.product_image });
+  if (fields.landing_page) writes.push({ col: 5, label: 'landing_page', value: fields.landing_page });
+  if (!writes.length) return;
+
+  var lastCol = Math.max(currenciesSheet.getLastColumn(), 5);
+  var existing = currenciesSheet.getRange(row, 1, 1, lastCol).getValues()[0];
+  for (var i = 0; i < writes.length; i++) {
+    var w = writes[i];
+    if (String(existing[w.col - 1] || '').trim()) {
+      Logger.log('[AssetReceipt] Fill-through skipped ' + w.label + ' (col ' + w.col + ' row ' + row + ' already populated)');
+      continue;
+    }
+    currenciesSheet.getRange(row, w.col).setValue(w.value);
+    Logger.log('[AssetReceipt] Fill-through wrote ' + w.label + ' (col ' + w.col + ') on existing Currencies row ' + row);
+  }
 }
 
 
