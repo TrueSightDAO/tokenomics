@@ -1681,11 +1681,18 @@ function doGet(e) {
     if (action === 'registerSingleQRCode') {
       return handleRegisterSingleQRCode(e.parameter);
     }
+
+    if (action === 'processCurrencyDefinitionsFromTelegramChatLogs') {
+      processCurrencyDefinitionsFromTelegramChatLogs();
+      return ContentService.createTextOutput(
+        JSON.stringify({ status: 'success', message: 'processCurrencyDefinitionsFromTelegramChatLogs executed' })
+      ).setMimeType(ContentService.MimeType.JSON);
+    }
     
     return ContentService.createTextOutput(
       JSON.stringify({
         status: 'error',
-        message: 'Unknown or missing action. Use ?action=processQRCodeGenerationTelegramLogs or ?action=registerSingleQRCode'
+        message: 'Unknown or missing action. Use ?action=processQRCodeGenerationTelegramLogs, ?action=registerSingleQRCode or ?action=processCurrencyDefinitionsFromTelegramChatLogs'
       })
     ).setMimeType(ContentService.MimeType.JSON);
   } catch (err) {
