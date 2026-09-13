@@ -23,6 +23,10 @@ token.json
 # Apps Script sources that embed API keys / secrets (basename contains "credential(s)")
 google_app_scripts/**/*redential*.gs
 google_app_scripts/**/Credentials.js
+# Exception: this ONE file is verified secret-free (seeds REPLACE_ME placeholders +
+# reads Script Properties only) and MUST be tracked so a clasp push from its folder can
+# never again delete the live accessor (2026-08-21 incident, thread 26819).
+!google_app_scripts/1dsWecVwbN0dOvilIz9r8DNt7LD3Ay13V8G9qliow4tZtF5LHsvQOFpF7/Credentials.js
 # Defensive: the ".gs.js" double-extension variant slipped past the rule above once
 # (Credentials.gs.js leaked the Wix token). Catch any *Credential* .gs.js too.
 google_app_scripts/**/*redential*.gs.js
