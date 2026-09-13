@@ -594,6 +594,7 @@ function extractQrCodeUpdateInfo(message) {
           'CACAO CIRCLE',
           'LOST',
           'SOLD',
+          'RESERVED',
           'TREE_PLANTING_FUNDS_TRANSFERRED',
           'EXPENSED',
           'ASSIGNED_TO_TREE',
