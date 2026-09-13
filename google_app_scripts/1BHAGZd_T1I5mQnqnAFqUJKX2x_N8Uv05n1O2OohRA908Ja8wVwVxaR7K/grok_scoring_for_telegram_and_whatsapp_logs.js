@@ -334,6 +334,12 @@ function processTelegramChatLogs() {
     const status = data[i][9] ? data[i][9].toString().trim() : "";
     const hash = data[i][13] ? data[i][13].toString().trim() : "";
     if (status === "Pending" && hash) {
+      // Only this pipeline's own rows ([CONTRIBUTION EVENT]) may be backfilled. A row belonging to
+      // another event type (currency definition, sales, inventory movement, ...) is audited by its
+      // own dedicated handler — stamping it here would be a false success and would block that
+      // handler's status claim. Leave it untouched.
+      const rowMessage = data[i][6] ? data[i][6].toString() : "";
+      if (!isContributionEvent(rowMessage)) continue;
       const newStatus = scoredHashSet.has(hash) ? 'Full Provision Awarded' : 'Successfully Completed';
       telegramSheet.getRange(i + 1, 10).setValue(newStatus);
       data[i][9] = newStatus; // keep in-memory copy in sync so the main loop filter below sees it
@@ -388,11 +394,21 @@ function processTelegramChatLogs() {
         });
       }
     } else {
+      // No records were produced, but WHY matters. This scorer only owns [CONTRIBUTION EVENT] rows.
+      // Any other event type (currency definition, sales, inventory movement, asset receipt, partner
+      // add, ...) is audited by its own dedicated handler, which claims a DIFFERENT status (e.g.
+      // "PROCESSING"). Stamping such a row "Successfully Completed" here is a FALSE SUCCESS: it marks
+      // the row done, so the dedicated handler skips it forever and its payload is silently lost.
+      // Leave non-contribution rows untouched and let their owner process them.
+      if (!isContributionEvent(message)) {
+        Logger.log(`processTelegramChatLogs: row ${i + 1} is not a [CONTRIBUTION EVENT]; leaving Status untouched for its dedicated handler`);
+        continue;
+      }
       Logger.log(`processTelegramChatLogs: Updated row ${i + 1} Column N with hash even though no contributors were found`);
       telegramSheet.getRange(i + 1, 14).setValue(generateUniqueHash(username, message, dateStr));
       // Mark as Successfully Completed so the J="Pending" filter skips it on future runs.
-      // Covers date-filtered, skip-string, and no-contributor-match cases. The precise reason is derivable
-      // from absence of the hash in Scored Chatlogs.
+      // Covers the date-filtered and no-contributor-match cases for genuine contribution rows.
+      // The precise reason is derivable from absence of the hash in Scored Chatlogs.
       telegramSheet.getRange(i + 1, 10).setValue('Successfully Completed');
     }
   }
@@ -1517,9 +1533,19 @@ function testUploadFileToGitHub(fileId, destinationUrl, message) {
  * @param {string} message - The chat log message to check.
  * @returns {boolean} - True if the message should be skipped (no [CONTRIBUTION EVENT] header).
  */
+/**
+ * True only for messages this scoring pipeline owns. Every other event type (currency
+ * definition, sales, inventory movement, asset receipt, partner add, ...) is audited by its
+ * own dedicated handler and must NOT be touched by the scorer.
+ * @param {string} message
+ * @return {boolean}
+ */
+function isContributionEvent(message) {
+  return (message || '').toUpperCase().includes('[CONTRIBUTION EVENT]');
+}
+
 function shouldSkipMessage(message) {
-  const messageUpper = (message || '').toUpperCase();
-  if (!messageUpper.includes('[CONTRIBUTION EVENT]')) {
+  if (!isContributionEvent(message)) {
     Logger.log(`shouldSkipMessage: skipping (no [CONTRIBUTION EVENT] header): ${(message || '').substring(0, 100)}`);
     return true;
   }
