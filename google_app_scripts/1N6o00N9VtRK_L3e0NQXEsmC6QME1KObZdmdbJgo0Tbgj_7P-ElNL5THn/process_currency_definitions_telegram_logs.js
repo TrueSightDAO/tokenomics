@@ -98,43 +98,43 @@ function parseCurrencyDefinitionMessage(message) {
   };
 
   try {
-    const currencyMatch = message.match(/- Currency:\s*([^\n]+)/i);
+    const currencyMatch = message.match(/- Currency:[ \t]*([^\n]*)/i);
     if (currencyMatch) details.currency = currencyMatch[1].trim();
 
-    const priceMatch = message.match(/- Price in USD:\s*\$?([0-9,]*\.?[0-9]+)/i);
+    const priceMatch = message.match(/- Price in USD:[ \t]*\$?([0-9,]*\.?[0-9]+)/i);
     if (priceMatch) details.priceInUsd = parseFloat(priceMatch[1].replace(/,/g, ''));
 
-    const serializableMatch = message.match(/- Serializable:\s*([^\n]+)/i);
+    const serializableMatch = message.match(/- Serializable:[ \t]*([^\n]*)/i);
     if (serializableMatch) details.serializable = serializableMatch[1].trim().toUpperCase();
 
-    const productImageMatch = message.match(/- Product Image:\s*([^\n]+)/i);
+    const productImageMatch = message.match(/- Product Image:[ \t]*([^\n]*)/i);
     if (productImageMatch) details.productImage = productImageMatch[1].trim();
 
-    const landingPageMatch = message.match(/- Landing Page:\s*([^\n]+)/i);
+    const landingPageMatch = message.match(/- Landing Page:[ \t]*([^\n]*)/i);
     if (landingPageMatch) details.landingPage = landingPageMatch[1].trim();
 
-    const ledgerMatch = message.match(/- Ledger:\s*([^\n]+)/i);
+    const ledgerMatch = message.match(/- Ledger:[ \t]*([^\n]*)/i);
     if (ledgerMatch) details.ledger = ledgerMatch[1].trim();
 
-    const farmNameMatch = message.match(/- Farm Name:\s*([^\n]+)/i);
+    const farmNameMatch = message.match(/- Farm Name:[ \t]*([^\n]*)/i);
     if (farmNameMatch) details.farmName = farmNameMatch[1].trim();
 
-    const stateMatch = message.match(/- State:\s*([^\n]+)/i);
+    const stateMatch = message.match(/- State:[ \t]*([^\n]*)/i);
     if (stateMatch) details.state = stateMatch[1].trim();
 
-    const countryMatch = message.match(/- Country:\s*([^\n]+)/i);
+    const countryMatch = message.match(/- Country:[ \t]*([^\n]*)/i);
     if (countryMatch) details.country = countryMatch[1].trim();
 
-    const yearMatch = message.match(/- Year:\s*([^\n]+)/i);
+    const yearMatch = message.match(/- Year:[ \t]*([^\n]*)/i);
     if (yearMatch) details.year = yearMatch[1].trim();
 
-    const unitWeightGramsMatch = message.match(/- Unit Weight \(grams\):\s*([0-9,]*\.?[0-9]+)/i);
+    const unitWeightGramsMatch = message.match(/- Unit Weight \(grams\):[ \t]*([0-9,]*\.?[0-9]+)/i);
     if (unitWeightGramsMatch) details.unitWeightGrams = parseFloat(unitWeightGramsMatch[1].replace(/,/g, ''));
 
-    const unitWeightOuncesMatch = message.match(/- Unit Weight \(ounces\):\s*([0-9,]*\.?[0-9]+)/i);
+    const unitWeightOuncesMatch = message.match(/- Unit Weight \(ounces\):[ \t]*([0-9,]*\.?[0-9]+)/i);
     if (unitWeightOuncesMatch) details.unitWeightOunces = parseFloat(unitWeightOuncesMatch[1].replace(/,/g, ''));
 
-    const skuProductIdMatch = message.match(/- SKU Product ID:\s*([^\n]+)/i);
+    const skuProductIdMatch = message.match(/- SKU Product ID:[ \t]*([^\n]*)/i);
     if (skuProductIdMatch) details.skuProductId = skuProductIdMatch[1].trim();
 
     // Digital signature and request transaction ID
