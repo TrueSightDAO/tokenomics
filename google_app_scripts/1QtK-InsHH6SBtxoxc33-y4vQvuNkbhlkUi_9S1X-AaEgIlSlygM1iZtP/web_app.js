@@ -491,10 +491,16 @@ function doGet(e) {
     return listAllCurrenciesAcrossLedgers();
   }
 
+  // Return distinct non-empty Farm / State / Country values from the Currencies tab
+  // (columns G / H / I) so define_currency.html can seed its pickers with existing values.
+  if (e.parameter.currency_fields) {
+    return getCurrencyFieldOptions();
+  }
+
   // No valid parameter provided
   return ContentService
     .createTextOutput(JSON.stringify({
-      error: 'Please specify ?list=true to list managers, ?manager=<key> to get assets, ?recipients=true to list recipients, ?ledgers=true to list ledgers, or ?all_currencies=true to list all currencies.'
+      error: 'Please specify ?list=true to list managers, ?manager=<key> to get assets, ?recipients=true to list recipients, ?ledgers=true to list ledgers, ?all_currencies=true to list all currencies, or ?currency_fields=true to list distinct farm/state/country values.'
     }))
     .setMimeType(ContentService.MimeType.JSON);
 }
@@ -538,6 +544,66 @@ function testAllCurrencies() {
   const e = { parameter: { all_currencies: 'true' } };
   const output = doGet(e);
   Logger.log('All currencies: %s', output.getContent());
+}
+
+/**
+ * Test function: list distinct currency field values (farm / state / country).
+ * Usage (in Apps Script console): testCurrencyFields();
+ */
+function testCurrencyFields() {
+  const e = { parameter: { currency_fields: 'true' } };
+  const output = doGet(e);
+  Logger.log('Currency fields: %s', output.getContent());
+}
+
+/**
+ * Distinct non-empty Farm / State / Country values from the Currencies tab
+ * (columns G / H / I), sorted A-Z. Powers the DApp define_currency.html pickers'
+ * seed lists via `?currency_fields=true`. Read-only; returns empty arrays when the
+ * sheet or columns are absent. Response shape matches the DApp consumer: top-level
+ * `farms` / `states` / `countries` arrays.
+ */
+function getCurrencyFieldOptions() {
+  try {
+    const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+    const sheet = ss.getSheetByName(CURRENCIES_SHEET_NAME);
+    const farms = {};
+    const states = {};
+    const countries = {};
+
+    if (sheet) {
+      const lastRow = sheet.getLastRow();
+      if (lastRow >= 2) {
+        // Columns G(7), H(8), I(9) -> Farm, State, Country. Skip the header row.
+        const values = sheet.getRange(2, 7, lastRow - 1, 3).getValues();
+        values.forEach(function (row) {
+          const f = row[0] ? String(row[0]).trim() : '';
+          const st = row[1] ? String(row[1]).trim() : '';
+          const c = row[2] ? String(row[2]).trim() : '';
+          if (f) farms[f] = true;
+          if (st) states[st] = true;
+          if (c) countries[c] = true;
+        });
+      }
+    }
+
+    const sortedKeys = function (o) {
+      return Object.keys(o).sort(function (a, b) { return a.localeCompare(b); });
+    };
+
+    return ContentService.createTextOutput(JSON.stringify({
+      action: 'currency_fields',
+      farms: sortedKeys(farms),
+      states: sortedKeys(states),
+      countries: sortedKeys(countries)
+    })).setMimeType(ContentService.MimeType.JSON);
+  } catch (error) {
+    Logger.log('Error in getCurrencyFieldOptions: ' + error.message);
+    return ContentService.createTextOutput(JSON.stringify({
+      status: 'error',
+      message: 'Error listing currency fields: ' + error.message
+    })).setMimeType(ContentService.MimeType.JSON);
+  }
 }
 
 /**
