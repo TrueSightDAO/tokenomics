@@ -1361,6 +1361,8 @@ See [`python_scripts/schema_validation/README.md`](./python_scripts/schema_valid
 | E | Status Date | Date | Status update date |
 | F | Contact Information / Whats App | String | Contact details |
 | G | Alibaba | String | Alibaba reference |
+| H | CNPJ | String | Brazilian company tax ID (Cadastro Nacional da Pessoa Juridica), e.g. 53.508.643/0001-07 |
+| I | Physical Address | String | Street address of the facility / supplier |
 
 **Used by:**
 - Cost tracking and pricing

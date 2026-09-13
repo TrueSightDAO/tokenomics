@@ -65,7 +65,7 @@ def append_to_sheet(rows: list[list]) -> None:
         .values()
         .append(
             spreadsheetId=SPREADSHEET_ID,
-            range=f"'{SHEET_NAME}'!A:G",
+            range=f"'{SHEET_NAME}'!A:I",
             valueInputOption="USER_ENTERED",
             insertDataOption="INSERT_ROWS",
             body=body,
