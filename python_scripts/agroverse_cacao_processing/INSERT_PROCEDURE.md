@@ -18,6 +18,8 @@
 | E | Status Date | String | YYYYMMDD (e.g. 20250210) or year "2024". |
 | F | Contact Information / Whats App | String | Phone +55... or Alibaba message link; can be empty. |
 | G | Alibaba | String | Usually empty. |
+| H | CNPJ | String | Brazilian company tax ID (e.g. 53.508.643/0001-07). Blank for individuals / nota simples with no CNPJ. |
+| I | Physical Address | String | Street address of the facility / supplier. |
 
 ---
 
@@ -53,7 +55,7 @@ If the sheet has more rows filled since, insert **immediately below the last row
 
 4. **Paste:**  
    Copy the **data rows only** (no header) from CSV and Paste (Ctrl+V / Cmd+V).  
-   Ensure columns line up: A=Facility, B=Process, C=Cost, D=Currency, E=Status Date, F=Contact, G=Alibaba.
+   Ensure columns line up: A=Facility, B=Process, C=Cost, D=Currency, E=Status Date, F=Contact, G=Alibaba, H=CNPJ, I=Physical Address.
 
 5. **Check:**  
    Verify Cost (C) is numeric and Status Date (E) looks correct (YYYYMMDD or year).
@@ -64,7 +66,7 @@ Use a script with **Google Sheets API** (e.g. `gspread` + service account, or sa
 
 - **Spreadsheet ID:** `1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU`
 - **Sheet name:** `Agroverse Cacao Processing Cost`
-- **Append:** One row per list of 7 values `[A, B, C, D, E, F, G]` in order.
+- **Append:** One row per list of 9 values `[A, B, C, D, E, F, G, H, I]` in order (H/I may be blank).
 
 Always **review** the rows (e.g. from CSV/JSON) before appending so Facility and Process names match sheet conventions.
 
