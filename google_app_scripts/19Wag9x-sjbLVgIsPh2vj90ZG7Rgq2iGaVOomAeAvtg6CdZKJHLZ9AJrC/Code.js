@@ -807,10 +807,18 @@ function InsertExpenseRecords(scoredRow, rowIndex) {
       const ledgerMatch = expenseDetails.inventoryType.match(/^\[([^\]]+)\]\s*(.+)$/);
       if (ledgerMatch) {
         targetLedgerName = ledgerMatch[1];
-        cleanInventoryType = ledgerMatch[2]; // Extract the actual inventory type without the ledger prefix
         Logger.log(`Ledger name detected in inventory type: ${targetLedgerName}`);
       }
     }
+
+    // Strip any [ledger] routing prefix from the Inventory Type BEFORE it is ever
+    // written to the ledger's Column E. The prefix (e.g. "[AGL16]") is routing
+    // metadata only -- it must never leak into the stored value. This strip used to
+    // run ONLY inside the `else` fallback above, so whenever the ledger was resolved
+    // from Column M or the message field (the normal path) the raw
+    // "[AGL16] Brazilian Reis" was written verbatim to Column E.
+    const invTypePrefixMatch = expenseDetails.inventoryType.match(/^\[([^\]]+)\]\s*(.+)$/);
+    cleanInventoryType = invTypePrefixMatch ? invTypePrefixMatch[2].trim() : cleanInventoryType;
     
     // If we have a target ledger name, resolve it
     if (targetLedgerName) {
