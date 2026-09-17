@@ -49,3 +49,29 @@ After this PR: audit moves from 34 healthy / 13 orphans / 3 unmirrored → **36 
 ## Future automation
 
 When operator decisions land, this doc is the durable record. As each row's disposition completes, mark it done above and re-run `scripts/audit_orphan_clasp_mirrors.py` to confirm the audit reflects reality.
+
+---
+
+## Tier-4 orphan folder cleanup (2026-09-17, thread 31220)
+
+Part of the local-vs-live GAS drift audit (`docs/gas_drift_audit_2026-09-17.md`). Four
+`google_app_scripts/<scriptId>/` folders were re-confirmed **unreachable** (`clasp pull` →
+"Requested entity was not found", verified twice, 2026-09-17) and removed. Before removal the
+folder contents were audited for uniqueness against the whole repo at `origin/main`; **3 files held
+logic found nowhere else** and were preserved under `google_app_scripts/deprecated/` (header-stamped
+with original project + scriptId, **no `.clasp.json` → not deployable**). This resolves the open
+dispositions for rows **4, 6 and 18** above.
+
+| scriptId (removed folder) | Google project name | Contained | Disposition |
+|---|---|---|---|
+| `10NKp8uLMGyfgDv0By…` | TDG - Telegram Identity Management | `register_member_digital_signatures_telegram.js` (**unique**, 16 funcs) + `telegram_webhook_listener.js` (**identical to 3 live copies** elsewhere) | unique file → `deprecated/register_member_digital_signatures_telegram.gs`; webhook dupe discarded |
+| `1E6XFs1X7GMqAEOJ…` | TrueSight DAO Gas Fee Update | `Code.js` = `setEcosystemGasFees` + 13 fn (**unique**) | → `deprecated/ecosystem_gas_fees.gs` (row 4 resolved). Wix access token **redacted** |
+| `1IBrXqW_uTsFkbKU-…` | Agroverse - QR code subscriber events automation | `subscription_notification.js` (`sendEmailForQRCode`, `processBatch`) — overlaps `1MnAsIQ…/qr_code_web_service.js`; superseded by the row-6 extraction | discarded (row 6 resolved — its extraction is redundant) |
+| `1zAXSdLe_vigsygxq…` | TDG USDT exchange rate update | `updateWixLandingPagePrice` (**unique**) | → `deprecated/tdg_rate_sync_to_wix.gs` (row 18 resolved). Wix access token **redacted**; flow retired with Wix |
+
+Notes:
+- Both Wix bearer tokens embedded in the two `Code.js` files were **redacted** in the preserved copies
+  (`// REDACTED…`). They remain in this repo's git history — a separate rotation/scrub item.
+- `docs/MANIFEST.json` still lists these 4 scriptIds. It is a **generated** snapshot
+  (`generatedAt 2026-03-29`) whose generator hardcodes a local `/Users/garyjob/…` path and cannot run
+  on the autopilot box — regen is filed as a follow-up.

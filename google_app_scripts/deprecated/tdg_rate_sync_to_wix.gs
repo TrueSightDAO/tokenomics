@@ -1,4 +1,17 @@
-var wixAccessToken = "IST.eyJraWQiOiJQb3pIX2FDMiIsImFsZyI6IlJTMjU2In0.eyJkYXRhIjoie1wiaWRcIjpcImYyNGZjZWY4LTljZDctNGE2ZS04NzdmLThlOWJkOThkZTk5Y1wiLFwiaWRlbnRpdHlcIjp7XCJ0eXBlXCI6XCJhcHBsaWNhdGlvblwiLFwiaWRcIjpcIjQ4MjU1ZDA5LWI5NTUtNGUwNi1iZjYxLTAyN2NiZThkN2MzNFwifSxcInRlbmFudFwiOntcInR5cGVcIjpcImFjY291bnRcIixcImlkXCI6XCIwZTJjZGU1Zi1iMzUzLTQ2OGItOWY0ZS0zNjgzNWZjNjBhMGVcIn19IiwiaWF0IjoxNzIxMzIwNTU5fQ.cLoxDKW5m4TYXdR-820GwrKrOkfkk_8OJZy956XOSwOQ4i1RqE9XjrHOFuZyhiq6FR0Hxy8ZJxmBB_1oTuA09nuYnhrMDJjevBDK0sVqQCCg4bTX1LF65VABEIj7WBCVcklhelmrc_X9_6J09whC8Al-D6Ttq_i-cCGh97EqFqqcQilSz9LjrL7jiMgpYMabjRYEP9FmzPseOXSv_HjU9zxgYzHhdHltENYq5dQiYJIDLbOu4Pp3YU52FtZUd4yrWDhqryjZ_QCtR1ygRI6153xnBRt-WqrD63XhEMiNpTIY7ZDwfuUfS9SFHj8vucp1MCgxgp9DCliDKxavFf-B1g";
+/**
+ * RETIRED 2026-09-17 - preserved copy of an orphaned GAS project file.
+ *
+ * Original project : TDG USDT exchange rate update
+ * Original scriptId: 1zAXSdLe_vigsygxqX41w_evQb3KfrtzUc4rFI3AxwdUjp8E-h3nIvgDG
+ * Original path    : google_app_scripts/1zAXSdLe_vigsygxqX41w_evQb3KfrtzUc4rFI3AxwdUjp8E-h3nIvgDG/Code.js
+ *
+ * Why preserved: the project is UNREACHABLE ("Requested entity was not found" on
+ * clasp pull) and its folder was deleted in the Tier-4 orphan cleanup. This file
+ * held logic found NOWHERE ELSE in the repo, so it is kept here as archaeology.
+ * No .clasp.json -> this file is NOT deployable. See
+ * docs/gas_orphan_mirror_dispositions.md for the full disposition.
+ */
+// REDACTED 2026-09-17: hardcoded Wix access token removed during orphan cleanup (Wix retired as a system).
 
 function updateWixLandingPagePrice() {
   getCurrentTdgExchangeRateOnWix();
