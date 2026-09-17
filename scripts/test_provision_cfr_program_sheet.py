@@ -70,3 +70,52 @@ def test_col_letter_conversion():
     assert module._col(26) == "Z"
     assert module._col(27) == "AA"
     assert module._col(28) == "AB"
+
+
+# ---------------------------------------------------------------------------
+# SS12.3 payout tabs (Tier 1 `payouts` on Ops; Tier 2 `payout events` on CFR)
+# ---------------------------------------------------------------------------
+
+
+def test_cfr_program_group_adds_tier2_payout_events():
+    mod = _mod()
+    assert list(mod.CFR_PROGRAM_TABS) == [*EXPECTED_TABS, "payout events"]
+    # TABS itself is unchanged -- the SS11.3 group stays a clean 4-tab group
+    assert list(mod.TABS) == EXPECTED_TABS
+
+
+def test_ops_workbook_group_is_just_the_tier1_payouts_tab():
+    mod = _mod()
+    assert list(mod.OPS_WORKBOOK_TABS) == ["payouts"]
+
+
+def test_tier2_is_tier1_plus_cfr_scoping_columns():
+    mod = _mod()
+    assert mod.TIER2_PAYOUT_COLUMNS == mod.TIER1_PAYOUT_COLUMNS + [
+        "cohort",
+        "student_ref",
+    ]
+
+
+def test_payout_columns_follow_the_dedup_and_shape_conventions():
+    mod = _mod()
+    for cols in (mod.TIER1_PAYOUT_COLUMNS, mod.TIER2_PAYOUT_COLUMNS):
+        assert cols[0] == "created_at_utc"
+        assert "telegram_update_id" in cols  # SS11.3 dedup key
+        # SS12.4 -- tree linkage is a LIST in one cell, one row per transfer
+        assert "tree_planting_id" in cols
+        # a payout carries NO raw PII (SS12.1), so no pix_key / masked pair here
+        assert "pix_key" not in cols
+        assert "pix_key_masked" not in cols
+
+
+def test_ops_workbook_id_is_the_canonical_ops_workbook():
+    assert _mod().OPS_WORKBOOK_ID == "1qbZZhf-_7xzmDTriaJVWj6OZshyQsFkdsAV8-pyzASQ"
+
+
+def test_plan_for_is_group_aware():
+    mod = _mod()
+    created = {tab: act for act, tab in mod.plan_for(mod.OPS_WORKBOOK_TABS, ["Sheet1"])}
+    assert created == {"payouts": "create"}
+    present = {tab: act for act, tab in mod.plan_for(mod.OPS_WORKBOOK_TABS, ["payouts"])}
+    assert present == {"payouts": "exists"}
