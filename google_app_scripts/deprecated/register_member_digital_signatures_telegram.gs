@@ -1,4 +1,17 @@
 /**
+ * RETIRED 2026-09-17 - preserved copy of an orphaned GAS project file.
+ *
+ * Original project : TDG - Telegram Identity Management
+ * Original scriptId: 10NKp8uLMGyfgDv0ByakHVGioOYzvDV7NbHMSBigB2TCVcY7aqYXhbywv
+ * Original path    : google_app_scripts/10NKp8uLMGyfgDv0ByakHVGioOYzvDV7NbHMSBigB2TCVcY7aqYXhbywv/register_member_digital_signatures_telegram.js
+ *
+ * Why preserved: the project is UNREACHABLE ("Requested entity was not found" on
+ * clasp pull) and its folder was deleted in the Tier-4 orphan cleanup. This file
+ * held logic found NOWHERE ELSE in the repo, so it is kept here as archaeology.
+ * No .clasp.json -> this file is NOT deployable. See
+ * docs/gas_orphan_mirror_dispositions.md for the full disposition.
+ */
+/**
  * File: google_app_scripts/tdg_identity_management/register_member_digital_signatures_telegram.gs
  * Repository: https://github.com/TrueSightDAO/tokenomics
  * Apps Script editor:

@@ -4,7 +4,6 @@ script_id	title
 1dsWecVwbN0dOvilIz9r8DNt7LD3Ay13V8G9qliow4tZtF5LHsvQOFpF7	Agroverse - Parse Telegram ChatLogs For Sales
 1N6o00N9VtRK_L3e0NQXEsmC6QME1KObZdmdbJgo0Tbgj_7P-ElNL5THn	Agroverse - Parse Telegram for QR code batch generation
 1slQVojn5P2wC7l5LdFesFT243afkZ2HQ9no9mciExl574VeOe3Wom2rW	Agroverse - QR code creation web service
-1IBrXqW_uTsFkbKU-fiOTrkfBlxLnX8KHsKSw2qqF3NoOa36wU0OKEVGH	Agroverse - QR code subscriber events automation
 1UrBgqLnnQc6PV4-gMIDh2SYwWu62wTdSrV30xk9q_eVr2UdoxdzXN38v	Agroverse - QR CODE UPDATE EVENT
 1Og2g8Q0_SdM9A5mJNO-tq_9r8XMQ00ybBmss4L3tItBAJ01-KdM-w40c	Agroverse - shipping planner
 1ovx-Hq5L5MgzF32qB_cPV_G5Hc6XshKMAYOmiJY8tZ355gzWUqvFCPvn	Agroverse - Shopping Cart
@@ -36,12 +35,9 @@ script_id	title
 1Dh_QQUn8hGGo75RsPpsN-GMn-uFgw-akwyv3uSZgO140J3NfQzsnuu9s	TDG - proposals
 177OJC0tVytZfSa6gMldKCqS5LxUZGnV_dT2NJ_FJE1uwvoGHzqC8HbyG	TDG - tabulate airdrops
 1QtK-InsHH6SBtxoxc33-y4vQvuNkbhlkUi_9S1X-AaEgIlSlygM1iZtP	TDG - tdg_inventory_management web_app.gs
-10NKp8uLMGyfgDv0ByakHVGioOYzvDV7NbHMSBigB2TCVcY7aqYXhbywv	TDG - Telegram Identity Management
 1m2sQONdMGw6HbxIVP0H0JJJ1aYrYLSRRlHb2MIplrDDsKhm8-IwKBntk	TDG - Telegram Webhook Listener
 1-ts0WTM8J4nOWdI29I9NJLzPQBGqph3ajSB8d8qrAHINJaZynwxLzPx8	TDG - transfer scored and reviewed to main ledger
 1QKqUTyl3_pyDHfVMoRUkzvU75eV6UtizIw5bR5xeDMaLyZGUPzWTz8Et	TDG - update balance in wallets on Ledger
-1zAXSdLe_vigsygxqX41w_evQb3KfrtzUc4rFI3AxwdUjp8E-h3nIvgDG	TDG USDT exchange rate update
-1E6XFs1X7GMqAEOJxoINHEYPazuYI7HYSyjqW2s9OhFXENm09ne0mUOER	TrueSight DAO Gas Fee Update
 1KreecWzQ1ZRXcqsWuoT8qY1SlQ5MWkmI1YrVBhQ6EMZ67MCV7pTdKx46	Untitled project
 17KSH5GQW1TINrI_O4Kn2F3EvdzCqOC15nASX-hmwCf4_eBlD0c64vKrY	Untitled project
 1CpAVMPR2mAHlnt20oDhi-_-C8gRbiPbHiemHzlrlpiRgrL0r8MLTMYhi	Written Assurance Letter - Template Generation
