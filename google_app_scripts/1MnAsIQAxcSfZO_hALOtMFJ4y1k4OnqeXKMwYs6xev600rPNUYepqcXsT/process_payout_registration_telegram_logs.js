@@ -1,45 +1,116 @@
 /**
- * File: google_app_scripts/<scriptId>/process_payout_registration_telegram_logs.gs
+ * File: google_app_scripts/<scriptId>/process_payout_registration_telegram_logs.js
  * Repository: https://github.com/TrueSightDAO/tokenomics
  * Apps Script project: 1MnAsIQAxcSfZO_hALOtMFJ4y1k4OnqeXKMwYs6xev600rPNUYepqcXsT
  *
  * Description: Async scanner for `[PAYOUT REGISTRATION]` rows on the canonical
- *   **Telegram Chat Logs** intake (`1qbZZhf-_7xzmDTriaJVWj6OZshyQsFkdsAV8-pyzASQ`).
+ *   Telegram Chat Logs intake (`1qbZZhf-_7xzmDTriaJVWj6OZshyQsFkdsAV8-pyzASQ`).
  *
  *   The self-serve form (dapp payout_registration.html, vendored into the CFR Anapu
  *   site) submits a signed `[PAYOUT REGISTRATION]` event to Edgar (RSA route), which
- *   writes the signed payload into Telegram Chat Logs col G and enqueues a webhook to
- *   this script (`?action=processPayoutRegistrationsFromTelegramChatLogs`).
+ *   writes the payload into Telegram Chat Logs col G and enqueues a webhook to this
+ *   script (`?action=processPayoutRegistrationsFromTelegramChatLogs`).
  *
- *   For each Telegram log row whose **Telegram Update ID** (col A) is not yet present
- *   on the **Payout Registrations** tab (col B), this scanner appends a row. The tab
- *   is BOTH the dedup ledger and the review surface: a row is written at most once per
- *   Telegram update id, and at most once per pk_hash (a later correction for the same
- *   student supersedes rather than duplicates).
+ *   For each Telegram log row whose Telegram Update ID (col A) is not yet present on
+ *   the payout tab, this scanner appends a row to the PRIVATE `cfr program`
+ *   spreadsheet (SS11.3). That tab is BOTH the dedup ledger and the review surface:
+ *   a row is written at most once per Telegram update id, and at most once per
+ *   pk_hash (a later correction for the same planter supersedes rather than
+ *   duplicates).
  *
- *   PRIVACY INVARIANT: this scanner never *derives* or echoes a raw PIX key. It
- *   copies whatever value the signed payload carried in its `- PIX Key:` field
- *   verbatim. The client is expected to send the key masked-plus-encrypted so that the
- *   public-republished surfaces (ADVISORY_SNAPSHOT, the notarizations redirect) never
- *   see plaintext. A fail-closed guard below REFUSES to write a raw CPF/CNPJ-shaped
- *   value into the tab unless it is short (masked) or high-entropy (ciphertext),
- *   logging the refusal instead of leaking. Access to the tab is restricted to
- *   governors + the `agroverse-ledger-manager@get-data-io.iam.gserviceaccount.com`
- *   service account (governor-gated provisioning; see plans/CRF_ANAPU_SUNMINT_COHORT_PROPOSAL.md).
+ *   PRIVACY POSTURE -- privacy by LOCATION, not encryption (SS11.2, Gary 2026-09-17):
  *
- *   Idempotent: dedup is keyed on Telegram Update ID (col A on Telegram Chat Logs,
- *   col B on Payout Registrations). Serialized via LockService. A self-installing
- *   hourly safety-net cron catches anything the webhook missed.
+ *     * The raw PIX key is stored PLAINTEXT, but ONLY in the private, governor-only
+ *       `cfr program` spreadsheet, which is never link-shared and never republished.
+ *       There is no RSA-OAEP cipher and no governor-private-key decrypt step (the
+ *       `pix_key_cipher` column is DROPPED).
+ *     * The Telegram Chat Logs intake workbook IS publicly republished
+ *       (ADVISORY_SNAPSHOT + the `truesight.me/notarizations` redirect), so this
+ *       scanner NEVER writes back to it -- it is strictly read-only.
+ *     * The PUBLIC JSON-cache generators must never emit `[PAYOUT REGISTRATION]`
+ *       (SS11.4; enforced upstream in sync_sunmint_signatures.py / ledger_emit.py /
+ *       generate_advisory_snapshot.py).
+ *     * `pix_key_masked` is derived here as the display-safe echo for any surface
+ *       that must render *something* without exposing the key.
+ *
+ *   Access to the private tab is restricted to governors + the
+ *   `agroverse-ledger-manager@get-data-io.iam.gserviceaccount.com` service account
+ *   (governor-gated provisioning; see plans/CRF_ANAPU_SUNMINT_COHORT_PROPOSAL.md SS11).
+ *
+ *   Idempotent: dedup is keyed on Telegram Update ID. Serialized via LockService.
+ *   A self-installing hourly safety-net cron catches anything the webhook missed.
  *
  *   Mirrors process_program_registration_telegram_logs.gs (same Apps Script project).
  */
 
-/** Canonical Telegram intake workbook (sibling tabs: Telegram Chat Logs, Program Registrations, ...). */
+/** Canonical Telegram intake workbook -- READ ONLY (it is publicly republished). */
 var PAYOUT_REG_TELEGRAM_SPREADSHEET_ID = '1qbZZhf-_7xzmDTriaJVWj6OZshyQsFkdsAV8-pyzASQ';
 var PAYOUT_REG_TELEGRAM_SHEET = 'Telegram Chat Logs';
 
-/** Dedup + review tab (auto-created on first run). */
-var PAYOUT_REG_SHEET = 'Payout Registrations';
+/**
+ * Governor-gated provisioning (SS11.8): the standalone, private, governor-only
+ * `cfr program` spreadsheet. Prefer setting the Script Property (no code change);
+ * the const below is a fallback for a fixed deployment.
+ */
+var PAYOUT_REG_CFR_PROGRAM_PROPERTY = 'CFR_PROGRAM_SPREADSHEET_ID';
+var PAYOUT_REG_CFR_PROGRAM_SPREADSHEET_ID = '';
+
+/**
+ * SS11.3 canonical four-tab schema. Lowercase tab name -> header row.
+ * SS11.2: the payout tab carries a PLAINTEXT `pix_key` (private sheet only) and
+ * no `pix_key_cipher`.
+ */
+var PAYOUT_REG_TABS = {
+  'payout registrations': [
+    'created_at_utc',
+    'telegram_update_id',
+    'pk_hash',
+    'program_slug',
+    'pix_key_type',
+    'pix_key',
+    'pix_key_masked',
+    'submission_source',
+    'status',
+    'supersedes_row',
+    'error_message'
+  ],
+  'tree planting': [
+    'created_at_utc',
+    'telegram_update_id',
+    'pk_hash',
+    'tree_id',
+    'species',
+    'lat',
+    'lng',
+    'photo_url',
+    'capture_source',
+    'status'
+  ],
+  'tree monitoring': [
+    'created_at_utc',
+    'telegram_update_id',
+    'tree_id_qr',
+    'species',
+    'dbh_cm',
+    'co2e_kg',
+    'measured_at',
+    'photo_url',
+    'status'
+  ],
+  'plot registrations': [
+    'created_at_utc',
+    'telegram_update_id',
+    'pk_hash',
+    'plot_ref',
+    'geometry_ref',
+    'captured_at',
+    'status'
+  ]
+};
+
+/** The tab this scanner writes (the payout-registration review surface). */
+var PAYOUT_REG_SHEET = 'payout registrations';
+var PAYOUT_REG_HEADERS = PAYOUT_REG_TABS[PAYOUT_REG_SHEET];
 
 /** Per-fire scan window. Matches the program-registration / donation-mint scanners. */
 var PAYOUT_REG_SCAN_BATCH = 200;
@@ -51,77 +122,107 @@ var PAYOUT_REG_TC_MESSAGE_COL = 6;
 
 var PAYOUT_REG_EVENT_TAG = '[PAYOUT REGISTRATION]';
 
-/** Governor-gated: the only non-governor principal granted access to this tab. */
+/** Governor-gated: the only non-governor principal granted access to the private sheet. */
 var PAYOUT_REG_SHARED_SA = 'agroverse-ledger-manager@get-data-io.iam.gserviceaccount.com';
 
-/** Header row. `pix_key_value` holds the payload value VERBATIM (masked or ciphertext). */
-var PAYOUT_REG_HEADERS = [
-  'created_at_utc',
-  'telegram_update_id',
-  'telegram_message_id',
-  'status',                 // RECORDED | UPDATED | REJECTED_NO_TELEGRAM_UPDATE_ID | REJECTED_UNSAFE_KEY | error
-  'student_name',
-  'student_email',
-  'pk_hash',
-  'program_slug',
-  'pix_key_type',
-  'pix_key_masked',         // display-safe mask, e.g. ***.***.***-35
-  'pix_key_cipher',         // RSA-OAEP ciphertext of the raw key - opaque here, never decrypted
-  'account_holder',
-  'relationship',
-  'no_key_channel',
-  'submission_source',
-  'supersedes_row',         // row number this record replaced, if any
-  'error_message'
-];
+/** Resolve the private `cfr program` spreadsheet (SS11.8). */
+function payoutRegCfrProgramSpreadsheet_() {
+  var id = '';
+  try {
+    var props = PropertiesService.getScriptProperties();
+    if (props) id = String(props.getProperty(PAYOUT_REG_CFR_PROGRAM_PROPERTY) || '').trim();
+  } catch (e) {}
+  if (!id) id = String(PAYOUT_REG_CFR_PROGRAM_SPREADSHEET_ID || '').trim();
+  if (!id) {
+    throw new Error(
+      'The private `cfr program` spreadsheet id is not set (SS11.8). Set the script ' +
+      'property "' + PAYOUT_REG_CFR_PROGRAM_PROPERTY + '" to the governor-created sheet id.'
+    );
+  }
+  return SpreadsheetApp.openById(id);
+}
 
-function ensurePayoutRegistrationsSheet_(spreadsheet) {
-  var sheet = spreadsheet.getSheetByName(PAYOUT_REG_SHEET);
+/**
+ * Idempotently ensure one tab exists with `headers` on row 1. Never deletes,
+ * reorders, or overwrites non-header data; throws rather than clobber a sheet
+ * whose row 1 is occupied by different headers.
+ */
+function ensurePayoutRegTab_(spreadsheet, tabName, headers) {
+  var sheet = spreadsheet.getSheetByName(tabName);
   if (!sheet) {
-    sheet = spreadsheet.insertSheet(PAYOUT_REG_SHEET);
-    sheet.appendRow(PAYOUT_REG_HEADERS);
+    sheet = spreadsheet.insertSheet(tabName);
+    sheet.appendRow(headers);
     return sheet;
   }
   var lastRow = sheet.getLastRow();
-  var lastCol = Math.max(sheet.getLastColumn(), PAYOUT_REG_HEADERS.length);
+  var lastCol = Math.max(sheet.getLastColumn(), headers.length);
   var firstRow = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
-  var row1Blank = firstRow.every(function (cell) { return String(cell || '').trim() === ''; });
+  var row1Blank = true;
+  for (var b = 0; b < firstRow.length; b++) {
+    if (String(firstRow[b] || '').trim() !== '') { row1Blank = false; break; }
+  }
   if (lastRow === 0 || row1Blank) {
-    sheet.getRange(1, 1, 1, PAYOUT_REG_HEADERS.length).setValues([PAYOUT_REG_HEADERS]);
+    sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
     return sheet;
   }
-  var matches = PAYOUT_REG_HEADERS.every(function (h, i) { return String(firstRow[i] || '').trim() === h; });
+  var matches = true;
+  for (var i = 0; i < headers.length; i++) {
+    if (String(firstRow[i] || '').trim() !== headers[i]) { matches = false; break; }
+  }
   if (matches) return sheet;
   if (lastRow <= 1) {
-    sheet.getRange(1, 1, 1, PAYOUT_REG_HEADERS.length).setValues([PAYOUT_REG_HEADERS]);
+    sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
     return sheet;
   }
   throw new Error(
-    'Sheet "' + PAYOUT_REG_SHEET + '" row 1 must be exactly: ' + PAYOUT_REG_HEADERS.join(', ') +
+    'Sheet "' + tabName + '" row 1 must be exactly: ' + headers.join(', ') +
     '. Fix row 1 in the spreadsheet, or move existing data so row 1 can be replaced.'
   );
+}
+
+/** Ensure all four SS11.3 tabs. Returns the tab this scanner writes. */
+function ensurePayoutRegistrationsSheet_(spreadsheet) {
+  var payoutSheet = null;
+  for (var name in PAYOUT_REG_TABS) {
+    if (!PAYOUT_REG_TABS.hasOwnProperty(name)) continue;
+    var s = ensurePayoutRegTab_(spreadsheet, name, PAYOUT_REG_TABS[name]);
+    if (name === PAYOUT_REG_SHEET) payoutSheet = s;
+  }
+  return payoutSheet;
 }
 
 function appendPayoutRegistrationRow_(sheet, p) {
   sheet.appendRow([
     new Date().toISOString(),
     String(p.telegram_update_id || ''),
-    String(p.telegram_message_id || ''),
-    String(p.status || ''),
-    String(p.student_name || ''),
-    String(p.student_email || ''),
     String(p.pk_hash || ''),
     String(p.program_slug || ''),
     String(p.pix_key_type || ''),
+    String(p.pix_key || ''),
     String(p.pix_key_masked || ''),
-    String(p.pix_key_cipher || ''),
-    String(p.account_holder || ''),
-    String(p.relationship || ''),
-    String(p.no_key_channel || ''),
     String(p.submission_source || ''),
+    String(p.status || ''),
     String(p.supersedes_row || ''),
     String(p.error_message || '')
   ]);
+}
+
+/**
+ * Normalise a `- Field: value` label into a canonical snake_case key, folding the
+ * human-readable aliases used by the redacted summary into the canonical names.
+ */
+function payoutRegNormKey_(key) {
+  var k = String(key || '').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+  var alias = {
+    'planting_identity_pk_hash': 'pk_hash',
+    'planting_identity': 'pk_hash',
+    'program': 'program_slug',
+    'pix_key_type': 'pix_key_type',
+    'pix_key': 'pix_key',
+    'pix_key_masked': 'pix_key_masked',
+    'submission_source': 'submission_source'
+  };
+  return alias[k] || k;
 }
 
 /**
@@ -140,9 +241,9 @@ function parsePayoutRegistrationEventText_(body) {
     if (line === '--------') continue;
     var isField = line.charAt(0) === '-';
     var probe = isField ? line.substring(1).trim() : line;
-    var m = probe.match(/^([A-Za-z][A-Za-z0-9_\s\/\-]*):\s*(.*)$/);
+    var m = probe.match(/^([A-Za-z][A-Za-z0-9_\s\/\-()]*):\s*(.*)$/);
     if (m && isField) {
-      var key = m[1].trim().toLowerCase().replace(/\s+/g, '_');
+      var key = payoutRegNormKey_(m[1]);
       result[key] = m[2].trim();
       lastKey = key;
     } else if (lastKey) {
@@ -171,35 +272,36 @@ function payoutRegCleanValue_(v) {
 }
 
 /**
- * Fail-closed privacy guard for the MASK field. The masked echo must be a genuine
- * mask (a `*` run) - never a raw CPF/CNPJ/phone/email. Empty is allowed (a no-key
- * student, or a payload that omitted the mask).
+ * Derive a display-safe mask from a raw key. NEVER returns the raw value.
+ *   CPF  111.444.777-35      -> ***.***.***-35
+ *   CNPJ 11.222.333/0001-99  -> **.***.***_****-99  (slashes rendered as _ in this doc)
+ *   email a@example.com      -> a***@example.com
+ *   phone +55 11 99999-8888  -> *****8888
+ *   EVP (uuid)               -> ****...last4
+ *   anything else            -> ****last4 (or **** when too short)
  */
-function payoutRegIsSafeMaskValue_(value) {
-  var v = String(value == null ? '' : value).trim();
-  if (!v) return true;
-  if (/^\(none\b/i.test(v) || /^\(not provided\)$/i.test(v)) return true;
-  if (v.indexOf('*') >= 0) {
-    // must NOT additionally carry a full raw key
-    var digits = v.replace(/\D/g, '');
-    if (digits.length >= 11) return false;
-    return true;
+function payoutRegMaskKey_(key, type) {
+  var v = String(key == null ? '' : key).trim();
+  if (!v) return '';
+  var t = String(type || '').toUpperCase();
+  var digits = v.replace(/\D/g, '');
+  if (t === 'CPF' || digits.length === 11) {
+    return '***.***.***-' + digits.slice(-2);
   }
-  return false;   // a non-masked, non-empty "mask" field is a raw-value red flag
-}
-
-/**
- * Fail-closed privacy guard for the CIPHER field. Must be opaque: long and
- * base64/hex-shaped. Empty allowed. Anything short or carrying PII punctuation
- * (dots/dashes/slashes/@ typical of a raw key) is refused.
- */
-function payoutRegIsSafeCipherValue_(value) {
-  var v = String(value == null ? '' : value).trim();
-  if (!v) return true;
-  var compact = v.replace(/\s+/g, '');
-  if (compact.length < 32) return false;
-  if (!/^[A-Za-z0-9+/=_.:\-]+$/.test(compact)) return false;
-  return true;
+  if (t === 'CNPJ' || digits.length === 14) {
+    return '**.***.***/****-' + digits.slice(-2);
+  }
+  if (t === 'EMAIL' || v.indexOf('@') >= 0) {
+    var at = v.indexOf('@');
+    return v.charAt(0) + '***' + v.slice(at);
+  }
+  if (t === 'PHONE' || (v.charAt(0) === '+' && digits.length >= 10)) {
+    return '*****' + digits.slice(-4);
+  }
+  if (t === 'EVP' || /^[0-9a-f]{8}-[0-9a-f]{4}/i.test(v)) {
+    return '****...' + v.slice(-4);
+  }
+  return v.length > 4 ? '****' + v.slice(-4) : '****';
 }
 
 /**
@@ -220,22 +322,27 @@ function processPayoutRegistrationsFromTelegramChatLogs() {
         (triggerErr && triggerErr.message ? triggerErr.message : triggerErr) + ' - proceeding with scan.');
     }
 
-    var ss = SpreadsheetApp.openById(PAYOUT_REG_TELEGRAM_SPREADSHEET_ID);
-    var tcSheet = ss.getSheetByName(PAYOUT_REG_TELEGRAM_SHEET);
+    // Intake: canonical Telegram Chat Logs (read-only; publicly republished).
+    var intake = SpreadsheetApp.openById(PAYOUT_REG_TELEGRAM_SPREADSHEET_ID);
+    var tcSheet = intake.getSheetByName(PAYOUT_REG_TELEGRAM_SHEET);
     if (!tcSheet) throw new Error('Telegram Chat Logs sheet not found');
-    var prSheet = ensurePayoutRegistrationsSheet_(ss);
+
+    // Output: the private, governor-only `cfr program` spreadsheet (SS11.2/SS11.3).
+    var cfr = payoutRegCfrProgramSpreadsheet_();
+    var prSheet = ensurePayoutRegistrationsSheet_(cfr);
+    if (!prSheet) throw new Error('Could not ensure the payout registrations tab.');
 
     var prValues = prSheet.getDataRange().getValues();
     var seenUpdateId = {};
     var rowByPkHash = {};
     var header = prValues.length ? prValues[0].map(function (h) { return String(h || '').trim(); }) : [];
     var idx = {};
-    header.forEach(function (h, i) { idx[h] = i; });
+    header.forEach(function (h, i) { if (h) idx[h] = i; });
     for (var r = 1; r < prValues.length; r++) {
-      var existing = String(prValues[r][idx['telegram_update_id']] || '').trim();
-      if (existing) seenUpdateId[existing] = true;
-      var pk = String(prValues[r][idx['pk_hash']] || '').trim();
-      if (pk) rowByPkHash[pk] = r + 1;
+      var upd = String(prValues[r][idx['telegram_update_id']] || '').trim();
+      if (upd) seenUpdateId[upd] = true;
+      var ph = String(prValues[r][idx['pk_hash']] || '').trim();
+      if (ph) rowByPkHash[ph] = r + 1;
     }
 
     var lastRow = tcSheet.getLastRow();
@@ -258,7 +365,7 @@ function processPayoutRegistrationsFromTelegramChatLogs() {
         var subKey = 'NO_UPDATE_ID_ROW_' + (startRow + i);
         if (seenUpdateId[subKey]) continue;
         appendPayoutRegistrationRow_(prSheet, {
-          telegram_update_id: subKey, telegram_message_id: messageId,
+          telegram_update_id: subKey,
           status: 'REJECTED_NO_TELEGRAM_UPDATE_ID',
           error_message: 'Telegram Chat Logs row ' + (startRow + i) + ' has no Update ID column A'
         });
@@ -268,52 +375,34 @@ function processPayoutRegistrationsFromTelegramChatLogs() {
 
       try {
         var f = parsePayoutRegistrationEventText_(message);
-        var maskedValue = payoutRegCleanValue_(f.pix_key_masked);
-        var cipherValue = payoutRegCleanValue_(f.pix_key_cipher);
-        var legacyRaw = payoutRegCleanValue_(f.pix_key);
+        var pixKey = payoutRegCleanValue_(f.pix_key);
+        var pixType = payoutRegCleanValue_(f.pix_key_type);
         var base = {
           telegram_update_id: updateId,
           telegram_message_id: messageId,
-          student_name: payoutRegCleanValue_(f.student_name),
-          student_email: payoutRegCleanValue_(f.student_email).toLowerCase(),
           pk_hash: payoutRegCleanValue_(f.pk_hash),
           program_slug: payoutRegCleanValue_(f.program_slug || f.program),
-          pix_key_type: payoutRegCleanValue_(f.pix_key_type),
-          pix_key_masked: maskedValue,
-          pix_key_cipher: cipherValue,
-          account_holder: payoutRegCleanValue_(f.account_holder),
-          relationship: payoutRegCleanValue_(f.relationship) || 'self',
-          no_key_channel: payoutRegCleanValue_(f.no_key_channel),
+          pix_key_type: pixType,
+          pix_key: pixKey,                                  // PLAINTEXT - private sheet only (SS11.2)
+          pix_key_masked: payoutRegCleanValue_(f.pix_key_masked) || payoutRegMaskKey_(pixKey, pixType),
           submission_source: payoutRegCleanValue_(f.submission_source)
         };
 
-        if (!base.student_name && !base.student_email) {
-          base.status = 'REJECTED_MISSING_IDENTITY';
-          base.error_message = 'No student name or email in the [PAYOUT REGISTRATION] payload.';
+        if (!base.pk_hash) {
+          // The public key IS the identity (SS11.1) - without it there is nothing to pay.
+          base.status = 'REJECTED_MISSING_PK_HASH';
+          base.error_message = 'No pk_hash in the [PAYOUT REGISTRATION] payload; nothing to link the PIX key to.';
           appendPayoutRegistrationRow_(prSheet, base);
           seenUpdateId[updateId] = true; rejected++; continue;
         }
 
-        var unsafeReason = '';
-        if (legacyRaw) unsafeReason = 'payload carried a raw `- PIX Key:` field; send `- PIX Key Masked:` + `- PIX Key Cipher:` instead';
-        else if (!payoutRegIsSafeMaskValue_(maskedValue)) unsafeReason = 'the `- PIX Key Masked:` value is not a real mask';
-        else if (!payoutRegIsSafeCipherValue_(cipherValue)) unsafeReason = 'the `- PIX Key Cipher:` value is not opaque ciphertext';
-        if (unsafeReason) {
-          base.status = 'REJECTED_UNSAFE_KEY';
-          base.pix_key_masked = '';
-          base.pix_key_cipher = '';   // do NOT persist anything key-shaped
-          base.error_message = 'Refused: ' + unsafeReason + '.';
-          appendPayoutRegistrationRow_(prSheet, base);
-          seenUpdateId[updateId] = true; rejected++; continue;
-        }
-
-        // Upsert by pk_hash: a later correction for the same student supersedes.
+        // Upsert by pk_hash: a later correction for the same planter supersedes.
         var supersedes = '';
-        if (base.pk_hash && rowByPkHash[base.pk_hash]) supersedes = String(rowByPkHash[base.pk_hash]);
+        if (rowByPkHash[base.pk_hash]) supersedes = String(rowByPkHash[base.pk_hash]);
         base.supersedes_row = supersedes;
         base.status = supersedes ? 'UPDATED' : 'RECORDED';
         appendPayoutRegistrationRow_(prSheet, base);
-        if (base.pk_hash) rowByPkHash[base.pk_hash] = prSheet.getLastRow();
+        rowByPkHash[base.pk_hash] = prSheet.getLastRow();
         seenUpdateId[updateId] = true;
         if (supersedes) updated++; else recorded++;
       } catch (rowErr) {
@@ -346,12 +435,12 @@ function ensurePayoutRegHourlyTriggerInstalled_() {
 
 /**
  * Read endpoint for the DApp review page. Returns status + row count.
- * `status` query param optionally filters (default ALL).
+ * `status` query param optionally filters (default ALL). Never returns the raw key.
  */
 function getPendingPayoutRegistrations(statusFilter) {
   try {
     var wanted = String(statusFilter || 'ALL').trim().toUpperCase();
-    var ss = SpreadsheetApp.openById(PAYOUT_REG_TELEGRAM_SPREADSHEET_ID);
+    var ss = payoutRegCfrProgramSpreadsheet_();
     var sheet = ss.getSheetByName(PAYOUT_REG_SHEET);
     if (!sheet) return { status: 'success', data: { count: 0, items: [] } };
     var values = sheet.getDataRange().getValues();
@@ -368,12 +457,11 @@ function getPendingPayoutRegistrations(statusFilter) {
         row: r + 1,
         status: String(row[idx['status']] || ''),
         submitted_date: String(row[idx['created_at_utc']] || ''),
-        student_name: String(row[idx['student_name']] || ''),
         program_slug: String(row[idx['program_slug']] || ''),
         pk_hash: String(row[idx['pk_hash']] || ''),
         pix_key_type: String(row[idx['pix_key_type']] || ''),
         pix_key_masked: String(row[idx['pix_key_masked']] || '')
-        // NOTE: pix_key_value is deliberately NOT returned by this read endpoint.
+        // NOTE: `pix_key` (plaintext) is deliberately NOT returned by this read endpoint.
       });
     }
     items.sort(function (a, b) { return (a.submitted_date < b.submitted_date) ? 1 : -1; });
