@@ -14,7 +14,16 @@
  *       ]
  *     }
  *
- * Schema v3 (current):
+ * Schema v4 (current):
+ *   - `discord_id` / `telegram_id` / `telegram_handle` — cross-interface identity
+ *     keys read from `Contributors contact information` cols G / X / H, so a
+ *     consumer (Discord/Telegram adapter) can resolve a sender to a contributor
+ *     from this one cache instead of a live Sheets read. ADDITIVE in v4; v3
+ *     consumers simply ignore the new fields.
+ *     `telegram_id` (col X) and `discord_id` (col G) are the binding keys;
+ *     `telegram_handle` (col H) is human-readable only, NOT authoritative.
+ *
+ * Schema v3:
  *   - `email` — first non-empty `Contributor Email Address` (col F) seen across
  *     the contributor's ACTIVE rows on `Contributors Digital Signatures`. May be
  *     `null` if no row has an email yet (older legacy contributors).
@@ -60,7 +69,7 @@ const DAO_MEMBERS_CACHE_REPO_OWNER = 'TrueSightDAO';
 const DAO_MEMBERS_CACHE_REPO_NAME = 'treasury-cache';
 const DAO_MEMBERS_CACHE_REPO_PATH = 'dao_members.json';
 const DAO_MEMBERS_CACHE_BRANCH = 'main';
-const DAO_MEMBERS_CACHE_SCHEMA_VERSION = 3;
+const DAO_MEMBERS_CACHE_SCHEMA_VERSION = 4;
 
 // assetVerify web app in tdg_asset_management — source of DAO-wide aggregates
 // (voting_rights_circulated, total_assets, asset_per_circulated_voting_right,
@@ -179,17 +188,31 @@ function publishDaoMembersCacheToGithub_(opts) {
   // appear in dao_members.json (and therefore the public members.html page).
   const contactSheet = ss.getSheetByName(DAO_MEMBERS_CACHE_CONTACT_SHEET);
   const sentinelsByName = {};
+  // lowercased name -> {name, discord_id, telegram_id, telegram_handle}
+  const contactByName = {};
   const contactAllNames = {}; // lowercased name → original-cased name
   if (contactSheet) {
     const contactLastRow = contactSheet.getLastRow();
     if (contactLastRow >= 4) {
-      // Columns A(1)..W(23): name, ..., Is Sentinel
-      const contactRows = contactSheet.getRange(4, 1, contactLastRow - 3, 23).getValues();
+      // Columns A(1)..X(24): name, ..., Is Sentinel(W=23), Telegram ID(X=24)
+      const contactRows = contactSheet.getRange(4, 1, contactLastRow - 3, 24).getValues();
       contactRows.forEach(function (row) {
         const name = String(row[0] || '').trim();
         if (!name) return;
         const key = name.toLowerCase();
         contactAllNames[key] = name;
+        // Interface ids on the same row: G(7)=Discord ID, H(8)=Telegram
+        // Handle, X(24)=Telegram ID. A contributor can appear on several rows,
+        // so first non-empty wins.
+        if (!contactByName[key]) {
+          contactByName[key] = {
+            name: name, discord_id: '', telegram_id: '', telegram_handle: '',
+          };
+        }
+        const rec = contactByName[key];
+        if (!rec.discord_id) rec.discord_id = normalizeInterfaceId_(row[6]);
+        if (!rec.telegram_handle) rec.telegram_handle = normalizeInterfaceId_(row[7]);
+        if (!rec.telegram_id) rec.telegram_id = normalizeInterfaceId_(row[23]);
         const isSentinel = String(row[22] || '').trim().toUpperCase() === 'TRUE';
         if (isSentinel) {
           sentinelsByName[key] = true;
@@ -273,6 +296,11 @@ function publishDaoMembersCacheToGithub_(opts) {
       roles: roles,                                        // ["governor","member"] or ["member"]
       voting_rights: voting.voting_rights,                 // may be null
       total_voting_power_pct: voting.total_voting_power_pct || null,
+      // Cross-interface identity keys (contact sheet cols G / H / X).
+      // '' when unknown; binding authority is X (Telegram) and G (Discord).
+      discord_id: (contactByName[k] && contactByName[k].discord_id) || '',
+      telegram_id: (contactByName[k] && contactByName[k].telegram_id) || '',
+      telegram_handle: (contactByName[k] && contactByName[k].telegram_handle) || '',
       public_keys: entry.public_keys,
     };
   });
@@ -329,6 +357,12 @@ function publishDaoMembersCacheToGithub_(opts) {
       sentinels: contributors.reduce(function (sum, c) {
         return sum + (c.roles.indexOf('sentinel') >= 0 ? 1 : 0);
       }, 0),
+      contributors_with_discord_id: contributors.reduce(function (sum, c) {
+        return sum + (c.discord_id ? 1 : 0);
+      }, 0),
+      contributors_with_telegram_id: contributors.reduce(function (sum, c) {
+        return sum + (c.telegram_id ? 1 : 0);
+      }, 0),
     },
     dao_totals: daoTotals,
     unjoined_governor_names: unjoinedGovernorNames,
@@ -341,7 +375,9 @@ function publishDaoMembersCacheToGithub_(opts) {
       ' contributors, ' + snapshot.counts.governors + ' governors, ' +
       snapshot.counts.sentinels + ' sentinels, ' +
       snapshot.counts.contributors_with_email + ' with email, ' +
-      snapshot.counts.active_public_keys + ' active keys, trigger=' +
+      snapshot.counts.active_public_keys + ' active keys, ' +
+      snapshot.counts.contributors_with_discord_id + ' discord, ' +
+      snapshot.counts.contributors_with_telegram_id + ' telegram, trigger=' +
       snapshot.trigger + ')';
 
   const commit = commitJsonToGithub_({
@@ -478,6 +514,27 @@ function formatTimestamp_(value) {
     return value.toISOString();
   }
   return String(value);
+}
+
+/**
+ * Normalize a contact-sheet interface-id cell to a trimmed string.
+ *
+ * These cells hold opaque decimal ids (Discord snowflakes ~19 digits, Telegram
+ * ids ~10 digits) meant to be stored as TEXT. A cell left on the default
+ * NUMBER format silently rounds a snowflake past 2^53, so warn loudly when we
+ * see one so the operator can reformat the cell as plain text.
+ */
+function normalizeInterfaceId_(value) {
+  if (value === null || value === undefined) return '';
+  if (typeof value === 'number') {
+    if (Math.abs(value) >= 9007199254740992) { // 2^53
+      Logger.log(
+          'WARNING: interface id stored as NUMBER (' + value + ') - float64 has ' +
+          'already rounded it; reformat that contact-sheet cell as plain text.');
+    }
+    return value.toLocaleString('fullwide', { useGrouping: false });
+  }
+  return String(value).trim();
 }
 
 function toNumberOrNull_(value) {
