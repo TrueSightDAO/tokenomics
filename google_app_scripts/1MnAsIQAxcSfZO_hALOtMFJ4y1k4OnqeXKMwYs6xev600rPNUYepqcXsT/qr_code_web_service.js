@@ -2104,6 +2104,17 @@ function doGet(e) {
       // See process_program_registration_telegram_logs.gs (same Apps Script project).
       return createCORSResponse(processProgramRegistrationsFromTelegramChatLogs());
     }
+    if (actionStr === 'processPayoutRegistrationsFromTelegramChatLogs') {
+      // Triggered by Edgar after a [PAYOUT REGISTRATION] lands on Telegram Chat Logs.
+      // Appends to the Payout Registrations tab (dedup ledger + review surface).
+      // Mirrors processPayoutRegistrationsFromTelegramChatLogs() in
+      // process_payout_registration_telegram_logs.gs (same project).
+      return createCORSResponse(processPayoutRegistrationsFromTelegramChatLogs());
+    }
+    if (actionStr === 'getPendingPayoutRegistrations') {
+      // DApp review page reads recorded payout registrations (masked fields only).
+      return createCORSResponse(getPendingPayoutRegistrations(getQueryParam_(e, 'status')));
+    }
     if (actionStr === 'registerSingleQRCode') {
       // Triggered by Edgar after a [QR CODE REGISTRATION] event. Registers a single
       // QR code in the Agroverse QR codes sheet and triggers GitHub Actions for
