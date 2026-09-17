@@ -117,5 +117,7 @@ def test_plan_for_is_group_aware():
     mod = _mod()
     created = {tab: act for act, tab in mod.plan_for(mod.OPS_WORKBOOK_TABS, ["Sheet1"])}
     assert created == {"payouts": "create"}
-    present = {tab: act for act, tab in mod.plan_for(mod.OPS_WORKBOOK_TABS, ["payouts"])}
+    present = {
+        tab: act for act, tab in mod.plan_for(mod.OPS_WORKBOOK_TABS, ["payouts"])
+    }
     assert present == {"payouts": "exists"}
