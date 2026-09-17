@@ -134,15 +134,16 @@ def main() -> int:
     if a.json:
         json.dump(rows, open(a.json, "w"), indent=2)
     if a.md:
+        dash = chr(8212)  # em-dash; kept out of f-string expressions (py<3.12)
         with open(a.md, "w") as fh:
-            fh.write(
-                "| scriptId | class | drift | live-only | repo-only |\n|---|---|---|---|---|\n"
-            )
+            fh.write("| scriptId | class | drift | live-only | repo-only |\n")
+            fh.write("|---|---|---|---|---|\n")
             for r in rows:
                 fh.write(
-                    f"| `{r['script_id'][:12]}\u2026` | {r['class']} | "
-                    f"{', '.join(r['drift']) or '\u2014'} | {', '.join(r['live_only']) or '\u2014'} | "
-                    f"{', '.join(r['repo_only']) or '\u2014'} |\n"
+                    f"| `{r['script_id'][:12]}...` | {r['class']} | "
+                    f"{', '.join(r['drift']) or dash} | "
+                    f"{', '.join(r['live_only']) or dash} | "
+                    f"{', '.join(r['repo_only']) or dash} |\n"
                 )
     for r in rows:
         print(
