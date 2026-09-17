@@ -532,6 +532,142 @@ def warn_if_orphan(project_dir: Path, sid: str) -> None:
     )
 
 
+# ── live/repo parity check (folder-mirror drift guard) ───────────────────────
+#
+# The folder IS the project (clasp push = updateContent), so the live project
+# must be exactly the pushable files in the folder. Drift is dangerous in both
+# directions:
+#   * live-only -> the next push DELETES it (the 2026-09-06 Credentials.gs
+#                  incident): usually a file edited in the Apps Script editor,
+#                  or a real source file the repo is missing.
+#   * repo-only -> the next push ADDS it: a stray file in the live project, e.g.
+#                  repo tooling metadata like manifest.json, which clasp WOULD
+#                  upload because .clasp.json lists ".json" as pushable.
+# Read-only: this never pushes and never writes.
+
+_CLASP_EXTENSIONS = (".js", ".gs", ".html", ".json")
+_NON_PUSHABLE = (".clasp.json", ".claspignore")
+
+
+def _stem(name: str) -> str:
+    """clasp strips extensions in the live project ('Code' for Code.js)."""
+    return name.rsplit(".", 1)[0] if "." in name else name
+
+
+def local_pushable_files(project_dir: Path) -> dict[str, Path]:
+    """Repo files clasp would push, keyed by extension-less stem."""
+    out: dict[str, Path] = {}
+    for f in sorted(project_dir.iterdir()):
+        if not f.is_file() or f.name in _NON_PUSHABLE:
+            continue
+        if f.suffix not in _CLASP_EXTENSIONS:
+            continue
+        out[_stem(f.name)] = f
+    return out
+
+
+def diff_live_vs_local(project_dir: Path, sid: str) -> tuple[dict | None, str]:
+    """Compare the LIVE GAS project against the repo folder.
+
+    Returns (report, error). report is None when the live fetch failed, so the
+    caller can fail OPEN (never block a legit deploy on a token/network issue).
+
+    report = {
+      "ok": bool,                     # True = no drift at all
+      "in_sync": [filename, ...],
+      "content_differs": [filename, ...],
+      "live_only": [stem, ...],       # next push DELETES these
+      "repo_only": [filename, ...],   # next push ADDS these
+      "ignored_live": [name, ...],    # live files .claspignore protects
+      "live_count": int,
+    }
+    """
+    live, err = fetch_live_project_files(sid)
+    if live is None:
+        return None, err
+    ignore = _read_claspignore(project_dir)
+    local = local_pushable_files(project_dir)
+
+    live_map: dict[str, dict] = {}
+    ignored: list[str] = []
+    for lf in live:
+        nm = lf.get("name") or ""
+        if not nm:
+            continue
+        if _basename_ignored(nm, ignore):
+            ignored.append(nm)
+            continue
+        live_map[_stem(nm)] = lf
+
+    in_sync: list[str] = []
+    differs: list[str] = []
+    repo_only: list[str] = []
+    for stem, path in local.items():
+        lf = live_map.get(stem)
+        if lf is None:
+            repo_only.append(path.name)
+            continue
+        try:
+            local_text = path.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            differs.append(path.name)
+            continue
+        live_text = lf.get("source") or ""
+        if local_text.rstrip("\n") == live_text.rstrip("\n"):
+            in_sync.append(path.name)
+        else:
+            differs.append(path.name)
+
+    live_only = sorted(stem for stem in live_map if stem not in local)
+
+    report = {
+        "ok": not (differs or live_only or repo_only),
+        "in_sync": sorted(in_sync),
+        "content_differs": sorted(differs),
+        "live_only": live_only,
+        "repo_only": sorted(repo_only),
+        "ignored_live": sorted(ignored),
+        "live_count": len(live),
+    }
+    return report, ""
+
+
+def format_parity_report(report: dict) -> str:
+    """Render a diff_live_vs_local() report as human-readable lines."""
+    lines: list[str] = []
+    n = len(report["in_sync"])
+    lines.append(f"  live files:            {report['live_count']}")
+    lines.append(f"  in sync:               {n}")
+    if report["content_differs"]:
+        lines.append(
+            f"  content differs ({len(report['content_differs'])}) "
+            "- next push UPDATEs:"
+        )
+        for f in report["content_differs"]:
+            lines.append(f"      ~ {f}")
+    if report["live_only"]:
+        lines.append(
+            f"  LIVE-ONLY ({len(report['live_only'])}) "
+            "- next push DELETES these from the live project!"
+        )
+        for s in report["live_only"]:
+            lines.append(f"      - {s}")
+    if report["repo_only"]:
+        lines.append(
+            f"  repo-only ({len(report['repo_only'])}) "
+            "- next push ADDS these to the live project:"
+        )
+        for f in report["repo_only"]:
+            lines.append(f"      + {f}")
+    if report["ignored_live"]:
+        lines.append(
+            f"  .claspignore-protected live files "
+            f"({len(report['ignored_live'])}): {', '.join(report['ignored_live'])}"
+        )
+    lines.append("  => IN SYNC" if report["ok"] else "  => DRIFT DETECTED")
+    return "\n".join(lines)
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("scriptId", nargs="?", help="GAS scriptId to deploy")
@@ -541,6 +677,19 @@ def main() -> int:
     )
     ap.add_argument("--no-hooks", action="store_true", help="skip hooks explicitly")
     ap.add_argument("--list", action="store_true", help="list all projects")
+    ap.add_argument(
+        "--check-parity",
+        action="store_true",
+        help=(
+            "report drift between the repo folder and the LIVE GAS project "
+            "(read-only; never pushes; exits non-zero on drift)"
+        ),
+    )
+    ap.add_argument(
+        "--strict-parity",
+        action="store_true",
+        help="with --push: refuse to push when live/repo drift is detected",
+    )
     ap.add_argument(
         "--allow-identity-mismatch",
         action="store_true",
@@ -574,6 +723,23 @@ def main() -> int:
             name = (proj.get("name") or sid) if proj else sid
             print(f"  {sid}   {name}")
         return 0
+
+    if args.check_parity:
+        if not args.scriptId:
+            ap.print_help()
+            return 2
+        sid = args.scriptId
+        project_dir = PROJECTS / sid
+        if not project_dir.is_dir():
+            print(f"X no project folder for {sid}")
+            return 1
+        print(f"=== parity check  scriptId={sid}  (read-only) ===")
+        report, err = diff_live_vs_local(project_dir, sid)
+        if report is None:
+            print(f"  ! live fetch failed (fail-open): {err}")
+            return 1
+        print(format_parity_report(report))
+        return 0 if report["ok"] else 1
 
     if not args.scriptId:
         ap.print_help()
@@ -636,6 +802,21 @@ def main() -> int:
             return 1
         if a_note:
             print(f"  ! {a_note}")
+
+    # Live/repo parity report (folder-mirror drift guard): informational by
+    # default, a hard gate when --strict-parity is set. Fail-OPEN on a live
+    # fetch error so a token/network hiccup never blocks a legit deploy.
+    p_report, p_err = diff_live_vs_local(project_dir, sid)
+    if p_report is None:
+        print(f"  ! parity check skipped (fail-open): {p_err}")
+    else:
+        print(format_parity_report(p_report))
+        if not p_report["ok"] and args.strict_parity:
+            print(
+                "\nX refusing to push - live/repo drift (override: drop "
+                "--strict-parity)."
+            )
+            return 1
 
     # Identity check
     active_email, identity_err = resolve_clasp_identity()
