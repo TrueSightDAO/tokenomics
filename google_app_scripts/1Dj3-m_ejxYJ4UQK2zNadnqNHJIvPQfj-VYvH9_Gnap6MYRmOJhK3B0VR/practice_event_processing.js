@@ -171,6 +171,35 @@ function parsePracticeEvent(message) {
 
   if (!payloadJson) {
     Logger.log('[parsePracticeEvent] could not extract Payload JSON; message head: ' + message.substring(0, 240).replace(/\n/g, '\\n'));
+
+    // Old-format fallback: capoeira events before the Payload JSON convention
+    // had flat fields (Theme, Moves Practiced, Music Played, Total Practice
+    // Minutes).  Build a proper JSON object from those so the cache builder
+    // can surface practice stats on the CV page.
+    var flatPayload = {};
+    var theme = field('Theme');
+    if (theme) flatPayload.theme = theme;
+    var minutesRaw = field('Total Practice Minutes');
+    if (minutesRaw) {
+      var mins = parseInt(minutesRaw, 10);
+      flatPayload.total_practice_minutes = isNaN(mins) ? minutesRaw : mins;
+    }
+    var movesRaw = field('Moves Practiced');
+    if (movesRaw) {
+      try { flatPayload.moves_practiced = JSON.parse(movesRaw); } catch (e) {
+        flatPayload.moves_practiced_raw = movesRaw;
+      }
+    }
+    var musicRaw = field('Music Played');
+    if (musicRaw) {
+      try { flatPayload.music_played = JSON.parse(musicRaw); } catch (e) {
+        flatPayload.music_played_raw = musicRaw;
+      }
+    }
+    if (Object.keys(flatPayload).length > 0) {
+      payloadJson = JSON.stringify(flatPayload, null, 2);
+      Logger.log('[parsePracticeEvent] built payload from old-format flat fields (len=' + payloadJson.length + ')');
+    }
   }
 
   var sigMatch    = message.match(/My Digital Signature:[ \t]*([^\n]*)/i);
@@ -179,7 +208,7 @@ function parsePracticeEvent(message) {
   return {
     program: field('Program'),
     practiceType: field('Practice Type'),
-    practitionerPublicKey: field('Practitioner Public Key'),
+    practitionerPublicKey: field('Practitioner Public Key') || (sigMatch ? sigMatch[1].trim() : ''),
     practitionerName: field('Practitioner Name'),
     capturedAt: field('Captured At'),
     sourceUrl: field('Source URL'),
@@ -677,6 +706,119 @@ function reprocessAllRowsWithEmptyPayload(opts) {
     }
   }
   Logger.log('🔁 Backfill done: reprocessed=' + reprocessed + ' skipped=' + skipped + ' errors=' + errors);
+  return {
+    reprocessed: reprocessed,
+    skipped: skipped,
+    errors: errors,
+    reprocessedRows: reprocessedRows,
+    errorDetails: errorDetails,
+  };
+}
+
+/**
+ * Backfill all FAILED capoeira-tribo-mirim rows where the Practitioner Public Key
+ * was previously missing but is now derivable from the digitalSignature fallback.
+ *
+ * Scans the Credentialing Events intake tab, re-parses every row whose status
+ * starts with 'FAILED: Missing Practitioner Public Key' and whose raw message
+ * contains 'capoeira-tribo-mirim', then:
+ *   1. Updates all parsed columns (E–M) with the re-parsed values,
+ *   2. Re-commits the event file to lineage-credentials,
+ *   3. Flips status to PROCESSED.
+ *
+ * Idempotent — re-running skips already-PROCESSED rows.
+ */
+function reprocessFailedCapoeiraRows() {
+  var intake = getIntakeSheet();
+  if (!intake) throw new Error('Credentialing Events sheet not found');
+
+  var lastRow = intake.getLastRow();
+  if (lastRow < 2) { Logger.log('No data rows to reprocess.'); return { reprocessed: 0, skipped: 0, errors: 0 }; }
+
+  var lastCol = CRED_INTAKE_HEADERS.length;
+  var values = intake.getRange(2, 1, lastRow - 1, lastCol).getValues();
+  var statusColIdx = CRED_INTAKE_HEADERS.indexOf('Status');
+  var programColIdx = CRED_INTAKE_HEADERS.indexOf('Program');
+  var practiceTypeColIdx = CRED_INTAKE_HEADERS.indexOf('Practice Type');
+  var pubKeyColIdx = CRED_INTAKE_HEADERS.indexOf('Practitioner Public Key');
+  var nameColIdx = CRED_INTAKE_HEADERS.indexOf('Practitioner Name');
+  var slugColIdx = CRED_INTAKE_HEADERS.indexOf('Slug');
+  var capturedAtColIdx = CRED_INTAKE_HEADERS.indexOf('Captured At');
+  var sourceUrlColIdx = CRED_INTAKE_HEADERS.indexOf('Source URL');
+  var payloadColIdx = CRED_INTAKE_HEADERS.indexOf('Payload JSON');
+  var commitShaColIdx = CRED_INTAKE_HEADERS.indexOf('GitHub Commit SHA');
+  var commitUrlColIdx = CRED_INTAKE_HEADERS.indexOf('GitHub Commit URL');
+  var processedAtColIdx = CRED_INTAKE_HEADERS.indexOf('Processed At');
+
+  var reprocessed = 0, skipped = 0, errors = 0;
+  var reprocessedRows = [], errorDetails = [];
+
+  for (var i = 0; i < values.length; i++) {
+    var rowNumber = i + 2; // 1-indexed, row 1 = header
+    var status = String(values[i][statusColIdx] || '');
+    var message = String(values[i][2] || ''); // col C = Raw Message
+
+    if (status.indexOf('FAILED: Missing Practitioner Public Key') !== 0) { skipped++; continue; }
+    if (message.indexOf('capoeira-tribo-mirim') < 0) { skipped++; continue; }
+
+    try {
+      var parsed = parsePracticeEvent(message);
+      if (!parsed || !parsed.program || !parsed.practitionerPublicKey) {
+        throw new Error('Re-parse did not yield required fields');
+      }
+
+      var slug = derivePkSlug(parsed.practitionerPublicKey);
+
+      // Update all parsed columns (E–M) in one bulk write
+      var colRange = intake.getRange(rowNumber, 5, 1, 9); // cols E–M (5 columns total: E=5..M=13)
+      colRange.setValues([[
+        'PRACTICE',                   // E  Event Type
+        parsed.program,              // F  Program
+        parsed.practiceType,         // G  Practice Type
+        parsed.practitionerPublicKey,// H  Practitioner Public Key
+        parsed.practitionerName || '',// I Practitioner Name
+        slug,                        // J  Slug
+        parsed.capturedAt,           // K  Captured At
+        parsed.sourceUrl,            // L  Source URL
+        parsed.payloadJson || '',    // M  Payload JSON
+      ]]);
+      SpreadsheetApp.flush();
+
+      // Re-commit the event file
+      var eventFile = {
+        program: parsed.program,
+        practice_type: parsed.practiceType,
+        practitioner_public_key: parsed.practitionerPublicKey,
+        practitioner_name: parsed.practitionerName,
+        slug: slug,
+        captured_at: parsed.capturedAt,
+        source_url: parsed.sourceUrl,
+        payload: tryParseJson(parsed.payloadJson),
+        raw_payload_json: parsed.payloadJson,
+        digital_signature: parsed.digitalSignature,
+        request_transaction_id: parsed.requestTransactionId,
+        intake: {
+          telegram_update_id: String(values[i][0] || ''),
+          telegram_message_id: String(values[i][1] || ''),
+          processed_at: new Date().toISOString(),
+          reprocessed: true,
+        },
+      };
+      var filename = buildEventFilename(parsed.capturedAt, parsed.requestTransactionId);
+      var commit = commitPracticeEvent(parsed.program, slug, filename, JSON.stringify(eventFile, null, 2));
+
+      // Flip to PROCESSED
+      setIntakeRowStatus(intake, rowNumber, 'PROCESSED', commit.sha || '', commit.html_url || '');
+      reprocessed++;
+      reprocessedRows.push({ row: rowNumber, slug: slug, commit_sha: commit.sha || '' });
+    } catch (e) {
+      Logger.log('Row ' + rowNumber + ' capoeira reprocess error: ' + e.message);
+      errors++;
+      errorDetails.push({ row: rowNumber, error: String(e && e.message || e) });
+    }
+  }
+
+  Logger.log('🔁 Capoeira backfill: reprocessed=' + reprocessed + ' skipped=' + skipped + ' errors=' + errors);
   return {
     reprocessed: reprocessed,
     skipped: skipped,

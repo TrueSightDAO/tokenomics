@@ -4,7 +4,7 @@
  *
  * Description: Consolidates newsletter subscriber emails into the ledger tab
  * "Agroverse News Letter Subscribers" from:
- *   - Holistic workbook -> "Email Agent Drafts" (column to_email)
+ *   - Holistic workbook -> "Email Agent Suggestions" (column to_email)
  *   - Ledger -> "Agroverse QR codes" (Owner Email / column L, or header-based)
  *   - Holistic workbook -> "Hit List" -> Email only when Status is exactly "Partnered"
  *
@@ -27,11 +27,11 @@ var QR_CODES_SHEET_NAME = 'Agroverse QR codes';
 
 // --- Holistic wellness hit list workbook ---
 var HOLISTIC_SPREADSHEET_ID = '1eiqZr3LW-qEI6Hmy0Vrur_8flbRwxwA7jXVrbUnHbvc';
-var SHEET_EMAIL_DRAFTS = 'Email Agent Drafts';
+var SHEET_EMAIL_SUGGESTIONS = 'Email Agent Suggestions';
 var SHEET_HIT_LIST = 'Hit List';
 
 /** Values written to the Source column for new rows (stable strings for dedupe). */
-var SOURCE_EMAIL_AGENT = 'Email Agent Drafts';
+var SOURCE_EMAIL_AGENT = 'Email Agent Suggestions';
 var SOURCE_QR_CODES = 'Agroverse QR codes';
 var SOURCE_HIT_LIST_PARTNERED = 'Hit List (Partnered)';
 
@@ -213,9 +213,9 @@ function ensureSubscriberHeaders_(sheet) {
 }
 
 function collectFromEmailAgentSuggestions_(holistic, existingKeys, toAppend, out) {
-  var sh = holistic.getSheetByName(SHEET_EMAIL_DRAFTS);
+  var sh = holistic.getSheetByName(SHEET_EMAIL_SUGGESTIONS);
   if (!sh) {
-    out.errors.push('Missing sheet: ' + SHEET_EMAIL_DRAFTS);
+    out.errors.push('Missing sheet: ' + SHEET_EMAIL_SUGGESTIONS);
     return;
   }
   var values = sh.getDataRange().getValues();

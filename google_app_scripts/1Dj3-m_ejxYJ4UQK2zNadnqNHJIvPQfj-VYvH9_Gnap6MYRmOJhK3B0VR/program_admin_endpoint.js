@@ -283,6 +283,11 @@ function doGet(e) {
       return ContentService.createTextOutput(JSON.stringify(result, null, 2)).setMimeType(ContentService.MimeType.JSON);
     }
 
+    if (action === 'reprocessFailedCapoeiraRows') {
+      const summary = reprocessFailedCapoeiraRows();
+      return ContentService.createTextOutput(JSON.stringify(summary, null, 2)).setMimeType(ContentService.MimeType.JSON);
+    }
+
     // --- program_admin_endpoint.gs actions ---
     if (action === 'list_sheet_editors') {
       const sheetUrl = e.parameter.sheet_url;
