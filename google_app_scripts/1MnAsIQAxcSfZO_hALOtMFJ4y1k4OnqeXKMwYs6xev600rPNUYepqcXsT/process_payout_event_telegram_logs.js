@@ -319,6 +319,17 @@ function processPayoutEventsFromTelegramChatLogs() {
     return { success: false, error: 'Could not obtain script lock; another run is in progress.' };
   }
   try {
+    // Safety-net fallback: if Edgar's webhook URL is unset (dispatch.py logs
+    // "no webhook URL ... GAS cron will process"), this hourly trigger is the ONLY
+    // path that processes events. Mirror the registration sink; never let a trigger
+    // error abort the scan.
+    try {
+      ensurePayoutEventHourlyTriggerInstalled_();
+    } catch (triggerErr) {
+      Logger.log('ensurePayoutEventHourlyTriggerInstalled_: ' +
+        (triggerErr && triggerErr.message ? triggerErr.message : triggerErr) + ' - proceeding with scan.');
+    }
+
     // Intake: canonical Telegram Chat Logs (read here; col R marker written below).
     var intake = SpreadsheetApp.openById(PAYOUT_EVENT_OPS_SPREADSHEET_ID);
     var tcSheet = intake.getSheetByName(PAYOUT_EVENT_TELEGRAM_SHEET);
