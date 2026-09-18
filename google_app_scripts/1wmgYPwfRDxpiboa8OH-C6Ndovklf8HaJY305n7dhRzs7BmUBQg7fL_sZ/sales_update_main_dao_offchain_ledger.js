@@ -18,7 +18,7 @@ const creds = getCredentials();
 
 // Telegram Bot API token for sending notifications
 // - Used to authenticate requests to the Telegram Bot API for sending messages.
-// - Example: "7095843169:AAFscsdjnj-AOCV1fhmUp5RN5SliLbQpZaU".
+// - Example: "<botId>:<botToken>". See Script Properties for the real value.
 // - Set your own token in Credentials.gs or Script Properties to enable notifications.
 // - Obtain this from BotFather on Telegram (https://t.me/BotFather).
 const TELEGRAM_TOKEN = creds.TELEGRAM_API_TOKEN;
