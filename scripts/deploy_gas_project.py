@@ -332,15 +332,23 @@ def validate_project_files(project_dir: Path, manifest: dict | None) -> list[str
 
 # ── pre-push live-accessor guard (2026-09-10 ReferenceError incident) ──────
 #
-# Some projects keep a secret accessor file (Credentials.gs / Credentials.js)
-# in the LIVE project only - it is gitignored AND .claspignore'd so a push
-# never deletes it. But nothing guarantees it is actually THERE. A fresh
-# checkout pushes a Code.js that calls setApiKeys()/getCredentials() while no
-# file in the post-push set defines them, so every entry point dies at load
-# with `ReferenceError: setApiKeys is not defined` (incidents 2026-09-06 and
-# 2026-09-10, scriptId 19Wag9x...). This guard models the post-push file set
-# (local sources + live-only files that survive because .claspignore protects
-# them) and refuses the push when a required accessor would be undefined.
+# Some projects need a secret accessor file (Credentials.gs / Credentials.js) whose
+# functions (setApiKeys()/getCredentials()) are called at the TOP of Code.js.
+#
+# RULE (Gary, 2026-09-18, confirmed against incidents 2026-08-21 and 2026-09-06):
+#   `clasp push` = projects.updateContent = REPLACES the project's remote file set.
+#   Any file NOT in the pushed set is DELETED from the live project. Therefore the
+#   correct model is to keep a SECRET-FREE Credentials.js, TRACK it in git (a
+#   .gitignore negation), and PUSH it -- exactly like any other source. Do NOT
+#   .claspignore it: the ignore is precisely what let a push delete the live
+#   accessor (-> `ReferenceError: setApiKeys is not defined` on @HEAD). Secrets
+#   live in Script Properties, which a push never touches.
+#
+# This guard still blocks a push that would leave a required accessor undefined:
+# if the accessor is not defined among the tracked sources, and a live-only
+# accessor would not SURVIVE (because it is absent from the pushed set), the push
+# is refused. With a tracked Credentials.js the accessor is defined locally and
+# the guard passes without needing the live fetch.
 # Fail-open on any live-fetch problem so a hiccup never blocks a real deploy.
 
 ACCESSOR_TEMPLATE_NAME = "Credentials.sample.js"

@@ -1,4 +1,12 @@
-Code.js
+# Files in THIS REPO FOLDER that must not be pushed by a raw `clasp push`.
+#
+# NOTICE 2026-09-18 (Gary): Credentials.js is deliberately NOT listed here.
+# `clasp push` REPLACES the project's remote file set, so an ignored/absent accessor
+# gets DELETED live (2026-08-21: this project's accessor had to be restored by hand).
+# The SECRET-FREE Credentials.js is tracked in git and pushed; secrets live in
+# Script Properties.
+#
+# `Code.js` is a defensive entry (this project has no Code.js), manifest.json is
+# repo-tooling metadata.
 manifest.json
-Credentials.sample.js
-Credentials.js
+Code.js
