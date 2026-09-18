@@ -41,6 +41,9 @@ google_app_scripts/**/*redential*.gs.js
 !google_app_scripts/**/Credentials.sample.js
 !google_app_scripts/1K1wcXFAopSA0cI7oBpu5bl1sagrJ2Quv44B0ppjiIxtl3MKJ_PCsppCf/Credentials.js
 !google_app_scripts/1XmwyzzauOoLUZAbm5jK1GBwWNIDLHBrlA465a3EE7bnNW3cvhqzIR8ml/Credentials.js
+# 1duQFfTO (TDG inventory mgmt): project had NO accessor at all -> every entry point
+# failed with "ReferenceError: setApiKeys is not defined" at load. Restored 2026-09-18.
+!google_app_scripts/1duQFfTO0Pj0lC4tPVNmMOhNOS1GvJgzqVxXbsEDu-eqt_64DwxvrOVyl/Credentials.js
 
 # Schema validation output
 python_scripts/schema_validation/discovered_headers.json
