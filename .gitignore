@@ -54,6 +54,11 @@ broken the ANYONE_ANONYMOUS doGet inventory webhook (@v14) with
 # would have DELETED the live Credentials.js and broken the ANYONE_ANONYMOUS doPost
 # Telegram webhook (@v5) with "ReferenceError: setApiKeys is not defined".
 !google_app_scripts/1wmgYPwfRDxpiboa8OH-C6Ndovklf8HaJY305n7dhRzs7BmUBQg7fL_sZ/Credentials.js
+# 1y6JVYwqdr (Api.TrueSight.me - QR code reader web service): the LIVE Credentials.js
+# hardcoded a Wix token + a QuickNode key while the repo folder had none, so a push would
+# have DELETED the live accessor and the live file was the only copy of those secrets.
+# Both services are retired. Restored as a tracked, secret-free accessor 2026-09-18.
+!google_app_scripts/1y6JVYwqdrFD4zHT4zyIfU762RRsW7GgZKPVuzorpwUS61mDnFQZ65Qsz/Credentials.js
 
 # Schema validation output
 python_scripts/schema_validation/discovered_headers.json
