@@ -208,6 +208,12 @@ def _ensure(
                 },
             ).execute()
             print(f"created {len(to_create)} tab(s): {to_create}")
+            # The addSheet calls above have just materialised these tabs, so fold
+            # them into `existing`. Otherwise the header-write loop below treats
+            # every freshly-created tab as still-missing and skips its headers,
+            # forcing a SECOND `--execute` run to finish provisioning (observed
+            # 2026-09-17 on the first real `cfr program` sheet).
+            existing = existing + to_create
         else:
             print(f"[dry-run] would create {len(to_create)} tab(s): {to_create}")
     else:
@@ -216,8 +222,10 @@ def _ensure(
     rc = 0
     for tab, headers in tabs.items():
         if tab not in existing:
-            # The tab does not exist yet (create is deferred in dry-run, or batched
-            # above); reading its header range would 400. Report intent instead.
+            # Dry-run only: in EXECUTE mode a freshly-created tab is folded into
+            # `existing` above, so it reaches the header-write path below. In
+            # dry-run nothing was created -- report intent rather than reading a
+            # range that would 400.
             print(
                 f"  {tab}: [dry-run] would create tab + write {len(headers)} header cols"
             )
