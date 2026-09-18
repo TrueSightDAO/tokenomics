@@ -323,11 +323,9 @@ function processPayoutEventsFromTelegramChatLogs() {
     // "no webhook URL ... GAS cron will process"), this hourly trigger is the ONLY
     // path that processes events. Mirror the registration sink; never let a trigger
     // error abort the scan.
-    try {
-      ensurePayoutEventHourlyTriggerInstalled_();
-    } catch (triggerErr) {
-      Logger.log('ensurePayoutEventHourlyTriggerInstalled_: ' +
-        (triggerErr && triggerErr.message ? triggerErr.message : triggerErr) + ' - proceeding with scan.');
+    var triggerStatus = ensurePayoutEventHourlyTriggerInstalled_();
+    if (triggerStatus !== 'present' && triggerStatus !== 'installed') {
+      Logger.log('ensurePayoutEventHourlyTriggerInstalled_: ' + triggerStatus + ' - proceeding with scan.');
     }
 
     // Intake: canonical Telegram Chat Logs (read here; col R marker written below).
@@ -359,7 +357,7 @@ function processPayoutEventsFromTelegramChatLogs() {
     }
 
     var lastRow = tcSheet.getLastRow();
-    if (lastRow < 2) return { success: true, recorded: 0, tier2: 0, rejected: 0, duplicates: 0, errors: 0 };
+    if (lastRow < 2) return { success: true, recorded: 0, tier2: 0, rejected: 0, duplicates: 0, errors: 0, trigger: triggerStatus };
     var startRow = Math.max(2, lastRow - PAYOUT_EVENT_SCAN_BATCH + 1);
     var numRows = lastRow - startRow + 1;
     var lastCol = Math.max(tcSheet.getLastColumn(), PAYOUT_EVENT_TC_DEDUP_COL + 1);
@@ -485,7 +483,8 @@ function processPayoutEventsFromTelegramChatLogs() {
       tier2: tier2Count,
       rejected: rejected,
       duplicates: duplicates,
-      errors: errors
+      errors: errors,
+      trigger: triggerStatus
     };
   } catch (err) {
     Logger.log('processPayoutEventsFromTelegramChatLogs error: ' + (err && err.message ? err.message : err));
@@ -514,11 +513,16 @@ function markPayoutEventProcessed_(tcSheet, physicalRow) {
 
 function ensurePayoutEventHourlyTriggerInstalled_() {
   var fn = 'processPayoutEventsFromTelegramChatLogs';
-  var triggers = ScriptApp.getProjectTriggers();
-  for (var i = 0; i < triggers.length; i++) {
-    if (triggers[i].getHandlerFunction() === fn) return;
+  try {
+    var triggers = ScriptApp.getProjectTriggers();
+    for (var i = 0; i < triggers.length; i++) {
+      if (triggers[i].getHandlerFunction() === fn) return 'present';
+    }
+    ScriptApp.newTrigger(fn).timeBased().everyHours(1).create();
+    return 'installed';
+  } catch (e) {
+    return 'error: ' + (e && e.message ? e.message : String(e));
   }
-  ScriptApp.newTrigger(fn).timeBased().everyHours(1).create();
 }
 
 /**
