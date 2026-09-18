@@ -457,12 +457,18 @@ def fetch_live_project_files(sid: str) -> tuple[list[dict] | None, str]:
     return content.get("files", []), ""
 
 
-def validate_accessor_survivability(project_dir: Path, sid: str) -> tuple[list[str], str]:
+def validate_accessor_survivability(
+    project_dir: Path, sid: str, *, fail_closed: bool = False
+) -> tuple[list[str], str]:
     """Block a push that would leave a required secret accessor undefined.
 
     The accessor contract is whatever the tracked Credentials.sample.js
     declares. Returns (errors, note): non-empty errors must block the push;
     note is informational (e.g. the fail-open path).
+
+    fail_closed=True turns a live-fetch failure into a blocking error instead of
+    a note. Callers pass it for a real `--push`; dry-run previews keep the
+    fail-open default so they never break on missing creds.
     """
     sample = project_dir / ACCESSOR_TEMPLATE_NAME
     if not sample.is_file():
@@ -494,6 +500,16 @@ def validate_accessor_survivability(project_dir: Path, sid: str) -> tuple[list[s
 
     live, err = fetch_live_project_files(sid)
     if live is None:
+        if fail_closed:
+            return (
+                [
+                    f"live accessor check could not verify the post-push file set "
+                    f"({err}). Refusing to push (fail-closed): a required accessor "
+                    f"may be defined only in the live project. Fix the live fetch "
+                    f"(clasp auth) or pass --allow-unverified-guards to override."
+                ],
+                "",
+            )
         return [], f"live accessor check skipped (fail-open): {err}"
 
     ignore = _read_claspignore(project_dir)
@@ -505,8 +521,8 @@ def validate_accessor_survivability(project_dir: Path, sid: str) -> tuple[list[s
     if missing:
         return (
             [
-                f"required accessor(s) {missing} are declared only by "
-                f"{ACCESSOR_TEMPLATE_NAME} (gitignored) and are absent from both the "
+                f"required accessor(s) {missing} are declared only by the tracked "
+                f"template {ACCESSOR_TEMPLATE_NAME} and are absent from both the "
                 f"local sources and the live project's protected files - after this "
                 f"push every entry point would fail with 'ReferenceError: "
                 f"{missing[0]} is not defined'. Restore the live accessor from "
@@ -558,18 +574,31 @@ def _local_upload_names(project_dir: Path) -> set[str]:
 
 
 def validate_no_remote_only_deletions(
-    project_dir: Path, sid: str
+    project_dir: Path, sid: str, *, fail_closed: bool = False
 ) -> tuple[list[str], str]:
     """Refuse a push that would delete live files absent from the local set.
 
     projects.updateContent clears the whole project before writing the pushed
     files, so every live file with no local counterpart is deleted -- even one
     listed in `.claspignore`. Returns (errors, note); a non-empty errors list
-    means the push must be blocked. Fails OPEN (note only) when the live fetch
-    fails, so a transient network/auth issue never blocks a healthy deploy.
+    means the push must be blocked.
+
+    fail_closed=True turns a live-fetch failure into a blocking error instead of
+    a note (a push we cannot verify is a push we must not make). Callers pass it
+    for a real `--push`; dry-run previews keep the fail-open default.
     """
     live, err = fetch_live_project_files(sid)
     if live is None:
+        if fail_closed:
+            return (
+                [
+                    f"remote-only-file check could not verify the live file set "
+                    f"({err}). Refusing to push (fail-closed): a live file with no "
+                    f"local counterpart would be DELETED. Fix the live fetch (clasp "
+                    f"auth) or pass --allow-unverified-guards to override."
+                ],
+                "",
+            )
         return [], f"remote-only-file check skipped (fail-open): {err}"
 
     local = _local_upload_names(project_dir)
@@ -715,6 +744,14 @@ def main() -> int:
         default="",
         help="version/description label for the repoint (default: auto)",
     )
+    ap.add_argument(
+        "--allow-unverified-guards",
+        action="store_true",
+        help=(
+            "on a real --push, let the survivability guards fail OPEN when the "
+            "live project cannot be fetched (default: fail closed)"
+        ),
+    )
     args = ap.parse_args()
 
     if args.list:
@@ -772,9 +809,14 @@ def main() -> int:
     # Live-accessor survivability guard (2026-09-10 ReferenceError incident):
     # a gitignored, .claspignore'd secret accessor can silently be ABSENT from
     # the live project. Model the post-push file set and refuse a push that
-    # would leave a called accessor undefined. Fail-open on live-fetch error.
+    # would leave a called accessor undefined. Fails CLOSED on a real --push
+    # (a push we cannot verify is a push we must not make); dry-run previews
+    # stay fail-open. --allow-unverified-guards restores fail-open.
+    guards_fail_closed = not dry_run and not args.allow_unverified_guards
     if not args.skip_accessor_guard:
-        a_errors, a_note = validate_accessor_survivability(project_dir, sid)
+        a_errors, a_note = validate_accessor_survivability(
+            project_dir, sid, fail_closed=guards_fail_closed
+        )
         for err in a_errors:
             print(f"  X {err}")
         if a_errors:
@@ -808,9 +850,12 @@ def main() -> int:
     # Remote-only-file guard (2026-09-18): `clasp push` = projects.updateContent,
     # which clears ALL remote files before writing the pushed set, so a live file
     # with no local counterpart is DELETED (a .claspignore entry does not protect
-    # it). Refuse such a push. Fail-open on live-fetch error.
+    # it). Refuse such a push. Fails CLOSED on a real --push (see
+    # guards_fail_closed above); dry-run / --allow-unverified-guards stay fail-open.
     if not args.skip_remote_only_guard:
-        r_errors, r_note = validate_no_remote_only_deletions(project_dir, sid)
+        r_errors, r_note = validate_no_remote_only_deletions(
+            project_dir, sid, fail_closed=guards_fail_closed
+        )
         for err in r_errors:
             print(f"  X {err}")
         if r_errors:

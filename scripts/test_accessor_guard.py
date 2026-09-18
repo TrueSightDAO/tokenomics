@@ -56,7 +56,11 @@ def test_basename_ignored_matches_live_stem():
 def test_guard_passes_when_live_accessor_present(tmp_path, monkeypatch):
     _mk_project(
         tmp_path,
-        {"Credentials.sample.js": SAMPLE, "Code.js": CALLER, ".claspignore": CLASPIGNORE},
+        {
+            "Credentials.sample.js": SAMPLE,
+            "Code.js": CALLER,
+            ".claspignore": CLASPIGNORE,
+        },
     )
     monkeypatch.setattr(
         dgp,
@@ -71,7 +75,11 @@ def test_guard_passes_when_live_accessor_present(tmp_path, monkeypatch):
 def test_guard_fails_when_live_accessor_missing(tmp_path, monkeypatch):
     _mk_project(
         tmp_path,
-        {"Credentials.sample.js": SAMPLE, "Code.js": CALLER, ".claspignore": CLASPIGNORE},
+        {
+            "Credentials.sample.js": SAMPLE,
+            "Code.js": CALLER,
+            ".claspignore": CLASPIGNORE,
+        },
     )
     monkeypatch.setattr(
         dgp,
@@ -123,3 +131,90 @@ def test_guard_noop_without_sample(tmp_path):
     _mk_project(tmp_path, {"Code.js": CALLER})
     errors, note = dgp.validate_accessor_survivability(tmp_path, "SID")
     assert errors == [] and note == ""
+
+
+# ── fail-closed variants (2026-09-18, thread 31220) ──────────────────────────
+
+
+def test_accessor_fail_closed_blocks_on_live_fetch_error(tmp_path, monkeypatch):
+    """A real --push (fail_closed=True) must REFUSE when the live set is unknown."""
+    _mk_project(tmp_path, {"Credentials.sample.js": SAMPLE, "Code.js": CALLER})
+    monkeypatch.setattr(
+        dgp, "fetch_live_project_files", lambda sid: (None, "network down")
+    )
+    errors, note = dgp.validate_accessor_survivability(
+        tmp_path, "SID", fail_closed=True
+    )
+    assert errors and "fail-closed" in errors[0]
+    assert note == ""
+
+
+def test_accessor_fail_open_default_unchanged(tmp_path, monkeypatch):
+    """Dry-run default (fail_closed=False) stays a note, never an error."""
+    _mk_project(tmp_path, {"Credentials.sample.js": SAMPLE, "Code.js": CALLER})
+    monkeypatch.setattr(
+        dgp, "fetch_live_project_files", lambda sid: (None, "network down")
+    )
+    errors, note = dgp.validate_accessor_survivability(tmp_path, "SID")
+    assert errors == []
+    assert "fail-open" in note
+
+
+def test_accessor_error_text_no_longer_says_gitignored(tmp_path, monkeypatch):
+    """The tracked template is not gitignored; the message must not claim it is."""
+    _mk_project(
+        tmp_path,
+        {
+            "Credentials.sample.js": SAMPLE,
+            "Code.js": CALLER,
+            ".claspignore": CLASPIGNORE,
+        },
+    )
+    monkeypatch.setattr(
+        dgp,
+        "fetch_live_project_files",
+        lambda sid: ([{"name": "Code", "source": CALLER}], ""),
+    )
+    errors, _ = dgp.validate_accessor_survivability(tmp_path, "SID")
+    assert errors and "gitignored" not in errors[0]
+    assert "tracked template" in errors[0]
+
+
+def test_remote_only_fail_closed_blocks_on_live_fetch_error(tmp_path, monkeypatch):
+    _mk_project(tmp_path, {"Code.js": CALLER})
+    monkeypatch.setattr(
+        dgp, "fetch_live_project_files", lambda sid: (None, "auth expired")
+    )
+    errors, note = dgp.validate_no_remote_only_deletions(
+        tmp_path, "SID", fail_closed=True
+    )
+    assert errors and "fail-closed" in errors[0]
+    assert note == ""
+
+
+def test_remote_only_fail_open_default_unchanged(tmp_path, monkeypatch):
+    _mk_project(tmp_path, {"Code.js": CALLER})
+    monkeypatch.setattr(
+        dgp, "fetch_live_project_files", lambda sid: (None, "auth expired")
+    )
+    errors, note = dgp.validate_no_remote_only_deletions(tmp_path, "SID")
+    assert errors == []
+    assert "fail-open" in note
+
+
+def test_remote_only_flags_live_file_with_no_local_counterpart(tmp_path, monkeypatch):
+    """The 1_3D4o2R shape: live has a Credentials file, local does not -> REFUSE."""
+    _mk_project(tmp_path, {"Code.js": CALLER})
+    monkeypatch.setattr(
+        dgp,
+        "fetch_live_project_files",
+        lambda sid: (
+            [
+                {"name": "Code", "source": CALLER},
+                {"name": "Credentials", "source": "x"},
+            ],
+            "",
+        ),
+    )
+    errors, _ = dgp.validate_no_remote_only_deletions(tmp_path, "SID", fail_closed=True)
+    assert errors and "Credentials" in errors[0]
