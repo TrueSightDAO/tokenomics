@@ -6,9 +6,10 @@
  * values in Script Properties (Project Settings → Script Properties), keys:
  *   GITHUB_API_TOKEN, TELEGRAM_API_TOKEN, WIX_API_KEY
  *
- * Credentials.js is gitignored (google_app_scripts/**/Credentials.js) AND claspignored
- * (.claspignore) — never commit real secrets, and never let a clasp push delete the
- * live file.
+ * Credentials.js is SECRET-FREE and therefore TRACKED in git and PUSHED — it is NOT
+ * in .claspignore. clasp push REPLACES the remote file set, so an ignored/absent
+ * accessor gets DELETED live (see the 2026-09-06 incident below). Never put real
+ * secrets in source; they belong in Script Properties.
  *
  * Incident 2026-09-06: an editor-only Credentials.gs in this project was deleted by a
  * clasp push (folder-mirror sync removed files not present locally), breaking @HEAD/@9

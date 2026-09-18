@@ -1,7 +1,13 @@
-# Protect live secret accessor from clasp push deletion (folder-mirror sync).
-# Incident 2026-09-06: clasp push deleted the editor-only Credentials.gs,
-# breaking @HEAD/@9. Credentials.js now lives in the live project and must
-# never be deleted by a push. Edit it in the Apps Script editor, not via clasp.
-Credentials.gs
-Credentials.js
+# Files in THIS REPO FOLDER that must not be pushed by a raw `clasp push`.
+#
+# NOTICE 2026-09-18 (Gary): Credentials.js is deliberately NOT listed here.
+# `clasp push` runs projects.updateContent, which REPLACES the project's remote file
+# set: any file that is not pushed is DELETED from the live project. Ignoring the
+# accessor is therefore exactly what let a push delete it (incidents 2026-08-21 and
+# 2026-09-06 in this project -> `ReferenceError: setApiKeys is not defined` on @HEAD).
+# The SECRET-FREE Credentials.js is tracked in git and pushed like any other source;
+# real secrets live in Script Properties (Project Settings -> Script properties).
+#
+# Repo-only files (NOT part of the live project):
+manifest.json
 Credentials.sample.js
