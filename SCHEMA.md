@@ -1,8 +1,20 @@
 # TrueSight DAO - Google Sheets Schema Documentation
 
-> **Last Updated:** 2026-07-13
+> **Last Updated:** 2026-09-18
 > 
 > This document provides a consolidated reference for all Google Sheets used across TrueSight DAO's Google Apps Scripts. Use this as a central schema reference when making code changes.
+
+## 📝 Recent Changes (2026-09-18)
+
+### **offchain assets in transit** — column **Q** (`NF-e Chave`)
+
+- **Workbook:** Main Ledger (`1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU`), tab **`offchain assets in transit`** (`gid=1888711771`).
+- **Column Q header:** **`NF-e Chave`** — the 44-digit Brazilian NF-e access key (*chave de acesso*), stored as **TEXT** (`numberFormat=TEXT`) so no digit precision is lost.
+- **Purpose:** associate each in-transit register line with the fiscal invoice (NF-e) it shipped under, joining to **`shipment_nfe`** column **B** (`NF-e Chave`). Blank when the parcel has no NF-e.
+- **Cardinality is 1:N** — one NF-e may cover several register lines (a box split into product lines). E.g. NF-e #5 → rows 10+11, NF-e #12 → rows 17+18+19.
+- **Backfill:** initial 19 rows populated via `agroverse-ledger-manager@get-data-io.iam.gserviceaccount.com`.
+
+---
 
 ## 📝 Recent Changes (2026-07-13)
 
@@ -983,6 +995,7 @@ See [`python_scripts/schema_validation/README.md`](./python_scripts/schema_valid
 | N | Ledger Location | String | Ledger reference |
 | O | Ledger Line Number | Number | Ledger row number |
 | P | Status | String | Shipping status |
+| Q | NF-e Chave | String | 44-digit Brazilian NF-e access key (*chave de acesso*) linking the register line to its fiscal invoice in `shipment_nfe`. Blank when the parcel has no NF-e. One NF-e may span multiple register lines (1:N). Stored as TEXT to preserve all 44 digits. |
 
 **Used by:**
 - Shipping and logistics tracking
