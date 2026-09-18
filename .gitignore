@@ -41,6 +41,11 @@ google_app_scripts/**/*redential*.gs.js
 !google_app_scripts/**/Credentials.sample.js
 !google_app_scripts/1K1wcXFAopSA0cI7oBpu5bl1sagrJ2Quv44B0ppjiIxtl3MKJ_PCsppCf/Credentials.js
 !google_app_scripts/1XmwyzzauOoLUZAbm5jK1GBwWNIDLHBrlA465a3EE7bnNW3cvhqzIR8ml/Credentials.js
+# 1wONDeDwZ (TDG inventory mgmt: process_movement_telegram_logs): NO tracked accessor
+existed, so a push from the repo folder would have DELETED the live Credentials.js and
+broken the ANYONE_ANONYMOUS doGet inventory webhook (@v14) with
+"ReferenceError: setApiKeys is not defined". Restored as a tracked secret-free accessor.
+!google_app_scripts/1wONDeDwZ_fXNapDKpstWrBION3aV3r7NXwq7PCdqbW1LvI5ceaykQNbR/Credentials.js
 # 1duQFfTO (TDG inventory mgmt): project had NO accessor at all -> every entry point
 # failed with "ReferenceError: setApiKeys is not defined" at load. Restored 2026-09-18.
 !google_app_scripts/1duQFfTO0Pj0lC4tPVNmMOhNOS1GvJgzqVxXbsEDu-eqt_64DwxvrOVyl/Credentials.js
