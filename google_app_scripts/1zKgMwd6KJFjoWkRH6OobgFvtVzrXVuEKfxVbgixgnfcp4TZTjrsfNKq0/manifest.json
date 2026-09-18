@@ -17,5 +17,6 @@
   },
   "source_files": [
     "register_member_digital_signatures_email.gs"
-  ]
+  ],
+  "notes": "POST-only web app (defines doPost, no doGet). An unauthenticated GET returns 'Script function not found: doGet' \u2014 EXPECTED, not an error. The endpoint smoke-test classifies this as POST-ONLY. See docs/gas_orphan_mirror_dispositions.md."
 }
