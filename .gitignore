@@ -49,6 +49,11 @@ broken the ANYONE_ANONYMOUS doGet inventory webhook (@v14) with
 # 1duQFfTO (TDG inventory mgmt): project had NO accessor at all -> every entry point
 # failed with "ReferenceError: setApiKeys is not defined" at load. Restored 2026-09-18.
 !google_app_scripts/1duQFfTO0Pj0lC4tPVNmMOhNOS1GvJgzqVxXbsEDu-eqt_64DwxvrOVyl/Credentials.js
+# 1wmgYPwf (TDG inventory mgmt: sales_update_main_dao_offchain_ledger +
+# telegram_webhook_listener): NO tracked accessor existed, so a push from the repo folder
+# would have DELETED the live Credentials.js and broken the ANYONE_ANONYMOUS doPost
+# Telegram webhook (@v5) with "ReferenceError: setApiKeys is not defined".
+!google_app_scripts/1wmgYPwfRDxpiboa8OH-C6Ndovklf8HaJY305n7dhRzs7BmUBQg7fL_sZ/Credentials.js
 
 # Schema validation output
 python_scripts/schema_validation/discovered_headers.json
