@@ -1,6 +1,6 @@
 {
   "scriptId": "1orWgdGckts55owiYOysR_y4sde52T_eUmrtDGAEkb4YV5DlUfJ0JZC5J",
-  "name": "TBC \u2014 confirm display name in GAS UI for 1orWgdGckts5\u2026",
+  "name": "Capital-injection + currency-conversion ledger processors",
   "owner_email": "garyjob@agroverse.shop",
   "post_push_hooks": [],
   "candidate_cache_refresh_hooks": [
@@ -9,14 +9,22 @@
         "notifyTreasuryCachePublisher_"
       ],
       "action_strings": [],
-      "mirror_code_path": "google_app_scripts/1orWgdGckts55owiYOysR_y4sde52T_eUmrtDGAEkb4YV5DlUfJ0JZC5J/Code.js",
+      "mirror_code_path": "google_app_scripts/1orWgdGckts55owiYOysR_y4sde52T_eUmrtDGAEkb4YV5DlUfJ0JZC5J/capital_injection_processing.js",
       "consumer_callers_with_known_url": []
     }
   ],
   "deployments": {
-    "head": "TBC \u2014 list every /exec URL for this scriptId in pre-flight"
+    "head": "AKfycbwMY0PfO7dnMszwUilr6DZBY5eeBGh86QEgshO7cgY (@HEAD - login-walled, do NOT use for anonymous calls)",
+    "web_app": "AKfycbzTWe1EnX8oXX1RDOOXcS1e0GmkX_SusWhT18FQ7zqs3RMTRlYcpZlWLOIaSLzoViA0 (@10 - ANYONE_ANONYMOUS web app; /exec?action=listTriggers | parseAndProcessCurrencyConversionLogs | parseAndProcessCapitalInjectionLogs)"
+  },
+  "webapp": {
+    "executeAs": "USER_DEPLOYING",
+    "access": "ANYONE_ANONYMOUS",
+    "note": "Only VERSIONED deployments are anonymously callable; @HEAD stays login-walled even with ANYONE_ANONYMOUS. appsscript.json MUST keep its webapp block or clasp deployments stop serving /exec. Prior @8 deployment (AKfycby8bOb0iE... - cutoff 2026-05-10) was undeployed 2026-09-18; its version pin froze an old Credentials file with hardcoded secrets, so the anonymous path to it is gone. The project no longer needs any credential accessor (dead WIX_ACCESS_TOKEN removed in tokenomics PR #527)."
   },
   "source_files": [
-    "capital_injection_processing.gs"
+    "capital_injection_processing.js",
+    "CurrencyConversion.js",
+    "Version.gs"
   ]
 }
