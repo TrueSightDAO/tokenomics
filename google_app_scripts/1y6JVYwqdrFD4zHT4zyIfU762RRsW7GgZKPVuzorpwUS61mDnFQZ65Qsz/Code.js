@@ -7,7 +7,18 @@
 
 /**
  * Google Apps Script Web Service for Cacao Bag QR Code lookup.
- * Deployment URL: https://script.google.com/macros/s/AKfycbxigq4-J0izShubqIC5k6Z7fgNRyVJLakfQ34HPuENiSpxuCG-wSq0g-wOAedZzzgaL/exec
+ *
+ * Apps Script editor (THIS file's live project - "Api.TrueSight.me - QR code reader web service"):
+ *   https://script.google.com/home/projects/1y6JVYwqdrFD4zHT4zyIfU762RRsW7GgZKPVuzorpwUS61mDnFQZ65Qsz/edit
+ * Live deployment (KEEP STABLE - agroverse_shop shipments/agl*/index.html LINK_EMAIL_API_URL points here):
+ *   https://script.google.com/macros/s/AKfycbxigq4-J0izShubqIC5k6Z7fgNRyVJLakfQ34HPuENiSpxuCG-wSq0g-wOAedZzzgaL/exec
+ * NOTE: the consolidated sibling qr_code_web_service.gs is a DIFFERENT project
+ *   (1MnAsIQ..., deployment AKfycbySJ86...) - do not confuse the two.
+ *
+ * NOTE ON FILENAME: the live project stores this file as "Code". A stale near-duplicate
+ * copy lived in the repo as web_app.js and re-declared all 7 top-level functions below,
+ * which would have made a clasp push fail with duplicate top-level declarations. It was
+ * removed 2026-09-18; this file is the single source of truth.
  */
 
 // ===== Configuration =====
