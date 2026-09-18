@@ -2115,6 +2115,16 @@ function doGet(e) {
       // DApp review page reads recorded payout registrations (masked fields only).
       return createCORSResponse(getPendingPayoutRegistrations(getQueryParam_(e, 'status')));
     }
+    if (actionStr === 'processPayoutEventsFromTelegramChatLogs') {
+      // Triggered by Edgar after a [PAYOUT EVENT] lands on Telegram Chat Logs.
+      // Dual-writes Tier-1 `payouts` (Ops) + Tier-2 `payout events` (CFR). See
+      // process_payout_event_telegram_logs.js (same Apps Script project), SS12.7 Q3b.
+      return createCORSResponse(processPayoutEventsFromTelegramChatLogs());
+    }
+    if (actionStr === 'getPayoutEvents') {
+      // DApp review surface reads booked payout events (no raw PII is present).
+      return createCORSResponse(getPayoutEvents(getQueryParam_(e, 'status')));
+    }
     if (actionStr === 'registerSingleQRCode') {
       // Triggered by Edgar after a [QR CODE REGISTRATION] event. Registers a single
       // QR code in the Agroverse QR codes sheet and triggers GitHub Actions for
