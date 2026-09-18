@@ -517,6 +517,80 @@ def validate_accessor_survivability(project_dir: Path, sid: str) -> tuple[list[s
     return [], ""
 
 
+# ── pre-push remote-only-file guard (2026-09-18 directive) ──────────────────
+#
+# `clasp push` issues projects.updateContent, which the Apps Script API
+# documents as clearing ALL existing files in the project before writing the
+# uploaded set. So a live file with no local counterpart is DELETED. A
+# `.claspignore` entry does NOT protect it: ignored files are merely omitted
+# from the upload, so an ignored-but-live file is removed the same way (this is
+# the mechanism behind the 2026-08-21 / 2026-09-06 `ReferenceError: setApiKeys
+# is not defined` incidents). This guard refuses a push that would drop live
+# files and names exactly what is at risk.
+# Override with --skip-remote-only-guard.
+
+UPLOAD_SUFFIXES = (".js", ".gs", ".ts", ".html")
+REPO_ONLY_FILES = (".clasp.json", ".claspignore", "manifest.json")
+
+
+def _local_upload_names(project_dir: Path) -> set[str]:
+    """Remote file names a `clasp push` would send for this folder.
+
+    Mirrors clasp's upload set: source files (.js/.gs/.ts/.html) that are not
+    `.claspignore`d, plus the manifest `appsscript.json` -> 'appsscript'.
+    Apps Script stores files extension-less ('Code', 'Credentials'), so local
+    names map to their stems. Repo-only files are never uploaded.
+    """
+    ignore = _read_claspignore(project_dir)
+    names: set[str] = set()
+    for f in sorted(project_dir.iterdir()):
+        if not f.is_file() or f.name in REPO_ONLY_FILES:
+            continue
+        if f.name == "appsscript.json":
+            names.add("appsscript")
+            continue
+        if f.suffix not in UPLOAD_SUFFIXES:
+            continue
+        if _basename_ignored(f.name, ignore):
+            continue
+        names.add(f.stem)
+    return names
+
+
+def validate_no_remote_only_deletions(
+    project_dir: Path, sid: str
+) -> tuple[list[str], str]:
+    """Refuse a push that would delete live files absent from the local set.
+
+    projects.updateContent clears the whole project before writing the pushed
+    files, so every live file with no local counterpart is deleted -- even one
+    listed in `.claspignore`. Returns (errors, note); a non-empty errors list
+    means the push must be blocked. Fails OPEN (note only) when the live fetch
+    fails, so a transient network/auth issue never blocks a healthy deploy.
+    """
+    live, err = fetch_live_project_files(sid)
+    if live is None:
+        return [], f"remote-only-file check skipped (fail-open): {err}"
+
+    local = _local_upload_names(project_dir)
+    remote_only = sorted(
+        n for n in ((f.get("name") or "") for f in live) if n and n not in local
+    )
+    if remote_only:
+        return (
+            [
+                f"live project has {len(remote_only)} file(s) with no local "
+                f"counterpart: {', '.join(remote_only)}. `clasp push` clears "
+                f"ALL remote files and writes only the pushed set, so these "
+                f"would be DELETED (a .claspignore entry does NOT protect "
+                f"them). Track them in the folder or restore with `clasp pull` "
+                f"before pushing."
+            ],
+            "",
+        )
+    return [], ""
+
+
 def warn_if_orphan(project_dir: Path, sid: str) -> None:
     """Soft warning: scriptId absent from the active clasp account's project
     list => push will likely fail with 'Requested entity was not found'."""
@@ -558,6 +632,11 @@ def main() -> int:
         "--skip-accessor-guard",
         action="store_true",
         help="push even if the live secret-accessor (Credentials.js) survivability check fails",
+    )
+    ap.add_argument(
+        "--skip-remote-only-guard",
+        action="store_true",
+        help="push even if live files absent locally would be deleted (remote-only-file guard)",
     )
     ap.add_argument(
         "--lease-id",
@@ -644,6 +723,23 @@ def main() -> int:
             return 1
         if a_note:
             print(f"  ! {a_note}")
+
+    # Remote-only-file guard (2026-09-18): `clasp push` = projects.updateContent,
+    # which clears ALL remote files before writing the pushed set, so a live file
+    # with no local counterpart is DELETED (a .claspignore entry does not protect
+    # it). Refuse such a push. Fail-open on live-fetch error.
+    if not args.skip_remote_only_guard:
+        r_errors, r_note = validate_no_remote_only_deletions(project_dir, sid)
+        for err in r_errors:
+            print(f"  X {err}")
+        if r_errors:
+            print(
+                "\nX refusing to push — remote-only-file guard "
+                "(override: --skip-remote-only-guard)."
+            )
+            return 1
+        if r_note:
+            print(f"  ! {r_note}")
 
     # Identity check
     active_email, identity_err = resolve_clasp_identity()
