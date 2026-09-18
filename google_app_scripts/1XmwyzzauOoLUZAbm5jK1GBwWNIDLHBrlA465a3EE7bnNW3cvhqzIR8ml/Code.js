@@ -1,6 +1,6 @@
 const creds = getCredentials();
 const TELEGRAM_CHAT_ID = PropertiesService.getScriptProperties().getProperty('TELEGRAM_CHAT_ID') || '-1002190388985';
-const TELEGRAM_API_TOKEN = creds.TELEGRAM_API_TOKEN || '8344194076:AAGSKIKt9yzCGJvxw5DObhfvWRmOp_3b6Jg';
+const TELEGRAM_API_TOKEN = creds.TELEGRAM_API_TOKEN;
 const TELEGRAM_API_URL = `https://api.telegram.org/bot${TELEGRAM_API_TOKEN}`;
 
 /**
@@ -259,9 +259,6 @@ function testSendToTelegram() {
  * Placeholder for getCredentials function
  * Replace with actual implementation
  */
-function getCredentials() {
-  // Replace with actual credential retrieval logic
-  return {
-    TELEGRAM_API_TOKEN: PropertiesService.getScriptProperties().getProperty('TELEGRAM_API_TOKEN') || '8344194076:AAGSKIKt9yzCGJvxw5DObhfvWRmOp_3b6Jg'
-  };
-}
+// getCredentials() now lives in Credentials.js (secret-free; reads Script Properties).
+// The inline placeholder that used to sit here hardcoded a live Telegram bot token;
+// it has been removed and the token must be rotated (2026-09-18).
