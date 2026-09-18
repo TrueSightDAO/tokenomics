@@ -181,7 +181,7 @@ function hitListSentTouchCountFormula_(row, status) {
  */
 function applyHitListAuAvFormulasToRow_(sheet, rowNum) {
   sheet
-    .getRange(rowNum, HIT_LIST_COL_AU, 1, 2)
+    .getRange(rowNum, HIT_LIST_COL_AU, rowNum, HIT_LIST_COL_AV)
     .setFormulas([
       [
         hitListSentTouchCountFormula_(rowNum, 'warmup'),
@@ -1520,7 +1520,6 @@ function doGet(e) {
       const shopName = e.parameter.shop_name;
       const newStatus = e.parameter.new_status;
       const newShopType = e.parameter.shop_type || '';
-      const newInstagram = e.parameter.instagram || '';
       const ownerName = e.parameter.owner_name || '';
       const contactPerson = e.parameter.contact_person || '';
       const email = e.parameter.email || '';
@@ -1596,6 +1595,14 @@ function doGet(e) {
       if (value && value !== "" && value !== "All") {
         statusMatches.push(value);
       }
+    }
+    /**
+     * Async partner add scanner (Telegram Chat Logs -> DAO Partners).
+     * Triggered by Edgar after every [PARTNER ADD EVENT] is logged.
+     */
+    if (e.parameter.action === 'processPartnerAddsFromTelegramChatLogs') {
+      const out = processPartnerAddsFromTelegramChatLogs();
+      return ContentService.createTextOutput(JSON.stringify(out)).setMimeType(ContentService.MimeType.JSON);
     }
     
     if (statusMatches.length > 0) {
