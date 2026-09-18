@@ -131,6 +131,21 @@ def test_cfr_routing_by_slug_and_host():
     assert "cfr.truesight.me" in src
 
 
+def test_hourly_trigger_installer_is_called_from_entry_point():
+    """The hourly cron is the fallback when Edgar's webhook URL is unset.
+
+    deploy regression 2026-09-18: ensurePayoutEventHourlyTriggerInstalled_() was
+    defined but never CALLED, so with DAO_PROTOCOL_WEBHOOK_PAYOUT_PROCESSING unset
+    (its state at merge time) events would never be processed at all.
+    """
+    src = _src()
+    body = src.split("function processPayoutEventsFromTelegramChatLogs()", 1)[1]
+    body = body.split("function markPayoutEventProcessed_", 1)[0]
+    assert "ensurePayoutEventHourlyTriggerInstalled_()" in body, (
+        "trigger installer not called from entry point"
+    )
+
+
 def test_lock_serialises_entry_point():
     src = _src()
     assert "LockService.getScriptLock" in src

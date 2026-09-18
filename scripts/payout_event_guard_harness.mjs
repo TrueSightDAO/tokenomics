@@ -55,7 +55,11 @@ globalThis.SpreadsheetApp = {
 };
 globalThis.PropertiesService = { getScriptProperties(){ return { getProperty(k){ return k==='CFR_PROGRAM_SPREADSHEET_ID' ? CFR_ID : null; } }; } };
 globalThis.LockService = { getScriptLock(){ return { tryLock(){return true;}, releaseLock(){} }; } };
-globalThis.ScriptApp = { getProjectTriggers(){return [];}, newTrigger(){return {timeBased(){return {everyHours(){return {create(){}};}};}};} };
+let triggerInstalls = [];
+globalThis.ScriptApp = {
+  getProjectTriggers(){return triggerInstalls.map(fn=>({getHandlerFunction(){return fn;}}));},
+  newTrigger(fn){ return { timeBased(){ return { everyHours(){ return { create(){ triggerInstalls.push(fn); } }; } }; } }; }
+};
 globalThis.Logger = { log(){} };
 globalThis.Utilities = {};
 // ---------------------------------------------------------------------------
@@ -166,6 +170,20 @@ t('e2e non-CFR writes Tier-1 only', ()=>{
 t('e2e intake workbook never got a payout row inserted', ()=>{
   // `payouts` was created on the ops workbook handle, not via a stray intake write
   if(tier1().length===0) throw new Error('tier1 not written');
+});
+
+// ---- entry point installs the hourly safety-net trigger --------------------
+t('e2e entry point installs exactly one hourly trigger', ()=>{
+  if(!triggerInstalls.includes('processPayoutEventsFromTelegramChatLogs'))
+    throw new Error('hourly trigger not installed by entry point');
+});
+t('e2e second run does not double-install the trigger', ()=>{
+  reset(); triggerInstalls=[];
+  tcGrid=[['A','B','C','D','E','F','G'], tcRow('999', payload({bank_ref:'E-TRIG'}))];
+  processPayoutEventsFromTelegramChatLogs();
+  processPayoutEventsFromTelegramChatLogs();
+  const n=triggerInstalls.filter(f=>f==='processPayoutEventsFromTelegramChatLogs').length;
+  if(n!==1) throw new Error('expected 1 trigger create, got '+n);
 });
 
 console.log('\n'+pass+' passed, '+fail+' failed');
