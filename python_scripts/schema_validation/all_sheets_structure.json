@@ -416,9 +416,10 @@
           "Destination Asset Name",
           "Ledger Location",
           "Ledger Line Number",
-          "Status"
+          "Status",
+          "NF-e Chave"
         ],
-        "column_count": 16,
+        "column_count": 17,
         "url": "https://docs.google.com/spreadsheets/d/1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU/edit#gid=1888711771"
       },
       "off chain asset balance": {
