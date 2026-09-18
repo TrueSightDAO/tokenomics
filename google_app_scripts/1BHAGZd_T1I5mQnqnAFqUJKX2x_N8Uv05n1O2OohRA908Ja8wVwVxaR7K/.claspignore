@@ -1,0 +1,9 @@
+# Files in THIS REPO FOLDER that must not be pushed by a raw `clasp push`.
+#
+# NOTICE 2026-09-18 (Gary): Credentials.js is deliberately NOT listed here.
+# `clasp push` runs projects.updateContent, which REPLACES the remote file set:
+# any file not pushed is DELETED live. The secret-free Credentials.js is tracked
+# in git and pushed like any other source; secrets live in Script Properties.
+#
+# Repo-only metadata (not part of the live project):
+manifest.json
