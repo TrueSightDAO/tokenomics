@@ -186,5 +186,22 @@ t('e2e second run does not double-install the trigger', ()=>{
   if(n!==1) throw new Error('expected 1 trigger create, got '+n);
 });
 
+// ---- trigger status is surfaced in the action response (#513 verifiability) --
+reset(); triggerInstalls=[];
+tcGrid=[['A','B','C','D','E','F','G'], tcRow('777', payload({bank_ref:'E-TRIGSTAT-A'}))];
+t('e2e first run reports trigger:installed', ()=>{
+  const r=processPayoutEventsFromTelegramChatLogs();
+  if(r.trigger!=='installed') throw new Error('expected trigger=installed, got '+r.trigger);
+});
+t('e2e second run reports trigger:present (no re-install)', ()=>{
+  const r=processPayoutEventsFromTelegramChatLogs();
+  if(r.trigger!=='present') throw new Error('expected trigger=present, got '+r.trigger);
+});
+t('e2e empty-intake run also reports trigger status', ()=>{
+  reset(); triggerInstalls=[];
+  const r=processPayoutEventsFromTelegramChatLogs();
+  if(r.trigger!=='installed') throw new Error('empty-intake run lacked trigger status: '+r.trigger);
+});
+
 console.log('\n'+pass+' passed, '+fail+' failed');
 process.exit(fail?1:0);
