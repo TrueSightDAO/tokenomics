@@ -76,6 +76,94 @@ const CC_STATUS_COL              = 13;  // N
 const CC_LEDGER_LINES_COL        = 14;  // O
 
 // ============================================================================
+// CURRENCY CANONICALIZATION (Fix A - 2026-09-18)
+// ============================================================================
+//
+// Canonical currency / SKU list, maintained by the repackaging-currency-ingest
+// GAS and consumed by dapp/currency_conversion.html. Single source of truth so
+// ledger currency labels are written with their canonical spelling rather than
+// an upper-cased guess (the 2026-09-18 'BRAZILIAN REIS' incident: upper-casing
+// minted a NEW label, and the case-sensitive 'off chain asset balance' rollup
+// then split the balance into two rows instead of netting).
+const CANONICAL_CURRENCIES_URL = 'https://raw.githubusercontent.com/TrueSightDAO/agroverse-inventory/main/currencies.json';
+
+function getCanonicalCurrencyList_() {
+  const cache = CacheService.getScriptCache();
+  const cached = cache.get('canonical_currencies_v1');
+  if (cached) {
+    try { return JSON.parse(cached); } catch (e) { /* fall through and refetch */ }
+  }
+  const list = [];
+  try {
+    const res = UrlFetchApp.fetch(CANONICAL_CURRENCIES_URL, { muteHttpExceptions: true });
+    if (res.getResponseCode() === 200) {
+      const data = JSON.parse(res.getContentText());
+      const arr = Array.isArray(data) ? data : (data.currencies || []);
+      arr.forEach(function (s) { const v = String(s).trim(); if (v) list.push(v); });
+    } else {
+      Logger.log(`\u26a0\ufe0f canonical currencies fetch returned HTTP ${res.getResponseCode()}`);
+    }
+  } catch (e) {
+    Logger.log(`\u26a0\ufe0f Could not load canonical currencies: ${e.message}`);
+  }
+  try { cache.put('canonical_currencies_v1', JSON.stringify(list), 3600); } catch (e) { /* ignore */ }
+  return list;
+}
+
+/**
+ * Resolve a free-text currency to its CANONICAL spelling via a case-insensitive
+ * match against the canonical list. If there is no match (a product SKU typed by
+ * hand, or a truncated legacy value), the raw trimmed value is returned
+ * UNCHANGED - we deliberately do NOT upper-case, because upper-casing mints a
+ * distinct label and splits the balance rollup. (Fix C: an unmatched value is
+ * logged as a warning so an unknown label surfaces instead of silently forking.)
+ */
+function canonicalizeCurrency_(raw) {
+  const trimmed = String(raw == null ? '' : raw).trim();
+  if (!trimmed) return trimmed;
+  try {
+    const list = getCanonicalCurrencyList_();
+    const lower = trimmed.toLowerCase();
+    for (let i = 0; i < list.length; i++) {
+      if (list[i].toLowerCase() === lower) return list[i];
+    }
+    Logger.log(`\u26a0\ufe0f Currency "${trimmed}" is not in the canonical list; storing raw value (no case change).`);
+  } catch (e) {
+    Logger.log(`\u26a0\ufe0f canonicalizeCurrency_ fell back to raw: ${e.message}`);
+  }
+  return trimmed;
+}
+
+/** Extract the signed Request Transaction ID from a full log message, or ''. */
+function extractRequestTransactionId_(message) {
+  const m = String(message == null ? '' : message).match(/Request Transaction ID:\s*([^\n]+)/i);
+  return m ? m[1].trim() : '';
+}
+
+/**
+ * Idempotency scan: return a comma-joined list of ledger row numbers whose
+ * Description already embeds this Request Transaction ID, or null if none.
+ * Col B (index 2) is the Description column in both the managed 'Transactions'
+ * tab and the Main Ledger 'offchain transactions' tab.
+ */
+function findExistingLedgerLines_(sheet, requestTransactionId) {
+  if (!requestTransactionId) return null;
+  try {
+    const lastRow = sheet.getLastRow();
+    if (lastRow < 2) return null;
+    const descs = sheet.getRange(2, 2, lastRow - 1, 1).getValues();
+    const hits = [];
+    for (let r = 0; r < descs.length; r++) {
+      if (String(descs[r][0] || '').indexOf(requestTransactionId) !== -1) hits.push(r + 2);
+    }
+    return hits.length ? hits.join(',') : null;
+  } catch (e) {
+    Logger.log(`\u26a0\ufe0f Idempotency scan failed: ${e.message}`);
+    return null;
+  }
+}
+
+// ============================================================================
 // PARSING
 // ============================================================================
 
@@ -114,13 +202,13 @@ function parseCurrencyConversionMessage(message) {
     if (warehouseManagerMatch) details.warehouseManager = warehouseManagerMatch[1].trim();
 
     const sourceCurrencyMatch = message.match(/- Source Currency:\s*([^\n]+)/i);
-    if (sourceCurrencyMatch) details.sourceCurrency = sourceCurrencyMatch[1].trim().toUpperCase();
+    if (sourceCurrencyMatch) details.sourceCurrency = canonicalizeCurrency_(sourceCurrencyMatch[1]);
 
     const sourceAmountMatch = message.match(/- Source Amount:\s*\$?([0-9,]*\.?[0-9]+)/i);
     if (sourceAmountMatch) details.sourceAmount = parseFloat(sourceAmountMatch[1].replace(/,/g, ''));
 
     const targetCurrencyMatch = message.match(/- Target Currency:\s*([^\n]+)/i);
-    if (targetCurrencyMatch) details.targetCurrency = targetCurrencyMatch[1].trim().toUpperCase();
+    if (targetCurrencyMatch) details.targetCurrency = canonicalizeCurrency_(targetCurrencyMatch[1]);
 
     const targetAmountMatch = message.match(/- Target Amount:\s*\$?([0-9,]*\.?[0-9]+)/i);
     if (targetAmountMatch) details.targetAmount = parseFloat(targetAmountMatch[1].replace(/,/g, ''));
@@ -252,6 +340,17 @@ function insertCurrencyConversionRecord(telegramUpdateId, telegramMessageId, log
  * implied rate). If you need explicit fee accounting, add a third row by hand.
  */
 function processNewCurrencyConversions() {
+  // Fix B (2026-09-18): serialize concurrent runners. BOTH the Edgar immediate
+  // webhook (doGet) and the 10-min time trigger call this function. Without a
+  // lock, two runs can read the same row while its Status is still 'NEW' and
+  // each append a full debit+credit pair -> a 4-row double-post (observed
+  // 2026-09-18: offchain transactions rows 4315-4318). The script lock makes the
+  // claim -> append -> flip sequence effectively atomic.
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(30000)) {
+    Logger.log('\u23ed\ufe0f Another currency-conversion run holds the lock; skipping this invocation.');
+    return;
+  }
   try {
     const spreadsheet = SpreadsheetApp.openByUrl(TELEGRAM_LOGS_URL);
     const sheet = spreadsheet.getSheetByName(CURRENCY_CONVERSION_SHEET);
@@ -273,6 +372,13 @@ function processNewCurrencyConversions() {
 
       const rowNumber = i + 1;
       Logger.log(`\n📝 Processing currency conversion at row ${rowNumber}`);
+
+      // Fix B (2026-09-18): claim the intake row BEFORE any append. A concurrent
+      // runner (serialized by the script lock above) then sees 'PROCESSING' and
+      // skips it, instead of both runs appending a full debit+credit pair.
+      // Flipped to PROCESSED on success and FAILED on any error below.
+      sheet.getRange(rowNumber, CC_STATUS_COL + 1).setValue('PROCESSING');
+      SpreadsheetApp.flush();
 
       const ledgerUrl         = row[CC_LEDGER_URL_COL];
       const conversionDate    = row[CC_CONVERSION_DATE_COL];
@@ -342,6 +448,21 @@ function processNewCurrencyConversions() {
         // transactions row 2811 has col D='50.00000000' typed as text and
         // silently drops from aggregate formulas). Explicit Number() coercion
         // + finiteness check catches NaN from a malformed audit row.
+        // Fix B (belt): idempotency scan. If this event's Request Transaction ID
+        // already appears in a Description cell of the target sheet, the pair was
+        // already written (by a prior run, or a duplicate intake row) - do NOT
+        // append it again. Mirrors the pre-append re-check in
+        // tdg_expenses_processing.gs.
+        const requestTransactionId = extractRequestTransactionId_(logMessage);
+        const existingLines = findExistingLedgerLines_(transactionsSheet, requestTransactionId);
+        if (existingLines) {
+          Logger.log(`\u23ed\ufe0f Row ${rowNumber}: Request Transaction ID already at line(s) ${existingLines}; skipping append.`);
+          sheet.getRange(rowNumber, CC_STATUS_COL + 1).setValue('PROCESSED');
+          sheet.getRange(rowNumber, CC_LEDGER_LINES_COL + 1).setNumberFormat('@').setValue(existingLines);
+          processedCount++;
+          continue;
+        }
+
         const debitAmount = Number(sourceAmount) * -1;
         const creditAmount = Number(targetAmount);
         if (!Number.isFinite(debitAmount) || !Number.isFinite(creditAmount)) {
@@ -406,6 +527,8 @@ function processNewCurrencyConversions() {
     Logger.log(`\n📊 Processing complete: ${processedCount} processed, ${failedCount} failed`);
   } catch (e) {
     Logger.log(`ERROR in processNewCurrencyConversions: ${e.message}`);
+  } finally {
+    lock.releaseLock();
   }
 }
 
