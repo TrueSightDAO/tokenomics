@@ -75,3 +75,19 @@ Notes:
 - `docs/MANIFEST.json` still lists these 4 scriptIds. It is a **generated** snapshot
   (`generatedAt 2026-03-29`) whose generator hardcodes a local `/Users/garyjob/…` path and cannot run
   on the autopilot box — regen is filed as a follow-up.
+
+
+---
+
+## Endpoint smoke-test anomalies — root-caused & dispositioned (2026-09-18, thread 31220)
+
+`scripts/test_gas_endpoints.py` (PR #523) sweeps every /exec URL registered in a
+`manifest.json`. Its first sweep surfaced 3 anomalies. All three are now resolved:
+
+| # | scriptId | Symptom | Root cause | Disposition |
+|---|---|---|---|---|
+| 1 | `19Wag9x-sjbLVgI…` | HTML `<title>Error</title>` | **2026-09-06 incident residue.** The *pinned* deployment served a stale version whose `Code` predated the restored secret-free `Credentials.js`, so the top-level `setApiKeys()` call had no definition: `ReferenceError: setApiKeys is not defined (line 27, file "Code")`. `@HEAD` worked; only the pinned URL was stale. | ✅ **FIXED LIVE** — repointed the pinned deployment to a fresh version (`@15`); URL now returns `ℹ️ No valid action specified…` (HTTP 200, ~1.5s). |
+| 2 | `1zKgMwd6KJFj…` | HTML `<title>Error</title>` | **Harness false positive.** A **POST-only** web app (`doPost` defined, no `doGet`); an unauthenticated GET has no router, so GAS answers `Script function not found: doGet`. Working as designed. | ✅ **Harness fixed** — added a `POST-ONLY` classification checked *before* the generic `<title>Error</title>` branch. |
+| 3 | `1MnAsIQAxcSfZO…` | 404 on one deployment | **Dead/rotated deployment** (`AKfycbySJ86OcV…`). The project's other two deployments both return 200. | 📝 **Marked dead in the manifest**; live `DEPLOYMENT_URL` unaffected. |
+
+**Net:** 17 registered endpoint(s) → **15 healthy · 2 need attention** (both understood/expected POST-ONLY), down from 3 unexplained anomalies.

@@ -35,5 +35,6 @@
     "process_donation_mint_telegram_logs.gs",
     "process_program_registration_telegram_logs.gs",
     "qr_code_web_service.gs"
-  ]
+  ],
+  "notes": "Deployment AKfycbySJ86OcV... is DEAD (404) \u2014 rotated/deleted; do not consume. The live DEPLOYMENT_URL is AKfycbxigq4... (200). See docs/gas_orphan_mirror_dispositions.md."
 }

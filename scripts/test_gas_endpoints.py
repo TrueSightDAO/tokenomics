@@ -7,6 +7,7 @@ Builds the test list straight from google_app_scripts/*/manifest.json (the
 For each /exec URL the tool classifies the unauthenticated GET into:
   HEALTHY      -> 200 + JSON body, or the canonical "No valid action" text/plain
   SLOW         -> 200 but took longer than --slow-secs (no action param invoked)
+  POST-ONLY    -> 200 text/html "Script function not found: doGet" (POST-only web app; expected)
   AUTH-WALL    -> 200 text/html served by Google's sign-in (deployment not PUBLIC)
   HTML-ERROR   -> 200 text/html with <title>Error</title> (GAS runtime/load error)
   NOT-FOUND    -> 404/410 (deployment deleted or wrong URL)
@@ -71,7 +72,7 @@ def classify(url: str, slow_secs: float) -> tuple[str, str, float]:
     t0 = time.time()
     try:
         with urllib.request.urlopen(req, timeout=45, context=ctx) as r:
-            body = r.read(400).decode("utf-8", "replace")
+            body = r.read(16384).decode("utf-8", "replace")
             ct = (r.headers.get("Content-Type") or "").lower()
             dt = time.time() - t0
     except urllib.error.HTTPError as e:
@@ -87,6 +88,9 @@ def classify(url: str, slow_secs: float) -> tuple[str, str, float]:
     if "text/html" in ct:
         if "accounts.google" in low or "sign in" in low or "servicelogin" in low:
             return "AUTH-WALL", "<Google sign-in page>", dt
+        if "script function not found" in low:
+            # POST-only web app: an unauthenticated GET has no doGet to dispatch.
+            return "POST-ONLY", "GET unsupported (POST-only web app)", dt
         if "<title>error</title>" in low:
             return "HTML-ERROR", "<title>Error</title>", dt
         return "HTML-ERROR", body[:60].replace("\n", " "), dt
