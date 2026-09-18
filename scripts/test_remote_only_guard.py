@@ -94,3 +94,82 @@ def test_guard_fails_open_on_live_fetch_error(tmp_path, monkeypatch):
     )
     errors, note = dgp.validate_no_remote_only_deletions(tmp_path, "SID")
     assert errors == [] and "fail-open" in note
+
+
+# -- selective pull-first (Gary 2026-09-18: "pull from remote before push") --
+
+
+def test_is_secret_accessor_detects_credentials():
+    assert dgp._is_secret_accessor("Credentials") is True
+    assert dgp._is_secret_accessor("Credentials.sample") is True
+    assert dgp._is_secret_accessor("MySecret") is True
+    assert dgp._is_secret_accessor("Code") is False
+    assert dgp._is_secret_accessor("Version") is False
+
+
+def test_pull_first_writes_remote_only_file(tmp_path, monkeypatch):
+    # live has a helper absent locally -> it gets materialised
+    _mk_project(tmp_path, {"Code.js": CODE})
+    monkeypatch.setattr(
+        dgp,
+        "fetch_live_project_files",
+        lambda sid: (
+            [{"name": "LegacyHelper", "type": "SERVER_JS", "source": "x=1;"}],
+            "",
+        ),
+    )
+    written, refused, err = dgp.materialize_remote_only_files(
+        tmp_path, "SID", dry_run=False
+    )
+    assert written == ["LegacyHelper.js"] and refused == [] and err == ""
+    assert (tmp_path / "LegacyHelper.js").read_text() == "x=1;"
+
+
+def test_pull_first_never_overwrites_local_file(tmp_path, monkeypatch):
+    _mk_project(tmp_path, {"Code.js": "LOCAL"})
+    monkeypatch.setattr(
+        dgp,
+        "fetch_live_project_files",
+        lambda sid: ([{"name": "Code", "type": "SERVER_JS", "source": "REMOTE"}], ""),
+    )
+    written, _, err = dgp.materialize_remote_only_files(tmp_path, "SID", dry_run=False)
+    assert written == [] and err == ""
+    assert (tmp_path / "Code.js").read_text() == "LOCAL"  # untouched
+
+
+def test_pull_first_refuses_secret_accessor(tmp_path, monkeypatch):
+    _mk_project(tmp_path, {"Code.js": CODE})
+    monkeypatch.setattr(
+        dgp,
+        "fetch_live_project_files",
+        lambda sid: (
+            [{"name": "Credentials", "type": "SERVER_JS", "source": "SECRET"}],
+            "",
+        ),
+    )
+    written, refused, err = dgp.materialize_remote_only_files(
+        tmp_path, "SID", dry_run=False
+    )
+    assert written == [] and refused == ["Credentials"]
+    assert not (tmp_path / "Credentials.js").exists()  # never written to disk
+
+
+def test_pull_first_dry_run_writes_nothing(tmp_path, monkeypatch):
+    _mk_project(tmp_path, {"Code.js": CODE})
+    monkeypatch.setattr(
+        dgp,
+        "fetch_live_project_files",
+        lambda sid: ([{"name": "Helper", "type": "SERVER_JS", "source": "s"}], ""),
+    )
+    written, _, err = dgp.materialize_remote_only_files(tmp_path, "SID", dry_run=True)
+    assert written == ["Helper.js (dry-run)"] and err == ""
+    assert not (tmp_path / "Helper.js").exists()
+
+
+def test_pull_first_fails_open_on_fetch_error(tmp_path, monkeypatch):
+    _mk_project(tmp_path, {"Code.js": CODE})
+    monkeypatch.setattr(dgp, "fetch_live_project_files", lambda sid: (None, "boom"))
+    written, refused, err = dgp.materialize_remote_only_files(
+        tmp_path, "SID", dry_run=False
+    )
+    assert written == [] and refused == [] and err == "boom"

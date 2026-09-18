@@ -591,6 +591,63 @@ def validate_no_remote_only_deletions(
     return [], ""
 
 
+# --- selective pull-first (2026-09-18, Gary: "pull from remote before push") ---
+#
+# `clasp push` = projects.updateContent = clears ALL remote files, so a live
+# file with no local counterpart is deleted. The remedy is to make the remote
+# files local FIRST. Do NOT just run `clasp pull`: it writes EVERY remote file
+# over the local tree (clasp files.js WriteFiles -> fs.writeFile, no prompt) and
+# ignores `.claspignore`, so it silently reverts local edits AND drops a live
+# Credentials accessor onto disk (a leak vector). Instead we materialise ONLY
+# the files absent locally -- never touching an existing local file. Secret
+# accessors are NOT written to disk; they must be tracked as secret-free
+# pointers (GAS_SCRIPT_PROPERTIES.md 1.6), so they stay for the guard to refuse.
+
+EXT_BY_TYPE = {"SERVER_JS": ".js", "HTML": ".html", "JSON": ".json"}
+SECRET_STEM_MARKERS = ("credential", "secret")
+
+
+def _is_secret_accessor(name: str) -> bool:
+    """True if `name` looks like a secret accessor we must never write to disk."""
+    stem = Path(name).stem.lower()
+    return any(m in stem for m in SECRET_STEM_MARKERS)
+
+
+def materialize_remote_only_files(
+    project_dir: Path, sid: str, dry_run: bool
+) -> tuple[list[str], list[str], str]:
+    """Write remote-only files into project_dir so a later push won't delete them.
+
+    Returns (written, refused_secret, error). Writes ONLY files with no local
+    counterpart, so a local file / local edit is never overwritten. Refuses to
+    write secret accessors (see module note). Fail-open: returns an error string
+    on fetch failure and writes nothing.
+    """
+    live, err = fetch_live_project_files(sid)
+    if live is None:
+        return [], [], err
+    local = _local_upload_names(project_dir)
+    written: list[str] = []
+    refused: list[str] = []
+    for f in live:
+        name = f.get("name") or ""
+        if not name or name in local:
+            continue
+        if _is_secret_accessor(name):
+            refused.append(name)
+            continue
+        ext = EXT_BY_TYPE.get(f.get("type", ""), ".js")
+        dest = project_dir / f"{name}{ext}"
+        if dest.exists():
+            continue  # never clobber an existing local file
+        if dry_run:
+            written.append(f"{dest.name} (dry-run)")
+            continue
+        dest.write_text(f.get("source") or "", encoding="utf-8")
+        written.append(dest.name)
+    return written, refused, ""
+
+
 def warn_if_orphan(project_dir: Path, sid: str) -> None:
     """Soft warning: scriptId absent from the active clasp account's project
     list => push will likely fail with 'Requested entity was not found'."""
@@ -637,6 +694,11 @@ def main() -> int:
         "--skip-remote-only-guard",
         action="store_true",
         help="push even if live files absent locally would be deleted (remote-only-file guard)",
+    )
+    ap.add_argument(
+        "--pull-first",
+        action="store_true",
+        help="materialise remote-only files before pushing (never overwrites local files)",
     )
     ap.add_argument(
         "--lease-id",
@@ -723,6 +785,25 @@ def main() -> int:
             return 1
         if a_note:
             print(f"  ! {a_note}")
+
+    # Selective pull-first (2026-09-18, Gary: "pull from remote before push").
+    # Materialise remote-only files so the push below cannot delete them. We do
+    # NOT run a blind `clasp pull` (it overwrites the whole local tree, silently
+    # reverting local edits) -- only files absent locally are written, and never
+    # a secret accessor.
+    if args.pull_first:
+        p_written, p_refused, p_err = materialize_remote_only_files(
+            project_dir, sid, dry_run=dry_run
+        )
+        for w in p_written:
+            print(f"  + pulled remote-only {w}")
+        for r in p_refused:
+            print(
+                f"  X refusing to pull secret accessor {r} "
+                f"(track a secret-free pointer instead)"
+            )
+        if p_err:
+            print(f"  ! pull-first skipped (fail-open): {p_err}")
 
     # Remote-only-file guard (2026-09-18): `clasp push` = projects.updateContent,
     # which clears ALL remote files before writing the pushed set, so a live file
