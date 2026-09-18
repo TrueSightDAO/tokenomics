@@ -39,6 +39,7 @@ google_app_scripts/**/Credentials.js
 # (Credentials.gs.js leaked the Wix token). Catch any *Credential* .gs.js too.
 google_app_scripts/**/*redential*.gs.js
 !google_app_scripts/**/Credentials.sample.js
+!google_app_scripts/1K1wcXFAopSA0cI7oBpu5bl1sagrJ2Quv44B0ppjiIxtl3MKJ_PCsppCf/Credentials.js
 
 # Schema validation output
 python_scripts/schema_validation/discovered_headers.json
