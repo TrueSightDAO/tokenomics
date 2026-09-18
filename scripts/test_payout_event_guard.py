@@ -170,3 +170,22 @@ def test_behavioral_harness():
     )
     assert proc.returncode == 0, f"guard harness failed:\n{proc.stdout}\n{proc.stderr}"
     assert "0 failed" in proc.stdout
+
+
+def test_trigger_installer_reports_status():
+    """The installer must report its outcome so the hourly-cron fallback is
+    verifiable from the action's own JSON response (no log access needed)."""
+    src = SINK.read_text()
+    m = re.search(r"function ensurePayoutEventHourlyTriggerInstalled_\(\) \{(.*?)\n\}", src, re.S)
+    assert m, "installer not found"
+    body = m.group(1)
+    assert "'present'" in body, "installer must return 'present' when already installed"
+    assert "'installed'" in body, "installer must return 'installed' on create"
+    assert "catch" in body, "installer must not throw (report error status instead)"
+
+
+def test_trigger_status_surfaced_in_response():
+    """Both the early (empty-intake) and main returns must include `trigger:`."""
+    src = SINK.read_text()
+    n = len(re.findall(r"trigger:\s*triggerStatus", src))
+    assert n >= 2, f"expected trigger status surfaced in both returns, found {n}"
