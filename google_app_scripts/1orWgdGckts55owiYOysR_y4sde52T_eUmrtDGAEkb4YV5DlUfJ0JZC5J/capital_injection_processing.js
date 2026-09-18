@@ -13,10 +13,15 @@
 // CONSTANTS
 // ============================================================================
 
-const creds = getCredentials();
-
 const MAX_REDIRECTS = 10;
-const WIX_ACCESS_TOKEN = creds.WIX_API_KEY; // Wix API key for fetching ledger configurations
+
+// NOTE (2026-09-18): removed `const creds = getCredentials();` and the
+// `WIX_ACCESS_TOKEN` constant. WIX_ACCESS_TOKEN was never referenced anywhere in
+// this project (grep = 0 uses) — getLedgerConfigsFromWix() reads Google Sheets,
+// not the Wix API — so the only effect of the call was a top-level dependency on
+// a Credentials accessor that does not exist in this project. That top-level
+// `getCredentials()` threw `ReferenceError` at load time, breaking EVERY function
+// in the project (including parseAndProcessCurrencyConversionLogs and doGet).
 
 // Spreadsheet URLs
 const TELEGRAM_LOGS_URL = 'https://docs.google.com/spreadsheets/d/1qbZZhf-_7xzmDTriaJVWj6OZshyQsFkdsAV8-pyzASQ/edit';
