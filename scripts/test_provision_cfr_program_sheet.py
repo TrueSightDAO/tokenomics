@@ -121,3 +121,106 @@ def test_plan_for_is_group_aware():
         tab: act for act, tab in mod.plan_for(mod.OPS_WORKBOOK_TABS, ["payouts"])
     }
     assert present == {"payouts": "exists"}
+
+
+# ---------------------------------------------------------------------------
+# Regression: a SINGLE --execute run must provision BOTH the tabs AND their
+# header rows. 2026-09-17 bug: `existing` was computed BEFORE the addSheet
+# batchUpdate, so the header-write loop skipped every freshly-created tab,
+# forcing a second run. This test fails on the unpatched script.
+# ---------------------------------------------------------------------------
+
+
+class _FakeSheet:
+    """Minimal stand-in for the googleapiclient sheets() resource chain."""
+
+    def __init__(self):
+        self.titles = ["Sheet1"]  # a brand-new Google Sheet
+        self.headers: dict[str, list] = {}  # tab -> row-1 values
+
+    # --- spreadsheets().get() ---
+    def _get(self, spreadsheetId=None, fields=None):
+        rows = [{"properties": {"title": t}} for t in self.titles]
+        return _Resp(
+            {
+                "properties": {"title": "fake"},
+                "sheets": rows,
+            }
+        )
+
+    # --- spreadsheets().batchUpdate() ---
+    def _batch_update(self, spreadsheetId=None, body=None):
+        for req in body["requests"]:
+            self.titles.append(req["addSheet"]["properties"]["title"])
+        return _Resp({})
+
+    # --- spreadsheets().values() ---
+    def _values(self):
+        return _FakeValues(self)
+
+    def spreadsheets(self):
+        outer = self
+
+        class _Spreadsheets:
+            def get(self, **kw):
+                return outer._get(**kw)
+
+            def batchUpdate(self, **kw):
+                return outer._batch_update(**kw)
+
+            def values(self):
+                return outer._values()
+
+        return _Spreadsheets()
+
+
+class _Resp:
+    def __init__(self, payload):
+        self._payload = payload
+
+    def execute(self):
+        return self._payload
+
+
+class _FakeValues:
+    def __init__(self, sheet: _FakeSheet):
+        self.sheet = sheet
+
+    def get(self, spreadsheetId=None, range=None):
+        tab = range.split("!")[0].strip("'")
+        row = self.sheet.headers.get(tab, [])
+        return _Resp({"values": [row] if row else []})
+
+    def update(self, spreadsheetId=None, range=None, valueInputOption=None, body=None):
+        tab = range.split("!")[0].strip("'")
+        self.sheet.headers[tab] = list(body["values"][0])
+        return _Resp({})
+
+
+def test_single_execute_run_writes_headers_for_created_tabs():
+    mod = _mod()
+    svc = _FakeSheet()
+    rc = mod._ensure(svc, "fake-id", mod.OPS_WORKBOOK_TABS, execute=True)
+    assert rc == 0
+    # the tab was created AND its headers were written in the SAME pass
+    assert "payouts" in svc.titles
+    assert svc.headers.get("payouts") == mod.TIER1_PAYOUT_COLUMNS
+
+
+def test_single_execute_run_provisions_all_cfr_tabs_and_headers():
+    mod = _mod()
+    svc = _FakeSheet()
+    mod._ensure(svc, "fake-id", mod.CFR_PROGRAM_TABS, execute=True)
+    for tab in mod.CFR_PROGRAM_TABS:
+        assert tab in svc.titles, f"{tab} not created"
+        assert svc.headers.get(tab) == mod.CFR_PROGRAM_TABS[tab], (
+            f"{tab} headers not written"
+        )
+
+
+def test_dry_run_creates_nothing_and_writes_no_headers():
+    mod = _mod()
+    svc = _FakeSheet()
+    mod._ensure(svc, "fake-id", mod.OPS_WORKBOOK_TABS, execute=False)
+    assert svc.titles == ["Sheet1"]  # nothing created
+    assert svc.headers == {}  # nothing written
