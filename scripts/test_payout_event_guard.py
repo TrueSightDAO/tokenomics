@@ -172,6 +172,25 @@ def test_behavioral_harness():
     assert "0 failed" in proc.stdout
 
 
+def test_manifest_declares_trigger_scope():
+    """Regression: the installer calls ScriptApp.getProjectTriggers(), which the
+    live webapp was DENIED ("You do not have permission to call
+    ScriptApp.getProjectTriggers ... /auth/script.scriptapp") because the
+    manifest declared no oauthScopes. Without this scope #513's hourly-cron
+    fallback silently never installs."""
+    import json
+
+    manifest = json.loads((PROJECT / "appsscript.json").read_text())
+    scopes = manifest.get("oauthScopes")
+    assert scopes, "appsscript.json must declare oauthScopes explicitly"
+    for required in (
+        "https://www.googleapis.com/auth/script.scriptapp",
+        "https://www.googleapis.com/auth/spreadsheets",
+        "https://www.googleapis.com/auth/script.external_request",
+    ):
+        assert required in scopes, f"missing scope {required}"
+
+
 def test_trigger_installer_reports_status():
     """The installer must report its outcome so the hourly-cron fallback is
     verifiable from the action's own JSON response (no log access needed)."""
