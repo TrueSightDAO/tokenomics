@@ -427,6 +427,10 @@ function processTelegramLogs() {
 //   Path B — no open balance (planted before payment): book `+1 Cacao Tree - To Be Paid For`
 //            on the MAIN ledger always (§0.3).
 //
+// IDEMPOTENCY (envoy review, PR3 follow-up): refuses to run twice for the same SunMint row —
+// keyed on a Description marker ("SunMint Tree Planting row N") written by BOTH paths — so a
+// status reset to NEW, a duplicate delivery inside one run, or a manual re-run cannot double-book.
+//
 // SYSTEM IDENTITY (§0.7 default / §7 open item): GAS holds no signing key, so this cannot emit an
 // RSA-signed event the way Edgar / edgar_client.py does. It therefore follows the codebase's existing
 // pattern for a handler-produced ledger effect — a direct, idempotent append whose Description names
@@ -461,6 +465,7 @@ function reconcileTreePlanting_(contributorName, sunMintRowNumber) {
     }
 
     const lastRow = offchain.getLastRow();
+    const reconMarker = sunMintRowNumber ? ('SunMint Tree Planting row ' + sunMintRowNumber) : '';
     const purchases = [];   // {row} — FIFO order = sheet order
     let balanceUnits = 0;   // Σ amounts on this literal for this farmer
     let consumedUnits = 0;  // Σ |negative amounts|
@@ -468,6 +473,17 @@ function reconcileTreePlanting_(contributorName, sunMintRowNumber) {
     if (lastRow >= 2) {
       const data = offchain.getRange(2, 1, lastRow - 1, 5).getValues(); // A..E
       for (let i = 0; i < data.length; i++) {
+        // Idempotency guard (envoy review, PR3 follow-up): if a reconciliation row already
+        // names THIS SunMint row, do nothing. The upstream Message-ID dedup only protects
+        // against replaying an already-appended message -- it does NOT stop a second fire for
+        // the same row (status reset to NEW, a duplicate delivery inside one run since the
+        // dedup arrays are read once and never mutated, or a manual re-run). Without this,
+        // both paths would double-book. Keyed on a Description marker set by BOTH paths,
+        // since Path B writes nothing else back to the row.
+        if (reconMarker && String(data[i][1] || '').indexOf(reconMarker) !== -1) {
+          Logger.log('reconcileTreePlanting_: already reconciled (' + reconMarker + '), skipping');
+          return;
+        }
         if (String(data[i][4] || '').trim() !== RECON_PURCHASED_LITERAL) continue; // E: Currency
         if (String(data[i][2] || '').trim() !== contributorName) continue;         // C: Fund Handler
         const amt = Number(data[i][3]);                                            // D: Amount
