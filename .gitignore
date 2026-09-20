@@ -63,3 +63,7 @@ broken the ANYONE_ANONYMOUS doGet inventory webhook (@v14) with
 # Schema validation output
 python_scripts/schema_validation/discovered_headers.json
 schema_output.txt
+
+# Python bytecode
+__pycache__/
+*.pyc

@@ -5,9 +5,10 @@ import fs from 'fs';
 const src = fs.readFileSync(process.argv[2], 'utf8');
 
 // ---- minimal GAS stubs -----------------------------------------------------
-let mainSheets = {}, managedSheets = {};
+let mainSheets = {}, managedSheets = {}, sourceSheets = {};
 const MAIN_URL = 'https://docs.google.com/spreadsheets/d/1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU/edit';
 const MANAGED_URL = 'https://docs.google.com/spreadsheets/d/MANAGED_LEDGER_XYZ/edit';
+const SOURCE_URL = 'https://docs.google.com/spreadsheets/d/1qbZZhf-_7xzmDTriaJVWj6OZshyQsFkdsAV8-pyzASQ/edit?gid=0#gid=0';
 
 function makeSheet(name, grid) {
   let g = grid ? grid.map(r => r.slice()) : [];
@@ -40,6 +41,9 @@ globalThis.SpreadsheetApp = {
     if (u.indexOf('MANAGED_LEDGER_XYZ') >= 0) {
       return { getSheetByName(n){ return managedSheets[n] || null; } };
     }
+    if (u.indexOf('1qbZZhf-_7xzmDTriaJVWj6OZshyQsFkdsAV8-pyzASQ') >= 0) {
+      return { getSheetByName(n){ return sourceSheets[n] || null; } };
+    }
     throw new Error('unexpected spreadsheet url: ' + u);
   },
   openById(id){ return this.openByUrl(id); }
@@ -48,10 +52,18 @@ globalThis.Logger = { log(){} };
 globalThis.Sheet = {};
 // ---------------------------------------------------------------------------
 
+// The link handler reuses process_qr_code_updates.js's SOURCE_SHEET_URL (shared GAS scope); expose it.
+globalThis.SOURCE_SHEET_URL = SOURCE_URL;
+// UrlFetchApp stub for the plot-media fetch (PR6) - overridden per-test via setMediaJson/.
+let __mediaResp = { code: 200, text: JSON.stringify({ plots: {} }) };
+globalThis.UrlFetchApp = { fetch(){ return { getResponseCode(){ return __mediaResp.code; }, getContentText(){ return __mediaResp.text; } }; } };
+
 // eval source + export in the SAME indirect eval, so the source's top-level consts are in scope
 const EXPORTS = ['tplComputeLegs_','tplResolveSource_','tplWriteLegs_','appendTreePlantingLedgerFulfillment_',
   'TPL_MAIN_DAO_LEDGER_URL','TPL_MAIN_DAO_OFFCHAIN_TAB','TPL_TRANSACTIONS_TAB','TPL_POOL_LITERAL',
-  'TPL_CUSTOMER_LIABILITY_LITERAL','TPL_TRANSFER_CURRENCY','TPL_MAIN_LEDGER_LEDGER_URLS'];
+  'TPL_CUSTOMER_LIABILITY_LITERAL','TPL_TRANSFER_CURRENCY','TPL_MAIN_LEDGER_LEDGER_URLS',
+  'tplResolvePlotContributor_','tplPickPlotImage_','tplResolvePlotImage_',
+  'TPL_PLOTS_TAB','TPL_PLOTS_CONTRIBUTOR_NAME_COL','TPL_LINKED_PLOT_ID_COL'];
 (0, eval)(src + "\n;Object.assign(globalThis, {" + EXPORTS.join(',') + "});");
 
 const tplComputeLegs_ = globalThis.tplComputeLegs_;
@@ -60,12 +72,21 @@ const tplWriteLegs_ = globalThis.tplWriteLegs_;
 const appendTreePlantingLedgerFulfillment_ = globalThis.appendTreePlantingLedgerFulfillment_;
 const TPL_POOL_LITERAL = globalThis.TPL_POOL_LITERAL;
 const TPL_CUSTOMER_LIABILITY_LITERAL = globalThis.TPL_CUSTOMER_LIABILITY_LITERAL;
+const tplResolvePlotContributor_ = globalThis.tplResolvePlotContributor_;
+const tplPickPlotImage_ = globalThis.tplPickPlotImage_;
+const tplResolvePlotImage_ = globalThis.tplResolvePlotImage_;
+const TPL_PLOTS_CONTRIBUTOR_NAME_COL = globalThis.TPL_PLOTS_CONTRIBUTOR_NAME_COL;
+const TPL_LINKED_PLOT_ID_COL = globalThis.TPL_LINKED_PLOT_ID_COL;
 
 let pass=0, fail=0;
 function t(name, fn){ try{ fn(); pass++; console.log('  ok  '+name); }catch(e){ fail++; console.log('FAIL  '+name+'\n      '+e.message); } }
 function eq(a,b,m){ if(a!==b) throw new Error((m||'')+' expected '+JSON.stringify(b)+' got '+JSON.stringify(a)); }
 
-function reset(){ mainSheets={}; managedSheets={}; }
+function reset(){ mainSheets={}; managedSheets={}; sourceSheets={}; __mediaResp={ code:200, text: JSON.stringify({ plots:{} }) }; }
+function setSource(n,g){ sourceSheets[n]=makeSheet(n,g); }
+function setMedia(m){ __mediaResp={ code:200, text: JSON.stringify(m) }; }
+function setMediaCode(c){ __mediaResp={ code:c, text:'{}' }; }
+function plotsGrid(){ return [['Plot ID','Farm ID','Plot Name','Hectares','Status','Boundary Authority','Plot Type','Owner','Region','Verified At','Media','Notes','Coordinates','Latitude','Longitude','Invalidated By','','Invalidated At','Invalidated Reason','Contributor Name']]; }
 function setMain(n,g){ mainSheets[n]=makeSheet(n,g); }
 function setManaged(n,g){ managedSheets[n]=makeSheet(n,g); }
 function mainRows(){ return mainSheets['offchain transactions'] ? mainSheets['offchain transactions'].getDataRange().getValues() : []; }
@@ -165,6 +186,55 @@ t('farmer name falls back to governor when SunMint col J is blank', () => {
   eq(ok, true);
   eq(managedRows()[1][4], TPL_CUSTOMER_LIABILITY_LITERAL);
 });
+
+console.log('== PR6 tplPickPlotImage_ ==');
+t('image preferred over video', () => {
+  const mj = { plots: { 'P1': { media: [ {kind:'video',url:'v',thumbnail:'t'}, {kind:'image',url:'img'} ] } } };
+  eq(tplPickPlotImage_(mj,'P1'), 'img');
+});
+t('video thumbnail fallback when no stills', () => {
+  const mj = { plots: { 'V-06-29': { media: [ {kind:'video',url:'v',thumbnail:'thumb.jpg'} ] } } };
+  eq(tplPickPlotImage_(mj,'V-06-29'), 'thumb.jpg');
+});
+t('unknown plot -> empty', () => { eq(tplPickPlotImage_({plots:{}}, 'ZZ'), ''); });
+t('no media -> empty', () => { eq(tplPickPlotImage_({plots:{'P1':{media:[]}}}, 'P1'), ''); });
+t('malformed -> empty (never throws)', () => { eq(tplPickPlotImage_(null, 'P1'), ''); });
+
+console.log('== PR6 tplResolvePlotContributor_ ==');
+t('registered contributor name -> resolved', () => {
+  reset();
+  const g = plotsGrid(); g.push(['FC-P1','fazenda-clara-bahia','', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', 'Fernando Soller Gimenez']);
+  setSource(TPL_PLOTS_TAB, g);
+  const r = tplResolvePlotContributor_('FC-P1');
+  eq(r.contributorName, 'Fernando Soller Gimenez'); eq(r.plotId, 'FC-P1');
+});
+t('blank contributor name -> null (fail closed)', () => {
+  reset();
+  const g = plotsGrid(); g.push(['PL-002','fazenda-bom-sucesso']);
+  setSource(TPL_PLOTS_TAB, g);
+  eq(tplResolvePlotContributor_('PL-002'), null);
+});
+t('unknown plot -> null', () => {
+  reset(); setSource(TPL_PLOTS_TAB, plotsGrid());
+  eq(tplResolvePlotContributor_('NOPE'), null);
+});
+t('missing registry tab -> null (never throws)', () => {
+  reset(); eq(tplResolvePlotContributor_('FC-P1'), null);
+});
+t('empty plot id -> null', () => { eq(tplResolvePlotContributor_(''), null); });
+
+console.log('== PR6 tplResolvePlotImage_ ==');
+t('fetch 200 -> picks image url', () => {
+  setMedia({ plots: { 'FC-P1': { media: [ {kind:'image',url:'https://x/a.jpg'} ] } } });
+  eq(tplResolvePlotImage_('FC-P1'), 'https://x/a.jpg');
+});
+t('fetch non-200 -> empty (fail closed)', () => {
+  setMediaCode(500); eq(tplResolvePlotImage_('FC-P1'), '');
+});
+
+console.log('== PR6 constants ==');
+t('Linked Plot ID is column AC (index 28)', () => { eq(TPL_LINKED_PLOT_ID_COL, 28); });
+t('plot contributor name is column T (index 19)', () => { eq(TPL_PLOTS_CONTRIBUTOR_NAME_COL, 19); });
 
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);
