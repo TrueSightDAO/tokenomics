@@ -325,6 +325,7 @@ function processTelegramLogs() {
               ]);
 
               const treePlantingRowNumber = sunMintTab.getLastRow();
+              if (rowStatus === 'NEW') reconcileTreePlanting_(contributorName, treePlantingRowNumber); // PR3
               sendTreePlantingNotification([
                 row[0], row[1], row[2], row[3], row[4], contributionMade, row[11], fileId,
                 photoUrl, contributorName, latitude, longitude, rowStatus, species, commitUrl || "N/A",
@@ -395,6 +396,7 @@ function processTelegramLogs() {
           ]);
 
           const treePlantingRowNumber = sunMintTab.getLastRow();
+          if (rowStatus === 'NEW') reconcileTreePlanting_(contributorName, treePlantingRowNumber); // PR3
           sendTreePlantingNotification([
             row[0], row[1], row[2], row[3], row[4], contributionMade, row[11], fileId,
             photoUrl, contributorName, latitude, longitude, rowStatus, species, commitUrl,
@@ -408,6 +410,146 @@ function processTelegramLogs() {
       }
     }
   });
+}
+
+// =====================================================================================
+// PR3 — SunMint farmer-settlement reconciliation
+// =====================================================================================
+// Spec: agentic_ai_context/plans/SUNMINT_FARMER_SETTLEMENT_AND_BATCH_LINK_PLAN.md §1.2.
+//
+// Runs on a newly-confirmed planting (Status "NEW"). Reuses the main ledger's
+// `offchain transactions` tab: the three tree-planting literals are plain string line-items,
+// never `Currencies` rows (tokenomics/SCHEMA.md -> Tree-Planting Ledger Literals).
+//
+//   Path A — the farmer has an open `Cacao Tree Purchased - Not Planted` balance (prepaid):
+//            consume 1 FIFO unit -> `-1 Purchased-Not-Planted` / `+1 Planted-Unassigned`, and
+//            stamp the SunMint row's `Payment Event Ref` with the consumed purchase.
+//   Path B — no open balance (planted before payment): book `+1 Cacao Tree - To Be Paid For`
+//            on the MAIN ledger always (§0.3).
+//
+// SYSTEM IDENTITY (§0.7 default / §7 open item): GAS holds no signing key, so this cannot emit an
+// RSA-signed event the way Edgar / edgar_client.py does. It therefore follows the codebase's existing
+// pattern for a handler-produced ledger effect — a direct, idempotent append whose Description names
+// the system identity and whose trigger is the farmer's own already-signed `[TREE PLANTING EVENT]`
+// (cf. appendTreePlantingLedgerFulfillment_ in the sibling link handler). Promoting the match to a
+// fully signed event needs a dedicated system signing identity — the one §7 item this PR leaves open.
+
+const RECON_PURCHASED_LITERAL = 'Cacao Tree Purchased - Not Planted';
+const RECON_PLANTED_UNASSIGNED_LITERAL = 'Cacao Tree Planted - Unassigned';
+const RECON_TO_BE_PAID_LITERAL = 'Cacao Tree - To Be Paid For';
+const RECON_OFFCHAIN_TAB = 'offchain transactions';
+const RECON_OPS_SS_ID = '1qbZZhf-_7xzmDTriaJVWj6OZshyQsFkdsAV8-pyzASQ';
+const RECON_ASSET_RECEIPTS_TAB = 'Asset Receipts';
+const SUNMINT_CONTRIBUTOR_NAME_COL = 9;   // Column J (0-based) — Contributor Name (§1.7 match key)
+const SUNMINT_PAYMENT_EVENT_REF_COL = 20; // Column U (0-based) — Payment Event Ref (PR3)
+
+/**
+ * Reconcile one newly-confirmed planting against the farmer's open `Cacao Tree Purchased - Not
+ * Planted` balance. Never throws — a ledger hiccup must not break ingestion.
+ */
+function reconcileTreePlanting_(contributorName, sunMintRowNumber) {
+  try {
+    if (!contributorName || contributorName === 'Unknown') {
+      Logger.log('reconcileTreePlanting_: skipped (no verified contributor name)');
+      return;
+    }
+    const mainSs = SpreadsheetApp.openById(contributorsSheetId);
+    const offchain = mainSs.getSheetByName(RECON_OFFCHAIN_TAB);
+    if (!offchain) {
+      Logger.log('reconcileTreePlanting_: no "' + RECON_OFFCHAIN_TAB + '" tab');
+      return;
+    }
+
+    const lastRow = offchain.getLastRow();
+    const purchases = [];   // {row} — FIFO order = sheet order
+    let balanceUnits = 0;   // Σ amounts on this literal for this farmer
+    let consumedUnits = 0;  // Σ |negative amounts|
+
+    if (lastRow >= 2) {
+      const data = offchain.getRange(2, 1, lastRow - 1, 5).getValues(); // A..E
+      for (let i = 0; i < data.length; i++) {
+        if (String(data[i][4] || '').trim() !== RECON_PURCHASED_LITERAL) continue; // E: Currency
+        if (String(data[i][2] || '').trim() !== contributorName) continue;         // C: Fund Handler
+        const amt = Number(data[i][3]);                                            // D: Amount
+        if (isNaN(amt)) continue;
+        balanceUnits += amt;
+        if (amt > 0) purchases.push({ row: i + 2 });
+        else if (amt < 0) consumedUnits += -amt;
+      }
+    }
+
+    const today = new Date();
+    const sunRef = sunMintRowNumber ? ('SunMint Tree Planting row ' + sunMintRowNumber) : 'SunMint';
+
+    if (balanceUnits >= 1) {
+      // Path A — consume the FIFO purchase (§1.2).
+      const idx = Math.min(Math.round(consumedUnits), purchases.length - 1);
+      const purchase = purchases[idx] || purchases[0] || null;
+      const ref = purchase ? findPurchaseRefForOffchainRow_(purchase.row) : '';
+      const desc = 'SunMint farmer settlement (system): -1 ' + RECON_PURCHASED_LITERAL +
+        ' / +1 ' + RECON_PLANTED_UNASSIGNED_LITERAL + ' for ' + contributorName +
+        ' — matched planting confirmation (' + sunRef + ')' +
+        (ref ? ' against purchase ' + ref : '');
+      appendReconRows_(offchain, [
+        [today, desc, contributorName, -1, RECON_PURCHASED_LITERAL, '', 'N'],
+        [today, desc, contributorName, 1, RECON_PLANTED_UNASSIGNED_LITERAL, '', 'N']
+      ]);
+      if (sunMintRowNumber) setPaymentEventRef_(sunMintRowNumber, ref || desc);
+      Logger.log('reconcileTreePlanting_: Path A booked for ' + contributorName +
+        ' (balance ' + balanceUnits + ', ref ' + (ref || 'n/a') + ')');
+    } else {
+      // Path B — no open balance: liability booked on MAIN always (§0.3).
+      const desc = 'SunMint farmer settlement (system): +1 ' + RECON_TO_BE_PAID_LITERAL +
+        ' for ' + contributorName +
+        ' — planting confirmation with no open purchase balance (' + sunRef + ')';
+      appendReconRows_(offchain, [
+        [today, desc, contributorName, 1, RECON_TO_BE_PAID_LITERAL, '', 'N']
+      ]);
+      Logger.log('reconcileTreePlanting_: Path B booked for ' + contributorName);
+    }
+  } catch (e) {
+    Logger.log('reconcileTreePlanting_ failed: ' + e.message);
+  }
+}
+
+/** Append A..G rows to a ledger tab, starting one row below the last. */
+function appendReconRows_(sheet, rows) {
+  const lastRow = sheet.getLastRow();
+  sheet.getRange(lastRow + 1, 1, rows.length, rows[0].length).setValues(rows);
+}
+
+/** Best-effort join: offchain row number -> the `Asset Receipts` audit row's Telegram Update ID. */
+function findPurchaseRefForOffchainRow_(offchainRowNumber) {
+  try {
+    const opsId = (creds && creds.SHEET_ID) ? creds.SHEET_ID : RECON_OPS_SS_ID;
+    const audit = SpreadsheetApp.openById(opsId).getSheetByName(RECON_ASSET_RECEIPTS_TAB);
+    if (!audit || audit.getLastRow() < 2) return '';
+    const data = audit.getRange(2, 1, audit.getLastRow() - 1, 7).getValues();
+    const target = String(offchainRowNumber).trim();
+    for (let i = 0; i < data.length; i++) {
+      if (String(data[i][5] || '').trim() === target) {   // F: Offchain Row
+        const uid = String(data[i][0] || '').trim();       // A: Telegram Update ID
+        if (uid) return '[ASSET RECEIPT EVENT] ' + uid;
+      }
+    }
+    return '';
+  } catch (e) {
+    Logger.log('findPurchaseRefForOffchainRow_ failed: ' + e.message);
+    return '';
+  }
+}
+
+/** Write the SunMint row's `Payment Event Ref` (col U), creating the header cell once if absent. */
+function setPaymentEventRef_(sunMintRowNumber, ref) {
+  try {
+    const sheet = SpreadsheetApp.openById(creds.SHEET_ID).getSheetByName(sunMintTabName);
+    if (!sheet) return;
+    const hdr = sheet.getRange(1, SUNMINT_PAYMENT_EVENT_REF_COL + 1);
+    if (String(hdr.getValue() || '').trim() === '') hdr.setValue('Payment Event Ref');
+    sheet.getRange(sunMintRowNumber, SUNMINT_PAYMENT_EVENT_REF_COL + 1).setValue(String(ref || ''));
+  } catch (e) {
+    Logger.log('setPaymentEventRef_ failed: ' + e.message);
+  }
 }
 
 // ========== Governor-only read endpoint (PR3, Sunmint tree-planting -> QR linking roadmap) ==========
