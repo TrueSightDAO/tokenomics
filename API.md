@@ -511,6 +511,59 @@ Request Transaction ID: {signature_hash}
 
 **DApp:** `dapp.truesight.me/link_tree_planting.html`. **CLI:** `python -m truesight_dao_client.modules.link_tree_planting`.
 
+### 10. Asset Receipt — and Tree Purchase
+
+**Format**:
+```
+[ASSET RECEIPT EVENT]
+- Currency: {currency_name}
+- Amount: {amount}
+- Description: {description}
+- Fund Handler: {fund_handler}
+- Attached Filename: {filename}
+--------
+
+My Digital Signature: {public_key}
+
+Request Transaction ID: {signature_hash}
+```
+
+Books a positive offchain inventory leg (on the main ledger) for cash paid to acquire an offchain
+asset. Processed by the `asset_receipt_ingest` GAS web app
+(`processAssetReceiptsFromTelegramChatLogs`), which dedups against the `Asset Receipts` tab, appends
+the audit row, auto-creates the `Currencies` row if absent, and writes the offchain row.
+**CLI:** `python -m truesight_dao_client.modules.report_asset_receipt`
+(`truesight-dao-report-asset-receipt`). **DApp:** `dapp.truesight.me/report_asset_receipt.html`.
+
+#### Tree Purchase — a naming convention on this event, not a new event type
+
+The DAO paying a farmer or cooperative for a tree **not yet confirmed planted** is submitted as the
+existing `[ASSET RECEIPT EVENT]` with `Currency = "Cacao Tree Purchased - Not Planted"` — a literal
+line-item string, never a `Currencies` row (see `SCHEMA.md` → *Tree-Planting Ledger Literals*). This
+books the "prepaid asset" leg of the SunMint farmer-settlement model; the reconciliation match later
+consumes it (`-1 Purchased-Not-Planted` / `+1 Planted-Unassigned`) and a `[FARMER PAYMENT EVENT]`
+discharges the paired liability. Spec:
+`agentic_ai_context/plans/SUNMINT_FARMER_SETTLEMENT_AND_BATCH_LINK_PLAN.md` §1.2 / §0.9.
+
+> **Verified 2026-09-20** (`clasp pull` of `asset_receipt_ingest`): `Currency Name` on this event is
+> **open-ended** — the handler accepts any string and auto-creates the `Currencies` row, so **no
+> allowlist change** is required for the three tree-planting literals. (A `(Test …)`-suffixed currency
+> is deliberately *not* given a rate row, per the 2026-08-29 QA guard.)
+
+### 11. Farmer Payment and Reconciliation (planned — SunMint farmer settlement)
+
+**Not yet implemented** — lands in PR4 of the SunMint farmer-settlement plan. Two forthcoming
+system-generated / governor-signed events complete the model:
+- **`[FARMER PAYMENT EVENT]`** — records a cash payout to a farmer/cooperative for confirmed tree(s),
+  discharging the `Cacao Tree - To Be Paid For` liability and/or drawing from the
+  `Cacao Tree Planted - Unassigned` settled pool. Generalizes the existing CFR `payouts` mechanism
+  (`tree_planting_id` / `bank_ref` / `receipt_url` / `program_slug`). A CLI wrapper is a PR4
+  deliverable (today only the DApp page `dapp_beta/report_payout_event.html` exists).
+- **Reconciliation match (system-signed)** — emitted by the SunMint handler when a new planting
+  confirmation matches an outstanding `Cacao Tree Purchased - Not Planted` balance for that farmer:
+  `-1 Purchased-Not-Planted` / `+1 Planted-Unassigned`, with the SunMint row's `Payment Event Ref`
+  written to point back at the originating receipt.
+
 ## Request Verification
 
 All requests can be verified using the verification endpoint at `https://dapp.truesight.me/verify_request.html`.

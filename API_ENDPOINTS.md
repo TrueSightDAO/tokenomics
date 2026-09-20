@@ -57,6 +57,7 @@ Verify submission here: https://dapp.truesight.me/verify_request.html
 - `[QR CODE UPDATE EVENT]` - QR code status/email updates (NEW)
 - `[CONTRIBUTION EVENT]` - General contributions
 - `[TREE PLANTING EVENT]` - Tree planting submissions
+- `[ASSET RECEIPT EVENT]` - Offchain asset/cash acquisitions; used for tree purchases via `Currency = "Cacao Tree Purchased - Not Planted"` (see API.md §10)
 - `[FARM REGISTRATION EVENT]` - Farm registrations
 - `[NOTARIZATION EVENT]` - Document notarizations
 
