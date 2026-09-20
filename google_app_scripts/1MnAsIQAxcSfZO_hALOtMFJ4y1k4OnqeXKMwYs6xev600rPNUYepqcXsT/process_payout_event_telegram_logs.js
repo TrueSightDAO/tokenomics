@@ -99,6 +99,32 @@ var PAYOUT_EVENT_DEFAULT_CURRENCY = 'BRL';
 var PAYOUT_EVENT_UNLINKED_RECIPIENT = 'unlinked_recipient';
 var PAYOUT_EVENT_UNLINKED_TREES = 'unlinked';
 
+/**
+ * PR4 - SunMint farmer settlement ([FARMER PAYMENT EVENT]) ledger legs.
+ * Spec: agentic_ai_context/plans/SUNMINT_FARMER_SETTLEMENT_AND_BATCH_LINK_PLAN.md SS1.2 / SS1.4 / SS0.11.
+ * A `[PAYOUT EVENT]` that carries a `tree_planting_id` settles a SunMint unit (SS0.10) - no new
+ * event or tag is introduced. The three tree-planting literals are plain string line-items
+ * (tokenomics/SCHEMA.md -> Tree-Planting Ledger Literals), never `Currencies` rows.
+ */
+var FPE_TO_BE_PAID_LITERAL = 'Cacao Tree - To Be Paid For';
+var FPE_PLANTED_UNASSIGNED_LITERAL = 'Cacao Tree Planted - Unassigned';
+var FPE_MAIN_LEDGER_SPREADSHEET_ID = '1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU';
+var FPE_MAIN_OFFCHAIN_TAB = 'offchain transactions';
+var FPE_MANAGED_TRANSACTIONS_TAB = 'Transactions';
+var FPE_QR_CODES_SHEET = 'Agroverse QR codes';
+var FPE_QR_LEDGER_URL_COL = 2;                  // Column C (0-based) -> the QR's own ledger URL
+var FPE_SHIPMENT_LEDGER_LISTING_TAB = 'Shipment Ledger Listing';
+var FPE_SUNMINT_TAB = 'SunMint Tree Planting';
+var FPE_SUNMINT_LINKED_QR_COL = 17;             // Column R (0-based) -> Linked QR Code
+var FPE_MAIN_LEDGER_LEDGER_URLS = [             // ledger URLs whose fulfilment routes to the MAIN ledger
+  'https://agroverse.shop/agl4',
+  'https://truesight.me/sunmint/main'
+];
+// Is-Revenue flag per leg kind on the main `offchain transactions` tab: a cash-out (payout) leg is
+// NOT revenue -> blank (Envoy, 2026-09-20); the inventory legs match PR3's settlement rows ('N').
+var FPE_CASH_IS_REVENUE = '';
+var FPE_INVENTORY_IS_REVENUE = 'N';
+
 /** Resolve the private `cfr program` spreadsheet (SS11.8). */
 function payoutEventCfrProgramSpreadsheet_() {
   var id = '';
@@ -306,6 +332,57 @@ function payoutEventCollectBankRefs_(values) {
     if (v) seen[v] = true;
   }
   return seen;
+}
+
+/**
+ * PR4 - pure SS0.11 leg computation for a settled SunMint unit. NO I/O (unit-testable).
+ * Returns the ledger legs a `[FARMER PAYMENT EVENT]` must write, as an ordered list of
+ * { target:'main'|'qr', amount:Number, literal:String, kind:'cash'|'inventory', isRevenue:String,
+ *   contributor:String }. An empty array means "refuse" (bad amount / no currency).
+ *
+ *   committed + QR ledger != main -> cross-ledger TRANSFER (SS0.11): -cash on the QR's own ledger,
+ *                                    +cash on main, -1 "Cacao Tree - To Be Paid For" on main.
+ *   committed + QR ledger  = main -> the two cash legs collapse; only -1 To Be Paid For remains.
+ *   uncommitted                   -> -cash, -1 To Be Paid For, +1 "Cacao Tree Planted - Unassigned",
+ *                                    all on main.
+ *
+ * @param {Object} opts
+ * @param {string|number} opts.amount     positive payout amount
+ * @param {string} opts.currency          line-item literal for the cash leg (e.g. 'BRL')
+ * @param {string} opts.contributor      row 'Fund Handler'
+ * @param {boolean} opts.committed        the SunMint row already carries a Linked QR Code
+ * @param {boolean} opts.qrLedgerIsMain   the linked QR's OWN ledger is the main ledger
+ * @return {Array<Object>}
+ */
+function fpeComputeLegs_(opts) {
+  opts = opts || {};
+  var amount = Number(opts.amount);
+  var currency = String(opts.currency || '').trim();
+  var contributor = String(opts.contributor || '').trim();
+  if (isNaN(amount) || !currency) return [];
+  function cash(target, amt) {
+    return { target: target, amount: amt, literal: currency, kind: 'cash',
+             isRevenue: FPE_CASH_IS_REVENUE, contributor: contributor };
+  }
+  function inv(target, amt, literal) {
+    return { target: target, amount: amt, literal: literal, kind: 'inventory',
+             isRevenue: FPE_INVENTORY_IS_REVENUE, contributor: contributor };
+  }
+  if (opts.committed) {
+    if (opts.qrLedgerIsMain) {
+      return [inv('main', -1, FPE_TO_BE_PAID_LITERAL)];
+    }
+    return [
+      cash('qr', -amount),
+      cash('main', amount),
+      inv('main', -1, FPE_TO_BE_PAID_LITERAL)
+    ];
+  }
+  return [
+    cash('main', -amount),
+    inv('main', -1, FPE_TO_BE_PAID_LITERAL),
+    inv('main', 1, FPE_PLANTED_UNASSIGNED_LITERAL)
+  ];
 }
 
 /**

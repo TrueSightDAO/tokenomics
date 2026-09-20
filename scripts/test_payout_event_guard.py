@@ -156,6 +156,22 @@ def test_read_endpoint_is_exposed_for_review():
     assert "getPayoutEvents" in ROUTER.read_text(encoding="utf-8")
 
 
+def test_pr4_pure_leg_computation_present():
+    """PR4 (step 1): the SS0.11 leg arithmetic is a pure, I/O-free function so the
+    money logic is unit-testable before any sheet write is wired in."""
+    src = _src()
+    assert "function fpeComputeLegs_" in src
+    body = src.split("function fpeComputeLegs_", 1)[1].split("\nfunction ", 1)[0]
+    assert "SpreadsheetApp" not in body, "fpeComputeLegs_ must stay I/O-free"
+    for literal in (
+        "Cacao Tree - To Be Paid For",
+        "Cacao Tree Planted - Unassigned",
+    ):
+        assert literal in src
+    assert "FPE_MAIN_LEDGER_SPREADSHEET_ID" in src
+    assert "'qr'" in src  # committed cross-ledger transfer targets the QR's own ledger
+
+
 def test_behavioral_harness():
     node = shutil.which("node")
     if node is None:

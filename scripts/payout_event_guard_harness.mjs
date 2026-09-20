@@ -104,6 +104,38 @@ t('parse extracts canonical fields', ()=>{
   eq(f.currency,'BRL'); eq(f.status,'live'); eq(f.tree_planting_id,'TREE-1, TREE-2');
 });
 
+// ---- PR4 pure leg computation (SS0.11, no I/O) -----------------------------
+t('PR4 uncommitted = -cash/-TBP/+Planted-Unassigned, all on main', ()=>{
+  const legs=fpeComputeLegs_({amount:150,currency:'BRL',contributor:'Paulo',committed:false,qrLedgerIsMain:false});
+  eq(legs.length,3);
+  eq(legs.map(l=>l.target).join(','),'main,main,main');
+  eq(legs[0].amount,-150); eq(legs[0].kind,'cash');
+  eq(legs[1].literal,'Cacao Tree - To Be Paid For'); eq(legs[1].amount,-1);
+  eq(legs[2].literal,'Cacao Tree Planted - Unassigned'); eq(legs[2].amount,1);
+});
+t('PR4 committed cross-ledger = -cash on QR ledger, +cash/-TBP on main', ()=>{
+  const legs=fpeComputeLegs_({amount:150,currency:'BRL',contributor:'Paulo',committed:true,qrLedgerIsMain:false});
+  eq(legs.length,3);
+  eq(legs[0].target,'qr'); eq(legs[0].amount,-150); eq(legs[0].kind,'cash');
+  eq(legs[1].target,'main'); eq(legs[1].amount,150); eq(legs[1].kind,'cash');
+  eq(legs[2].target,'main'); eq(legs[2].literal,'Cacao Tree - To Be Paid For'); eq(legs[2].amount,-1);
+  if(legs.some(l=>l.literal==='Cacao Tree Planted - Unassigned')) throw new Error('phantom pool unit on a committed settlement');
+});
+t('PR4 committed when QR ledger IS main = 1 leg (two cash legs collapse)', ()=>{
+  const legs=fpeComputeLegs_({amount:150,currency:'BRL',contributor:'Paulo',committed:true,qrLedgerIsMain:true});
+  eq(legs.length,1);
+  eq(legs[0].target,'main'); eq(legs[0].amount,-1); eq(legs[0].kind,'inventory');
+  eq(legs[0].literal,'Cacao Tree - To Be Paid For');
+});
+t('PR4 cash-out leg is not revenue', ()=>{
+  const legs=fpeComputeLegs_({amount:1,currency:'BRL',committed:false});
+  eq(legs[0].isRevenue,'');
+});
+t('PR4 fails closed on non-numeric amount / empty currency', ()=>{
+  eq(fpeComputeLegs_({amount:'abc',currency:'BRL'}).length,0);
+  eq(fpeComputeLegs_({amount:1,currency:''}).length,0);
+});
+
 // ---- CFR routing -----------------------------------------------------------
 t('CFR detected by program_slug', ()=>eq(payoutEventIsCfr_('crf-anapu',''),true));
 t('CFR detected by submission source host', ()=>eq(payoutEventIsCfr_('','https://cfr.truesight.me/x.html'),true));
