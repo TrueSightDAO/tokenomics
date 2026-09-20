@@ -65,6 +65,25 @@ const TPL_MAIN_LEDGER_LEDGER_URLS = [                                  // ledger
 const TPL_MAIN_DAO_LEDGER_URL = 'https://docs.google.com/spreadsheets/d/1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU/edit'; // main DAO ledger
 const TPL_MAIN_DAO_OFFCHAIN_TAB = 'offchain transactions';     // main-ledger tab that holds the agl4 sale-time liability
 
+// ----- PR5 (plan 1.3/1.4): link-time ledger effects -----
+// The [TREE PLANTING LINK EVENT] books its OWN independent "-1 Cacao Tree To Be Planted" (discharging the
+// sale-time customer liability - plan 1.3; the sales handler is never touched, plan 0.2). On top of that
+// it books a source-dependent effect (plan 1.4). The source is DERIVED from the farmer's aggregate pool
+// balance (Envoy, 2026-09-20): an open "Cacao Tree Planted - Unassigned" unit => 'pool'; otherwise the
+// farmer has a confirmed-but-unpaid tree => 'committed'. This mirrors PR3's farmer-aggregate FIFO
+// abstraction (reconcileTreePlanting_ in process_tree_planting_telegram_logs.js) - the ledger derives
+// the accounting fact, the submitter never asserts it.
+//   * pool source:      -1 "To Be Planted" / -1 "Planted - Unassigned" (the pool leg sits on MAIN, where
+//                       PR3 books pool units), and - ONLY when the QR's own ledger differs from main -
+//                       a reimbursement transfer (claiming/QR ledger -cash, main +cash).
+//   * committed source: -1 "To Be Planted" only; the "To Be Paid For" liability stays open, tagged
+//                       committed via the SunMint row's Linked QR Code / Linked At (plan 1.4).
+const TPL_CUSTOMER_LIABILITY_LITERAL = 'Cacao Tree To Be Planted';       // sale-time liability the link discharges (plan 1.3)
+const TPL_POOL_LITERAL = 'Cacao Tree Planted - Unassigned';              // the settled pool (plan 1.4, pool source)
+const TPL_TRANSFER_CURRENCY = 'USD';                                    // cash literal on the reimbursement-transfer legs (matches the sale-time booker)
+const TPL_SUNMINT_COST_OF_TREE_COL = 15;   // Column P - "Cost of Tree" (the per-tree cash the funding ledger fronted; plan 1.4/1.7)
+const TPL_SUNMINT_CONTRIBUTOR_NAME_COL = 9; // Column J - Contributor Name (plan 1.7 match key; PR3's SUNMINT_CONTRIBUTOR_NAME_COL)
+
 const TPL_TRACKING_HEADERS = [
   'Row Number',
   'Telegram Update ID',
@@ -355,50 +374,155 @@ function resendTreePlantedNotification_(qrCode) {
 }
 
 /**
- * Appends the ledger fulfillment pair to the resolved managed ledger's Transactions tab:
- *   -1 "Cacao Tree To Be Planted" (Liability)  — discharges the sale-time obligation
- *   +1 "Cacao Tree Planted"       (Asset)      — Gary, 2026-08-18: fulfilled pledge is a countable asset,
- *                                                 not a liability; also gives a running per-ledger count.
- * Mirrors the row shape sales_update_managed_agl_ledgers.js writes at sale time (Sales Date, message,
- * contributor, amount, currency, category).
- * @param {string} transactionsSpreadsheetUrl
- * @param {string} message full [TREE PLANTING LINK EVENT] text (for the ledger row's "Value"/message column)
- * @param {string} contributorName
- * @return {boolean} true if the pair was appended
+ * PR5 (plan 1.3/1.4) - PURE, I/O-free leg computation for the link-time ledger effect, so the money
+ * logic is unit-testable before any sheet write is wired in (mirrors PR4's fpeComputeLegs_).
+ *   * always: -1 "Cacao Tree To Be Planted" (discharges the sale-time customer liability, plan 1.3),
+ *     targeted at the QR's own ledger (managed 6-col "Transactions"), or the main 7-col
+ *     "offchain transactions" when the QR routes to main - the same routing the old pair used.
+ *   * pool source (plan 1.4): also -1 "Planted - Unassigned" (the pool leg lives on MAIN, where PR3
+ *     books pool units), and - only when the QR's own ledger differs from main - a reimbursement
+ *     transfer (claiming ledger -cash, main +cash) for the tree's cost.
+ *   * committed source: nothing beyond the customer-liability discharge (the "To Be Paid For"
+ *     liability stays open, tagged committed via the SunMint Linked QR Code).
+ * @param {Object} opts { customerContributor, farmerContributor, source, amount, qrRoutesToMain }
+ * @return {Array<Object>} legs; [] when the input is not bookable (fails closed)
  */
-function appendTreePlantingLedgerFulfillment_(transactionsSpreadsheetUrl, message, contributorName, ledgerUrl) {
+function tplComputeLegs_(opts) {
+  opts = opts || {};
+  var customer = String(opts.customerContributor || '').trim();
+  var farmer = String(opts.farmerContributor || '').trim();
+  if (!customer || !farmer) return [];
+  function inv(target, amt, literal, contributor, category) {
+    return { target: target, amount: amt, literal: literal, kind: 'inventory',
+             contributor: contributor, category: category };
+  }
+  function cash(target, amt, contributor) {
+    return { target: target, amount: amt, literal: TPL_TRANSFER_CURRENCY, kind: 'cash',
+             contributor: contributor, category: 'Assets' };
+  }
+  var custTarget = opts.qrRoutesToMain ? 'main' : 'qr';
+  // Customer-liability discharge. Managed tab keeps the old handler's category convention
+  // ("Liability"); the main tab is 7-col with Is Revenue = 'N' (PR3 precedent).
+  var legs = [inv(custTarget, -1, TPL_CUSTOMER_LIABILITY_LITERAL, customer,
+                  custTarget === 'main' ? '' : 'Liability')];
+  if (opts.source === 'pool') {
+    legs.push(inv('main', -1, TPL_POOL_LITERAL, farmer, 'N'));
+    var amount = Number(opts.amount);
+    if (!opts.qrRoutesToMain && !isNaN(amount) && amount > 0) {
+      legs.push(cash('qr', -amount, farmer));
+      legs.push(cash('main', amount, farmer));
+    }
+  }
+  return legs;
+}
+
+/**
+ * PR5 (plan 1.4) - derive the link's source from the farmer's aggregate pool balance: an open
+ * "Cacao Tree Planted - Unassigned" unit (sum of that literal's amounts for this contributor on the
+ * main offchain tab) => 'pool'; otherwise 'committed'. Mirrors PR3's farmer-aggregate abstraction.
+ * Never throws; on any read failure returns 'committed' (the conservative no-transfer branch).
+ * @param {string} farmerContributor
+ * @return {string} 'pool' | 'committed'
+ */
+function tplResolveSource_(farmerContributor) {
   try {
-    // AGL4 discharges on the MAIN DAO ledger's offchain tab (where its sale-time liability lives),
-    // not on its own sub-ledger — mirrors sales_update_main_dao_offchain_ledger.js.
-    const routesToMain = TPL_MAIN_LEDGER_LEDGER_URLS.includes((ledgerUrl || '').toString().trim());
-    const spreadsheet = SpreadsheetApp.openByUrl(routesToMain ? TPL_MAIN_DAO_LEDGER_URL : transactionsSpreadsheetUrl);
-    const sheet = spreadsheet.getSheetByName(routesToMain ? TPL_MAIN_DAO_OFFCHAIN_TAB : TPL_TRANSACTIONS_TAB);
-    if (!sheet) {
-      Logger.log(`appendTreePlantingLedgerFulfillment_: no "${routesToMain ? TPL_MAIN_DAO_OFFCHAIN_TAB : TPL_TRANSACTIONS_TAB}" tab in ${routesToMain ? TPL_MAIN_DAO_LEDGER_URL : transactionsSpreadsheetUrl}`);
+    if (!farmerContributor) return 'committed';
+    var ss = SpreadsheetApp.openByUrl(TPL_MAIN_DAO_LEDGER_URL);
+    var sh = ss.getSheetByName(TPL_MAIN_DAO_OFFCHAIN_TAB);
+    if (!sh || sh.getLastRow() < 2) return 'committed';
+    var data = sh.getRange(2, 1, sh.getLastRow() - 1, 5).getValues(); // A..E
+    var balance = 0;
+    for (var i = 0; i < data.length; i++) {
+      if (String(data[i][4] || '').trim() !== TPL_POOL_LITERAL) continue;  // E: Currency / literal
+      if (String(data[i][2] || '').trim() !== farmerContributor) continue; // C: Fund Handler
+      var amt = Number(data[i][3]);                                        // D: Amount
+      if (!isNaN(amt)) balance += amt;
+    }
+    return balance >= 1 ? 'pool' : 'committed';
+  } catch (e) {
+    Logger.log('tplResolveSource_ failed: ' + e.message);
+    return 'committed';
+  }
+}
+
+/**
+ * PR5 - append each leg, without rollback: Sheets has no cross-sheet transaction, so a mid-write
+ * failure is flagged (returned written/error) rather than hidden (plan 5.9c precedent).
+ * @return {Object} { written:number, error:string }
+ */
+function tplWriteLegs_(legs, ctx) {
+  var today = new Date();
+  var desc = (ctx && ctx.description) || '';
+  var written = 0;
+  for (var i = 0; i < legs.length; i++) {
+    var leg = legs[i];
+    try {
+      if (leg.target === 'main') {
+        var ss = SpreadsheetApp.openByUrl(TPL_MAIN_DAO_LEDGER_URL);
+        var sh = ss.getSheetByName(TPL_MAIN_DAO_OFFCHAIN_TAB);
+        if (!sh) return { written: written, error: 'NO_MAIN_TAB' };
+        // 7-col: Date | Description | Fund Handler | Amount | Currency | Ledger Line | Is Revenue
+        sh.appendRow([today, desc, leg.contributor, leg.amount, leg.literal, '',
+                      leg.kind === 'inventory' ? 'N' : '']);
+        written++;
+      } else {
+        var managedUrl = (ctx && ctx.transactionsSpreadsheetUrl) || '';
+        if (!managedUrl) return { written: written, error: 'NO_QR_LEDGER' };
+        var msh = SpreadsheetApp.openByUrl(managedUrl).getSheetByName(TPL_TRANSACTIONS_TAB);
+        if (!msh) return { written: written, error: 'NO_MANAGED_TAB' };
+        // 6-col: Date | Description | Contributor | Amount | Currency | Transaction Type
+        msh.appendRow([today, desc, leg.contributor, leg.amount, leg.literal, leg.category || 'Assets']);
+        written++;
+      }
+    } catch (e) {
+      Logger.log('tplWriteLegs_ failed at leg ' + i + ': ' + e.message);
+      return { written: written, error: 'EXCEPTION:' + e.message };
+    }
+  }
+  return { written: written, error: '' };
+}
+
+/**
+ * PR5 (plan 1.3/1.4) - books the link-time ledger effect. Replaces the old fixed
+ * "-1 To Be Planted / +1 Cacao Tree Planted" pair: the +1 is gone, a source-dependent effect (and, in
+ * the cross-ledger pool case, a reimbursement transfer) is booked instead. Never throws.
+ * @param {string} transactionsSpreadsheetUrl the QR's resolved managed ledger, or main
+ * @param {string} message full [TREE PLANTING LINK EVENT] text (ledger Description column)
+ * @param {string} contributorName the governor's resolved name (customer-leg fallback on managed ledgers)
+ * @param {string} ledgerUrl the QR's ledger URL (decides main-routing + the customer-leg contributor)
+ * @param {string} farmerName the SunMint row's Contributor Name (plan 1.7 match key)
+ * @param {number|string} costOfTree the SunMint row's Cost of Tree (per-tree cash, plan 1.4)
+ * @return {boolean} true if every leg was appended
+ */
+function appendTreePlantingLedgerFulfillment_(transactionsSpreadsheetUrl, message, contributorName, ledgerUrl, farmerName, costOfTree) {
+  try {
+    var routesToMain = TPL_MAIN_LEDGER_LEDGER_URLS.includes((ledgerUrl || '').toString().trim());
+    var ledgerName = (ledgerUrl || '').toString().trim().split('/').filter(Boolean).pop() || 'main';
+    // Customer-leg contributor keeps the old handler's convention; the pool/transfer legs use the FARMER.
+    var customerContributor = routesToMain ? ('SunMint Tree Planting Contract - ' + ledgerName) : contributorName;
+    var farmerContributor = String(farmerName || '').trim() || contributorName;
+    var source = tplResolveSource_(farmerContributor);
+    var legs = tplComputeLegs_({
+      customerContributor: customerContributor,
+      farmerContributor: farmerContributor,
+      source: source,
+      amount: costOfTree,
+      qrRoutesToMain: routesToMain
+    });
+    if (!legs.length) {
+      Logger.log('appendTreePlantingLedgerFulfillment_: no bookable legs (farmer=' + farmerContributor + ')');
       return false;
     }
-    const today = new Date();
-    let rows;
-    if (routesToMain) {
-      // 7-column shape matching the main-ledger sale-time rows (Sales Date, message, contributor,
-      // amount, category, '', TRUE). Contributor mirrors the sale-time booker's pattern:
-      // "SunMint Tree Planting Contract - <ledgerName>" where ledgerName is derived from the ledger URL.
-      const ledgerName = (ledgerUrl || '').toString().trim().split('/').filter(Boolean).pop() || 'main';
-      rows = [
-        [today, message, `SunMint Tree Planting Contract - ${ledgerName}`, -1, 'Cacao Tree To Be Planted', '', true],
-        [today, message, `SunMint Tree Planting Contract - ${ledgerName}`, 1, 'Cacao Tree Planted', '', true]
-      ];
-    } else {
-      rows = [
-        [today, message, contributorName, -1, 'Cacao Tree To Be Planted', 'Liability'],
-        [today, message, contributorName, 1, 'Cacao Tree Planted', 'Asset']
-      ];
+    var res = tplWriteLegs_(legs, { description: message, transactionsSpreadsheetUrl: transactionsSpreadsheetUrl });
+    if (res.error) {
+      Logger.log('appendTreePlantingLedgerFulfillment_: partial ' + res.written + '/' + legs.length +
+                 ' (' + res.error + ', source=' + source + ')');
+      return res.written === legs.length;
     }
-    const lastRow = sheet.getLastRow();
-    sheet.getRange(lastRow + 1, 1, rows.length, rows[0].length).setValues(rows);
+    Logger.log('appendTreePlantingLedgerFulfillment_: booked ' + res.written + ' leg(s), source=' + source);
     return true;
   } catch (e) {
-    Logger.log(`appendTreePlantingLedgerFulfillment_ failed: ${e.message}`);
+    Logger.log('appendTreePlantingLedgerFulfillment_ failed: ' + e.message);
     return false;
   }
 }
@@ -636,7 +760,7 @@ function processTreePlantingLinksFromTelegramChatLogs() {
       sunmintSheet.getRange(sunmintRowIndex, TPL_SUNMINT_LINKED_AT_COL + 1).setValue(new Date().toISOString());
 
       // 3. Ledger fulfillment (transactionsUrl already resolved + validated above, before any writes).
-      const ledgerBooked = appendTreePlantingLedgerFulfillment_(transactionsUrl, message, contributorName, ledgerUrl);
+      const ledgerBooked = appendTreePlantingLedgerFulfillment_(transactionsUrl, message, contributorName, ledgerUrl, sunmintRow[TPL_SUNMINT_CONTRIBUTOR_NAME_COL], sunmintRow[TPL_SUNMINT_COST_OF_TREE_COL]);
 
       // 4. Owner notification (best-effort; failures don't roll back the writes above).
       let emailSent = false;
