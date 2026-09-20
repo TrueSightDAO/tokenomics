@@ -98,6 +98,62 @@ def test_pr5_managed_ledger_upfront_resolution_still_before_writes():
     assert i < j, "ledger must be resolved before any write"
 
 
+def test_pr6_plot_registry_is_the_farmer_source():
+    """PR6: farmer identity must come from the plot registry, never the payload (Envoy 2026-09-20)."""
+    src = _src()
+    assert "function tplResolvePlotContributor_" in src
+    assert "const TPL_PLOTS_CONTRIBUTOR_NAME_COL = 19;" in src
+    body = src.split("function tplResolvePlotContributor_", 1)[1].split(
+        "\nfunction ", 1
+    )[0]
+    assert "TPL_PLOTS_TAB" in body, "must read the SunMint Plots registry"
+
+
+def test_pr6_fails_closed_without_registered_contributor():
+    body = (
+        _src()
+        .split("function tplResolvePlotContributor_", 1)[1]
+        .split("\nfunction ", 1)[0]
+    )
+    assert "catch" in body, "must never throw (fail closed)"
+    assert "return null" in body, "must fail closed (null) on unknown/unattributed plot"
+
+
+def test_pr6_linked_plot_id_column_is_ac():
+    src = _src()
+    assert "const TPL_LINKED_PLOT_ID_COL = 28;" in src
+
+
+def test_pr6_image_selection_is_pure_and_has_video_fallback():
+    src = _src()
+    body = src.split("function tplPickPlotImage_", 1)[1].split("\nfunction ", 1)[0]
+    assert "SpreadsheetApp" not in body and "UrlFetchApp" not in body, (
+        "tplPickPlotImage_ must stay I/O-free"
+    )
+    assert "thumbnail" in body, (
+        "must fall back to a video thumbnail when a plot has no stills"
+    )
+
+
+def test_pr6_plot_branch_uses_pr5_booker_and_skips_transfer_amount():
+    """A plot has no per-tree cost, so the pool-source transfer amount is unbookable (no cash legs)."""
+    src = _src()
+    branch = src.split("if (!parsed.sunmintMessageId && parsed.plotId)", 1)[1]
+    branch = branch.split("continue;\n      }", 1)[0]
+    assert "appendTreePlantingLedgerFulfillment_(" in branch
+    assert "plot.contributorName, '')" in branch, (
+        "cost must be '' (no transfer) for a plot link"
+    )
+    assert "TPL_LINKED_PLOT_ID_COL" in branch
+
+
+def test_pr6_guard_allows_plot_id_without_sunmint_id():
+    src = _src()
+    assert "(!parsed.sunmintMessageId && !parsed.plotId)" in src, (
+        "the early guard must accept a Plot ID in place of a SunMint submission id"
+    )
+
+
 def test_behavioral_harness():
     node = shutil.which("node")
     if node is None:

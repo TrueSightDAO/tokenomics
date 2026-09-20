@@ -84,6 +84,18 @@ const TPL_TRANSFER_CURRENCY = 'USD';                                    // cash 
 const TPL_SUNMINT_COST_OF_TREE_COL = 15;   // Column P - "Cost of Tree" (the per-tree cash the funding ledger fronted; plan 1.4/1.7)
 const TPL_SUNMINT_CONTRIBUTOR_NAME_COL = 9; // Column J - Contributor Name (plan 1.7 match key; PR3's SUNMINT_CONTRIBUTOR_NAME_COL)
 
+// ----- PR6 (plan 1.6): plot-level link path -----
+// A governor may link a sold QR to a PLOT (many trees' worth of supply) instead of a single tree
+// submission - the batch tool's repeat/no-email case. Farmer identity is resolved from the plot
+// REGISTRY, never from the submission payload (Envoy 2026-09-20: on money-adjacent logic the
+// registry holds the fact; an externally-asserted attribution could discharge the wrong farmer's
+// balance). Fails closed when the plot has no registered Contributor Name.
+const TPL_PLOTS_TAB = 'SunMint Plots';                    // lives on SOURCE_SHEET_URL's spreadsheet (plan 1.7)
+const TPL_PLOTS_PLOT_ID_COL = 0;                          // Column A - Plot ID
+const TPL_PLOTS_CONTRIBUTOR_NAME_COL = 19;                // Column T - Contributor Name (NEW 2026-09-20; registry-held farmer identity)
+const TPL_LINKED_PLOT_ID_COL = 28;                        // Column AC on "Agroverse QR codes" (PR1; SCHEMA.md)
+const TPL_PLOTS_MEDIA_RAW_URL = 'https://raw.githubusercontent.com/TrueSightDAO/sunmint/main/plots/media.json';
+
 const TPL_TRACKING_HEADERS = [
   'Row Number',
   'Telegram Update ID',
@@ -249,7 +261,7 @@ function normalizeTreePlantingLinkMessage_(raw) {
  * @return {{qrCode: string, sunmintMessageId: string, updatedBy: string, publicSignature: string}}
  */
 function extractTreePlantingLinkInfo_(message) {
-  const result = { qrCode: '', sunmintMessageId: '', updatedBy: '', publicSignature: '', reason: '' };
+  const result = { qrCode: '', sunmintMessageId: '', plotId: '', updatedBy: '', publicSignature: '', reason: '' };
   try {
     const m = normalizeTreePlantingLinkMessage_(message);
 
@@ -258,6 +270,9 @@ function extractTreePlantingLinkInfo_(message) {
 
     const sunmintMatch = m.match(/-\s+SunMint Submission Message ID:\s*([^\n]+)/i);
     if (sunmintMatch) result.sunmintMessageId = sunmintMatch[1].trim();
+
+    const plotMatch = m.match(/-\s+Plot ID:\s*([^\n]+)/i);
+    if (plotMatch) result.plotId = plotMatch[1].trim();
 
     const updatedByMatch = m.match(/-\s+Updated by:\s*([^\n]+)/i);
     if (updatedByMatch) result.updatedBy = updatedByMatch[1].trim();
@@ -483,6 +498,74 @@ function tplWriteLegs_(legs, ctx) {
 }
 
 /**
+ * PR6 (plan 1.6) - resolve a plot id to its registered farmer via the "SunMint Plots" registry.
+ * The registry holds the fact (Envoy 2026-09-20); the submission payload never asserts it. Fails
+ * closed (null) when the plot is unknown OR has no Contributor Name, so a link can never book a
+ * ledger effect against an unattributed/unknown farmer.
+ * @param {string} plotId
+ * @return {{plotId: string, contributorName: string}|null}
+ */
+function tplResolvePlotContributor_(plotId) {
+  try {
+    const want = String(plotId || '').trim();
+    if (!want) return null;
+    const ss = SpreadsheetApp.openByUrl(SOURCE_SHEET_URL);
+    const sh = ss.getSheetByName(TPL_PLOTS_TAB);
+    if (!sh || sh.getLastRow() < 2) return null;
+    const data = sh.getDataRange().getValues();
+    for (let i = 1; i < data.length; i++) {
+      if ((data[i][TPL_PLOTS_PLOT_ID_COL] || '').toString().trim() !== want) continue;
+      const name = (data[i][TPL_PLOTS_CONTRIBUTOR_NAME_COL] || '').toString().trim();
+      if (!name) return null; // fail closed: registry has no farmer for this plot yet
+      return { plotId: want, contributorName: name };
+    }
+    return null;
+  } catch (e) {
+    Logger.log('tplResolvePlotContributor_ failed: ' + e.message);
+    return null;
+  }
+}
+
+/**
+ * PR6 (plan 1.6) - pick a representative image for a plot from its media collection. Pure (no I/O),
+ * so the selection rule is unit-testable: prefer the first `kind: 'image'`, else the first item that
+ * carries a `thumbnail` (video previews - some plots, e.g. Paulo's V-06-29, have videos but no stills).
+ * @param {Object} mediaJson parsed plots/media.json
+ * @param {string} plotId
+ * @return {string} image URL, or '' when none is available
+ */
+function tplPickPlotImage_(mediaJson, plotId) {
+  try {
+    if (!mediaJson || !mediaJson.plots) return '';
+    const p = mediaJson.plots[String(plotId || '').trim()];
+    if (!p || !Array.isArray(p.media) || !p.media.length) return '';
+    const img = p.media.find(function (m) { return m && m.kind === 'image' && m.url; });
+    if (img) return img.url;
+    const thumb = p.media.find(function (m) { return m && m.thumbnail; });
+    return thumb ? thumb.thumbnail : '';
+  } catch (e) {
+    return '';
+  }
+}
+
+/**
+ * PR6 (plan 1.6) - fetch plots/media.json and pick the plot's representative image. Never throws;
+ * a missing image must not block the link (returns '').
+ * @param {string} plotId
+ * @return {string}
+ */
+function tplResolvePlotImage_(plotId) {
+  try {
+    const resp = UrlFetchApp.fetch(TPL_PLOTS_MEDIA_RAW_URL, { muteHttpExceptions: true });
+    if (resp.getResponseCode() !== 200) return '';
+    return tplPickPlotImage_(JSON.parse(resp.getContentText()), plotId);
+  } catch (e) {
+    Logger.log('tplResolvePlotImage_ failed: ' + e.message);
+    return '';
+  }
+}
+
+/**
  * PR5 (plan 1.3/1.4) - books the link-time ledger effect. Replaces the old fixed
  * "-1 To Be Planted / +1 Cacao Tree Planted" pair: the +1 is gone, a source-dependent effect (and, in
  * the cross-ledger pool case, a reimbursement transfer) is booked instead. Never throws.
@@ -591,9 +674,9 @@ function processTreePlantingLinksFromTelegramChatLogs() {
         ]);
       };
 
-      if (!parsed.qrCode || !parsed.sunmintMessageId) {
-        Logger.log(`Row ${rowNumber}: missing QR Code or SunMint Submission Message ID — skipping`);
-        recordOutcome('REJECTED', 'Missing QR Code or SunMint Submission Message ID');
+      if (!parsed.qrCode || (!parsed.sunmintMessageId && !parsed.plotId)) {
+        Logger.log(`Row ${rowNumber}: missing QR Code, or neither a SunMint Submission Message ID nor a Plot ID - skipping`);
+        recordOutcome('REJECTED', 'Missing QR Code, or neither a SunMint Submission Message ID nor a Plot ID');
         result.rejected++;
         continue;
       }
@@ -717,6 +800,49 @@ function processTreePlantingLinksFromTelegramChatLogs() {
         Logger.log(`Row ${rowNumber}: could not resolve managed ledger spreadsheet for "${ledgerUrl}"`);
         recordOutcome('REJECTED', `Could not resolve managed ledger for "${ledgerUrl}"`);
         result.rejected++;
+        continue;
+      }
+
+      // --- PR6 (plan 1.6): plot-level link path. A governor may link a sold QR to a PLOT (many
+      // trees' worth of supply) instead of a single tree submission - the batch tool's repeat/no-email
+      // case. Farmer identity comes from the plot registry (Envoy 2026-09-20), never the payload.
+      if (!parsed.sunmintMessageId && parsed.plotId) {
+        const plot = tplResolvePlotContributor_(parsed.plotId);
+        if (!plot) {
+          Logger.log(`Row ${rowNumber}: plot "${parsed.plotId}" not found or has no registered Contributor Name - rejecting`);
+          recordOutcome('REJECTED', `Plot "${parsed.plotId}" not found or missing Contributor Name`);
+          result.rejected++;
+          continue;
+        }
+        // Representative image from the plot's media collection (plan 1.6); '' is tolerated.
+        const plotImage = tplResolvePlotImage_(plot.plotId);
+        // 1. QR row: status + Linked Plot ID + representative image. Plot lat/long left blank - a
+        //    plot has no single coordinate (its boundary hull lives in the plots geojson).
+        qrSheet.getRange(qrRowIndex, STATUS_COL_DEST + 1).setValue('ASSIGNED_TO_TREE');
+        qrSheet.getRange(qrRowIndex, TPL_LINKED_PLOT_ID_COL + 1).setValue(plot.plotId);
+        if (plotImage) qrSheet.getRange(qrRowIndex, TPL_PHOTO_COL + 1).setValue(plotImage);
+        // 2. Ledger: the same plan-1.4 effect as a tree-level link, sourced from the plot's farmer.
+        //    A plot has no per-tree Cost of Tree, so the pool-source reimbursement transfer amount is
+        //    unbookable => no cash legs (fail closed; Envoy default 2026-09-20). Reuses PR5's booker.
+        const plotLedgerBooked = appendTreePlantingLedgerFulfillment_(
+          transactionsUrl, message, contributorName, ledgerUrl, plot.contributorName, '');
+        // 3. Owner notification (best-effort; a mail failure never rolls back the writes above).
+        let plotEmailSent = false;
+        if (ownerEmail) {
+          plotEmailSent = sendTreePlantedNotificationEmail_(
+            qrSheet, qrRowIndex, parsed.qrCode, ownerEmail, '', plotImage, '', '');
+        } else {
+          Logger.log(`Row ${rowNumber}: QR "${parsed.qrCode}" has no Owner Email - notification skipped`);
+        }
+        let plotOutcome = 'OK';
+        if (!plotLedgerBooked) {
+          plotOutcome = 'Ledger fulfillment not booked - see log';
+        } else if (ownerEmail && !plotEmailSent) {
+          plotOutcome = 'Email notification failed - see log';
+        }
+        recordOutcome('LINKED', plotOutcome);
+        result.processed++;
+        Logger.log(`Row ${rowNumber}: linked QR "${parsed.qrCode}" to plot "${plot.plotId}" (farmer: ${plot.contributorName}, governor: ${contributorName})`);
         continue;
       }
 
