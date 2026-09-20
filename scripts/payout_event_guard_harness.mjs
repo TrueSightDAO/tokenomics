@@ -219,6 +219,35 @@ t('PR4 fail-closed on unresolvable QR ledger', ()=>{
   eq(mainSheets['offchain transactions'].getDataRange().getValues().length,0);
 });
 
+// ---- PR4 step 2: PARTIAL WRITE (added on Envoy review, 2026-09-20) ----------
+// Sheets has no cross-sheet transaction, so a leg that fails mid-write cannot be
+// rolled back. The design is therefore to WRITE WHAT WE CAN, then FLAG LOUDLY -
+// never to report success. These cases pin that contract explicitly (previously it
+// was only implicit in the written!=legs.length branch of fpeBookLedger_).
+t('PR4 PARTIAL WRITE: 1 of 3 legs lands, remainder flagged, no silent success', ()=>{
+  reset();
+  setOps('SunMint Tree Planting', sunmintGrid('T-MECH-P','2024OSCAR_P'));
+  setMain('Agroverse QR codes', qrGrid('2024OSCAR_P','https://truesight.me/sunmint/bec'));
+  setMain('Shipment Ledger Listing', shipGrid('https://truesight.me/sunmint/bec','https://docs.google.com/spreadsheets/d/'+MANAGED_ID+'/edit'));
+  setManaged('Transactions', []);   // the QR leg's target EXISTS -> leg 1 lands
+  // deliberately leave the main 'offchain transactions' tab MISSING -> legs 2 & 3 fail
+  const res=fpeBookLedger_({amount:150,currency:'BRL',recipient_pk_hash:'pk-1',tree_planting_id:'T-MECH-P'});
+  eq(res.booked,false);
+  eq(res.reason,'PARTIAL_WRITE_1_OF_3');
+  // The one landed leg is NOT rolled back (Sheets has no cross-sheet transaction) -
+  // documented, deliberate behaviour: surface the inconsistency, don't hide it.
+  eq(managedSheets['Transactions'].getDataRange().getValues().length,1);
+  eq(mainSheets['offchain transactions'], undefined);
+});
+t('PR4 PARTIAL WRITE: 0 of 3 legs land is still refused (boundary)', ()=>{
+  reset();
+  setOps('SunMint Tree Planting', sunmintGrid('T-MECH-R',''));
+  // uncommitted -> all 3 legs target main, and the main tab is absent -> nothing lands.
+  const res=fpeBookLedger_({amount:150,currency:'BRL',tree_planting_id:'T-MECH-R'});
+  eq(res.booked,false);
+  eq(res.reason,'PARTIAL_WRITE_0_OF_3');
+});
+
 // ---- CFR routing -----------------------------------------------------------
 t('CFR detected by program_slug', ()=>eq(payoutEventIsCfr_('crf-anapu',''),true));
 t('CFR detected by submission source host', ()=>eq(payoutEventIsCfr_('','https://cfr.truesight.me/x.html'),true));
@@ -330,6 +359,23 @@ t('PR4 e2e books 3 legs and marks tracking row BOOKED', ()=>{
   eq(tx.length,3);
   const st=tier1().map(x=>x[12]);
   if(st.indexOf('BOOKED')<0) throw new Error('tracking status not BOOKED: '+st.join(','));
+});
+
+// PR4 step 2 end-to-end: a mid-write leg failure is FLAGGED on the tracking row,
+// never silently booked (Envoy review, 2026-09-20).
+reset();
+setOps('SunMint Tree Planting', sunmintGrid('T-E2E-P','2024OSCAR_PE'));
+setMain('Agroverse QR codes', qrGrid('2024OSCAR_PE','https://truesight.me/sunmint/bec'));
+setMain('Shipment Ledger Listing', shipGrid('https://truesight.me/sunmint/bec','https://docs.google.com/spreadsheets/d/'+MANAGED_ID+'/edit'));
+setManaged('Transactions', []);   // QR leg lands; the main tab is left missing -> 1 of 3
+tcGrid=[['A','B','C','D','E','F','G'], tcRow('889', payload({bank_ref:'E-FPE-P', trees:'T-E2E-P'}))];
+t('PR4 e2e partial write: tracking row flagged LEDGER_NOT_BOOKED + reason', ()=>{
+  const r=processPayoutEventsFromTelegramChatLogs();
+  eq(r.recorded,1);
+  const st=tier1().map(x=>x[12]);
+  if(st.indexOf('LEDGER_NOT_BOOKED')<0) throw new Error('tracking status not LEDGER_NOT_BOOKED: '+st.join(','));
+  const em=tier1().map(x=>x[14]).join(' ');
+  if(em.indexOf('PARTIAL_WRITE_1_OF_3')<0) throw new Error('error_message missing PARTIAL_WRITE_1_OF_3: '+em);
 });
 
 console.log('\n'+pass+' passed, '+fail+' failed');
