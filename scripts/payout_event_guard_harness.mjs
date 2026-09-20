@@ -32,6 +32,10 @@ const opsSheets = {};             // Tier-1 lives on the ops workbook (=== intak
 const cfrSheets = {};             // Tier-2 lives on the private cfr program workbook
 const OPS_ID = '1qbZZhf-_7xzmDTriaJVWj6OZshyQsFkdsAV8-pyzASQ';
 const CFR_ID = 'CFR_PRIVATE_SHEET_ID';
+const MAIN_ID = '1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU';   // PR4: main ledger workbook
+const MANAGED_ID = 'MANAGED_LEDGER_ID';                            // PR4: a resolved managed ledger
+const mainSheets = {};                                             // PR4: main-ledger tabs
+const managedSheets = {};                                          // PR4: managed-ledger tabs
 
 globalThis.SpreadsheetApp = {
   openById(id){
@@ -48,6 +52,18 @@ globalThis.SpreadsheetApp = {
       return {
         getSheetByName(n){ return cfrSheets[n] || null; },
         insertSheet(n){ cfrSheets[n] = makeSheet(n); return cfrSheets[n]; }
+      };
+    }
+    if (id === MAIN_ID) {
+      return {
+        getSheetByName(n){ return mainSheets[n] || null; },
+        insertSheet(n){ mainSheets[n] = makeSheet(n); return mainSheets[n]; }
+      };
+    }
+    if (id === MANAGED_ID) {
+      return {
+        getSheetByName(n){ return managedSheets[n] || null; },
+        insertSheet(n){ managedSheets[n] = makeSheet(n); return managedSheets[n]; }
       };
     }
     throw new Error('unexpected spreadsheet id: '+id);
@@ -91,7 +107,13 @@ function payload(o){
   return lines.join('\n');
 }
 function tcRow(updateId, msg){ const r=new Array(18).fill(''); r[0]=updateId; r[3]='msg_'+updateId; r[6]=msg; return r; }
-function reset(){ tcGrid=[]; tcSheetSingleton=null; for(const k in opsSheets) delete opsSheets[k]; for(const k in cfrSheets) delete cfrSheets[k]; intakeWrites=0; }
+function reset(){ tcGrid=[]; tcSheetSingleton=null; for(const k in opsSheets) delete opsSheets[k]; for(const k in cfrSheets) delete cfrSheets[k]; for(const k in mainSheets) delete mainSheets[k]; for(const k in managedSheets) delete managedSheets[k]; intakeWrites=0; }
+function setOps(n,g){ opsSheets[n]=makeSheet(n,g); }        // PR4 helpers
+function setMain(n,g){ mainSheets[n]=makeSheet(n,g); }
+function setManaged(n,g){ managedSheets[n]=makeSheet(n,g); }
+function sunmintGrid(treeId,linkedQr){ const g=[['Telegram Update ID','b','c','Telegram Message ID']]; const row=new Array(18).fill(''); row[3]=treeId; row[17]=linkedQr||''; g.push(row); return g; }
+function qrGrid(qr,ledgerUrl){ const g=[['QR Code','b','Ledger']]; g.push([qr,'',ledgerUrl]); return g; }
+function shipGrid(ledgerUrl,resolvedUrl){ const g=[new Array(28).fill('')]; const row=new Array(28).fill(''); row[11]=ledgerUrl; row[27]=resolvedUrl; g.push(row); return g; }
 function tier1(){ const s=opsSheets['payouts']; return s? s.getDataRange().getValues():[]; }
 function tier2(){ const s=cfrSheets['payout events']; return s? s.getDataRange().getValues():[]; }
 
@@ -134,6 +156,67 @@ t('PR4 cash-out leg is not revenue', ()=>{
 t('PR4 fails closed on non-numeric amount / empty currency', ()=>{
   eq(fpeComputeLegs_({amount:'abc',currency:'BRL'}).length,0);
   eq(fpeComputeLegs_({amount:1,currency:''}).length,0);
+});
+
+// ---- PR4 step 2: ledger booking (I/O) --------------------------------------
+t('PR4 uncommitted books 3 legs on main offchain', ()=>{
+  reset();
+  setOps('SunMint Tree Planting', sunmintGrid('T-MECH-1',''));
+  setMain('offchain transactions', []);
+  const res=fpeBookLedger_({amount:150,currency:'BRL',recipient_pk_hash:'pk-1',tree_planting_id:'T-MECH-1'});
+  eq(res.booked,true); eq(res.legs,3);
+  const tx=mainSheets['offchain transactions'].getDataRange().getValues();
+  eq(tx.length,3);
+  eq(tx[0][3],-150); eq(tx[0][4],'BRL'); eq(tx[0][6],'');
+  eq(tx[1][3],-1); eq(tx[1][4],'Cacao Tree - To Be Paid For');
+  eq(tx[2][3],1); eq(tx[2][4],'Cacao Tree Planted - Unassigned');
+});
+t('PR4 committed cross-ledger: -cash on QR ledger, +cash/-TBP on main', ()=>{
+  reset();
+  setOps('SunMint Tree Planting', sunmintGrid('T-MECH-2','2024OSCAR_1'));
+  setMain('Agroverse QR codes', qrGrid('2024OSCAR_1','https://truesight.me/sunmint/bec'));
+  setMain('Shipment Ledger Listing', shipGrid('https://truesight.me/sunmint/bec','https://docs.google.com/spreadsheets/d/'+MANAGED_ID+'/edit'));
+  setMain('offchain transactions', []);
+  setManaged('Transactions', []);
+  const res=fpeBookLedger_({amount:150,currency:'BRL',recipient_pk_hash:'pk-1',tree_planting_id:'T-MECH-2'});
+  eq(res.booked,true); eq(res.legs,3);
+  const mtx=managedSheets['Transactions'].getDataRange().getValues();
+  eq(mtx.length,1); eq(mtx[0][3],-150); eq(mtx[0][4],'BRL');
+  const tx=mainSheets['offchain transactions'].getDataRange().getValues();
+  eq(tx.length,2); eq(tx[0][3],150); eq(tx[1][3],-1); eq(tx[1][4],'Cacao Tree - To Be Paid For');
+});
+t('PR4 committed when QR ledger IS main: 1 leg, no cash legs', ()=>{
+  reset();
+  setOps('SunMint Tree Planting', sunmintGrid('T-MECH-3','2024OSCAR_2'));
+  setMain('Agroverse QR codes', qrGrid('2024OSCAR_2','https://agroverse.shop/agl4'));
+  setMain('offchain transactions', []);
+  const res=fpeBookLedger_({amount:150,currency:'BRL',recipient_pk_hash:'pk-1',tree_planting_id:'T-MECH-3'});
+  eq(res.booked,true); eq(res.legs,1);
+  const tx=mainSheets['offchain transactions'].getDataRange().getValues();
+  eq(tx.length,1); eq(tx[0][3],-1); eq(tx[0][4],'Cacao Tree - To Be Paid For');
+});
+t('PR4 fails closed when no SunMint row joins - nothing written', ()=>{
+  reset();
+  setOps('SunMint Tree Planting', sunmintGrid('T-OTHER',''));
+  setMain('offchain transactions', []);
+  const res=fpeBookLedger_({amount:150,currency:'BRL',tree_planting_id:'T-MISSING'});
+  eq(res.booked,false); eq(res.reason,'SUNMINT_ROW_NOT_FOUND');
+  eq(mainSheets['offchain transactions'].getDataRange().getValues().length,0);
+});
+t('PR4 skips an unlinked tree id (no settlement attempt)', ()=>{
+  reset();
+  const res=fpeBookLedger_({amount:150,currency:'BRL',tree_planting_id:'unlinked'});
+  eq(res.booked,false); eq(res.reason,'NO_TREE_PLANTING_ID');
+});
+
+t('PR4 fail-closed on unresolvable QR ledger', ()=>{
+  reset();
+  setOps('SunMint Tree Planting', sunmintGrid('T-MECH-4','2024OSCAR_9'));
+  setMain('Agroverse QR codes', qrGrid('2024OSCAR_9',''));
+  setMain('offchain transactions', []);
+  const res=fpeBookLedger_({amount:150,currency:'BRL',tree_planting_id:'T-MECH-4'});
+  eq(res.booked,false); eq(res.reason,'QR_LEDGER_UNRESOLVED');
+  eq(mainSheets['offchain transactions'].getDataRange().getValues().length,0);
 });
 
 // ---- CFR routing -----------------------------------------------------------
@@ -233,6 +316,20 @@ t('e2e empty-intake run also reports trigger status', ()=>{
   reset(); triggerInstalls=[];
   const r=processPayoutEventsFromTelegramChatLogs();
   if(r.trigger!=='installed') throw new Error('empty-intake run lacked trigger status: '+r.trigger);
+});
+
+// PR4 step 2 end-to-end: booked legs + tracking row carries the outcome.
+reset();
+setOps('SunMint Tree Planting', sunmintGrid('T-E2E',''));
+setMain('offchain transactions', []);
+tcGrid=[['A','B','C','D','E','F','G'], tcRow('888', payload({bank_ref:'E-FPE', trees:'T-E2E'}))];
+t('PR4 e2e books 3 legs and marks tracking row BOOKED', ()=>{
+  const r=processPayoutEventsFromTelegramChatLogs();
+  eq(r.recorded,1);
+  const tx=mainSheets['offchain transactions'].getDataRange().getValues();
+  eq(tx.length,3);
+  const st=tier1().map(x=>x[12]);
+  if(st.indexOf('BOOKED')<0) throw new Error('tracking status not BOOKED: '+st.join(','));
 });
 
 console.log('\n'+pass+' passed, '+fail+' failed');

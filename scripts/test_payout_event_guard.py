@@ -172,6 +172,28 @@ def test_pr4_pure_leg_computation_present():
     assert "'qr'" in src  # committed cross-ledger transfer targets the QR's own ledger
 
 
+def test_pr4_ledger_booking_wired_and_fail_closed():
+    """PR4 (step 2): the SunMint settlement booking is wired into the payout sink,
+    runs before the Tier-1 tracking write, and fails closed."""
+    src = _src()
+    for fn in (
+        "function fpeBookLedger_",
+        "function fpeWriteLeg_",
+        "function fpeFindSunMintRow_",
+        "function fpeResolveQrLedgerUrl_",
+        "function fpeResolveLedgerSpreadsheetUrl_",
+    ):
+        assert fn in src, f"missing {fn}"
+    assert "LEDGER_NOT_BOOKED" in src
+    assert "'BOOKED'" in src
+    # the booking runs immediately before the Tier-1 tracking write
+    i = src.index("fpeBookLedger_(base)")
+    j = src.index("appendPayoutEventRow_(tier1Sheet, base, false)")
+    assert i < j, "booking must precede the Tier-1 tracking write"
+    body = src.split("function fpeBookLedger_", 1)[1].split("\nfunction ", 1)[0]
+    assert "catch" in body, "fpeBookLedger_ must never throw (fail closed to LEDGER_NOT_BOOKED)"
+
+
 def test_behavioral_harness():
     node = shutil.which("node")
     if node is None:

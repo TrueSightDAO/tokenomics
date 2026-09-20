@@ -385,6 +385,193 @@ function fpeComputeLegs_(opts) {
   ];
 }
 
+/** PR4 - extract a spreadsheet id from a canonical sheet URL. */
+function fpeUrlToId_(url) {
+  var m = String(url || '').match(/\/d\/([a-zA-Z0-9_-]+)/);
+  return m ? m[1] : '';
+}
+
+/**
+ * PR4 - resolve a QR code's OWN ledger URL from "Agroverse QR codes" col C (main ledger workbook).
+ * Mirrors the link handler's TPL_LEDGER_URL_COL lookup. Returns '' if not found.
+ */
+function fpeResolveQrLedgerUrl_(qrCode) {
+  var need = String(qrCode || '').trim();
+  if (!need) return '';
+  try {
+    var ss = SpreadsheetApp.openById(FPE_MAIN_LEDGER_SPREADSHEET_ID);
+    var sh = ss.getSheetByName(FPE_QR_CODES_SHEET);
+    if (!sh) return '';
+    var last = sh.getLastRow();
+    if (last < 2) return '';
+    var data = sh.getRange(2, 1, last - 1, Math.max(sh.getLastColumn(), FPE_QR_LEDGER_URL_COL + 2)).getValues();
+    for (var i = 0; i < data.length; i++) {
+      if (String(data[i][0] || '').trim() === need) {
+        return String(data[i][FPE_QR_LEDGER_URL_COL] || '').trim();
+      }
+    }
+  } catch (e) {
+    Logger.log('fpeResolveQrLedgerUrl_ lookup failed: ' + e.message);
+  }
+  return '';
+}
+
+/**
+ * PR4 - resolve a managed-ledger URL to its spreadsheet URL via "Shipment Ledger Listing"
+ * col L (unresolved URL) -> col AB (resolved URL). Same lookup resolveManagedLedgerSpreadsheetUrl_
+ * uses in the link handler. Returns '' if not found.
+ */
+function fpeResolveLedgerSpreadsheetUrl_(ledgerUrl) {
+  var needle = String(ledgerUrl || '').trim();
+  if (!needle) return '';
+  try {
+    var ss = SpreadsheetApp.openById(FPE_MAIN_LEDGER_SPREADSHEET_ID);
+    var sh = ss.getSheetByName(FPE_SHIPMENT_LEDGER_LISTING_TAB);
+    if (!sh) return '';
+    var last = sh.getLastRow();
+    if (last < 2) return '';
+    var data = sh.getRange(2, 1, last - 1, 28).getValues(); // A..AB
+    for (var i = 0; i < data.length; i++) {
+      if (String(data[i][11] || '').trim() === needle) {        // col L: Ledger URL
+        return String(data[i][27] || '').trim();                 // col AB: Resolved URL
+      }
+    }
+  } catch (e) {
+    Logger.log('fpeResolveLedgerSpreadsheetUrl_ lookup failed: ' + e.message);
+  }
+  return '';
+}
+
+/**
+ * PR4 - find the SunMint Tree Planting row whose col D (Telegram Message ID) equals the payout's
+ * `tree_planting_id` (the join key the link handler itself matches on). Returns
+ * { rowNumber, linkedQrCode } or null. Lives on the OPS workbook (= the intake workbook).
+ */
+function fpeFindSunMintRow_(treePlantingId) {
+  var need = String(treePlantingId || '').trim();
+  if (!need) return null;
+  try {
+    var ss = SpreadsheetApp.openById(PAYOUT_EVENT_OPS_SPREADSHEET_ID);
+    var sh = ss.getSheetByName(FPE_SUNMINT_TAB);
+    if (!sh) return null;
+    var last = sh.getLastRow();
+    if (last < 2) return null;
+    var width = Math.max(sh.getLastColumn(), FPE_SUNMINT_LINKED_QR_COL + 1);
+    var data = sh.getRange(2, 1, last - 1, width).getValues();
+    for (var i = 0; i < data.length; i++) {
+      if (String(data[i][3] || '').trim() === need) {            // col D: Telegram Message ID
+        return {
+          rowNumber: i + 2,
+          linkedQrCode: String(data[i][FPE_SUNMINT_LINKED_QR_COL] || '').trim()
+        };
+      }
+    }
+  } catch (e) {
+    Logger.log('fpeFindSunMintRow_ lookup failed: ' + e.message);
+  }
+  return null;
+}
+
+/** PR4 - true if a ledger URL routes to the MAIN ledger (no cross-ledger transfer needed). */
+function fpeIsMainLedgerUrl_(ledgerUrl) {
+  return FPE_MAIN_LEDGER_LEDGER_URLS.indexOf(String(ledgerUrl || '').trim()) >= 0;
+}
+
+/**
+ * PR4 - append one computed leg to its target tab. Reads the CONTRIBUTOR/SD doc note in SS0.11.
+ * Returns true only if the row was appended. Never throws (a ledger-write failure must not abort
+ * the payout scan - the caller turns a false into a LEDGER_NOT_BOOKED tracking status).
+ */
+function fpeWriteLeg_(leg, ctx) {
+  var today = new Date();
+  var desc = (ctx && ctx.description) || '';
+  try {
+    if (leg.target === 'main') {
+      var ss = SpreadsheetApp.openById(FPE_MAIN_LEDGER_SPREADSHEET_ID);
+      var sh = ss.getSheetByName(FPE_MAIN_OFFCHAIN_TAB);
+      if (!sh) return false;
+      // 7-col: Date | Description | Fund Handler | Amount | Currency | Ledger Line | Is Revenue
+      sh.appendRow([today, desc, leg.contributor, leg.amount, leg.literal, '', leg.isRevenue]);
+      return true;
+    }
+    // target 'qr' -> the QR's OWN managed ledger's Transactions tab (6-col).
+    var managedUrl = ctx && ctx.qrLedgerSpreadsheetUrl;
+    if (!managedUrl) return false;
+    var id = fpeUrlToId_(managedUrl);
+    if (!id) return false;
+    var msh = SpreadsheetApp.openById(id).getSheetByName(FPE_MANAGED_TRANSACTIONS_TAB);
+    if (!msh) return false;
+    // 6-col: Date | Description | Entity | Amount | Currency | Transaction Type
+    msh.appendRow([today, desc, leg.contributor, leg.amount, leg.literal, 'Assets']);
+    return true;
+  } catch (e) {
+    Logger.log('fpeWriteLeg_ failed: ' + e.message);
+    return false;
+  }
+}
+
+/**
+ * PR4 - book the SunMint settlement legs for a payout event that carries a `tree_planting_id`.
+ * A `[PAYOUT EVENT]` with a tree_planting_id IS the `[FARMER PAYMENT EVENT]` of the plan (SS0.10) -
+ * no new tag is introduced. Fail-closed: returns { booked:false, reason } and writes NOTHING when it
+ * cannot positively determine the farmer's SunMint row or the QR's ledger (a wrong booking is worse
+ * than no booking). Never throws.
+ * @param {Object} base parsed payout fields (uses tree_planting_id, amount, currency, recipient_pk_hash)
+ * @return {{booked:boolean, reason:(string|undefined), legs:(number|undefined)}}
+ */
+function fpeBookLedger_(base) {
+  try {
+    var ids = String((base && base.tree_planting_id) || '').split(',')
+      .map(function (s) { return s.trim(); })
+      .filter(function (s) { return s && s !== PAYOUT_EVENT_UNLINKED_TREES; });
+    if (!ids.length) return { booked: false, reason: 'NO_TREE_PLANTING_ID' };
+
+    var sun = null, treeId = '';
+    for (var k = 0; k < ids.length; k++) {
+      sun = fpeFindSunMintRow_(ids[k]);
+      if (sun) { treeId = ids[k]; break; }
+    }
+    if (!sun) return { booked: false, reason: 'SUNMINT_ROW_NOT_FOUND' };
+
+    var committed = !!sun.linkedQrCode;
+    var qrLedgerUrl = '', qrLedgerSpreadsheetUrl = '', qrLedgerIsMain = false;
+    if (committed) {
+      qrLedgerUrl = fpeResolveQrLedgerUrl_(sun.linkedQrCode);
+      if (!qrLedgerUrl) return { booked: false, reason: 'QR_LEDGER_UNRESOLVED' };
+      qrLedgerIsMain = fpeIsMainLedgerUrl_(qrLedgerUrl);
+      if (!qrLedgerIsMain) {
+        qrLedgerSpreadsheetUrl = fpeResolveLedgerSpreadsheetUrl_(qrLedgerUrl);
+        if (!qrLedgerSpreadsheetUrl) return { booked: false, reason: 'QR_LEDGER_UNRESOLVED' };
+      }
+    }
+
+    var legs = fpeComputeLegs_({
+      amount: base.amount,
+      currency: base.currency,
+      contributor: String(base.recipient_pk_hash || ''),
+      committed: committed,
+      qrLedgerIsMain: qrLedgerIsMain
+    });
+    if (!legs.length) return { booked: false, reason: 'BAD_AMOUNT_OR_CURRENCY' };
+
+    var ctx = {
+      description: '[FARMER PAYMENT EVENT] ' + String(base.bank_ref || '') + ' - tree ' + treeId,
+      qrLedgerSpreadsheetUrl: qrLedgerSpreadsheetUrl
+    };
+    var written = 0;
+    for (var i = 0; i < legs.length; i++) {
+      if (fpeWriteLeg_(legs[i], ctx)) written++;
+    }
+    if (written !== legs.length) {
+      return { booked: false, reason: 'PARTIAL_WRITE_' + written + '_OF_' + legs.length };
+    }
+    return { booked: true, legs: written };
+  } catch (e) {
+    Logger.log('fpeBookLedger_ failed: ' + (e && e.message ? e.message : e));
+    return { booked: false, reason: 'ERROR_' + (e && e.message ? e.message : String(e)) };
+  }
+}
+
 /**
  * HTTP / time-driven entry point. Triggered by Edgar after every `[PAYOUT EVENT]`
  * submission (?action=processPayoutEventsFromTelegramChatLogs), plus an hourly
@@ -526,6 +713,17 @@ function processPayoutEventsFromTelegramChatLogs() {
           seenUpdateId[updateId] = true;
           markPayoutEventProcessed_(tcSheet, physicalRow);
           continue;
+        }
+
+        // PR4 - book the SunMint settlement ledger legs BEFORE the Tier-1 tracking write,
+        // so the tracking row carries the true booking outcome. Fail-closed: a payout that
+        // cannot be positively attributed writes nothing and is flagged LEDGER_NOT_BOOKED.
+        var fpeResult = fpeBookLedger_(base);
+        if (fpeResult.reason !== 'NO_TREE_PLANTING_ID') {
+          base.status = fpeResult.booked ? 'BOOKED' : 'LEDGER_NOT_BOOKED';
+          if (!fpeResult.booked) {
+            base.error_message = 'SunMint settlement not booked: ' + fpeResult.reason;
+          }
         }
 
         appendPayoutEventRow_(tier1Sheet, base, false);
