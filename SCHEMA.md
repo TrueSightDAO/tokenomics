@@ -1,8 +1,37 @@
 # TrueSight DAO - Google Sheets Schema Documentation
 
-> **Last Updated:** 2026-09-18
+> **Last Updated:** 2026-09-20
 > 
 > This document provides a consolidated reference for all Google Sheets used across TrueSight DAO's Google Apps Scripts. Use this as a central schema reference when making code changes.
+
+## 📝 Recent Changes (2026-09-20)
+
+### SunMint farmer-settlement + batch QR-tree linking — 3 new ledger literals, 2 new columns
+
+Source roadmap: `SUNMINT_FARMER_SETTLEMENT_AND_BATCH_LINK_PLAN.md` (in `agentic_ai_context`), plan PR1.
+Docs-only — no code, no `Currencies` rows, no new tabs.
+
+**Three new ledger line-item literals** (plain strings in the ledger `Currency` / `Inventory Type`
+column, never `Currencies` tab rows — same convention as the existing `Cacao Tree To Be Planted`;
+see [Tree-Planting Ledger Literals](#tree-planting-ledger-literals) below):
+
+| Literal | Category | First booked by |
+|---------|----------|-----------------|
+| `Cacao Tree Purchased - Not Planted` | Asset | `[TREE PURCHASE EVENT]` (plan PR2) |
+| `Cacao Tree - To Be Paid For` | Liability | reconciliation match (plan PR3) |
+| `Cacao Tree Planted - Unassigned` | Asset (settled pool) | reconciliation match (plan PR3) / `[FARMER PAYMENT EVENT]` (plan PR4) |
+
+**Two new columns:**
+
+| Sheet | New column | Purpose |
+|-------|-----------|---------|
+| `Agroverse QR codes` | **AC — `Linked Plot ID`** | Plot-fallback link target (plan PR6). Blank for the existing tree-level link path. |
+| `SunMint Tree Planting` | **U — `Payment Event Ref`** | References the `[TREE PURCHASE EVENT]` / `[FARMER PAYMENT EVENT]` that funded this confirmed tree (its Telegram Update ID or `Asset Receipts` / `payouts` row ref). `Cost of Tree` (col P) records an amount only, not a reference. |
+
+**Also added below (first-time `SCHEMA.md` coverage of live tabs):** `SunMint Plots`, `Asset Receipts`,
+`payouts`; plus `SunMint Tree Planting`'s previously-undocumented `Plot ID` column.
+
+---
 
 ## 📝 Recent Changes (2026-09-18)
 
@@ -180,6 +209,9 @@ Canonical layout for **`QR Code Sales`** (workbook `1qbZZ…`, `gid=1003674539`)
 - [Proposal Submissions](#sheet-proposal-submissions)
 - [SunMint Tree Planting](#sheet-sunmint-tree-planting)
 - [SunMint Registered Farms](#sheet-sunmint-registered-farms)
+- [SunMint Plots](#sheet-sunmint-plots)
+- [Asset Receipts](#sheet-asset-receipts)
+- [payouts](#sheet-payouts)
 - [Document Notarizations](#sheet-document-notarizations)
 - [Currency Creation](#sheet-currency-creation)
 - [States](#sheet-states-telegram)
@@ -565,6 +597,8 @@ See [`python_scripts/schema_validation/README.md`](./python_scripts/schema_valid
 | Q | Tree Planting Time | String | Time of planting |
 | R | Linked QR Code | String | QR code this submission was linked to (NEW - added 2026-08-18). Written by `process_tree_planting_link.gs` on `[TREE PLANTING LINK EVENT]`; presence = idempotency marker (rows with R set are skipped on re-run). |
 | S | Linked At | String | ISO 8601 UTC timestamp of the link (NEW - added 2026-08-18). Written alongside column R. |
+| T | Plot ID | String | Plot this submission's tree belongs to (live since before 2026-09-20; formally documented here 2026-09-20). Upstream of the tree-planting-link work — confirms plots are already tracked per-submission. |
+| U | Payment Event Ref | String | References the `[TREE PURCHASE EVENT]` / `[FARMER PAYMENT EVENT]` that funded this confirmed tree — its Telegram Update ID or `Asset Receipts` / `payouts` row reference (NEW - added 2026-09-20). `Cost of Tree` (col P) records an amount, not a reference. Written by plan PR3's reconciliation. |
 
 **Used by:**
 - [`process_tree_planting_telegram_logs.gs`](https://github.com/TrueSightDAO/tokenomics/blob/main/google_app_scripts/sunmint_tree_planting/process_tree_planting_telegram_logs.gs) - Processes tree planting submissions from `[TREE PLANTING EVENT]`; also serves the governor-only read endpoint `?list_new=true&governor_key=...` (added 2026-08-18 — this project had no `doGet` at all before)
@@ -592,6 +626,102 @@ See [`python_scripts/schema_validation/README.md`](./python_scripts/schema_valid
 
 **Used by:**
 - SunMint farm registration processes
+
+---
+
+##### Sheet: `SunMint Plots`
+**Purpose:** Registry of SunMint plots (each plot groups many trees; the join target for plot-level links)
+
+**Sheet URL:** https://docs.google.com/spreadsheets/d/1qbZZhf-_7xzmDTriaJVWj6OZshyQsFkdsAV8-pyzASQ/edit#gid=526449180
+
+**Header Row:** 1
+
+| Column | Name | Type | Description |
+|--------|------|------|-------------|
+| A | Plot ID | String | Stable plot identifier (matches `sunmint/plots/index.geojson`) |
+| B | Farm ID | String | Owning farm (→ `SunMint Registered Farms`) |
+| C | Plot Name | String | Display name |
+| D | Hectares | Number | Plot area |
+| E | Status | String | Plot lifecycle status |
+| F | Boundary Authority | String | Who attested the boundary |
+| G | Plot Type | String | Plot classification |
+| H | Owner | String | Plot owner |
+| I | Region | String | Region |
+| J | Verified At | Date | Boundary verification timestamp |
+| K | Media | String | Media reference(s) for the plot |
+| L | Notes | String | Free-text notes |
+| M | Coordinates | String | Boundary geometry |
+| N | Latitude | String | Centroid latitude |
+| O | Longitude | String | Centroid longitude |
+| P | Invalidated By | String | Who invalidated the plot |
+| Q | (blank) | - | Reserved / currently unused |
+| R | Invalidated At | Date | When invalidated |
+| S | Invalidated Reason | String | Why invalidated |
+
+**Used by:**
+- `SUNMINT_FARMER_SETTLEMENT_AND_BATCH_LINK_PLAN.md` PR6 (plot-level link + representative image resolution)
+
+---
+
+##### Sheet: `Asset Receipts`
+**Purpose:** Offchain asset receipts — pay cash, book an offchain asset row (reused by `[TREE PURCHASE EVENT]`)
+
+**Sheet URL:** https://docs.google.com/spreadsheets/d/1qbZZhf-_7xzmDTriaJVWj6OZshyQsFkdsAV8-pyzASQ/edit#gid=77510441
+
+**Header Row:** 1
+
+| Column | Name | Type | Description |
+|--------|------|------|-------------|
+| A | Telegram Update ID | Number | Source Telegram update ID |
+| B | Processed At (ISO) | String | ISO 8601 processing timestamp |
+| C | Currency Name | String | Asset literal booked (`[TREE PURCHASE EVENT]` submits `Cacao Tree Purchased - Not Planted`) |
+| D | Amount | Number | Quantity received |
+| E | Fund Handler | String | Who paid / handled funds |
+| F | Offchain Row | String | Row reference in the main ledger `offchain transactions` tab |
+| G | Status | String | Processing status |
+
+**Notes:** Target tab of the `asset_receipt_ingest` GAS project (`Code.gs`); CLI is `dao_client`'s
+`report_asset_receipt.py`. `Offchain Row` confirms it books to the single **main** offchain tab —
+it cannot target a specific managed ledger (relevant to `SUNMINT_FARMER_SETTLEMENT_AND_BATCH_LINK_PLAN.md` §0.9).
+
+**Used by:**
+- `asset_receipt_ingest` GAS project (`1o2lzpdTZBYTTFdXzWJoATxznbqL959b_O7_no2Gd-OV4ryOPZOsqxtpU`)
+- `[ASSET RECEIPT EVENT]` / `[TREE PURCHASE EVENT]`
+
+---
+
+##### Sheet: `payouts`
+**Purpose:** Payout records to recipients (reuse target for `[FARMER PAYMENT EVENT]`)
+
+**Sheet URL:** https://docs.google.com/spreadsheets/d/1qbZZhf-_7xzmDTriaJVWj6OZshyQsFkdsAV8-pyzASQ/edit#gid=606329241
+
+**Header Row:** 1
+
+| Column | Name | Type | Description |
+|--------|------|------|-------------|
+| A | created_at_utc | String | Row creation timestamp (UTC) |
+| B | telegram_update_id | Number | Source Telegram update ID |
+| C | program_slug | String | Program (e.g. `cfr`, `sunmint`) |
+| D | submission_source | String | Which surface submitted the payout |
+| E | recipient_pk_hash | String | Recipient public-key hash |
+| F | amount | Number | Payout amount |
+| G | currency | String | Payout currency |
+| H | tree_planting_id | String | Join key → `SunMint Tree Planting` submission |
+| I | bank_ref_type | String | Bank reference type |
+| J | bank_ref | String | Bank reference |
+| K | paid_at | String | Payment timestamp |
+| L | receipt_url | String | Receipt URL |
+| M | status | String | Payout status |
+| N | supersedes_row | String | Row this payout supersedes |
+| O | error_message | String | Error detail, if any |
+
+**Notes:** Carries `tree_planting_id` (the join key the farmer-payment event needs) but **no**
+ledger/offchain-row reference field — so it may currently be log-only, pending the plan-PR4 `clasp`
+source check (`SUNMINT_FARMER_SETTLEMENT_AND_BATCH_LINK_PLAN.md` §0.10).
+
+**Used by:**
+- `qr_code_web_service.js` GAS project (`processPayoutEventsFromTelegramChatLogs`)
+- `SUNMINT_FARMER_SETTLEMENT_AND_BATCH_LINK_PLAN.md` PR4 (`[FARMER PAYMENT EVENT]`)
 
 ---
 
@@ -915,6 +1045,7 @@ See [`python_scripts/schema_validation/README.md`](./python_scripts/schema_valid
 | Z | Stripe Session ID | String | **PRIMARY link** to `Stripe Social Media Checkout ID` column C for this purchase. Multi-item-safe: one Stripe session → many QR codes, so the FK lives on the "many" side (each QR row). Written by `process_qr_code_updates.gs` on `[QR CODE UPDATE EVENT]` with a Stripe block. Preferred over legacy `Stripe Social Media Checkout ID` column P for lookups. |
 | AA | Sold Date | Date | Stamped whenever **status** transitions to `SOLD` (moved to AA 2026-08-20 — previously documented as W, but live col W is the review workflow's "Review Email Sent Date"; grid max is 28 cols so AA=27 is safe). Written by `process_qr_code_updates.gs`'s New Status branch and by the sale-processing scripts (`process_sales_telegram_logs.gs` / its identical `Parse Telegram ChatLogs.gs` pair). Source of the chronological ordering for the tree-planting-link governor picker. |
 | AB | Tree Planted Notification Sent Date | Date | Stamped by `process_tree_planting_link.gs` after emailing the QR owner that their tree has been planted (moved to AB 2026-08-20 — previously documented as X, but live col X is the review workflow's "Review Click Through Date"). Mirrors column M's onboarding-email pattern, kept as a separate column since it's a different email. |
+| AC | Linked Plot ID | String | Plot-fallback link target (NEW - added 2026-09-20). Set by `process_tree_planting_link.gs` when a governor links a sold QR to a **plot** rather than an individual tree submission (see `SUNMINT_FARMER_SETTLEMENT_AND_BATCH_LINK_PLAN.md` §1.6 / PR6). Blank for the standard tree-level link. |
 
 **Status enum (column D):** `SCHEDULED_FOR_MINTING`, `MINTED`, `WAREHOUSED`, `ON CONSIGNMENT`, `CACAO CIRCLE`, `LOST`, `SOLD`, `RESERVED`, `TREE_PLANTING_FUNDS_TRANSFERRED`, `EXPENSED`, `ASSIGNED_TO_TREE`, `GIFT`, `INVALIDATED` (validated in `process_qr_code_updates.gs`). `RESERVED` (added for the reservation feature) marks a bag whose sale is booked (cash leg) but not yet collected/delivered — set at `RESERVATION EVENT` and cleared to `SOLD` at `RESERVATION SETTLEMENT EVENT`. It is excluded from the `list=true` / `list_with_members=true` availability pickers (a held bag must not be re-sellable) and is terminal-until-collected: no auto-expiry, no reversal (see `RESERVATION_EVENT_SPEC.md` Ruled #4). `ASSIGNED_TO_TREE` is set by `process_tree_planting_link.gs` when a governor links a sold QR to a planted-tree submission (see `SUNMINT_TREE_QR_LINKING_PLAN.md`) — treated as "sold" everywhere `SOLD` is (landing-page tree count, `list=true`/`list_with_members=true` availability pickers) so it neither regresses the public count nor becomes re-sellable. `INVALIDATED` (added 2026-08-22) marks a QR row as permanently void — used for synthetic/test QR codes created for end-to-end testing (see `SUNMINT_TREE_QR_LINKING_PLAN.md` §10) once verification is complete, so test artifacts are clearly excluded from real sales/inventory reporting without being deleted from the audit trail. Excluded from every "available"/"sold" picker and count the same way a real void would be — treat it as a terminal, non-actionable state.
 
@@ -1754,6 +1885,21 @@ TELEGRAM_FILE_ID_COL = 14     // Column O
 1. **offchain** - Default main DAO ledger (5 columns)
 2. **Managed AGL** - Individual shipment ledgers (6 columns)
 3. **Balance sheets** - Inventory tracking for AGL ledgers
+
+### Tree-Planting Ledger Literals
+
+Tree-planting accounting uses **plain string literals** in the ledger `Currency` column
+(`offchain transactions` col E) / `Type/Currency` column (managed AGL `Transactions` col E) —
+**never** a row in the `Currencies` tab. A party's balance on a literal is simply the sum of its
+`+`/`-` rows on that literal (the same per-currency balance pattern used elsewhere in the ledger).
+Introduced/tracked by `SUNMINT_FARMER_SETTLEMENT_AND_BATCH_LINK_PLAN.md`.
+
+| Literal | Category | Meaning |
+|---------|----------|---------|
+| `Cacao Tree To Be Planted` | Liability (customer) | Existing — booked `+1` at sale time by `sales_update_managed_agl_ledgers.js`; discharged `-1` by `process_tree_planting_link.gs` at link time. |
+| `Cacao Tree Purchased - Not Planted` | Asset | DAO paid a farmer for a tree not yet confirmed planted (prepaid). Consumed `-1` when a planting confirmation matches it. |
+| `Cacao Tree - To Be Paid For` | Liability | A planting confirmed before payment was made (accrued obligation). **Always sits on the main ledger.** Discharged `-1` by `[FARMER PAYMENT EVENT]`. |
+| `Cacao Tree Planted - Unassigned` | Asset (settled pool) | Confirmed tree with no QR claimed yet — the pool the link event draws from. |
 
 ---
 
