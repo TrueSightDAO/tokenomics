@@ -674,6 +674,36 @@ See [`python_scripts/schema_validation/README.md`](./python_scripts/schema_valid
 
 ---
 
+##### Sheet: `Plot Financing`
+**Purpose:** Audit + idempotency ledger for `[PLOT FINANCING EVENT]` — the cash **advance** the DAO pays to finance **N** trees on a SunMint plot (the **opposite direction** to `[PAYOUT EVENT]`: an advance leaves main *before* any sale exists)
+
+**Sheet URL:** https://docs.google.com/spreadsheets/d/1qbZZhf-_7xzmDTriaJVWj6OZshyQsFkdsAV8-pyzASQ/ (tab auto-created on first processing by the handler)
+
+**Header Row:** 1
+
+| Column | Name | Type | Description |
+|--------|------|------|-------------|
+| A | Submitted At | String | ISO 8601 processing timestamp |
+| B | Telegram Update ID | Number | Source Telegram update ID (dedup key) |
+| C | Telegram Message ID | Number | Source Telegram message ID |
+| D | Plot ID | String | Target plot (col A of `SunMint Plots`) |
+| E | Farmer | String | Farmer named on the event (must resolve to a live plot row) |
+| F | Tree Count | Number | N trees financed; must be strictly positive |
+| G | Amount | Number | Cash advanced; must be strictly positive |
+| H | Currency | String | Advance currency |
+| I | Bank Ref | String | Payment reference |
+| J | Receipt URL | String | Payment receipt |
+| K | Status | String | Outcome (`BOOKED` / `REJECTED` / `FAILED`) |
+| L | Error Message | String | Fail-closed reason when not booked |
+
+**Notes:** Written by `process_plot_financing_event_telegram_logs.js` (GAS project `1MnAsIQAxcSfZO_hALOtMFJ4y1k4OnqeXKMwYs6xev600rPNUYepqcXsT`; PR10b). An advance books exactly **two legs on the MAIN ledger** — cash OUT `-amount` (Is Revenue **blank**, matching PR4's cash-out convention) and a pool mint `+N \`Cacao Tree Planted - Unassigned\`` (Is Revenue `N`, matching PR3's settlement rows) — and it **seeds `SunMint Plots` col T `Contributor Name`** with the farmer, which is what makes a downstream plot-level link bookable (a plot link **fails closed** while col T is blank). Financing is **per plot** — a farmer may hold many plots (Decision 0.14). **FAIL-CLOSED**: an unresolved plot row, a non-positive amount / tree count, or a leg write that does not land books **nothing** and flags the tracking row — a wrong booking is worse than no booking. The per-tree infrastructure charge (`Currencies` col **U `Tree Charge`**) that a downstream `[TREE PLANTING LINK EVENT]` transfers off a managed ledger is a **separate** number — never conflated with this advance (see §8.5 / Q7v5).
+
+**Used by:**
+- `[PLOT FINANCING EVENT]` (`process_plot_financing_event_telegram_logs.js`, PR10b)
+- `SUNMINT_FARMER_SETTLEMENT_AND_BATCH_LINK_PLAN.md` (Decisions 0.14 / 0.15)
+
+---
+
 ##### Sheet: `Asset Receipts`
 **Purpose:** Offchain asset receipts — pay cash, book an offchain asset row (reused by `[TREE PURCHASE EVENT]`)
 
@@ -1919,6 +1949,8 @@ Introduced/tracked by `SUNMINT_FARMER_SETTLEMENT_AND_BATCH_LINK_PLAN.md`.
 | `Cacao Tree Purchased - Not Planted` | Asset | DAO paid a farmer for a tree not yet confirmed planted (prepaid). Consumed `-1` when a planting confirmation matches it. |
 | `Cacao Tree - To Be Paid For` | Liability | A planting confirmed before payment was made (accrued obligation). **Always sits on the main ledger.** Discharged `-1` by `[FARMER PAYMENT EVENT]`. |
 | `Cacao Tree Planted - Unassigned` | Asset (settled pool) | Confirmed tree with no QR claimed yet — the pool the link event draws from. |
+
+**Where the pool unit is minted vs consumed.** `Cacao Tree Planted - Unassigned` is **created** by a reconciliation match (PR3, Path A), by a `[FARMER PAYMENT EVENT]` settlement of an uncommitted unit (PR4, Path B), and by a **`[PLOT FINANCING EVENT]` advance** (PR10b) — the DAO financing N trees up front (`-amount` cash + `+N Planted - Unassigned`, both on **main**). It is **consumed** `-1` when a `[TREE PLANTING LINK EVENT]` draws on it. A `[PLOT FINANCING EVENT]` additionally seeds the `SunMint Plots` col T `Contributor Name` registry (see the `Plot Financing` sheet section).
 
 ---
 
