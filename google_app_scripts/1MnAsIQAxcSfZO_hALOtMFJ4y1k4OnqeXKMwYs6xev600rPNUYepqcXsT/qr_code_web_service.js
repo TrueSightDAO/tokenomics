@@ -2121,6 +2121,12 @@ function doGet(e) {
       // process_payout_event_telegram_logs.js (same Apps Script project), SS12.7 Q3b.
       return createCORSResponse(processPayoutEventsFromTelegramChatLogs());
     }
+    if (actionStr === 'processPlotFinancingEventsFromTelegramChatLogs') {
+      // Triggered by Edgar after a [PLOT FINANCING EVENT] lands on Telegram Chat Logs.
+      // Books the DAO's cash advance on the main ledger + seeds the SunMint Plots registry.
+      // See process_plot_financing_event_telegram_logs.js (same Apps Script project), PR10b.
+      return createCORSResponse(processPlotFinancingEventsFromTelegramChatLogs());
+    }
     if (actionStr === 'getPayoutEvents') {
       // DApp review surface reads booked payout events (no raw PII is present).
       return createCORSResponse(getPayoutEvents(getQueryParam_(e, 'status')));
