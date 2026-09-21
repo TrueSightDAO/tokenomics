@@ -80,14 +80,39 @@ def test_pr5_writer_flags_partial_write_without_rollback():
     assert "written" in body and "error" in body
 
 
-def test_pr5_call_site_passes_farmer_and_cost():
+def test_pr5_call_site_passes_farmer_and_resolved_charge():
     src = _src()
-    assert (
-        "sunmintRow[TPL_SUNMINT_CONTRIBUTOR_NAME_COL], sunmintRow[TPL_SUNMINT_COST_OF_TREE_COL])"
-        in src
-    )
+    assert "sunmintRow[TPL_SUNMINT_CONTRIBUTOR_NAME_COL], treeCharge)" in src
     assert "const TPL_SUNMINT_CONTRIBUTOR_NAME_COL = 9;" in src
-    assert "const TPL_SUNMINT_COST_OF_TREE_COL = 15;" in src
+
+
+def test_pr53a_charge_source_is_currencies_col_u_not_retail_or_farm_cost():
+    """Q7v5: the infra charge is a DEDICATED Currencies column U - not col B (retail/AUM) nor col P."""
+    src = _src()
+    assert "const TPL_TREE_CHARGE_COL = 20;" in src
+    assert "const TPL_CURRENCIES_TAB = 'Currencies';" in src
+    body = src.split("function tplResolveTreeCharge_", 1)[1].split(
+        "function tplResolveSource_", 1
+    )[0]
+    assert "TPL_MAIN_DAO_LEDGER_URL" in body, (
+        "charge must come from the MAIN ledger's Currencies tab"
+    )
+    assert "TPL_TREE_CHARGE_COL" in body, "must read the dedicated charge column (U)"
+
+
+def test_pr53a_charge_normalizes_and_fails_closed():
+    """The fail-OPEN defect PR5 shipped (Number('1.5 BRL')===NaN) must be gone: normalize + fail closed."""
+    src = _src()
+    assert "function tplNormalizeAmount_" in src
+    assert "Number(opts.amount)" not in src, "must normalize, not blindly Number()"
+    body = src.split("function tplComputeLegs_", 1)[1].split(
+        "function tplResolveSource_", 1
+    )[0]
+    assert "return [];" in body, "an unbookable charge must fail closed (no legs)"
+    i = src.index("TPL_MAIN_LEDGER_LEDGER_URLS.includes(ledgerUrl)")
+    j = src.index("tplResolveTreeCharge_(TPL_CUSTOMER_LIABILITY_LITERAL)")
+    k = src.index("const ledgerBooked = appendTreePlantingLedgerFulfillment_")
+    assert i < j < k, "charge resolved up front, before the QR/SunMint writes"
 
 
 def test_pr5_managed_ledger_upfront_resolution_still_before_writes():
@@ -141,8 +166,8 @@ def test_pr6_plot_branch_uses_pr5_booker_and_skips_transfer_amount():
     branch = src.split("if (!parsed.sunmintMessageId && parsed.plotId)", 1)[1]
     branch = branch.split("continue;\n      }", 1)[0]
     assert "appendTreePlantingLedgerFulfillment_(" in branch
-    assert "plot.contributorName, '')" in branch, (
-        "cost must be '' (no transfer) for a plot link"
+    assert "plot.contributorName, null)" in branch, (
+        "a plot link intends NO transfer (null) until PR6.2"
     )
     assert "TPL_LINKED_PLOT_ID_COL" in branch
 
