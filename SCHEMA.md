@@ -31,6 +31,16 @@ see [Tree-Planting Ledger Literals](#tree-planting-ledger-literals) below):
 **Also added below (first-time `SCHEMA.md` coverage of live tabs):** `SunMint Plots`, `Asset Receipts`,
 `payouts`; plus `SunMint Tree Planting`'s previously-undocumented `Plot ID` column.
 
+**PR9 addendum (2026-09-20) — two columns + a correction:**
+- New `Currencies` column **U `Tree Charge`** — the per-tree infra charge booked at link time (col U;
+  *not* col B retail/AUM, *not* `SunMint Tree Planting` col P farm cost). See the `Currencies` section.
+- New `SunMint Plots` column **T `Contributor Name`** — the registry-held farmer identity for plot-level
+  links, plus the **invalidated-plot eligibility filter** (`Status` col E `= invalid` ⇒ not linkable).
+- **Correction:** the tree-planting literals note below previously read *"never a `Currencies` tab row."*
+  That is true for the three **line-item** literals, but the two **tree-charge** literals
+  (`Cacao Tree To Be Planted` / `Cacao Tree Planted`) **do** have `Currencies` rows — they carry the
+  charge (col U). Corrected in place below.
+
 ---
 
 ## 📝 Recent Changes (2026-09-18)
@@ -657,6 +667,7 @@ See [`python_scripts/schema_validation/README.md`](./python_scripts/schema_valid
 | Q | (blank) | - | Reserved / currently unused |
 | R | Invalidated At | Date | When invalidated |
 | S | Invalidated Reason | String | Why invalidated |
+| T | Contributor Name | String | Registry-held **farmer identity** for the plot — the farmer a plot-level link pays, resolved server-side from this cell (never asserted in the event payload). Populated by the proximity-computed backfill (see `OPEN_FOLLOWUPS.md`). A plot-level link (`process_tree_planting_link.js`) requires this cell to be non-blank **and** `Status` (col E) to not be `invalid`; otherwise the link **fails CLOSED** (`REJECTED`, no writes). Added by `SUNMINT_FARMER_SETTLEMENT_AND_BATCH_LINK_PLAN.md` PR6; the invalidated-plot eligibility filter is PR6.2. |
 
 **Used by:**
 - `SUNMINT_FARMER_SETTLEMENT_AND_BATCH_LINK_PLAN.md` PR6 (plot-level link + representative image resolution)
@@ -1393,6 +1404,7 @@ source check (`SUNMINT_FARMER_SETTLEMENT_AND_BATCH_LINK_PLAN.md` §0.10).
 | Q | Sale Type | String | **Allowed values:** `Bulk`, `Retail ready` — **how the SKU is traded / packed**. Dropdown sourced from **`States`** col **Y**. (Header still reads `Sale Type` on the Main Ledger; `States`!Y labels the concept `Unit format`.) |
 | R | GTIN | String | Barcode / GTIN identifier for the SKU, when assigned. |
 | S | HS Code | String | Harmonized System (HS) tariff heading for the SKU, e.g. `1801` (cocoa beans), `1803.1` (cocoa paste/mass), `1804` (cocoa butter, fat & oil), `1806.32` (chocolate bars), `2106.9` (other food preparations, e.g. cacao tea). Stored as **text** to preserve dotted subheadings. For Brazil-source lines the heading follows the NF-e's NCM (e.g. `NCM 1804.00.00` → HS `1804`). Use for customs/export docs. **Not** auto-populated by any ingest — set by hand / write. |
+| U | Tree Charge | Number | **Tree infra charge** — the per-tree amount charged to a managed ledger when one of its QRs is linked to a tree (the "cost to infrastructure users", plan Q7v5; **distinct** from col **B `Price in USD`** = retail/AUM price, and from `SunMint Tree Planting` col **P `Cost of Tree`** = what the DAO pays the farmer). Keyed by the tree literals (`Cacao Tree To Be Planted` / `Cacao Tree Planted`). Read by `process_tree_planting_link.js` (`tplResolveTreeCharge_`) at link time, which books `-U` on the QR's own ledger + `+U` on main when the QR is **not** already on main; **fails CLOSED** if the cell is absent or unparseable. Introduced by `SUNMINT_FARMER_SETTLEMENT_AND_BATCH_LINK_PLAN.md` PR5.3a/b; booked for both tree-level and (PR6.2) plot-level links. |
 | T | Source Documents | String | Provenance links for the SKU — the purchase/customs documents backing its cost. Either a single URL or a JSON array of URLs (e.g. purchase NF-e PDF, purchase agreement), using the same repo-URL style as col **O**. Sits **after** HS Code. **Not** auto-populated by any ingest today — populated by write (e.g. the `agroverse-ledger-manager` service account). Example — the Coopercabruca cacao-butter line (row 108) carries its purchase NF-e here. |
 
 **Used by:**
@@ -1889,9 +1901,16 @@ TELEGRAM_FILE_ID_COL = 14     // Column O
 ### Tree-Planting Ledger Literals
 
 Tree-planting accounting uses **plain string literals** in the ledger `Currency` column
-(`offchain transactions` col E) / `Type/Currency` column (managed AGL `Transactions` col E) —
-**never** a row in the `Currencies` tab. A party's balance on a literal is simply the sum of its
-`+`/`-` rows on that literal (the same per-currency balance pattern used elsewhere in the ledger).
+(`offchain transactions` col E) / `Type/Currency` column (managed AGL `Transactions` col E). A party's
+balance on a literal is simply the sum of its `+`/`-` rows on that literal (the same per-currency
+balance pattern used elsewhere in the ledger).
+
+⚠️ **Correction 2026-09-20 (PR9):** this note previously said the literals are **"never** a row in the
+`Currencies` tab." That is **not accurate for the two tree-charge literals** — `Cacao Tree To Be Planted`
+(booked `+1` at sale) and its mirror `Cacao Tree Planted` **are** legitimate `Currencies` tab rows: they
+carry the retail/AUM price in col B **and** the per-tree infra charge in the new col **U `Tree Charge`**
+(plan Q7v5). The three **line-item** literals below (`Purchased - Not Planted`, `To Be Paid For`,
+`Planted - Unassigned`) remain plain ledger strings with **no** `Currencies` row.
 Introduced/tracked by `SUNMINT_FARMER_SETTLEMENT_AND_BATCH_LINK_PLAN.md`.
 
 | Literal | Category | Meaning |
