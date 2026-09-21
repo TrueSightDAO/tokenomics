@@ -94,6 +94,7 @@ const TPL_SUNMINT_CONTRIBUTOR_NAME_COL = 9; // Column J - Contributor Name (plan
 const TPL_PLOTS_TAB = 'SunMint Plots';                    // lives on SOURCE_SHEET_URL's spreadsheet (plan 1.7)
 const TPL_PLOTS_PLOT_ID_COL = 0;                          // Column A - Plot ID
 const TPL_PLOTS_CONTRIBUTOR_NAME_COL = 19;                // Column T - Contributor Name (NEW 2026-09-20; registry-held farmer identity)
+const TPL_PLOTS_STATUS_COL = 4;                           // Column E - Status ('invalid' = retracted; PR6.2 eligibility filter, Q6)
 const TPL_LINKED_PLOT_ID_COL = 28;                        // Column AC on "Agroverse QR codes" (PR1; SCHEMA.md)
 const TPL_PLOTS_MEDIA_RAW_URL = 'https://raw.githubusercontent.com/TrueSightDAO/sunmint/main/plots/media.json';
 
@@ -402,7 +403,8 @@ function resendTreePlantedNotification_(qrCode) {
  *     liability stays open, tagged committed via the SunMint Linked QR Code).
  * @param {Object} opts { customerContributor, farmerContributor, source, amount, qrRoutesToMain }
  *   amount = the resolved per-tree infra charge (Currencies col U), or null when no transfer is
- *   intended (the plot path pre-PR6.2). Required (non-null) whenever the QR routes off main.
+ *   intended (a QR routing to main). Required (non-null) whenever the QR routes off main - both
+ *   link paths (tree-level and PR6.2 plot-level) now supply it.
  * @return {Array<Object>} legs; [] when the input is not bookable (fails closed)
  */
 function tplComputeLegs_(opts) {
@@ -570,6 +572,10 @@ function tplResolvePlotContributor_(plotId) {
     const data = sh.getDataRange().getValues();
     for (let i = 1; i < data.length; i++) {
       if ((data[i][TPL_PLOTS_PLOT_ID_COL] || '').toString().trim() !== want) continue;
+      // PR6.2 (Q6) - a plot is linkable ONLY while it is not invalidated. Status='invalid' is set by
+      // process_plot_invalidation.gs; such a plot is hard-rejected here, so a link can never book a
+      // ledger effect against a retracted plot (Q3: a bad target is refused, not silently booked).
+      if (tplIsPlotStatusInvalid_(data[i][TPL_PLOTS_STATUS_COL])) return null;
       const name = (data[i][TPL_PLOTS_CONTRIBUTOR_NAME_COL] || '').toString().trim();
       if (!name) return null; // fail closed: registry has no farmer for this plot yet
       return { plotId: want, contributorName: name };
@@ -579,6 +585,17 @@ function tplResolvePlotContributor_(plotId) {
     Logger.log('tplResolvePlotContributor_ failed: ' + e.message);
     return null;
   }
+}
+
+/**
+ * PR6.2 (Q6) - is a SunMint Plots Status cell 'invalid'? Pure. process_plot_invalidation.gs writes
+ * Status='invalid' to retract a plot; comparison is trimmed + case-insensitive so a stray 'Invalid '
+ * still filters. Any other value (blank, 'active', 'verified') is eligible to be linked.
+ * @param {*} status
+ * @return {boolean}
+ */
+function tplIsPlotStatusInvalid_(status) {
+  return String(status === null || status === undefined ? '' : status).trim().toLowerCase() === 'invalid';
 }
 
 /**
@@ -864,10 +881,24 @@ function processTreePlantingLinksFromTelegramChatLogs() {
       if (!parsed.sunmintMessageId && parsed.plotId) {
         const plot = tplResolvePlotContributor_(parsed.plotId);
         if (!plot) {
-          Logger.log(`Row ${rowNumber}: plot "${parsed.plotId}" not found or has no registered Contributor Name - rejecting`);
-          recordOutcome('REJECTED', `Plot "${parsed.plotId}" not found or missing Contributor Name`);
+          Logger.log(`Row ${rowNumber}: plot "${parsed.plotId}" not found, invalidated, or has no registered Contributor Name - rejecting`);
+          recordOutcome('REJECTED', `Plot "${parsed.plotId}" not found, invalidated, or missing Contributor Name`);
           result.rejected++;
           continue;
+        }
+        // PR6.2 (Q1/Q7v5) - a plot link now books the SAME col-U tree transfer as a tree-level link,
+        // resolved UP FRONT (before any write) so an unbookable charge can never half-apply the link.
+        // A QR that routes to main needs no transfer, so no charge is read (plotCharge stays null).
+        // Fails CLOSED.
+        let plotCharge = null;
+        if (!TPL_MAIN_LEDGER_LEDGER_URLS.includes(ledgerUrl)) {
+          plotCharge = tplResolveTreeCharge_(TPL_CUSTOMER_LIABILITY_LITERAL);
+          if (!isFinite(plotCharge) || plotCharge <= 0) {
+            Logger.log(`Row ${rowNumber}: plot-link tree charge unbookable for "${TPL_CUSTOMER_LIABILITY_LITERAL}" (Currencies col U) - rejecting`);
+            recordOutcome('REJECTED', `Tree charge unbookable (Currencies col U, "${TPL_CUSTOMER_LIABILITY_LITERAL}")`);
+            result.rejected++;
+            continue;
+          }
         }
         // Representative image from the plot's media collection (plan 1.6); '' is tolerated.
         const plotImage = tplResolvePlotImage_(plot.plotId);
@@ -877,12 +908,11 @@ function processTreePlantingLinksFromTelegramChatLogs() {
         qrSheet.getRange(qrRowIndex, TPL_LINKED_PLOT_ID_COL + 1).setValue(plot.plotId);
         if (plotImage) qrSheet.getRange(qrRowIndex, TPL_PHOTO_COL + 1).setValue(plotImage);
         // 2. Ledger: the same plan-1.4 effect as a tree-level link, sourced from the plot's farmer.
-        //    A plot has no per-tree Cost of Tree, so the pool-source reimbursement transfer amount is
-        //    unbookable => no cash legs (fail closed; Envoy default 2026-09-20). Reuses PR5's booker.
-        // PR5.3b: null = no transfer INTENDED here (a plot has no per-tree charge; PR6.2 adds it).
-        // Distinct from an unparseable charge, which fails closed.
+        //    PR6.2: a plot link books the SAME col-U transfer as a tree-level link (plotCharge,
+        //    resolved above; null only when the QR routes to main, where no transfer is needed).
+        //    Reuses PR5's booker.
         const plotLedgerBooked = appendTreePlantingLedgerFulfillment_(
-          transactionsUrl, message, contributorName, ledgerUrl, plot.contributorName, null);
+          transactionsUrl, message, contributorName, ledgerUrl, plot.contributorName, plotCharge);
         // 3. Owner notification (best-effort; a mail failure never rolls back the writes above).
         let plotEmailSent = false;
         if (ownerEmail) {

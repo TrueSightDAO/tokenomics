@@ -166,9 +166,12 @@ def test_pr6_plot_branch_uses_pr5_booker_and_skips_transfer_amount():
     branch = src.split("if (!parsed.sunmintMessageId && parsed.plotId)", 1)[1]
     branch = branch.split("continue;\n      }", 1)[0]
     assert "appendTreePlantingLedgerFulfillment_(" in branch
-    assert "plot.contributorName, null)" in branch, (
-        "a plot link intends NO transfer (null) until PR6.2"
+    assert "plot.contributorName, plotCharge)" in branch, (
+        "PR6.2: a plot link books the resolved col-U charge, same as a tree-level link"
     )
+    assert (
+        "plotCharge = tplResolveTreeCharge_(TPL_CUSTOMER_LIABILITY_LITERAL)" in branch
+    ), "PR6.2: the plot charge is resolved via the SAME col-U helper"
     assert "TPL_LINKED_PLOT_ID_COL" in branch
 
 
@@ -194,3 +197,28 @@ def test_behavioral_harness():
     )
     assert proc.returncode == 0, f"link harness failed:\n{proc.stdout}\n{proc.stderr}"
     assert "0 failed" in proc.stdout
+
+
+def test_pr62_plot_eligibility_filter_excludes_invalidated():
+    """Q6: a plot is linkable ONLY while not invalidated - the resolver must reject Status='invalid'."""
+    src = _src()
+    assert "const TPL_PLOTS_STATUS_COL = 4;" in src
+    assert "function tplIsPlotStatusInvalid_" in src
+    body = src.split("function tplResolvePlotContributor_", 1)[1].split(
+        "function tplIsPlotStatusInvalid_", 1
+    )[0]
+    assert "tplIsPlotStatusInvalid_(data[i][TPL_PLOTS_STATUS_COL])" in body, (
+        "the registry lookup must filter invalidated plots"
+    )
+    assert "return null;" in body, "an invalidated plot fails closed"
+
+
+def test_pr62_bad_target_hard_rejected_not_just_flagged():
+    """Q3: a non-linkable plot is HARD-rejected (REJECTED outcome, result.rejected++), not booked."""
+    src = _src()
+    branch = src.split("if (!parsed.sunmintMessageId && parsed.plotId)", 1)[1].split(
+        "const plotImage = tplResolvePlotImage_", 1
+    )[0]
+    assert "result.rejected++" in branch, "a bad plot target must hard-reject"
+    assert "continue;" in branch
+    assert "invalidated" in branch, "the reject reason must name the invalidated case"
