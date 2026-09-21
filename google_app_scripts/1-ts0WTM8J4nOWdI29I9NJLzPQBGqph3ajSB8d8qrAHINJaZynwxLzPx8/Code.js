@@ -10,9 +10,22 @@
  * based on hash_key matching and specific conditions.
  */
 
+function _json(obj) {
+  return ContentService.createTextOutput(JSON.stringify(obj))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+/**
+ * HTTP entrypoint (web app, ANYONE_ANONYMOUS). GAS web apps 302-redirect to
+ * script.googleusercontent.com, so callers MUST follow redirects (curl -L).
+ *   ?ping=1 -> liveness; ?limit=N -> transfer up to N; ?schedule=1 -> arm 30s trigger.
+ * Always returns JSON, including on error.
+ */
 function doGet(e) {
-  const limit = parseInt(e?.parameter?.limit || '0') || 0;
-  const schedule = e?.parameter?.schedule || '';
+  try {
+    const p = (e && e.parameter) || {};
+    const limit = parseInt(p.limit || '0', 10) || 0;
+    const schedule = p.schedule || '';
 
   // Schedule a one-shot trigger to run the transfer asynchronously.
   // Web requests timeout before large transfers finish.
@@ -26,13 +39,15 @@ function doGet(e) {
     })).setMimeType(ContentService.MimeType.JSON);
   }
 
-  if (e?.parameter?.ping) {
-    return ContentService.createTextOutput(JSON.stringify({status:'ok'}))
-      .setMimeType(ContentService.MimeType.JSON);
-  }
+    if (p.ping) return _json({ status: 'ok', ts: new Date().toISOString() });
 
-  return ContentService.createTextOutput(JSON.stringify(processAllReviewedRows(limit)))
-    .setMimeType(ContentService.MimeType.JSON);
+    const result = processAllReviewedRows(limit);
+    return _json(result && typeof result === 'object'
+      ? result
+      : { status: 'error', error: 'processAllReviewedRows returned no result' });
+  } catch (err) {
+    return _json({ status: 'error', error: String((err && err.message) || err) });
+  }
 }
 
 /** Trigger wrapper — processes a batch then re-schedules if more remain. */
@@ -312,10 +327,11 @@ function processAllReviewedRows(limit = 0) {
       contribByName[nm] = true;
       const h = contribData[c][7]; if (h) contribByHandle[h] = nm;
     }
-    const destHashSeen = {};
+    const destSeen = {};
+    const dupKey_ = (a, c) => String(a || '').trim().toLowerCase() + '||' +
+      String(c || '').trim().toLowerCase().replace(/\s+/g, ' ');
     for (let d = 1; d < destData.length; d++) {
-      const hk = String(destData[d][8] || '').trim();
-      if (hk) destHashSeen[hk] = true;
+      if (destData[d][0]) destSeen[dupKey_(destData[d][0], destData[d][2])] = true;
     }
 
     // --- Single pass: compute everything in-memory ---
@@ -338,14 +354,11 @@ function processAllReviewedRows(limit = 0) {
         originSheet.getRange(i + 1, 6).setValue(IGNORED_STATUS);
         continue;
       }
-      if (destHashSeen[hash_key]) {
-        originSheet.getRange(i + 1, 6).setValue(TRANSFERRED_STATUS);
-        continue;
-      }
 
+      // Resolve contributor name FIRST (Column A exact, then Column H handle).
       let contribName = originData[i][0];
       if (!contribByName[contribName]) {
-        const h = contribName.startsWith('@') ? contribName.slice(1) : contribName;
+        const h = String(contribName || '').startsWith('@') ? contribName.slice(1) : contribName;
         if (contribByHandle[h]) contribName = contribByHandle[h];
         else if (contribByHandle['@' + h]) contribName = contribByHandle['@' + h];
         else {
@@ -354,20 +367,20 @@ function processAllReviewedRows(limit = 0) {
         }
       }
 
-      destSheet.getRange(destAppendRow, 1, 1, 9).setValues([[
-        String(originData[i][8] || '').trim(),
-        contribName,
-        originData[i][2],
-        '',
-        originData[i][6],
-        'Scored Chatlogs',
-        originData[i][9],
-        originData[i][1],
-        hash_key,
+      const tdgRounded = Math.round((parseFloat(originData[i][6]) || 0) * 100) / 100;
+      destSheet.getRange(destAppendRow, 1, 1, 8).setValues([[
+        contribName,            // A: Contributor Name (validated)
+        originData[i][1],       // B: Project Name
+        originData[i][2],       // C: Contribution Made
+        originData[i][3],       // D: Rubric classification
+        tdgRounded,             // E: TDGs Provisioned
+        COMPLETED_STATUS,       // F: Status
+        tdgRounded,             // G: TDGs Issued
+        originData[i][7],       // H: Status date
       ]]);
-      destHashSeen[hash_key] = true;
+      destSeen[dupKey_(contribName, originData[i][2])] = true;
       originSheet.getRange(i + 1, 6).setValue(TRANSFERRED_STATUS);
-      originSheet.getRange(i + 1, 13).setValue(destAppendRow);
+      originSheet.getRange(i + 1, 12).setValue(destAppendRow); // col L: Main Ledger Row Number
       destAppendRow++;
       processedCount++;
 
