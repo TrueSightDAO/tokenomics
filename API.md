@@ -493,11 +493,20 @@ planting evidence onto the QR row, books the ledger fulfillment entry, and email
 server-side (logged, no writes) if the signer isn't in the `Governors` tab. See
 `agentic_ai_context/plans/SUNMINT_TREE_QR_LINKING_PLAN.md`.
 
+**Two target variants (exactly one per event):** either `SunMint Submission Message ID` (a **tree-level**
+link) **or** `Plot ID` (a **plot-level** link, added by
+`SUNMINT_FARMER_SETTLEMENT_AND_BATCH_LINK_PLAN.md` PR6; the plot is resolved against the `SunMint Plots`
+registry and the farmer is taken from col **T `Contributor Name`**, never the payload). A plot is linkable
+only while its `Status` (col E) is not `invalid`. Both variants book the same ledger fulfillment —
+including the `Currencies` col **U `Tree Charge`** transfer when the QR is not already on main. An
+unknown / blank / invalidated target, or an unbookable charge, **fails CLOSED** (`REJECTED`, no writes).
+
 **Format**:
 ```
 [TREE PLANTING LINK EVENT]
 - QR Code: {qr_code}
 - SunMint Submission Message ID: {telegram_message_id}
+- Plot ID: {plot_id}
 - Updated by: {governor_name}
 - Submission Source: {source_url}
 --------
