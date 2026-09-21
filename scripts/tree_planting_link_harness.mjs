@@ -62,7 +62,7 @@ globalThis.UrlFetchApp = { fetch(){ return { getResponseCode(){ return __mediaRe
 const EXPORTS = ['tplComputeLegs_','tplResolveSource_','tplWriteLegs_','appendTreePlantingLedgerFulfillment_','tplNormalizeAmount_','tplResolveTreeCharge_','TPL_TREE_CHARGE_COL','TPL_CURRENCIES_TAB',
   'TPL_MAIN_DAO_LEDGER_URL','TPL_MAIN_DAO_OFFCHAIN_TAB','TPL_TRANSACTIONS_TAB','TPL_POOL_LITERAL',
   'TPL_CUSTOMER_LIABILITY_LITERAL','TPL_TRANSFER_CURRENCY','TPL_MAIN_LEDGER_LEDGER_URLS',
-  'tplResolvePlotContributor_','tplPickPlotImage_','tplResolvePlotImage_',
+  'tplResolvePlotContributor_','tplPickPlotImage_','tplResolvePlotImage_','tplIsPlotStatusInvalid_',
   'TPL_PLOTS_TAB','TPL_PLOTS_CONTRIBUTOR_NAME_COL','TPL_LINKED_PLOT_ID_COL'];
 (0, eval)(src + "\n;Object.assign(globalThis, {" + EXPORTS.join(',') + "});");
 
@@ -75,6 +75,7 @@ const TPL_CUSTOMER_LIABILITY_LITERAL = globalThis.TPL_CUSTOMER_LIABILITY_LITERAL
 const tplResolvePlotContributor_ = globalThis.tplResolvePlotContributor_;
 const tplPickPlotImage_ = globalThis.tplPickPlotImage_;
 const tplResolvePlotImage_ = globalThis.tplResolvePlotImage_;
+const tplIsPlotStatusInvalid_ = globalThis.tplIsPlotStatusInvalid_;
 const TPL_PLOTS_CONTRIBUTOR_NAME_COL = globalThis.TPL_PLOTS_CONTRIBUTOR_NAME_COL;
 const TPL_LINKED_PLOT_ID_COL = globalThis.TPL_LINKED_PLOT_ID_COL;
 const tplNormalizeAmount_ = globalThis.tplNormalizeAmount_;
@@ -281,6 +282,29 @@ t('missing registry tab -> null (never throws)', () => {
   reset(); eq(tplResolvePlotContributor_('FC-P1'), null);
 });
 t('empty plot id -> null', () => { eq(tplResolvePlotContributor_(''), null); });
+
+console.log('== PR6.2 tplIsPlotStatusInvalid_ ==');
+t('PR6.2: status invalid detection is trimmed + case-insensitive', () => {
+  eq(tplIsPlotStatusInvalid_('invalid'), true);
+  eq(tplIsPlotStatusInvalid_('Invalid '), true);
+  eq(tplIsPlotStatusInvalid_('INVALID'), true);
+  eq(tplIsPlotStatusInvalid_(''), false);
+  eq(tplIsPlotStatusInvalid_(null), false);
+  eq(tplIsPlotStatusInvalid_('active'), false);
+});
+t('PR6.2: an invalidated plot is NOT linkable (fail closed)', () => {
+  reset();
+  const g = plotsGrid(); g.push(['FC-P1','fazenda-clara-bahia','','','invalid','','','','','','','','','','','','','','','Fernando Soller Gimenez']);
+  setSource(TPL_PLOTS_TAB, g);
+  eq(tplResolvePlotContributor_('FC-P1'), null);
+});
+t('PR6.2: a non-invalidated plot with a farmer IS linkable', () => {
+  reset();
+  const g = plotsGrid(); g.push(['FC-P1','fazenda-clara-bahia','','','active','','','','','','','','','','','','','','','Fernando Soller Gimenez']);
+  setSource(TPL_PLOTS_TAB, g);
+  const r = tplResolvePlotContributor_('FC-P1');
+  eq(r && r.contributorName, 'Fernando Soller Gimenez');
+});
 
 console.log('== PR6 tplResolvePlotImage_ ==');
 t('fetch 200 -> picks image url', () => {
