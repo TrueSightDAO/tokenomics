@@ -59,7 +59,7 @@ let __mediaResp = { code: 200, text: JSON.stringify({ plots: {} }) };
 globalThis.UrlFetchApp = { fetch(){ return { getResponseCode(){ return __mediaResp.code; }, getContentText(){ return __mediaResp.text; } }; } };
 
 // eval source + export in the SAME indirect eval, so the source's top-level consts are in scope
-const EXPORTS = ['tplComputeLegs_','tplResolveSource_','tplWriteLegs_','appendTreePlantingLedgerFulfillment_',
+const EXPORTS = ['tplComputeLegs_','tplResolveSource_','tplWriteLegs_','appendTreePlantingLedgerFulfillment_','tplNormalizeAmount_','tplResolveTreeCharge_','TPL_TREE_CHARGE_COL','TPL_CURRENCIES_TAB',
   'TPL_MAIN_DAO_LEDGER_URL','TPL_MAIN_DAO_OFFCHAIN_TAB','TPL_TRANSACTIONS_TAB','TPL_POOL_LITERAL',
   'TPL_CUSTOMER_LIABILITY_LITERAL','TPL_TRANSFER_CURRENCY','TPL_MAIN_LEDGER_LEDGER_URLS',
   'tplResolvePlotContributor_','tplPickPlotImage_','tplResolvePlotImage_',
@@ -77,6 +77,10 @@ const tplPickPlotImage_ = globalThis.tplPickPlotImage_;
 const tplResolvePlotImage_ = globalThis.tplResolvePlotImage_;
 const TPL_PLOTS_CONTRIBUTOR_NAME_COL = globalThis.TPL_PLOTS_CONTRIBUTOR_NAME_COL;
 const TPL_LINKED_PLOT_ID_COL = globalThis.TPL_LINKED_PLOT_ID_COL;
+const tplNormalizeAmount_ = globalThis.tplNormalizeAmount_;
+const tplResolveTreeCharge_ = globalThis.tplResolveTreeCharge_;
+const TPL_TREE_CHARGE_COL = globalThis.TPL_TREE_CHARGE_COL;
+let TREE_CHARGE = 1.5;
 
 let pass=0, fail=0;
 function t(name, fn){ try{ fn(); pass++; console.log('  ok  '+name); }catch(e){ fail++; console.log('FAIL  '+name+'\n      '+e.message); } }
@@ -91,15 +95,23 @@ function setMain(n,g){ mainSheets[n]=makeSheet(n,g); }
 function setManaged(n,g){ managedSheets[n]=makeSheet(n,g); }
 function mainRows(){ return mainSheets['offchain transactions'] ? mainSheets['offchain transactions'].getDataRange().getValues() : []; }
 function managedRows(){ return managedSheets['Transactions'] ? managedSheets['Transactions'].getDataRange().getValues() : []; }
+function currenciesGrid(charge){
+  return [['Currencies','Price in USD','a','b','c','d','e','f','g','h','i','j','k','l','m','n','o','p','q','r','s','t','u'],
+          [TPL_CUSTOMER_LIABILITY_LITERAL, 1.5, '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', charge]];
+}
 function poolGrid(farmer, amt){ return [['Date','Desc','Fund Handler','Amount','Currency'],
   ['', '', farmer, amt, TPL_POOL_LITERAL]]; }
 
 console.log('== tplComputeLegs_ (pure) ==');
-t('committed / managed: 1 leg, customer liability, category Liability', () => {
-  const legs = tplComputeLegs_({ customerContributor:'Gov', farmerContributor:'F1', source:'committed', amount:0.01, qrRoutesToMain:false });
-  eq(legs.length, 1, 'legs');
+t('committed / managed: 3 legs (liability + PR5.3b cash transfer), category Liability', () => {
+  const legs = tplComputeLegs_({ customerContributor:'Gov', farmerContributor:'F1', source:'committed', amount:1.5, qrRoutesToMain:false });
+  eq(legs.length, 3, 'legs');
   eq(legs[0].target, 'qr'); eq(legs[0].amount, -1);
   eq(legs[0].literal, TPL_CUSTOMER_LIABILITY_LITERAL); eq(legs[0].category, 'Liability');
+  const cash = legs.filter(l=>l.kind==='cash');
+  eq(cash.length, 2, 'cash legs (Q1: cash moves QR->main at link)');
+  eq(cash[0].target,'qr'); eq(cash[0].amount,-1.5);
+  eq(cash[1].target,'main'); eq(cash[1].amount,1.5);
 });
 t('committed / main: 1 leg, category blank (7-col Is Revenue N)', () => {
   const legs = tplComputeLegs_({ customerContributor:'Gov', farmerContributor:'F1', source:'committed', amount:0.01, qrRoutesToMain:true });
@@ -112,17 +124,44 @@ t('pool / same-ledger-as-main: 2 legs, NO transfer', () => {
   eq(legs.filter(l=>l.kind==='cash').length, 0, 'no cash leg');
 });
 t('pool / cross-ledger: 4 legs incl. reimbursement transfer', () => {
-  const legs = tplComputeLegs_({ customerContributor:'Gov', farmerContributor:'F1', source:'pool', amount:0.01, qrRoutesToMain:false });
+  const legs = tplComputeLegs_({ customerContributor:'Gov', farmerContributor:'F1', source:'pool', amount:1.5, qrRoutesToMain:false });
   eq(legs.length, 4);
   const cash = legs.filter(l=>l.kind==='cash');
   eq(cash.length, 2);
-  eq(cash[0].target,'qr'); eq(cash[0].amount,-0.01); eq(cash[0].literal, globalThis.TPL_TRANSFER_CURRENCY);
-  eq(cash[1].target,'main'); eq(cash[1].amount,0.01);
+  eq(cash[0].target,'qr'); eq(cash[0].amount,-1.5); eq(cash[0].literal, globalThis.TPL_TRANSFER_CURRENCY);
+  eq(cash[1].target,'main'); eq(cash[1].amount,1.5);
 });
-t('pool / cross-ledger but amount unbookable (NaN) -> 2 legs, no transfer (fail closed)', () => {
-  const legs = tplComputeLegs_({ customerContributor:'Gov', farmerContributor:'F1', source:'pool', amount:'', qrRoutesToMain:false });
-  eq(legs.length, 2); eq(legs.filter(l=>l.kind==='cash').length, 0);
+t('PR5.3b: cross-ledger unbookable amount -> [] (fail CLOSED, nothing booked)', () => {
+  eq(tplComputeLegs_({ customerContributor:'Gov', farmerContributor:'F1', source:'pool', amount:'', qrRoutesToMain:false }).length, 0);
+  eq(tplComputeLegs_({ customerContributor:'Gov', farmerContributor:'F1', source:'committed', amount:'N/A', qrRoutesToMain:false }).length, 0);
 });
+t('PR5.3b: null amount = no transfer intended (plot path), inventory legs still book', () => {
+  const legs = tplComputeLegs_({ customerContributor:'Gov', farmerContributor:'F1', source:'pool', amount:null, qrRoutesToMain:false });
+  eq(legs.length, 2, 'liability + pool, no cash');
+  eq(legs.filter(l=>l.kind==='cash').length, 0);
+});
+t('PR5.3a: normalizer parses currency-suffixed strings', () => {
+  eq(tplNormalizeAmount_('1.5 BRL'), 1.5);
+  eq(tplNormalizeAmount_('1 USD'), 1);
+  eq(tplNormalizeAmount_('1,234.50'), 1234.5);
+  eq(tplNormalizeAmount_(2.25), 2.25);
+  eq(isNaN(tplNormalizeAmount_('N/A')), true);
+  eq(isNaN(tplNormalizeAmount_('')), true);
+  eq(isNaN(tplNormalizeAmount_('   ')), true);
+});
+t('PR5.3a: tree charge resolved from Currencies col U (case-insensitive)', () => {
+  reset(); setMain('Currencies', currenciesGrid(1.5));
+  eq(tplResolveTreeCharge_('Cacao Tree To Be Planted'), 1.5);
+  eq(tplResolveTreeCharge_('cacao tree to be planted'), 1.5);
+  reset(); setMain('Currencies', currenciesGrid('2 BRL'));
+  eq(tplResolveTreeCharge_('Cacao Tree To Be Planted'), 2);
+});
+t('PR5.3a: tree charge fails closed on missing tab / blank cell / unknown literal', () => {
+  reset(); eq(isNaN(tplResolveTreeCharge_('Cacao Tree To Be Planted')), true);
+  reset(); setMain('Currencies', currenciesGrid('')); eq(isNaN(tplResolveTreeCharge_('Cacao Tree To Be Planted')), true);
+  reset(); setMain('Currencies', currenciesGrid(1.5)); eq(isNaN(tplResolveTreeCharge_('Other')), true);
+});
+t('PR5.3a: Currencies tree charge is column U (index 20)', () => { eq(TPL_TREE_CHARGE_COL, 20); });
 t('missing contributors -> [] (fail closed)', () => {
   eq(tplComputeLegs_({ customerContributor:'', farmerContributor:'F1', source:'pool', amount:1, qrRoutesToMain:false }).length, 0);
   eq(tplComputeLegs_({ customerContributor:'Gov', farmerContributor:'', source:'pool', amount:1, qrRoutesToMain:false }).length, 0);
@@ -159,15 +198,35 @@ t('pool cross-ledger: books 2 managed + 2 main rows, returns true', () => {
   reset();
   setMain('offchain transactions', poolGrid('F1', 1));
   setManaged('Transactions', [['Date','Desc','Contributor','Amount','Currency','Type']]);
-  const ok = appendTreePlantingLedgerFulfillment_(MANAGED_URL, 'msg', 'Gov', 'https://truesight.me/sunmint/bec', 'F1', 0.01);
+  const ok = appendTreePlantingLedgerFulfillment_(MANAGED_URL, 'msg', 'Gov', 'https://truesight.me/sunmint/bec', 'F1', 1.5);
   eq(ok, true);
   const m = managedRows(), mn = mainRows();
   eq(m.length, 3, 'managed rows');   // header + customer leg + cash leg
   eq(mn.length, 4, 'main rows');     // header + setup pool row + pool leg + cash leg
   eq(m[1][4], TPL_CUSTOMER_LIABILITY_LITERAL); eq(m[1][3], -1);
-  eq(m[2][4], globalThis.TPL_TRANSFER_CURRENCY); eq(m[2][3], -0.01);
+  eq(m[2][4], globalThis.TPL_TRANSFER_CURRENCY); eq(m[2][3], -1.5);
   eq(mn[2][4], TPL_POOL_LITERAL); eq(mn[2][3], -1);   // the new pool-consumption leg
-  eq(mn[3][3], 0.01);                                  // the new reimbursement cash leg
+  eq(mn[3][3], 1.5);                                   // the new reimbursement cash leg
+});
+t('PR5.3b e2e: committed on a managed ledger books 3 legs (Q1)', () => {
+  reset();
+  setMain('offchain transactions', [['Date','Desc','Fund Handler','Amount','Currency','a','b']]);
+  setManaged('Transactions', [['Date','Desc','Contributor','Amount','Currency','Type']]);
+  const ok = appendTreePlantingLedgerFulfillment_(MANAGED_URL, 'msg', 'Gov', 'https://truesight.me/sunmint/bec', 'F1', 1.5);
+  eq(ok, true);
+  const m = managedRows(), mn = mainRows();
+  eq(m.length, 3, 'managed rows');   // header + customer liability + cash-out
+  eq(mn.length, 2, 'main rows');     // header + cash-in
+  eq(mn[1][3], 1.5);
+});
+t('PR5.3b e2e: unbookable charge on a managed ledger books nothing, returns false', () => {
+  reset();
+  setMain('offchain transactions', [['Date','Desc','Fund Handler','Amount','Currency','a','b']]);
+  setManaged('Transactions', [['Date','Desc','Contributor','Amount','Currency','Type']]);
+  const ok = appendTreePlantingLedgerFulfillment_(MANAGED_URL, 'msg', 'Gov', 'https://truesight.me/sunmint/bec', 'F1', '');
+  eq(ok, false);
+  eq(managedRows().length, 1, 'no managed rows written');
+  eq(mainRows().length, 1, 'no main rows written');
 });
 t('committed on a main-routed ledger: books 1 main row, returns true', () => {
   reset();
