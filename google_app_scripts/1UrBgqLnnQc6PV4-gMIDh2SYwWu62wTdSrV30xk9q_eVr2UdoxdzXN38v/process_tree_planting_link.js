@@ -81,7 +81,8 @@ const TPL_MAIN_DAO_OFFCHAIN_TAB = 'offchain transactions';     // main-ledger ta
 const TPL_CUSTOMER_LIABILITY_LITERAL = 'Cacao Tree To Be Planted';       // sale-time liability the link discharges (plan 1.3)
 const TPL_POOL_LITERAL = 'Cacao Tree Planted - Unassigned';              // the settled pool (plan 1.4, pool source)
 const TPL_TRANSFER_CURRENCY = 'USD';                                    // cash literal on the reimbursement-transfer legs (matches the sale-time booker)
-const TPL_SUNMINT_COST_OF_TREE_COL = 15;   // Column P - "Cost of Tree" (the per-tree cash the funding ledger fronted; plan 1.4/1.7)
+const TPL_CURRENCIES_TAB = 'Currencies';   // PR5.3a/b (Q7v5) - the master price tab on the MAIN DAO ledger
+const TPL_TREE_CHARGE_COL = 20;            // Column U - the per-tree INFRA charge (Q7v5: dedicated column, NOT col B retail/AUM, NOT SunMint col P farm cost)
 const TPL_SUNMINT_CONTRIBUTOR_NAME_COL = 9; // Column J - Contributor Name (plan 1.7 match key; PR3's SUNMINT_CONTRIBUTOR_NAME_COL)
 
 // ----- PR6 (plan 1.6): plot-level link path -----
@@ -400,6 +401,8 @@ function resendTreePlantedNotification_(qrCode) {
  *   * committed source: nothing beyond the customer-liability discharge (the "To Be Paid For"
  *     liability stays open, tagged committed via the SunMint Linked QR Code).
  * @param {Object} opts { customerContributor, farmerContributor, source, amount, qrRoutesToMain }
+ *   amount = the resolved per-tree infra charge (Currencies col U), or null when no transfer is
+ *   intended (the plot path pre-PR6.2). Required (non-null) whenever the QR routes off main.
  * @return {Array<Object>} legs; [] when the input is not bookable (fails closed)
  */
 function tplComputeLegs_(opts) {
@@ -422,13 +425,65 @@ function tplComputeLegs_(opts) {
                   custTarget === 'main' ? '' : 'Liability')];
   if (opts.source === 'pool') {
     legs.push(inv('main', -1, TPL_POOL_LITERAL, farmer, 'N'));
-    var amount = Number(opts.amount);
-    if (!opts.qrRoutesToMain && !isNaN(amount) && amount > 0) {
-      legs.push(cash('qr', -amount, farmer));
-      legs.push(cash('main', amount, farmer));
-    }
+  }
+  // PR5.3b (Q1 + Q7v5) - the cash transfer fires in BOTH source branches, whenever the QR routes
+  // to a ledger other than main (that is where the sale-time cash actually sits; the link moves it
+  // to main). The amount is the resolved per-tree INFRA charge (Currencies col U), normalized. An
+  // unbookable amount FAILS CLOSED (no legs at all) - never a silent skip of the cash legs (the
+  // fail-OPEN defect PR5 shipped with: Number('1.5 BRL') === NaN).
+  if (!opts.qrRoutesToMain && opts.amount !== null) {
+    var amount = tplNormalizeAmount_(opts.amount);
+    if (!isFinite(amount) || amount <= 0) return [];
+    legs.push(cash('qr', -amount, farmer));
+    legs.push(cash('main', amount, farmer));
   }
   return legs;
+}
+
+/**
+ * PR5.3a - normalize a possibly currency-suffixed / punctuation-laden cell into a number.
+ * Live cells look like "1.5 BRL", "1 USD", "N/A"; Number() on those is NaN, which is exactly the
+ * fail-OPEN defect PR5 shipped (cash legs silently skipped). Strips commas, then parses the leading
+ * numeric literal. Returns NaN when nothing numeric is present (the caller fails closed). Pure.
+ * @param {*} raw
+ * @return {number} a finite number, or NaN
+ */
+function tplNormalizeAmount_(raw) {
+  if (typeof raw === 'number') return isFinite(raw) ? raw : NaN;
+  var s = String(raw === null || raw === undefined ? '' : raw).replace(/,/g, '').trim();
+  if (!s) return NaN;
+  var n = parseFloat(s);
+  return isFinite(n) ? n : NaN;
+}
+
+/**
+ * PR5.3a (Q7v5) - resolve the per-tree INFRA transfer charge: the Currencies tab's dedicated
+ * column U, keyed by the tree-planting literal. Deliberately NOT the SKU retail price (Currencies
+ * col B - includes chocolate/processing markup and feeds AUM valuation) and NOT the farm cost
+ * (SunMint col P - what we pay the farmer). Lookup is case-insensitive (defensive: the literal is
+ * constant today, but a per-ledger spelling difference must never silently zero the transfer).
+ * Never throws; returns NaN on any miss so the caller fails closed.
+ * @param {string} treeLiteral the tree-planting currency literal
+ * @return {number} the charge, or NaN
+ */
+function tplResolveTreeCharge_(treeLiteral) {
+  try {
+    var ss = SpreadsheetApp.openByUrl(TPL_MAIN_DAO_LEDGER_URL);
+    var sh = ss.getSheetByName(TPL_CURRENCIES_TAB);
+    if (!sh) return NaN;
+    var data = sh.getDataRange().getValues();
+    var key = String(treeLiteral || '').trim().toLowerCase();
+    if (!key) return NaN;
+    for (var i = 1; i < data.length; i++) {
+      if (String(data[i][0] || '').trim().toLowerCase() === key) {
+        return tplNormalizeAmount_(data[i][TPL_TREE_CHARGE_COL]);
+      }
+    }
+    return NaN;
+  } catch (e) {
+    Logger.log('tplResolveTreeCharge_ failed: ' + e.message);
+    return NaN;
+  }
 }
 
 /**
@@ -574,10 +629,10 @@ function tplResolvePlotImage_(plotId) {
  * @param {string} contributorName the governor's resolved name (customer-leg fallback on managed ledgers)
  * @param {string} ledgerUrl the QR's ledger URL (decides main-routing + the customer-leg contributor)
  * @param {string} farmerName the SunMint row's Contributor Name (plan 1.7 match key)
- * @param {number|string} costOfTree the SunMint row's Cost of Tree (per-tree cash, plan 1.4)
+ * @param {number} treeCharge the resolved per-tree infra charge (Currencies col U, normalized) - PR5.3a/b
  * @return {boolean} true if every leg was appended
  */
-function appendTreePlantingLedgerFulfillment_(transactionsSpreadsheetUrl, message, contributorName, ledgerUrl, farmerName, costOfTree) {
+function appendTreePlantingLedgerFulfillment_(transactionsSpreadsheetUrl, message, contributorName, ledgerUrl, farmerName, treeCharge) {
   try {
     var routesToMain = TPL_MAIN_LEDGER_LEDGER_URLS.includes((ledgerUrl || '').toString().trim());
     var ledgerName = (ledgerUrl || '').toString().trim().split('/').filter(Boolean).pop() || 'main';
@@ -589,7 +644,7 @@ function appendTreePlantingLedgerFulfillment_(transactionsSpreadsheetUrl, messag
       customerContributor: customerContributor,
       farmerContributor: farmerContributor,
       source: source,
-      amount: costOfTree,
+      amount: treeCharge,
       qrRoutesToMain: routesToMain
     });
     if (!legs.length) {
@@ -824,8 +879,10 @@ function processTreePlantingLinksFromTelegramChatLogs() {
         // 2. Ledger: the same plan-1.4 effect as a tree-level link, sourced from the plot's farmer.
         //    A plot has no per-tree Cost of Tree, so the pool-source reimbursement transfer amount is
         //    unbookable => no cash legs (fail closed; Envoy default 2026-09-20). Reuses PR5's booker.
+        // PR5.3b: null = no transfer INTENDED here (a plot has no per-tree charge; PR6.2 adds it).
+        // Distinct from an unparseable charge, which fails closed.
         const plotLedgerBooked = appendTreePlantingLedgerFulfillment_(
-          transactionsUrl, message, contributorName, ledgerUrl, plot.contributorName, '');
+          transactionsUrl, message, contributorName, ledgerUrl, plot.contributorName, null);
         // 3. Owner notification (best-effort; a mail failure never rolls back the writes above).
         let plotEmailSent = false;
         if (ownerEmail) {
@@ -844,6 +901,20 @@ function processTreePlantingLinksFromTelegramChatLogs() {
         result.processed++;
         Logger.log(`Row ${rowNumber}: linked QR "${parsed.qrCode}" to plot "${plot.plotId}" (farmer: ${plot.contributorName}, governor: ${contributorName})`);
         continue;
+      }
+
+      // PR5.3a/b - resolve the per-tree transfer charge UP FRONT (before any writes), so an
+      // unresolvable/unparseable charge can never yield a half-applied link. A QR that routes to
+      // main needs no transfer, so no charge is read. Fails CLOSED.
+      let treeCharge = NaN;
+      if (!TPL_MAIN_LEDGER_LEDGER_URLS.includes(ledgerUrl)) {
+        treeCharge = tplResolveTreeCharge_(TPL_CUSTOMER_LIABILITY_LITERAL);
+        if (!isFinite(treeCharge) || treeCharge <= 0) {
+          Logger.log(`Row ${rowNumber}: tree charge unbookable for "${TPL_CUSTOMER_LIABILITY_LITERAL}" (Currencies col U) - rejecting`);
+          recordOutcome('REJECTED', `Tree charge unbookable (Currencies col U, "${TPL_CUSTOMER_LIABILITY_LITERAL}")`);
+          result.rejected++;
+          continue;
+        }
       }
 
       // Locate + validate the SunMint submission row.
@@ -886,7 +957,7 @@ function processTreePlantingLinksFromTelegramChatLogs() {
       sunmintSheet.getRange(sunmintRowIndex, TPL_SUNMINT_LINKED_AT_COL + 1).setValue(new Date().toISOString());
 
       // 3. Ledger fulfillment (transactionsUrl already resolved + validated above, before any writes).
-      const ledgerBooked = appendTreePlantingLedgerFulfillment_(transactionsUrl, message, contributorName, ledgerUrl, sunmintRow[TPL_SUNMINT_CONTRIBUTOR_NAME_COL], sunmintRow[TPL_SUNMINT_COST_OF_TREE_COL]);
+      const ledgerBooked = appendTreePlantingLedgerFulfillment_(transactionsUrl, message, contributorName, ledgerUrl, sunmintRow[TPL_SUNMINT_CONTRIBUTOR_NAME_COL], treeCharge);
 
       // 4. Owner notification (best-effort; failures don't roll back the writes above).
       let emailSent = false;
