@@ -338,6 +338,7 @@ function processAllReviewedRows(limit = 0) {
     // Process newest-first. Commit origin status + destination row immediately
     // per row: if interrupted, the next run skips already-transferred rows.
     let processedCount = 0;
+    let skippedResolveFailed = 0;
     let destAppendRow = destData.length + 1;
 
     for (let i = originData.length - 1; i >= 1; i--) {
@@ -345,7 +346,16 @@ function processAllReviewedRows(limit = 0) {
       const hash_key = String(originData[i][10] || '').trim();
       const colI = String(originData[i][8] || '').trim();
 
-      if (colI === 'RESOLVE FAILED' && status !== REVIEWED_STATUS) continue;
+      // Fail closed on unresolved contributor identity. A row the scorer
+      // flagged RESOLVE FAILED (could not verify the contributor) must NEVER
+      // auto-pay, even if it was later stamped Reviewed with G>0. The previous
+      // guard here was dead code: its condition was always false for Reviewed
+      // rows, and every non-Reviewed row is skipped by the next line anyway.
+      if (colI === 'RESOLVE FAILED') {
+        skippedResolveFailed++;
+        Logger.log('Row ' + (i + 1) + ' skipped: RESOLVE FAILED (contributor unresolved).');
+        continue;
+      }
       if (status !== REVIEWED_STATUS || !hash_key) continue;
 
       const tdg = parseFloat(originData[i][6]) || 0;
@@ -388,7 +398,7 @@ function processAllReviewedRows(limit = 0) {
     }
 
     Logger.log('Transferred ' + processedCount + ' rows.');
-    return { status: 'ok', processed: processedCount };
+    return { status: 'ok', processed: processedCount, skippedResolveFailed: skippedResolveFailed };
   } catch (e) {
     Logger.log('Error: ' + e.message + ' stack: ' + e.stack);
     return { status: 'error', error: e.message };
