@@ -573,6 +573,47 @@ system-generated / governor-signed events complete the model:
   `-1 Purchased-Not-Planted` / `+1 Planted-Unassigned`, with the SunMint row's `Payment Event Ref`
   written to point back at the originating receipt.
 
+### 12. Plot Financing (SunMint)
+
+**Governor-only.** Records a cash **advance** the DAO pays up front to finance **N** trees on a SunMint
+plot — the **opposite direction** to `[FARMER PAYMENT EVENT]`: an advance leaves main *before* any sale
+exists, whereas a payout settles a liability *after* one. It books exactly **two legs on the main
+ledger** — cash OUT `-amount` (Is Revenue blank) and a pool mint `+N "Cacao Tree Planted - Unassigned"`
+(Is Revenue `N`) — and **seeds the `SunMint Plots` registry (col T `Contributor Name`)** with the farmer,
+which is what makes a later plot-level `[TREE PLANTING LINK EVENT]` bookable. Financing is **per plot** —
+a farmer may hold many plots. Processed by the `process_plot_financing_event_telegram_logs.js` GAS sink
+(project `1MnAsIQAxcSfZO_hALOtMFJ4y1k4OnqeXKMwYs6xev600rPNUYepqcXsT`), which dedups against the
+`Plot Financing` tab and fails **CLOSED** (books nothing, flags the row) if the plot cannot be resolved or
+the amount / tree count is not strictly positive. The per-tree infrastructure charge
+(`Currencies` col **U `Tree Charge`**) that a downstream link transfers is a **separate** number — never
+conflated with this advance or with the retail price (`Currencies` col B). See `SCHEMA.md` →
+*`Plot Financing`*; spec
+`agentic_ai_context/plans/SUNMINT_FARMER_SETTLEMENT_AND_BATCH_LINK_PLAN.md`.
+
+**Format**:
+```
+[PLOT FINANCING EVENT]
+- Plot ID: {plot_id}
+- Farmer: {farmer}
+- Tree Count: {tree_count}
+- Amount: {amount}
+- Currency: {currency}
+- Date: {date}
+- Bank Ref: {bank_ref}
+- Receipt URL: {receipt_url}
+- Notes: {notes}
+- Submission Source: {source_url}
+--------
+
+My Digital Signature: {public_key}
+
+Request Transaction ID: {signature_hash}
+```
+
+**Required fields**: `Plot ID`, `Farmer`, `Amount`, `Currency`, `Tree Count`.
+
+**Attachments**: None. **DApp:** `dapp.truesight.me/report_plot_financing.html`.
+
 ## Request Verification
 
 All requests can be verified using the verification endpoint at `https://dapp.truesight.me/verify_request.html`.
