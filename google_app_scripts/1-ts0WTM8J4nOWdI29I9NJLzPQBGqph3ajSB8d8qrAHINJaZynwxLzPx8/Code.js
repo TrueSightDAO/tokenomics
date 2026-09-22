@@ -312,6 +312,13 @@ function transferRowByHashKey(hash_key) {
  */
 function processAllReviewedRows(limit = 0) {
   Logger.log('Starting transfer' + (limit > 0 ? ' (limit: ' + limit + ')' : '') + '.');
+  // Serialize concurrent runs: the 30s re-arm, a cron, and a manual drain can
+  // otherwise overlap and each append against its own pre-append snapshot.
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(30000)) {
+    Logger.log('Could not obtain script lock - another transfer run is in progress. Aborting.');
+    return { status: 'locked', processed: 0 };
+  }
   try {
     const originSS = SpreadsheetApp.openById(ORIGIN_SPREADSHEET_ID);
     const originSheet = originSS.getSheetByName(ORIGIN_SHEET_NAME);
@@ -344,6 +351,9 @@ function processAllReviewedRows(limit = 0) {
     };
     const destSeen = {};
     const destTxnSeen = {};
+    // Column P = Scoring Hash Key: the durable dedup key (never overwritten by
+    // airdrop processing, unlike Column I 'Solana Transfer Hash').
+    const destHashKeySeen = {};
     const dupKey_ = (a, c, e, h) => String(a || '').trim().toLowerCase() + '||' +
       String(c || '').trim().toLowerCase().replace(/\s+/g, ' ') + '||' +
       String(e || '').trim() + '||' + String(h || '').trim();
@@ -351,6 +361,8 @@ function processAllReviewedRows(limit = 0) {
       if (destData[d][0]) destSeen[dupKey_(destData[d][0], destData[d][2], destData[d][4], destData[d][7])] = d + 1;
       const t0 = txnIdOf_(destData[d][2]);
       if (t0) destTxnSeen[t0] = d + 1;
+      const h0 = String(destData[d][15] || '').trim();
+      if (h0) destHashKeySeen[h0] = d + 1;
     }
 
     // --- Single pass: compute everything in-memory ---
@@ -406,7 +418,8 @@ function processAllReviewedRows(limit = 0) {
       const txnId = txnIdOf_(bodyC);
       const tdgC = Math.round((parseFloat(originData[i][6]) || 0) * 100) / 100;
       const dKey = dupKey_(contribName, bodyC, tdgC, originData[i][7]);
-      const existingLedgerRow = (txnId && destTxnSeen[txnId]) || destSeen[dKey] || 0;
+      const existingLedgerRow = (hash_key && destHashKeySeen[hash_key]) ||
+        (txnId && destTxnSeen[txnId]) || destSeen[dKey] || 0;
       if (existingLedgerRow) {
         duplicatesSkipped++;
         originSheet.getRange(i + 1, 6).setValue(TRANSFERRED_STATUS);
@@ -416,18 +429,20 @@ function processAllReviewedRows(limit = 0) {
       }
 
       const tdgRounded = Math.round((parseFloat(originData[i][6]) || 0) * 100) / 100;
-      destSheet.getRange(destAppendRow, 1, 1, 8).setValues([[
-        contribName,            // A: Contributor Name (validated)
-        originData[i][1],       // B: Project Name
-        originData[i][2],       // C: Contribution Made
-        originData[i][3],       // D: Rubric classification
-        tdgRounded,             // E: TDGs Provisioned
-        COMPLETED_STATUS,       // F: Status
-        tdgRounded,             // G: TDGs Issued
-        originData[i][7],       // H: Status date
-      ]]);
+      const destRow = new Array(16).fill('');
+      destRow[0] = contribName;        // A: Contributor Name (validated)
+      destRow[1] = originData[i][1];   // B: Project Name
+      destRow[2] = originData[i][2];   // C: Contribution Made
+      destRow[3] = originData[i][3];   // D: Rubric classification
+      destRow[4] = tdgRounded;         // E: TDGs Provisioned
+      destRow[5] = COMPLETED_STATUS;   // F: Status
+      destRow[6] = tdgRounded;         // G: TDGs Issued
+      destRow[7] = originData[i][7];   // H: Status date
+      destRow[15] = hash_key;          // P: Scoring Hash Key (durable dedup key)
+      destSheet.getRange(destAppendRow, 1, 1, 16).setValues([destRow]);
       destSeen[dKey] = destAppendRow;
       if (txnId) destTxnSeen[txnId] = destAppendRow;
+      if (hash_key) destHashKeySeen[hash_key] = destAppendRow;
       originSheet.getRange(i + 1, 6).setValue(TRANSFERRED_STATUS);
       originSheet.getRange(i + 1, 12).setValue(destAppendRow); // col L: Main Ledger Row Number
       destAppendRow++;
@@ -446,6 +461,8 @@ function processAllReviewedRows(limit = 0) {
   } catch (e) {
     Logger.log('Error: ' + e.message + ' stack: ' + e.stack);
     return { status: 'error', error: e.message };
+  } finally {
+    try { lock.releaseLock(); } catch (ignored) {}
   }
 }
 

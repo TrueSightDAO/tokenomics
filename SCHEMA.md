@@ -4,6 +4,15 @@
 > 
 > This document provides a consolidated reference for all Google Sheets used across TrueSight DAO's Google Apps Scripts. Use this as a central schema reference when making code changes.
 
+## 📝 Recent Changes (2026-09-22)
+
+### **Ledger history** — column **P** (`Scoring Hash Key`) + idempotent transfers
+
+- **Column P header:** `Scoring Hash Key` — the origin `Scored Chatlogs` **column K** hash key for the submission that produced the row, copied verbatim at transfer time.
+- **Why:** the transfer GAS had no persisted dedup key. Column I (`Solana Transfer Hash`) is overwritten by airdrop processing, so it cannot carry the key. Column P is never overwritten.
+- **Transfer GAS** (`Code.js`): now (1) writes `hash_key` to ledger **column P** on append, (2) reads the dedup set from column P in addition to the txn-ID / content guards, and (3) wraps `processAllReviewedRows` in `LockService.getScriptLock()` so the 30s re-arm / cron / manual drain cannot overlap.
+- **Backfill:** column P was backfilled for 3,624 of ~12.5K ledger rows (those traceable to a `Scored Chatlogs` origin row); blank where the origin could not be resolved unambiguously.
+
 ## 📝 Recent Changes (2026-09-20)
 
 ### SunMint farmer-settlement + batch QR-tree linking — 3 new ledger literals, 2 new columns
@@ -1008,6 +1017,7 @@ source check (`SUNMINT_FARMER_SETTLEMENT_AND_BATCH_LINK_PLAN.md` §0.10).
 | M | Within past 90 days vesting | String | 90-day vesting status |
 | N | Within past 180 days | String | Recent 180-day activity indicator |
 | O | Within past 180 days vesting | Number | 180-day vesting amount |
+| P | Scoring Hash Key | String | Durable dedup key — copied from the origin `Scored Chatlogs` column K at transfer time. Unlike column I (`Solana Transfer Hash`, overwritten by airdrop), this column is never overwritten, so the transfer GAS can make ledger appends idempotent. |
 
 **Special Cells:**
 - **Cell E1:** Contains `voting_rights_circulated` total (sum of all TDG tokens issued)
