@@ -332,11 +332,25 @@ function processAllReviewedRows(limit = 0) {
       contribByName[nm] = true;
       const h = contribData[c][7]; if (h) contribByHandle[h] = nm;
     }
+    // Duplicate guard. The signed Request Transaction ID embedded in the
+    // contribution body (Column C) is the strongest de-dup key: a re-appended
+    // copy of the SAME submission carries a byte-identical ID. Fall back to
+    // (contributor || normalized body || TDG || date) for legacy unsigned rows.
+    // NOTE: this map was previously BUILT AND WRITTEN BUT NEVER READ, so no
+    // duplicate was ever skipped. It is now enforced in the row loop below.
+    const txnIdOf_ = (body) => {
+      const m = String(body || '').match(/Request Transaction ID:\s*([A-Za-z0-9+/=]{16,})/);
+      return m ? m[1] : '';
+    };
     const destSeen = {};
-    const dupKey_ = (a, c) => String(a || '').trim().toLowerCase() + '||' +
-      String(c || '').trim().toLowerCase().replace(/\s+/g, ' ');
+    const destTxnSeen = {};
+    const dupKey_ = (a, c, e, h) => String(a || '').trim().toLowerCase() + '||' +
+      String(c || '').trim().toLowerCase().replace(/\s+/g, ' ') + '||' +
+      String(e || '').trim() + '||' + String(h || '').trim();
     for (let d = 1; d < destData.length; d++) {
-      if (destData[d][0]) destSeen[dupKey_(destData[d][0], destData[d][2])] = true;
+      if (destData[d][0]) destSeen[dupKey_(destData[d][0], destData[d][2], destData[d][4], destData[d][7])] = d + 1;
+      const t0 = txnIdOf_(destData[d][2]);
+      if (t0) destTxnSeen[t0] = d + 1;
     }
 
     // --- Single pass: compute everything in-memory ---
@@ -347,6 +361,7 @@ function processAllReviewedRows(limit = 0) {
     let destAppendRow = destData.length + 1;
 
     let rowErrors = 0;
+    let duplicatesSkipped = 0;
     for (let i = originData.length - 1; i >= 1; i--) {
       try {
       const status = String(originData[i][5] || '').trim();
@@ -384,6 +399,22 @@ function processAllReviewedRows(limit = 0) {
         }
       }
 
+      // DUPLICATE GUARD (the previously-missing READ). Skip a row whose
+      // submission is already in the Ledger - matched by signed txn ID first,
+      // then by (contributor, body, TDG, date). Fail closed: never re-append.
+      const bodyC = originData[i][2];
+      const txnId = txnIdOf_(bodyC);
+      const tdgC = Math.round((parseFloat(originData[i][6]) || 0) * 100) / 100;
+      const dKey = dupKey_(contribName, bodyC, tdgC, originData[i][7]);
+      const existingLedgerRow = (txnId && destTxnSeen[txnId]) || destSeen[dKey] || 0;
+      if (existingLedgerRow) {
+        duplicatesSkipped++;
+        originSheet.getRange(i + 1, 6).setValue(TRANSFERRED_STATUS);
+        originSheet.getRange(i + 1, 12).setValue(existingLedgerRow);
+        Logger.log('Row ' + (i + 1) + ' skipped: already in Ledger at row ' + existingLedgerRow + '.');
+        continue;
+      }
+
       const tdgRounded = Math.round((parseFloat(originData[i][6]) || 0) * 100) / 100;
       destSheet.getRange(destAppendRow, 1, 1, 8).setValues([[
         contribName,            // A: Contributor Name (validated)
@@ -395,7 +426,8 @@ function processAllReviewedRows(limit = 0) {
         tdgRounded,             // G: TDGs Issued
         originData[i][7],       // H: Status date
       ]]);
-      destSeen[dupKey_(contribName, originData[i][2])] = true;
+      destSeen[dKey] = destAppendRow;
+      if (txnId) destTxnSeen[txnId] = destAppendRow;
       originSheet.getRange(i + 1, 6).setValue(TRANSFERRED_STATUS);
       originSheet.getRange(i + 1, 12).setValue(destAppendRow); // col L: Main Ledger Row Number
       destAppendRow++;
@@ -410,7 +442,7 @@ function processAllReviewedRows(limit = 0) {
     }
 
     Logger.log('Transferred ' + processedCount + ' rows.');
-    return { status: 'ok', processed: processedCount, skippedResolveFailed: skippedResolveFailed, rowErrors: rowErrors };
+    return { status: 'ok', processed: processedCount, skippedResolveFailed: skippedResolveFailed, duplicatesSkipped: duplicatesSkipped, rowErrors: rowErrors };
   } catch (e) {
     Logger.log('Error: ' + e.message + ' stack: ' + e.stack);
     return { status: 'error', error: e.message };
