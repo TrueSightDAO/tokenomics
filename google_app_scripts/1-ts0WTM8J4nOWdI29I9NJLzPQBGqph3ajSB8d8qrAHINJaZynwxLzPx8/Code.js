@@ -81,7 +81,12 @@ const REVIEWED_STATUS = 'Reviewed';
 const COMPLETED_STATUS = 'Successfully Completed / Full Provision Awarded';
 const TRANSFERRED_STATUS = 'Transferred to Main Ledger';
 const ERROR_STATUS = 'Entry Error';
-const ERROR_CONTRIBUTOR_NOT_FOUND = 'Entry Error - Contributor Not Found';
+// NOTE: origin col F has STRICT data validation (=States!$A$2:$A$1009) and the
+// States list offers 'Entry Error' -- NOT this longer descriptive string. Writing
+// an out-of-list value THROWS; with no per-row catch that single row aborted the
+// ENTIRE transfer run (root cause of the partial ~66-row drains). Keep this a
+// valid state; the descriptive reason stays visible via col I ('RESOLVE FAILED').
+const ERROR_CONTRIBUTOR_NOT_FOUND = ERROR_STATUS;
 const IGNORED_STATUS = 'Ignored';
 
 /**
@@ -341,7 +346,9 @@ function processAllReviewedRows(limit = 0) {
     let skippedResolveFailed = 0;
     let destAppendRow = destData.length + 1;
 
+    let rowErrors = 0;
     for (let i = originData.length - 1; i >= 1; i--) {
+      try {
       const status = String(originData[i][5] || '').trim();
       const hash_key = String(originData[i][10] || '').trim();
       const colI = String(originData[i][8] || '').trim();
@@ -395,10 +402,15 @@ function processAllReviewedRows(limit = 0) {
       processedCount++;
 
       if (limit > 0 && processedCount >= limit) break;
+      } catch (rowErr) {
+        // One bad row must never abort the whole run: log, count, continue.
+        rowErrors++;
+        Logger.log('Row ' + (i + 1) + ' skipped (write error): ' + rowErr.message);
+      }
     }
 
     Logger.log('Transferred ' + processedCount + ' rows.');
-    return { status: 'ok', processed: processedCount, skippedResolveFailed: skippedResolveFailed };
+    return { status: 'ok', processed: processedCount, skippedResolveFailed: skippedResolveFailed, rowErrors: rowErrors };
   } catch (e) {
     Logger.log('Error: ' + e.message + ' stack: ' + e.stack);
     return { status: 'error', error: e.message };

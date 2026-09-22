@@ -11,12 +11,13 @@
  */
 
 /** ISO UTC timestamp of the last clasp push for this mirror */
-var CLASP_MIRROR_LAST_CLASP_PUSH_UTC = '2026-09-21T20:40:00Z';
+var CLASP_MIRROR_LAST_CLASP_PUSH_UTC = '2026-09-21T23:45:00Z';
 
 /**
  * Newest first. Keep lines short; link PRs/commits in git instead of pasting secrets.
  */
 var CLASP_MIRROR_CHANGELOG =
+  '2026-09-21 - Fix transfer ABORT: ERROR_CONTRIBUTOR_NOT_FOUND wrote an out-of-list value to strictly-validated col F -> setValue threw and aborted the whole run (root cause of partial ~66-row drains). Now writes valid ERROR_STATUS + per-row try/catch (new rowErrors counter) so one bad row can never abort a pass.\n' +
   '2026-09-21 - Fix transfer: remove duplicate legacy fns (stale processAllReviewedRows ignored limit -> 68-89s web timeout), robust doGet (always JSON, error-safe), canonical 8-col A-H Ledger write, ledger row# -> col L, dedup on (contributor, contribution).\n' +
   '2026-04-12 - Added default Version.gs for clasp deploy audit trail (tokenomics).\n';
 
