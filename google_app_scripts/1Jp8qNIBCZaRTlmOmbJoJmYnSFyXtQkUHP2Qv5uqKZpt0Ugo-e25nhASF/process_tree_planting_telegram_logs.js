@@ -195,6 +195,27 @@ function uploadToGitHub(token, imageBlob, filename, contributionMade) {
 
 // Main processing function
 function processTelegramLogs() {
+  // IDEMPOTENCY HARDENING: serialize invocations. Without this, two overlapping
+  // runs (auto-dispatch + a manual/cron re-fire, or a re-run while the first is
+  // still appending across the 12k-row source tab) each snapshot the dedup arrays
+  // at the top of processTelegramLogsLocked_() BEFORE either appends a row, both
+  // pass the guard, and both appendRow() -> one DUPLICATE row per submission.
+  // The money side (reconcileTreePlanting_) already had its own idempotency marker;
+  // this closes the same hole for the row append itself.
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(30000)) {
+    Logger.log('processTelegramLogs: another run holds the lock; skipping this invocation');
+    return;
+  }
+  try {
+    processTelegramLogsLocked_();
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+// Body of processTelegramLogs(), run under the script lock acquired above.
+function processTelegramLogsLocked_() {
   const sheet = SpreadsheetApp.openById(creds.SHEET_ID);
   let telegramLogTab = sheet.getSheetByName(telegramLogTabName);
   let sunMintTab = sheet.getSheetByName(sunMintTabName);
@@ -332,6 +353,11 @@ function processTelegramLogs() {
                 cost, plantingTime
               ], treePlantingRowNumber);
 
+              // Keep the in-memory dedup sets current within THIS run: they were
+              // read once at the top and never updated, so a fileId reused by a later
+              // source row in the same run could slip through and append twice.
+              processedMessageIds.push(row[3]);
+              if (fileId !== 'N/A') processedFileIds.push(fileId);
               Logger.log(`Processed file_id: ${fileId}, filename: ${fileNameToUse}`);
             } catch (err) {
               Logger.log(`Error processing file_id ${fileId}: ${err.message}`);
@@ -403,6 +429,8 @@ function processTelegramLogs() {
             cost, plantingTime
           ], treePlantingRowNumber);
 
+          processedMessageIds.push(row[3]);
+          if (fileId !== 'N/A') processedFileIds.push(fileId);
           Logger.log(`Processed record without file attachment: ${fileId}, filename: ${fileNameToUse}`);
         } catch (err) {
           Logger.log(`Error processing record without file attachment: ${err.message}`);
