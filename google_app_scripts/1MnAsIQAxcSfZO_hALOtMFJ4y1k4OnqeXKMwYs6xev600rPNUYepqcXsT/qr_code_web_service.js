@@ -2115,6 +2115,14 @@ function doGet(e) {
       // DApp review page reads recorded payout registrations (masked fields only).
       return createCORSResponse(getPendingPayoutRegistrations(getQueryParam_(e, 'status')));
     }
+    if (actionStr === 'processCfrProgramSubmissionsFromTelegramChatLogs') {
+      // Triggered by Edgar after a CFR-origin tree-planting / growth-monitoring /
+      // plot-boundary submission lands on Telegram Chat Logs. Mirrors ONLY
+      // cfr.truesight.me-origin submissions into the private `cfr program` sheet's
+      // tree planting / tree monitoring / plot registrations tabs (SS11.5).
+      // See process_cfr_program_submission_telegram_logs.js (same Apps Script project).
+      return createCORSResponse(processCfrProgramSubmissionsFromTelegramChatLogs());
+    }
     if (actionStr === 'processPayoutEventsFromTelegramChatLogs') {
       // Triggered by Edgar after a [PAYOUT EVENT] lands on Telegram Chat Logs.
       // Dual-writes Tier-1 `payouts` (Ops) + Tier-2 `payout events` (CFR). See

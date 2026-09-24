@@ -238,7 +238,10 @@ function parsePayoutRegistrationEventText_(body) {
     var line = lines[i].trim();
     if (!line) continue;
     if (line.indexOf(PAYOUT_REG_EVENT_TAG) === 0) continue;
-    if (line === '--------') continue;
+    // The payload terminator: STOP accumulating the previous field here, so the
+    // trailing `My Digital Signature:` / `Request Transaction ID:` / footer prose
+    // (which are NOT `- Field:` lines) are never folded into the last real field.
+    if (line === '--------') { lastKey = null; continue; }
     var isField = line.charAt(0) === '-';
     var probe = isField ? line.substring(1).trim() : line;
     var m = probe.match(/^([A-Za-z][A-Za-z0-9_\s\/\-()]*):\s*(.*)$/);
