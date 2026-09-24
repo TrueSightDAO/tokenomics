@@ -229,6 +229,19 @@ def test_manifest_declares_trigger_scope():
         assert required in scopes, f"missing scope {required}"
 
 
+def test_manifest_declares_documents_scope():
+    """Regression (2026-09-24): processBatch calls DocumentApp.openById, but the
+    manifest omitted the `documents` scope, so every live run failed with
+    "Specified permissions are not sufficient to call DocumentApp.openById"."""
+    import json
+
+    manifest = json.loads((PROJECT / "appsscript.json").read_text())
+    scopes = manifest.get("oauthScopes") or []
+    assert "https://www.googleapis.com/auth/documents" in scopes, (
+        "appsscript.json must declare the documents scope (processBatch uses DocumentApp)"
+    )
+
+
 def test_trigger_installer_reports_status():
     """The installer must report its outcome so the hourly-cron fallback is
     verifiable from the action's own JSON response (no log access needed)."""
