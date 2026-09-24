@@ -2131,6 +2131,40 @@ function scannerTriggerInstallers_() {
 }
 
 /**
+ * Read-only operator endpoint: report which scanners currently have a live hourly
+ * trigger in THIS project. Apps Script exposes no API to list triggers, so this is
+ * how the deployment is verified over HTTP (the counterpart to
+ * ?action=installAllScannerHourlyTriggers). `missing` non-empty => call the installer.
+ * Returns { success, count, totalScanners, installed: [...], missing: [...], byFunction }.
+ */
+function getInstalledScannerTriggers_() {
+  var fns = scannerFunctions_();
+  var triggers = ScriptApp.getProjectTriggers();
+  var handlers = {};
+  for (var i = 0; i < triggers.length; i++) {
+    var h = triggers[i].getHandlerFunction();
+    handlers[h] = (handlers[h] || 0) + 1;
+  }
+  var installed = [];
+  var missing = [];
+  for (var j = 0; j < fns.length; j++) {
+    if (handlers[fns[j]]) {
+      installed.push(fns[j]);
+    } else {
+      missing.push(fns[j]);
+    }
+  }
+  return {
+    success: true,
+    count: installed.length,
+    totalScanners: fns.length,
+    installed: installed,
+    missing: missing,
+    byFunction: handlers
+  };
+}
+
+/**
  * One-shot bulk installer: ensure the hourly safety-net trigger exists for EVERY
  * scanner. Idempotent (each installer is existence-guarded) — safe to call
  * repeatedly, and the fix after an operator deletes triggers (2026-09-24).
@@ -2215,6 +2249,12 @@ function doGet(e) {
       // One-shot operator lever: idempotently ensure the hourly safety-net trigger
       // exists for EVERY scanner in this project. Reading = re-arm. See AGENTS.md.
       return createCORSResponse(ensureAllScannerHourlyTriggersInstalled_());
+    }
+    if (actionStr === 'getInstalledScannerTriggers') {
+      // Read-only operator verification: which scanners currently have a live hourly
+      // trigger. Apps Script exposes NO API to list triggers, so this is the only way
+      // to confirm a deploy/trigger state over HTTP. See AGENTS.md 1.
+      return createCORSResponse(getInstalledScannerTriggers_());
     }
     if (actionStr === 'getPayoutEvents') {
       // DApp review surface reads booked payout events (no raw PII is present).
