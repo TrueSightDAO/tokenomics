@@ -2083,6 +2083,74 @@ function forwardProcessQrGenerationTelegramLogs_() {
     .setMimeType(ContentService.MimeType.JSON);
 }
 
+// ===== Scanner exposure registry (STANDING CONVENTION — see AGENTS.md) =====
+// Every async scanner in this project MUST be reachable via a doGet `?action=`
+// branch (so it is webhook-triggerable AND re-armable over HTTP) and MUST carry an
+// idempotent in-run hourly self-installer. This block is the single source of the
+// scanner list; scripts/test_gas_scanner_exposure.py guards it.
+
+/** HTTP wrapper: run the onboarding batch sender and always return JSON. */
+function processBatchSummary_() {
+  try {
+    processBatch();
+    return { success: true, scanner: 'processBatch' };
+  } catch (e) {
+    // processBatch re-throws after sending its own alert email; surface it as JSON.
+    return {
+      success: false,
+      scanner: 'processBatch',
+      error: (e && e.message) ? e.message : String(e)
+    };
+  }
+}
+
+/** The canonical scanner list for this project (feature-detected by the guard test). */
+function scannerFunctions_() {
+  return [
+    'processBatch',
+    'processDonationMintsFromTelegramChatLogs',
+    'processProgramRegistrationsFromTelegramChatLogs',
+    'processPayoutEventsFromTelegramChatLogs',
+    'processPayoutRegistrationsFromTelegramChatLogs',
+    'processPlotFinancingEventsFromTelegramChatLogs',
+    'processCfrProgramSubmissionsFromTelegramChatLogs'
+  ];
+}
+
+/** scanner fn -> its idempotent in-run self-installer (all defined in this project). */
+function scannerTriggerInstallers_() {
+  return {
+    'processBatch': ensureProcessBatchHourlyTriggerInstalled_,
+    'processDonationMintsFromTelegramChatLogs': ensureDonationMintHourlyTriggerInstalled_,
+    'processProgramRegistrationsFromTelegramChatLogs': ensureProgramRegHourlyTriggerInstalled_,
+    'processPayoutEventsFromTelegramChatLogs': ensurePayoutEventHourlyTriggerInstalled_,
+    'processPayoutRegistrationsFromTelegramChatLogs': ensurePayoutRegHourlyTriggerInstalled_,
+    'processPlotFinancingEventsFromTelegramChatLogs': ensurePlotFinancingHourlyTriggerInstalled_,
+    'processCfrProgramSubmissionsFromTelegramChatLogs': ensureCfrSubHourlyTriggerInstalled_
+  };
+}
+
+/**
+ * One-shot bulk installer: ensure the hourly safety-net trigger exists for EVERY
+ * scanner. Idempotent (each installer is existence-guarded) — safe to call
+ * repeatedly, and the fix after an operator deletes triggers (2026-09-24).
+ * Returns { success, scanners: { fn: 'installed'|'present'|'error: …' } }.
+ */
+function ensureAllScannerHourlyTriggersInstalled_() {
+  var installers = scannerTriggerInstallers_();
+  var fns = scannerFunctions_();
+  var report = {};
+  for (var i = 0; i < fns.length; i++) {
+    var fn = fns[i];
+    try {
+      report[fn] = installers[fn] ? String(installers[fn]()) : 'error: no installer';
+    } catch (e) {
+      report[fn] = 'error: ' + (e && e.message ? e.message : String(e));
+    }
+  }
+  return { success: true, scanners: report };
+}
+
 function doGet(e) {
   try {
     var actionRaw = getQueryParam_(e, 'action');
@@ -2134,6 +2202,19 @@ function doGet(e) {
       // Books the DAO's cash advance on the main ledger + seeds the SunMint Plots registry.
       // See process_plot_financing_event_telegram_logs.js (same Apps Script project), PR10b.
       return createCORSResponse(processPlotFinancingEventsFromTelegramChatLogs());
+    }
+    if (actionStr === 'processBatch') {
+      // Onboarding-email batch sender. Standing convention (AGENTS.md): EVERY scanner
+      // in this project is reachable via a doGet `?action=` branch so it is both
+      // webhook-triggerable and re-armable over HTTP. Uses a Summary_ wrapper because
+      // processBatch re-throws on failure (so a TRIGGER run is flagged failed); a
+      // webhook caller must always get a JSON body, never a poisoned 500.
+      return createCORSResponse(processBatchSummary_());
+    }
+    if (actionStr === 'installAllScannerHourlyTriggers') {
+      // One-shot operator lever: idempotently ensure the hourly safety-net trigger
+      // exists for EVERY scanner in this project. Reading = re-arm. See AGENTS.md.
+      return createCORSResponse(ensureAllScannerHourlyTriggersInstalled_());
     }
     if (actionStr === 'getPayoutEvents') {
       // DApp review surface reads booked payout events (no raw PII is present).
