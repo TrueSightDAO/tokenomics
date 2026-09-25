@@ -118,6 +118,41 @@ t('e2e UPSERT: same pk_hash supersedes (2 updates, 1 row linked)', ()=>{
   eq(r.recorded,1); eq(r.updated,1);
 });
 
+// ---- ACTIVE/SUPERSEDED lifecycle (col I holds ONE ACTIVE row per pk_hash) ----
+reset();
+tcGrid = [['A','B','C','D','E','F','G'],
+  ['Edgar_1','-','EDGAR','msg1','Edgar','',''+payload.replace('111.444.777-35','222.555.888-44')],
+  ['Edgar_2','-','EDGAR','msg2','Edgar','',''+payload.replace('111.444.777-35','333.666.999-55')]];
+t('e2e LIFECYCLE: one ACTIVE row, prior row SUPERSEDED (same pk_hash)', ()=>{
+  processPayoutRegistrationsFromTelegramChatLogs();
+  const rows = payoutRows(); const h = rows[0]; const si = h.indexOf('status');
+  const st = rows.slice(1).map(r=>String(r[si]));
+  eq(st.filter(s=>s==='ACTIVE').length, 1, 'ACTIVE rows');
+  eq(st.filter(s=>s==='SUPERSEDED').length, 1, 'SUPERSEDED rows');
+});
+reset();
+tcGrid = [['A','B','C','D','E','F','G'],['Edgar_1','-','EDGAR','msg1','Edgar','',''+payload]];
+t('e2e LIFECYCLE: first submission is ACTIVE (not RECORDED)', ()=>{
+  processPayoutRegistrationsFromTelegramChatLogs();
+  const rows = payoutRows(); const si = rows[0].indexOf('status');
+  eq(String(rows[1][si]), 'ACTIVE');
+});
+t('source no longer emits legacy RECORDED/UPDATED statuses', ()=>{
+  if(/'UPDATED'|"UPDATED"|'RECORDED'|"RECORDED"/.test(src)) throw new Error('legacy status literals still present');
+});
+t('supersede flips ALL prior rows for the hash, not just the last', ()=>{
+  reset();
+  let g = [['A','B','C','D','E','F','G']];
+  for(const [id,pix] of [['Edgar_1','222.555.888-44'],['Edgar_2','333.666.999-55'],['Edgar_3','444.777.111-66']])
+    g.push([id,'-','EDGAR','m'+id,'Edgar','',''+payload.replace('111.444.777-35',pix)]);
+  tcGrid = g;
+  processPayoutRegistrationsFromTelegramChatLogs();
+  const rows = payoutRows(); const si = rows[0].indexOf('status');
+  const st = rows.slice(1).map(r=>String(r[si]));
+  eq(st.filter(s=>s==='ACTIVE').length, 1, 'ACTIVE rows');
+  eq(st.filter(s=>s==='SUPERSEDED').length, 2, 'SUPERSEDED rows');
+});
+
 reset();
 const noHash = payload.replace('- Planting identity (pk_hash): pk-abcdefghijkl\n','');
 tcGrid = [['A','B','C','D','E','F','G'],['Edgar_1','-','EDGAR','msg1','Edgar','',''+noHash]];
