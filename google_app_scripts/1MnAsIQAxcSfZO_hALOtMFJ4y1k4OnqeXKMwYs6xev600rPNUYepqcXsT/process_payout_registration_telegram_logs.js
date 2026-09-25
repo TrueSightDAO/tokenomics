@@ -122,6 +122,17 @@ var PAYOUT_REG_TC_MESSAGE_COL = 6;
 
 var PAYOUT_REG_EVENT_TAG = '[PAYOUT REGISTRATION]';
 
+/**
+ * Status lifecycle (SS11.3, col I). The tab holds exactly ONE `ACTIVE` row per
+ * `pk_hash`: the moment a correction arrives, the new row is written `ACTIVE` and
+ * every earlier row for that same planter is flipped to `SUPERSEDED`. A governor
+ * can therefore filter the tab on `status = ACTIVE` and see exactly the payable
+ * set, instead of wading through stale RECORDED/UPDATED rows. Terminal refusals
+ * keep their `REJECTED_*` status and are never superseded.
+ */
+var PAYOUT_REG_STATUS_ACTIVE = 'ACTIVE';
+var PAYOUT_REG_STATUS_SUPERSEDED = 'SUPERSEDED';
+
 /** Governor-gated: the only non-governor principal granted access to the private sheet. */
 var PAYOUT_REG_SHARED_SA = 'agroverse-ledger-manager@get-data-io.iam.gserviceaccount.com';
 
@@ -205,6 +216,38 @@ function appendPayoutRegistrationRow_(sheet, p) {
     String(p.supersedes_row || ''),
     String(p.error_message || '')
   ]);
+}
+
+/** Read one cell (0-based column index) as a trimmed string. */
+function readPayoutRegCell_(sheet, row, colZero) {
+  if (colZero == null || colZero < 0) return '';
+  var v = sheet.getRange(row, colZero + 1, 1, 1).getValues();
+  return (v && v[0] && v[0][0] != null) ? v[0][0] : '';
+}
+
+/** Write one cell (0-based column index). */
+function writePayoutRegCell_(sheet, row, colZero, value) {
+  if (colZero == null || colZero < 0) return;
+  sheet.getRange(row, colZero + 1, 1, 1).setValues([[value]]);
+}
+
+/**
+ * Flip every prior row for `pkHash` to `SUPERSEDED` (col I). Called just before
+ * the new ACTIVE row is appended, so the tab ends with exactly one ACTIVE row per
+ * `pk_hash`. Rows already `SUPERSEDED` and terminal `REJECTED_*` rows are left
+ * alone. Never touches the raw PIX column. Idempotent.
+ */
+function supersedePriorPayoutRows_(sheet, pkHash, pkCol, statusCol) {
+  var hash = String(pkHash || '').trim();
+  if (!hash || pkCol == null || statusCol == null) return;
+  var last = sheet.getLastRow();
+  for (var r = 2; r <= last; r++) {
+    if (String(readPayoutRegCell_(sheet, r, pkCol) || '').trim() !== hash) continue;
+    var cur = String(readPayoutRegCell_(sheet, r, statusCol) || '').trim().toUpperCase();
+    if (cur === PAYOUT_REG_STATUS_SUPERSEDED) continue;
+    if (cur.indexOf('REJECTED_') === 0) continue;
+    writePayoutRegCell_(sheet, r, statusCol, PAYOUT_REG_STATUS_SUPERSEDED);
+  }
 }
 
 /**
@@ -399,11 +442,14 @@ function processPayoutRegistrationsFromTelegramChatLogs() {
           seenUpdateId[updateId] = true; rejected++; continue;
         }
 
-        // Upsert by pk_hash: a later correction for the same planter supersedes.
+        // Upsert by pk_hash: a later correction supersedes the prior row. The new
+        // row is ACTIVE; every earlier row for this pk_hash is flipped to SUPERSEDED
+        // (col I), so the tab holds exactly one ACTIVE row per pk_hash.
         var supersedes = '';
         if (rowByPkHash[base.pk_hash]) supersedes = String(rowByPkHash[base.pk_hash]);
         base.supersedes_row = supersedes;
-        base.status = supersedes ? 'UPDATED' : 'RECORDED';
+        base.status = PAYOUT_REG_STATUS_ACTIVE;
+        supersedePriorPayoutRows_(prSheet, base.pk_hash, idx['pk_hash'], idx['status']);
         appendPayoutRegistrationRow_(prSheet, base);
         rowByPkHash[base.pk_hash] = prSheet.getLastRow();
         seenUpdateId[updateId] = true;
