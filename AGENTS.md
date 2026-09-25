@@ -69,3 +69,43 @@ An earlier note warned that `qr_code_web_service.gs` (this project) was **behind
 - **Standing practice:** treat any *prod-only* line (present live, absent in source) as a
   blocker — back-port it into `google_app_scripts/` before deploying. Absence of prod-only
   lines = go.
+
+## 4. Function ordering — top-level `function` declarations in ASCENDING ALPHABETICAL order (STANDING, Gary 2026-09-24)
+
+Within each GAS source file, the **top-level `function` declarations** (`function name(...) { ... }`)
+MUST be ordered **ascending alphabetically by name** (case-insensitive; treat trailing `_` as
+part of the name, so `appendFoo_` sorts under `a`). This exists purely so a **human can find a
+function at a glance** — scrolling the file, reading the ▶ Run dropdown, or Ctrl-F'ing for the
+next symbol all land where the reader expects.
+
+**Why this is safe.** The Apps Script **V8 runtime hoists top-level function declarations**, so
+their source order has **no behavioural effect** — reordering them is a pure readability change.
+This is *why* the rule can be a rule.
+
+**Rules:**
+
+1. Sort the file's top-level `function` declarations A→Z. **Each function keeps its own leading
+doc-comment / banner** — the comment travels with its function, never stranded behind.
+2. **Do NOT reorder order-sensitive code.** Only *hoisted function declarations* may be freely
+   sorted. Leave the following in their dependency order:
+   - `const name = function(...) {...}` and `const name = (...) => {...}` — **not hoisted**
+     (temporal dead zone); a call may only appear after the definition.
+   - top-level `const`/`let`/`var` that run at load time — config objects, sheet-URL maps,
+     and the router's `scannerFunctions_()` / `scannerTriggerInstallers_()` registries.
+3. When a file mixes hoisted declarations with order-dependent consts, **do not force one
+alphabetical run across both**: sort the hoisted block; leave the order-dependent block where it
+is (alphabetize it only within itself, and only if that is dependency-safe).
+4. A file-level header comment block (deployment notes, sheetIds) stays at the **top of the file**.
+5. **Diff hygiene:** a *new* file MUST ship alphabetized. An *edit* to an existing file MAY
+   alphabetize it, but a re-sort churn MUST be a **standalone “sort only” PR** (no logic change) so
+   the reviewer sees a mechanical diff — **never** bury a mass re-sort inside a behavioural PR.
+
+**Worked example (current, to be fixed opportunistically):**
+`process_cfr_program_submission_telegram_logs.js` is domain-grouped (`cfrSubNormKey_`,
+`cfrSubParseFields_`, … then `processCfrProgramSubmissionsFromTelegramChatLogs`) rather than
+alphabetical. Its hoisted declarations would sort as `appendCfrSubMonRow_`, `appendCfrSubPlotRow_`,
+`appendCfrSubTreeRow_`, `cfrSubBuildRow_`, `cfrSubCleanValue_`, … `ensureCfrSubHourlyTriggerInstalled_`,
+`processCfrProgramSubmissionsFromTelegramChatLogs`.
+
+**Apply this whenever you open a GAS file to edit** — not as a one-off sweep. A whole-repo sort is
+optional and, if done, is its own PR.
