@@ -45,8 +45,10 @@ var LOOKUP_PARAM = 'lookup';
 /**
  * GET list_sold_pending_tree=true&governor_key=... — governor-only. Returns QR codes where column D is
  * 'SOLD', column L (Owner Email) is non-empty, and column N (Tree Planting Date) is empty — i.e. sold
- * pledges not yet linked to a planted tree. Sorted by column W (Sold Date) descending (most recent
- * first). Gated by GOVERNOR_READ_KEY (Script Property) since the response includes owner emails.
+ * pledges not yet linked to a planted tree. Also returns product context (columns B/I/S/T/U: landing
+ * page, item descriptor, product image, price, manager) so the governor sees what was sold. Sorted by
+ * column W (Sold Date) descending (most recent first). Gated by GOVERNOR_READ_KEY (Script Property)
+ * since the response includes owner emails.
  * Part of the Sunmint tree-planting -> QR linking roadmap
  * (agentic_ai_context/plans/SUNMINT_TREE_QR_LINKING_PLAN.md, PR3).
  */
@@ -126,8 +128,10 @@ function doOptionsWebLedger_(e) {
  *   dao_client can prefill those fields when an operator picks a session, without a second round trip.
  * - 'list_contributor_names=true' returns { status, names: string[] } from **Contributors Digital Signatures** (batch QR manager dropdown).
  * - 'list_sold_pending_tree=true&governor_key=...' (governor-only, see GOVERNOR_READ_KEY_PROPERTY) returns
- *   { status, items: [{ qr_code, owner_email, sold_date, ledger_name }] } for SOLD QRs with an owner email
- *   and no Tree Planting Date yet, sorted by Sold Date descending.
+ *   { status, items: [{ qr_code, owner_email, sold_date, ledger_name, product, landing_page,
+ *   product_image, price, manager_name }] } for SOLD QRs with an owner email and no Tree Planting
+ *   Date yet, sorted by Sold Date descending. The product-context fields (Gary 2026-09-25, thread
+ *   35944) are additive; the response is already governor-gated because it carries owner emails.
  *
  * @param {Object} e Event object containing parameters.
  * @return {ContentService.TextOutput} JSON response with results or error.
@@ -290,7 +294,17 @@ function doGetWebLedger_(e) {
             owner_email: ownerEmail,
             ledger_name: row[21] || '',
             status: status,
-            sold_date: row[22] instanceof Date ? row[22].toISOString() : (row[22] || '')
+            sold_date: row[22] instanceof Date ? row[22].toISOString() : (row[22] || ''),
+            // Product context (Gary 2026-09-25, thread 35944): the QR record already carries the
+            // product descriptor (col I), product landing page (col B), product image (col S),
+            // sale price (col T) and manager (col U). Surfacing them here lets the governor see
+            // *what was sold* when linking a tree / paying out, instead of a bare QR code.
+            // Governor-only endpoint (owner emails are already PII-gated by GOVERNOR_READ_KEY).
+            product: row[8] || '',          // col I - item descriptor
+            landing_page: row[1] || '',     // col B - product landing page
+            product_image: row[18] || '',   // col S - product image URL
+            price: row[19] || '',           // col T - price the product sold at
+            manager_name: row[20] || ''     // col U - manager name
           });
         }
       }
