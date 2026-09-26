@@ -2231,6 +2231,13 @@ function doGet(e) {
       // DApp review page reads recorded payout registrations (masked fields only).
       return createCORSResponse(getPendingPayoutRegistrations(getQueryParam_(e, 'status')));
     }
+    if (actionStr === 'backfillPayoutRegistrations') {
+      // One-shot operator lever (SS11.3 + SS11.3-bis): normalise the private tab to one
+      // ACTIVE row per pk_hash (prior rows SUPERSEDED) and re-project every ACTIVE row
+      // onto the intake workbook's SS11.3-bis mirror tab. Idempotent.
+      // See process_payout_registration_telegram_logs.js (same project).
+      return createCORSResponse(backfillPayoutRegistrations());
+    }
     if (actionStr === 'processCfrProgramSubmissionsFromTelegramChatLogs') {
       // Triggered by Edgar after a CFR-origin tree-planting / growth-monitoring /
       // plot-boundary submission lands on Telegram Chat Logs. Mirrors ONLY
