@@ -63,7 +63,8 @@ const EXPORTS = ['tplComputeLegs_','tplResolveSource_','tplWriteLegs_','appendTr
   'TPL_MAIN_DAO_LEDGER_URL','TPL_MAIN_DAO_OFFCHAIN_TAB','TPL_TRANSACTIONS_TAB','TPL_POOL_LITERAL',
   'TPL_CUSTOMER_LIABILITY_LITERAL','TPL_TRANSFER_CURRENCY','TPL_MAIN_LEDGER_LEDGER_URLS',
   'tplResolvePlotContributor_','tplPickPlotImage_','tplResolvePlotImage_','tplIsPlotStatusInvalid_',
-  'TPL_PLOTS_TAB','TPL_PLOTS_CONTRIBUTOR_NAME_COL','TPL_LINKED_PLOT_ID_COL'];
+  'TPL_PLOTS_TAB','TPL_PLOTS_CONTRIBUTOR_NAME_COL','TPL_LINKED_PLOT_ID_COL',
+  'tplResolveSunmintRowIndex_','TPL_SUNMINT_TXID_COL','TPL_SUNMINT_MESSAGE_ID_COL','TPL_SUNMINT_STATUS_COL'];
 (0, eval)(src + "\n;Object.assign(globalThis, {" + EXPORTS.join(',') + "});");
 
 const tplComputeLegs_ = globalThis.tplComputeLegs_;
@@ -78,6 +79,10 @@ const tplResolvePlotImage_ = globalThis.tplResolvePlotImage_;
 const tplIsPlotStatusInvalid_ = globalThis.tplIsPlotStatusInvalid_;
 const TPL_PLOTS_CONTRIBUTOR_NAME_COL = globalThis.TPL_PLOTS_CONTRIBUTOR_NAME_COL;
 const TPL_LINKED_PLOT_ID_COL = globalThis.TPL_LINKED_PLOT_ID_COL;
+const tplResolveSunmintRowIndex_ = globalThis.tplResolveSunmintRowIndex_;
+const TPL_SUNMINT_TXID_COL = globalThis.TPL_SUNMINT_TXID_COL;
+const TPL_SUNMINT_MESSAGE_ID_COL = globalThis.TPL_SUNMINT_MESSAGE_ID_COL;
+const TPL_SUNMINT_STATUS_COL = globalThis.TPL_SUNMINT_STATUS_COL;
 const tplNormalizeAmount_ = globalThis.tplNormalizeAmount_;
 const tplResolveTreeCharge_ = globalThis.tplResolveTreeCharge_;
 const TPL_TREE_CHARGE_COL = globalThis.TPL_TREE_CHARGE_COL;
@@ -318,6 +323,56 @@ t('fetch non-200 -> empty (fail closed)', () => {
 console.log('== PR6 constants ==');
 t('Linked Plot ID is column AC (index 28)', () => { eq(TPL_LINKED_PLOT_ID_COL, 28); });
 t('plot contributor name is column T (index 19)', () => { eq(TPL_PLOTS_CONTRIBUTOR_NAME_COL, 19); });
+
+console.log('== tplResolveSunmintRowIndex_ (txid-primary, msgId fallback; Gary, thread 35944) ==');
+const SM_MAX = 22;
+function smRow(o){
+  const r = new Array(SM_MAX).fill('');
+  r[0]  = o.a || '';
+  r[3]  = o.msgId || '';
+  r[12] = o.status || '';
+  r[21] = o.txid || '';
+  return r;
+}
+function smGrid(rows){ return [new Array(SM_MAX).fill('h')].concat(rows); }
+
+t('txid-primary: resolves by col V even when col D differs (the col-D drift case)', () => {
+  const g = smGrid([ smRow({ a:'U-1', msgId:'Edgar_..._081', status:'NEW', txid:'TX_A' }) ]);
+  const r = tplResolveSunmintRowIndex_(g, { sunmintTxid:'TX_A', sunmintMessageId:'Edgar_..._082' });
+  eq(r.rowIndex, 2); eq(r.reason, '');
+});
+t('txid not unique but ONE non-INVALID twin -> resolves to that live row (fail-closed tie-break)', () => {
+  const g = smGrid([
+    smRow({ msgId:'m1', status:'NEW',     txid:'TX_A' }),
+    smRow({ msgId:'m2', status:'INVALID', txid:'TX_A' }),
+  ]);
+  eq(tplResolveSunmintRowIndex_(g, { sunmintTxid:'TX_A' }).rowIndex, 2);
+});
+t('txid ambiguous (TWO non-INVALID rows) -> -1 + reason (never guess)', () => {
+  const g = smGrid([
+    smRow({ msgId:'m1', status:'NEW', txid:'TX_A' }),
+    smRow({ msgId:'m2', status:'NEW', txid:'TX_A' }),
+  ]);
+  const r = tplResolveSunmintRowIndex_(g, { sunmintTxid:'TX_A' });
+  eq(r.rowIndex, -1); eq(/ambiguous/.test(r.reason), true);
+});
+t('lone INVALID txid hit resolves to its row; the downstream NEW-gate then rejects it', () => {
+  const g = smGrid([ smRow({ msgId:'m1', status:'INVALID', txid:'TX_A' }) ]);
+  eq(tplResolveSunmintRowIndex_(g, { sunmintTxid:'TX_A' }).rowIndex, 2);
+});
+t('legacy event (no txid) falls back to col D message id', () => {
+  const g = smGrid([ smRow({ msgId:'Edgar_20260903083532_007', status:'NEW', txid:'TX_Z' }) ]);
+  eq(tplResolveSunmintRowIndex_(g, { sunmintMessageId:'Edgar_20260903083532_007' }).rowIndex, 2);
+});
+t('txid present but unmatched falls through to a matching message id', () => {
+  const g = smGrid([ smRow({ msgId:'m9', status:'NEW', txid:'TX_OTHER' }) ]);
+  eq(tplResolveSunmintRowIndex_(g, { sunmintTxid:'TX_NOPE', sunmintMessageId:'m9' }).rowIndex, 2);
+});
+t('neither key matches -> -1 (rejected, not guessed)', () => {
+  const g = smGrid([ smRow({ msgId:'m1', status:'NEW', txid:'TX_A' }) ]);
+  eq(tplResolveSunmintRowIndex_(g, { sunmintTxid:'TX_X', sunmintMessageId:'mY' }).rowIndex, -1);
+});
+t('col V constant is 21 (column V)', () => { eq(TPL_SUNMINT_TXID_COL, 21); });
 
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);
