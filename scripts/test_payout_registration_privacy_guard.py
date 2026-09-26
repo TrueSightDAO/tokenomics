@@ -6,9 +6,14 @@ Why this exists
 ---------------
 A PIX key in Brazil is frequently a CPF (national ID) and the CRF Anapu cohort
 includes minors, so a plaintext PIX key must never reach a publicly-republished
-surface. Edgar writes every signed payload into `Telegram Chat Logs` col G, and
-that workbook is republished by ADVISORY_SNAPSHOT and the public
-`truesight.me/notarizations` redirect.
+surface. Edgar writes every signed payload into `Telegram Chat Logs` col G. That
+workbook WAS republished by ADVISORY_SNAPSHOT and the
+`truesight.me/notarizations` redirect, but was ACL-privatised 2026-09-18 (no
+anyone/link/domain grant; anonymous gviz/edit/export = 401). On that basis Gary
+approved SS11.3-bis (2026-09-25): a raw-PIX MIRROR tab on that same workbook, so
+that farmers OUTSIDE the CFR cohort (CFR is a subset of SunMint) are payable from
+one navigable surface. If the workbook is ever republished again, the mirror tab
+must be excluded from the projection.
 
 SS11.2 (Gary, 2026-09-17) changed the posture from **encryption** to **privacy by
 location**: the raw PIX is stored *plaintext*, but ONLY in the private,
@@ -18,8 +23,11 @@ republished. There is no RSA-OAEP cipher and no governor-private-key step (the
 
 So the guard is no longer "refuse a raw key" -- it is:
 
-    (a) a raw key may be written ONLY to the private `cfr program` sheet;
-    (b) the public intake workbook is NEVER written to;
+    (a) a raw key is written to the private `cfr program` sheet AND, on Gary's
+        2026-09-25 decision (SS11.3-bis), to the schema-identical MIRROR tab on the
+        intake workbook -- which is safe ONLY because that workbook is private-by-ACL;
+    (b) the `Telegram Chat Logs` TAB itself is NEVER written to (read-only); the
+        mirror tab is a dedicated, separate tab;
     (c) the derived display-safe mask never echoes the raw value;
     (d) the read endpoint never returns the plaintext key; and
     (e) the same Telegram record is never processed twice.
@@ -101,14 +109,29 @@ def test_lock_serialises_entry_point():
     assert ".tryLock(" in src and "releaseLock" in src
 
 
-def test_public_intake_is_read_only_not_a_write_target():
-    """The sink must open the PRIVATE sheet to write, and never insertSheet on intake."""
+def test_telegram_chat_logs_tab_is_read_only():
+    """The sink writes to the PRIVATE sheet, and NEVER to the `Telegram Chat Logs` TAB."""
     src = _src()
-    # All writes go through the private-sheet handle (`cfr`), never the intake (`intake`).
+    # Canonical writes go through the private-sheet handle (`cfr`).
     assert "var cfr = payoutRegCfrProgramSpreadsheet_()" in src
     assert "ensurePayoutRegistrationsSheet_(cfr)" in src
     assert not re.search(r"ensurePayoutRegistrationsSheet_\(intake\)", src)
     assert not re.search(r"\bintake\.insertSheet\b", src)
+    assert not re.search(r"\btcSheet\.appendRow\b", src)
+
+
+def test_ss113bis_mirror_tab_is_written_on_the_intake_workbook():
+    """SS11.3-bis (Gary 2026-09-25): the schema-identical MIRROR tab is written too."""
+    src = _src()
+    assert "PAYOUT_REG_MIRROR_SHEET" in src
+    assert "appendPayoutRegistrationMirrorRow_" in src
+    # the mirror is passed the intake handle, and reuses the shared upsert helper
+    assert re.search(r"appendPayoutRegistrationMirrorRow_\(intake,", src)
+    assert "upsertPayoutRegistrationRow_" in src
+    # a mirror failure must never block the canonical private write (defensive try)
+    assert re.search(
+        r"try \{\s*appendPayoutRegistrationMirrorRow_\(intake, base\);", src
+    )
 
 
 def test_payout_tab_carries_plaintext_pix_and_drops_the_cipher():
@@ -158,6 +181,7 @@ def test_behavioral_harness():
         capture_output=True,
         text=True,
         cwd=str(REPO),
+        check=False,
     )
     assert proc.returncode == 0, f"guard harness failed:\n{proc.stdout}\n{proc.stderr}"
     assert "0 failed" in proc.stdout
