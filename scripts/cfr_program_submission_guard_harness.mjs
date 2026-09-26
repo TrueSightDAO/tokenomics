@@ -392,5 +392,50 @@ t('collapseCfrTreeTxDuplicates NEVER touches un-txid\'d rows', ()=>{
   eq(rows('tree planting').length, 3);   // the two blank-txid rows survive
 });
 
+// ---- linkage guard: a linked tree is NEVER deduped away (Gary, thread 35944) ----
+// "make sure the trees already associated with QR code don't get dedup away"
+t('collapse keeps a LINKED row even when it shares a txid (never un-link a sold bag)', ()=>{
+  reset();
+  cfrSheets['tree planting']=makeSheet('tree planting',[
+    TREE_HEADER,
+    treeRow('U1','TX_A'),                       // RECORDED, first
+    ['2026-09-24T00:00:00Z','U2','pk-x000000000000','U2','Cacao','-3.5','-51.5','http://x/o.jpg','https://cfr.truesight.me/','LINKED','TX_A'],
+  ]);
+  const r = collapseCfrTreeTxDuplicates(true);
+  eq(r.collapsed, 0);                            // nothing deleted: the txid has a linked row
+  eq(r.linkedProtected, 1); eq(r.protectedTxids, 1);
+  eq(rows('tree planting').length, 2);           // both survive
+});
+t('collapse protects a row carrying a non-empty Linked QR Code column', ()=>{
+  reset();
+  const H = TREE_HEADER.concat(['Linked QR Code']);
+  cfrSheets['tree planting']=makeSheet('tree planting',[
+    H,
+    ['2026-09-24T00:00:00Z','U1','pk','U1','Cacao','-3.5','-51.5','http://x/o.jpg','src','RECORDED','TX_A',''],
+    ['2026-09-24T00:00:00Z','U2','pk','U2','Cacao','-3.5','-51.5','http://x/o.jpg','src','RECORDED','TX_A','2024OSCAR_X_1'],
+  ]);
+  const r = collapseCfrTreeTxDuplicates();
+  eq(r.collapsed, 0);
+  eq(r.linkedProtected, 1); eq(r.protectedTxids, 1);
+  eq(rows('tree planting').length, 2);
+});
+t('collapse still collapses UNLINKED duplicate txids (guard is targeted, not a blanket no-op)', ()=>{
+  reset();
+  cfrSheets['tree planting']=makeSheet('tree planting',[
+    TREE_HEADER,
+    treeRow('U1','TX_A'), treeRow('U2','TX_A'),   // both RECORDED, unlinked -> collapse
+    treeRow('U3','TX_B'),
+  ]);
+  const r = collapseCfrTreeTxDuplicates();
+  eq(r.collapsed, 1); eq(r.linkedProtected, 0);
+  eq(rows('tree planting').length, 2);
+});
+t('guard reports linkedProtected/protectedTxids=0 on a tab with no links', ()=>{
+  reset();
+  cfrSheets['tree planting']=makeSheet('tree planting',[TREE_HEADER, treeRow('U1','TX_A'), treeRow('U2','TX_A')]);
+  const r = collapseCfrTreeTxDuplicates(true);
+  eq(r.linkedProtected, 0); eq(r.protectedTxids, 0);
+});
+
 console.log('\n'+pass+' passed, '+fail+' failed');
 process.exit(fail?1:0);

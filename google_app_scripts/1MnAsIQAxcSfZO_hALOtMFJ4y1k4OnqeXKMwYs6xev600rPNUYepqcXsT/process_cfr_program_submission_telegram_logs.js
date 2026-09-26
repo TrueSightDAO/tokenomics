@@ -187,6 +187,31 @@ function backfillCfrTreeTxIds(dryRun) {
 }
 
 /**
+ * True when a tree row carries evidence of a QR/plot LINKAGE and therefore must
+ * NEVER be removed by a dedup/collapse (Gary, thread 35944: "make sure the trees
+ * already associated with QR code don't get dedup away").
+ *
+ * Detects either:
+ *   (a) a linkage column - any header matching /linked/i (e.g. "Linked QR Code",
+ *       "Linked Plot ID", "Linked At") holding a NON-EMPTY value, or
+ *   (b) a status column (header "status"/"Status") whose value is a linked state
+ *       (LINKED / ASSIGNED_TO_TREE - see SCHEMA.md's Agroverse QR status enum).
+ *
+ * Fails safe: a row with no linkage evidence returns false, so ordinary rows
+ * collapse exactly as before.
+ */
+function cfrSubIsLinkedRow_(header, row) {
+  for (var c = 0; c < header.length; c++) {
+    var name = String(header[c] || '').trim();
+    var val = String((row && row[c]) || '').trim();
+    if (!val) continue;
+    if (/linked/i.test(name)) return true;
+    if (/^status$/i.test(name) && /^(linked|assigned_to_tree)$/i.test(val)) return true;
+  }
+  return false;
+}
+
+/**
  * One-shot, IDEMPOTENT lever (Gary thread 35944): COLLAPSE pre-existing duplicate
  * `tree planting` rows that share a Request Transaction ID -- keeping the FIRST
  * occurrence of each. `backfillCfrTreeTxIds` only POPULATES the txid column; this
@@ -206,11 +231,27 @@ function collapseCfrTreeTxDuplicates(dryRun) {
     var sheet = tabs[CFRSUB_TREE_TAB];
     var values = sheet.getDataRange().getValues();
     if (values.length < 2) {
-      return { success: true, dryRun: !apply, checked: 0, collapsed: 0, distinctTxIds: 0, untxRow: 0 };
+      return { success: true, dryRun: !apply, checked: 0, collapsed: 0, distinctTxIds: 0, untxRow: 0, linkedProtected: 0, protectedTxids: 0 };
     }
     var header = values[0].map(function (h) { return String(h || '').trim(); });
     var txCol = header.indexOf('request_transaction_id');
     if (txCol < 0) throw new Error('tree planting row 1 must carry request_transaction_id');
+
+    // ---- Linkage guard (Gary, thread 35944). ------------------------------------
+    // A row that carries a QR/plot link is never collapsed away. We first collect the
+    // set of txids that have ANY linked row, then exclude those txids ENTIRELY from the
+    // collapse - so a linked tree can never be un-linked by dedup, even if its row is
+    // not the first occurrence of its txid. Leaving a duplicate is always preferable
+    // to silently dropping a sold bag's tree linkage.
+    var linkedIdx = {}, linkedProtected = 0, protectedTxids = 0;
+    for (var rl = 1; rl < values.length; rl++) {
+      if (cfrSubIsLinkedRow_(header, values[rl])) {
+        linkedProtected++;
+        var lk = cfrSubTreeTxKey_(values[rl][txCol]);
+        if (lk) linkedIdx[lk] = true;
+      }
+    }
+    for (var lk2 in linkedIdx) protectedTxids++;
 
     var seen = {};
     var toDelete = [];   // 1-based sheet rows, ascending
@@ -218,6 +259,7 @@ function collapseCfrTreeTxDuplicates(dryRun) {
     for (var r = 1; r < values.length; r++) {
       var k = cfrSubTreeTxKey_(values[r][txCol]);
       if (!k) { untx++; continue; }          // un-txid'd rows are never collapsed
+      if (linkedIdx[k]) continue;            // a txid with ANY linked row is left intact
       if (seen[k]) { toDelete.push(r + 1); continue; }
       seen[k] = true; distinct++;
     }
@@ -226,7 +268,8 @@ function collapseCfrTreeTxDuplicates(dryRun) {
       for (var d = toDelete.length - 1; d >= 0; d--) sheet.deleteRow(toDelete[d]);
     }
     return { success: true, dryRun: !apply, checked: values.length - 1,
-             collapsed: toDelete.length, distinctTxIds: distinct, untxRow: untx };
+             collapsed: toDelete.length, distinctTxIds: distinct, untxRow: untx,
+             linkedProtected: linkedProtected, protectedTxids: protectedTxids };
   } catch (err) {
     Logger.log('collapseCfrTreeTxDuplicates error: ' + (err && err.message ? err.message : err));
     return { success: false, error: (err && err.message ? err.message : String(err)) };
