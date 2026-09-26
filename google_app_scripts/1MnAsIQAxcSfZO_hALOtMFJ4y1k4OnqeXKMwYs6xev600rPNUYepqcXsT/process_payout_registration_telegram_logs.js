@@ -588,6 +588,52 @@ function getPendingPayoutRegistrations(statusFilter) {
 }
 
 /**
+ * Governor/DApp read: the `tree_id` -> `pk_hash` map for the CFR program cohort.
+ *
+ * A tree's `pk_hash` (the one-way hash of the submitting farmer's public key,
+ * derived at intake by cfrSubDerivePkHash_) is the SAME identity the payout
+ * register keys on. Surfacing the map lets the DApp payout page AUTO-FILL the
+ * recipient `pk_hash` the moment an operator selects a tree -- today they must
+ * transcribe or hand-pick it, and a wrong hash still pays the wrong account
+ * (the raw PIX key never travels, but the hash is what the sink resolves against).
+ *
+ * Returns ONLY `{ tree_id, pk_hash }` -- no raw PII (no PIX key, no CPF, no email).
+ * Trees with no `pk_hash`, and trees outside the CFR cohort, are simply absent
+ * from the map; the caller leaves the field blank and the manual pick still works.
+ */
+function getTreeRecipientMap() {
+  try {
+    var treeTab = (typeof CFRSUB_TREE_TAB !== 'undefined' && CFRSUB_TREE_TAB)
+      ? String(CFRSUB_TREE_TAB) : 'tree planting';
+    var ss = payoutRegCfrProgramSpreadsheet_();
+    var sheet = ss.getSheetByName(treeTab);
+    if (!sheet) return { status: 'success', data: { count: 0, items: [] } };
+    var values = sheet.getDataRange().getValues();
+    if (values.length < 2) return { status: 'success', data: { count: 0, items: [] } };
+    var header = values[0].map(function (h) { return String(h || '').trim(); });
+    var idx = {};
+    header.forEach(function (h, i) { if (h) idx[h] = i; });
+    var tCol = idx['tree_id'];
+    var pCol = idx['pk_hash'];
+    if (tCol === undefined || pCol === undefined) {
+      return { status: 'success', data: { count: 0, items: [] } };
+    }
+    var items = [];
+    var seen = {};
+    for (var r = 1; r < values.length; r++) {
+      var treeId = String(values[r][tCol] == null ? '' : values[r][tCol]).trim();
+      var pk = String(values[r][pCol] == null ? '' : values[r][pCol]).trim();
+      if (!treeId || !pk || seen[treeId]) continue;
+      seen[treeId] = 1;
+      items.push({ tree_id: treeId, pk_hash: pk });
+    }
+    return { status: 'success', data: { count: items.length, items: items } };
+  } catch (err) {
+    return { status: 'error', message: (err && err.message ? err.message : String(err)) };
+  }
+}
+
+/**
  * One-shot operator lever (SS11.3 + SS11.3-bis normalisation). Rewrites the private
  * `payout registrations` tab so each `pk_hash` has exactly ONE `ACTIVE` row -- its
  * latest by `created_at_utc` (tie-break: highest row number) -- and every earlier row

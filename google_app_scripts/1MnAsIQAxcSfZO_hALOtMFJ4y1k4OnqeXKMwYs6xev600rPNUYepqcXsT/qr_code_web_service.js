@@ -2231,6 +2231,12 @@ function doGet(e) {
       // DApp review page reads recorded payout registrations (masked fields only).
       return createCORSResponse(getPendingPayoutRegistrations(getQueryParam_(e, 'status')));
     }
+    if (actionStr === 'getTreeRecipientMap') {
+      // DApp payout page: `tree_id` -> `pk_hash` so picking a tree auto-fills the
+      // recipient. Hash-only, no raw PII. See process_payout_registration_telegram_logs.js
+      // (same Apps Script project).
+      return createCORSResponse(getTreeRecipientMap());
+    }
     if (actionStr === 'backfillPayoutRegistrations') {
       // One-shot operator lever (SS11.3 + SS11.3-bis): normalise the private tab to one
       // ACTIVE row per pk_hash (prior rows SUPERSEDED) and re-project every ACTIVE row
