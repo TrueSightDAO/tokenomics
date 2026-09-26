@@ -92,7 +92,10 @@ var PAYOUT_REG_TABS = {
     'lng',
     'photo_url',
     'capture_source',
-    'status'
+    'status',
+    // Trailing (never reordered): the TRANSACTION key. Gary thread 35944 -- one
+    // telegram_update_id can map to multiple rows; the unique unit is a transaction.
+    'request_transaction_id'
   ],
   'tree monitoring': [
     'created_at_utc',
@@ -202,6 +205,21 @@ function ensurePayoutRegTab_(spreadsheet, tabName, headers) {
     if (String(firstRow[i] || '').trim() !== headers[i]) { matches = false; break; }
   }
   if (matches) return sheet;
+  // A strict PREFIX is compatible: the header gained TRAILING columns since this tab
+  // was created (e.g. tree planting gained request_transaction_id, thread 35944), so
+  // extend row 1 in place rather than throwing -- existing data rows keep their columns.
+  var sheetCols = Math.max(sheet.getLastColumn(), 0);
+  if (sheetCols > 0 && sheetCols < headers.length) {
+    var existing = sheet.getRange(1, 1, 1, sheetCols).getValues()[0];
+    var prefixOk = true;
+    for (var p = 0; p < sheetCols; p++) {
+      if (String(existing[p] || '').trim() !== headers[p]) { prefixOk = false; break; }
+    }
+    if (prefixOk) {
+      sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+      return sheet;
+    }
+  }
   if (lastRow <= 1) {
     sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
     return sheet;
