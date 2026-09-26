@@ -586,3 +586,114 @@ function getPendingPayoutRegistrations(statusFilter) {
     return { status: 'error', message: (err && err.message ? err.message : String(err)) };
   }
 }
+
+/**
+ * One-shot operator lever (SS11.3 + SS11.3-bis normalisation). Rewrites the private
+ * `payout registrations` tab so each `pk_hash` has exactly ONE `ACTIVE` row -- its
+ * latest by `created_at_utc` (tie-break: highest row number) -- and every earlier row
+ * for that `pk_hash` is `SUPERSEDED`. This is what converts the legacy RECORDED/UPDATED
+ * statuses the pre-lifecycle sink wrote. It then re-projects every `ACTIVE` row onto the
+ * SS11.3-bis mirror tab (creating it on first use).
+ *
+ * Rows with no `pk_hash` (terminal `REJECTED_*` / error rows) are left untouched. The raw
+ * PIX column is never altered. Idempotent: a second run is a no-op (each group already
+ * holds one ACTIVE), so `changed` returns 0.
+ *
+ * Exposed as `?action=backfillPayoutRegistrations` (operator lever).
+ */
+function backfillPayoutRegistrations() {
+  var lock = LockService.getScriptLock();
+  if (!lock.tryLock(180000)) {
+    return { success: false, error: 'busy' };
+  }
+  try {
+    var cfr = payoutRegCfrProgramSpreadsheet_();
+    var prSheet = ensurePayoutRegistrationsSheet_(cfr);
+    if (!prSheet) throw new Error('Could not ensure the payout registrations tab.');
+
+    var values = prSheet.getDataRange().getValues();
+    if (values.length < 2) {
+      return { success: true, pk_hashes: 0, active: 0, superseded: 0, changed: 0, mirror_written: 0 };
+    }
+    var header = values[0].map(function (h) { return String(h || '').trim(); });
+    var idx = {};
+    header.forEach(function (h, i) { if (h) idx[h] = i; });
+    var pkCol = idx['pk_hash'];
+    var stCol = idx['status'];
+    var createdCol = idx['created_at_utc'];
+
+    // Group non-terminal rows by pk_hash.
+    var groups = {};
+    for (var r = 1; r < values.length; r++) {
+      var ph = String(values[r][pkCol] || '').trim();
+      if (!ph) continue;
+      var cur = String(values[r][stCol] || '').trim().toUpperCase();
+      if (cur.indexOf('REJECTED_') === 0) continue;
+      if (!groups[ph]) groups[ph] = [];
+      groups[ph].push({ row: r + 1, created: String(values[r][createdCol] || '') });
+    }
+
+    var active = 0, superseded = 0, changed = 0;
+    for (var key in groups) {
+      if (!groups.hasOwnProperty(key)) continue;
+      var list = groups[key];
+      var winner = list[0];
+      for (var i = 1; i < list.length; i++) {
+        var a = list[i];
+        if (a.created > winner.created || (a.created === winner.created && a.row > winner.row)) {
+          winner = a;
+        }
+      }
+      for (var j = 0; j < list.length; j++) {
+        var g = list[j];
+        var want = (g.row === winner.row) ? PAYOUT_REG_STATUS_ACTIVE : PAYOUT_REG_STATUS_SUPERSEDED;
+        var have = String(values[g.row - 1][stCol] || '').trim().toUpperCase();
+        if (have !== want) { writePayoutRegCell_(prSheet, g.row, stCol, want); changed++; }
+        if (g.row === winner.row) active++; else superseded++;
+      }
+    }
+
+    // Re-project every ACTIVE row onto the SS11.3-bis mirror tab (intake workbook).
+    var intake = SpreadsheetApp.openById(PAYOUT_REG_TELEGRAM_SPREADSHEET_ID);
+    var refreshed = prSheet.getDataRange().getValues();
+    var rIdx = {};
+    refreshed[0].forEach(function (h, k) { if (String(h || '').trim()) rIdx[String(h).trim()] = k; });
+    var mirrorWritten = 0;
+    for (var m = 1; m < refreshed.length; m++) {
+      if (String(refreshed[m][rIdx['status']] || '').trim().toUpperCase() !== PAYOUT_REG_STATUS_ACTIVE) continue;
+      var p = {
+        telegram_update_id: String(refreshed[m][rIdx['telegram_update_id']] || ''),
+        pk_hash: String(refreshed[m][rIdx['pk_hash']] || ''),
+        program_slug: String(refreshed[m][rIdx['program_slug']] || ''),
+        pix_key_type: String(refreshed[m][rIdx['pix_key_type']] || ''),
+        pix_key: String(refreshed[m][rIdx['pix_key']] || ''),
+        pix_key_masked: String(refreshed[m][rIdx['pix_key_masked']] || ''),
+        submission_source: String(refreshed[m][rIdx['submission_source']] || ''),
+        status: PAYOUT_REG_STATUS_ACTIVE,
+        supersedes_row: '',
+        error_message: ''
+      };
+      try {
+        appendPayoutRegistrationMirrorRow_(intake, p);
+        mirrorWritten++;
+      } catch (mirrorErr) {
+        Logger.log('backfill mirror projection failed for ' + p.pk_hash + ': ' +
+          (mirrorErr && mirrorErr.message ? mirrorErr.message : mirrorErr));
+      }
+    }
+
+    return {
+      success: true,
+      pk_hashes: active,
+      active: active,
+      superseded: superseded,
+      changed: changed,
+      mirror_written: mirrorWritten
+    };
+  } catch (err) {
+    Logger.log('backfillPayoutRegistrations error: ' + (err && err.message ? err.message : err));
+    return { success: false, error: (err && err.message ? err.message : String(err)) };
+  } finally {
+    lock.releaseLock();
+  }
+}

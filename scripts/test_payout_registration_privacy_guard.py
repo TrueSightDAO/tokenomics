@@ -160,8 +160,21 @@ def test_shared_service_account_recorded():
 
 def test_read_endpoint_does_not_return_the_plaintext_key():
     src = _src()
-    fn = src[src.index("function getPendingPayoutRegistrations") :]
+    start = src.index("function getPendingPayoutRegistrations")
+    # Slice ONLY this function's body -- stop at the next top-level `function` (a
+    # later function that legitimately reads the raw PIX column must not be scanned
+    # as if it were the read endpoint).
+    nxt = src.find("\nfunction ", start + 1)
+    fn = src[start:nxt] if nxt != -1 else src[start:]
     assert not re.search(r"pix_key:\s*String\(", fn), "read endpoint leaks the raw key"
+
+
+def test_backfill_lever_defined_and_routed():
+    """SS11.3 + SS11.3-bis normalisation lever exists and is reachable over HTTP."""
+    assert "function backfillPayoutRegistrations(" in _src()
+    assert "backfillPayoutRegistrations" in ROUTER.read_text(encoding="utf-8")
+    # the lever must reuse the shared mirror upsert (never a bespoke writer)
+    assert "appendPayoutRegistrationMirrorRow_(intake, p)" in _src()
 
 
 def test_router_wires_both_actions():
