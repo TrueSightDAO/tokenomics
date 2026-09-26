@@ -128,13 +128,16 @@ function cfrSubParseFields_(body) {
  * rows written before the column existed carry none. Writes ONLY to the private
  * `cfr program` sheet -- never to the read-only public intake. (Gary thread 35944.)
  */
-function backfillCfrTreeTxIds() {
+function backfillCfrTreeTxIds(dryRun) {
+  // dryRun: preview what WOULD change without writing (gate-friendly).
+  // Returns counts only -- never txid strings -- so a preview leaks no data.
+  var apply = !dryRun;
   try {
     var intake = SpreadsheetApp.openById(CFRSUB_TELEGRAM_SPREADSHEET_ID);
     var tcSheet = intake.getSheetByName(CFRSUB_TELEGRAM_SHEET);
     if (!tcSheet) throw new Error('Telegram Chat Logs sheet not found');
     var lastRow = tcSheet.getLastRow();
-    if (lastRow < 2) return { success: true, checked: 0, changed: 0, unmatched: 0 };
+    if (lastRow < 2) return { success: true, dryRun: !apply, checked: 0, changed: 0, unmatched: 0, distinctTxIds: 0, duplicateRows: 0 };
     var lastCol = Math.max(tcSheet.getLastColumn(), CFRSUB_TC_MESSAGE_COL + 1);
     var tcVals = tcSheet.getRange(2, 1, lastRow - 1, lastCol).getValues();
     var txByUpdateId = {};
@@ -150,7 +153,7 @@ function backfillCfrTreeTxIds() {
     var tabs = cfrSubEnsureTabs_(cfr);
     var sheet = tabs[CFRSUB_TREE_TAB];
     var values = sheet.getDataRange().getValues();
-    if (values.length < 2) return { success: true, checked: 0, changed: 0, unmatched: 0 };
+    if (values.length < 2) return { success: true, dryRun: !apply, checked: 0, changed: 0, unmatched: 0, distinctTxIds: 0, duplicateRows: 0 };
     var header = values[0].map(function (h) { return String(h || '').trim(); });
     var uCol = header.indexOf('telegram_update_id');
     var txCol = header.indexOf('request_transaction_id');
@@ -158,16 +161,25 @@ function backfillCfrTreeTxIds() {
       throw new Error('tree planting row 1 must carry telegram_update_id and request_transaction_id');
     }
     var checked = 0, changed = 0, unmatched = 0;
+    var txCount = {};   // distinct txid -> row count, so the caller can verify the collapse
+    for (var p = 1; p < values.length; p++) {
+      var pre = String(values[p][txCol] == null ? '' : values[p][txCol]).trim();
+      if (pre) txCount[pre] = (txCount[pre] || 0) + 1;
+    }
     for (var r = 1; r < values.length; r++) {
       checked++;
       var existing = String(values[r][txCol] == null ? '' : values[r][txCol]).trim();
       if (existing) continue;  // already populated -- idempotent
       var txid = txByUpdateId[String(values[r][uCol] || '').trim()];
       if (!txid) { unmatched++; continue; }
-      sheet.getRange(r + 1, txCol + 1).setValue(txid);
+      if (apply) sheet.getRange(r + 1, txCol + 1).setValue(txid);
+      txCount[txid] = (txCount[txid] || 0) + 1;
       changed++;
     }
-    return { success: true, checked: checked, changed: changed, unmatched: unmatched };
+    var distinctTxIds = 0, duplicateRows = 0;
+    for (var k in txCount) { distinctTxIds++; if (txCount[k] > 1) duplicateRows += txCount[k] - 1; }
+    return { success: true, dryRun: !apply, checked: checked, changed: changed,
+             unmatched: unmatched, distinctTxIds: distinctTxIds, duplicateRows: duplicateRows };
   } catch (err) {
     Logger.log('backfillCfrTreeTxIds error: ' + (err && err.message ? err.message : err));
     return { success: false, error: (err && err.message ? err.message : String(err)) };

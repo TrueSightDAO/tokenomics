@@ -2238,7 +2238,9 @@ function doGet(e) {
       return createCORSResponse(getTreeRecipientMap());
     }
     if (actionStr === 'backfillCfrTreeTxIds') {
-      return createCORSResponse(backfillCfrTreeTxIds());
+      // ?dryRun=1 previews without writing (counts only, no txids). Default is live.
+      var bfDry = getQueryParam_(e, 'dryRun');
+      return createCORSResponse(backfillCfrTreeTxIds(bfDry === '1' || bfDry === 'true'));
     }
     if (actionStr === 'backfillCfrTreeIds') {
       // One-shot: rewrite the private `tree planting` tab's tree_id to the CANONICAL
