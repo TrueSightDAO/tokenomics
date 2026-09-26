@@ -392,49 +392,74 @@ t('collapseCfrTreeTxDuplicates NEVER touches un-txid\'d rows', ()=>{
   eq(rows('tree planting').length, 3);   // the two blank-txid rows survive
 });
 
-// ---- linkage guard: a linked tree is NEVER deduped away (Gary, thread 35944) ----
-// "make sure the trees already associated with QR code don't get dedup away"
-t('collapse keeps a LINKED row even when it shares a txid (never un-link a sold bag)', ()=>{
+// ---- linkage-aware collapse: keep the FIRST row per txid, but graft any QR link
+// that lived on a duplicate onto the surviving row (Gary, thread 35944: "point it to
+// the correct record which has the same transaction request id") ----
+const L = (uid, status, txid, qr) => ['2026-09-24T00:00:00Z',uid,'pk-x000000000000',uid,'Cacao','-3.5','-51.5','http://x/o.jpg','src',status,txid,qr||''];
+const LH = TREE_HEADER.concat(['Linked QR Code','Linked At','Plot ID']);
+
+t('real-data shape: LINKED first + INVALID twin -> twin collapsed, link stays on row 1', ()=>{
   reset();
   cfrSheets['tree planting']=makeSheet('tree planting',[
-    TREE_HEADER,
-    treeRow('U1','TX_A'),                       // RECORDED, first
-    ['2026-09-24T00:00:00Z','U2','pk-x000000000000','U2','Cacao','-3.5','-51.5','http://x/o.jpg','https://cfr.truesight.me/','LINKED','TX_A'],
-  ]);
-  const r = collapseCfrTreeTxDuplicates(true);
-  eq(r.collapsed, 0);                            // nothing deleted: the txid has a linked row
-  eq(r.linkedProtected, 1); eq(r.protectedTxids, 1);
-  eq(rows('tree planting').length, 2);           // both survive
-});
-t('collapse protects a row carrying a non-empty Linked QR Code column', ()=>{
-  reset();
-  const H = TREE_HEADER.concat(['Linked QR Code']);
-  cfrSheets['tree planting']=makeSheet('tree planting',[
-    H,
-    ['2026-09-24T00:00:00Z','U1','pk','U1','Cacao','-3.5','-51.5','http://x/o.jpg','src','RECORDED','TX_A',''],
-    ['2026-09-24T00:00:00Z','U2','pk','U2','Cacao','-3.5','-51.5','http://x/o.jpg','src','RECORDED','TX_A','2024OSCAR_X_1'],
+    LH,
+    L('U1','LINKED','TX_A','2024OSCAR_20251124_13'),
+    L('U2','INVALID','TX_A',''),
   ]);
   const r = collapseCfrTreeTxDuplicates();
-  eq(r.collapsed, 0);
-  eq(r.linkedProtected, 1); eq(r.protectedTxids, 1);
-  eq(rows('tree planting').length, 2);
+  eq(r.collapsed, 1); eq(r.grafted, 0);
+  const body = rows('tree planting');
+  eq(body.length, 1);
+  const h = tab('tree planting')[0];
+  eq(body[0][h.indexOf('status')], 'LINKED');
+  eq(body[0][h.indexOf('Linked QR Code')], '2024OSCAR_20251124_13');   // link preserved
 });
-t('collapse still collapses UNLINKED duplicate txids (guard is targeted, not a blanket no-op)', ()=>{
+t('dup carries the link, survivor does NOT -> link is GRAFTED onto the survivor, then dup deleted', ()=>{
   reset();
   cfrSheets['tree planting']=makeSheet('tree planting',[
-    TREE_HEADER,
-    treeRow('U1','TX_A'), treeRow('U2','TX_A'),   // both RECORDED, unlinked -> collapse
-    treeRow('U3','TX_B'),
+    LH,
+    L('U1','INVALID','TX_A',''),
+    L('U2','LINKED','TX_A','2024PAULO_20250804_20'),
   ]);
   const r = collapseCfrTreeTxDuplicates();
-  eq(r.collapsed, 1); eq(r.linkedProtected, 0);
+  eq(r.collapsed, 1); eq(r.grafted, 1);
+  const body = rows('tree planting');
+  eq(body.length, 1);
+  const h = tab('tree planting')[0];
+  eq(body[0][h.indexOf('Linked QR Code')], '2024PAULO_20250804_20');    // grafted to survivor
+  eq(body[0][h.indexOf('status')], 'LINKED');                           // status follows the link (self-consistent)
+});
+t('BOTH rows carry a link -> ambiguous, keep BOTH (never silently drop a linkage)', ()=>{
+  reset();
+  cfrSheets['tree planting']=makeSheet('tree planting',[
+    LH,
+    L('U1','LINKED','TX_A','QR_1'),
+    L('U2','LINKED','TX_A','QR_2'),
+  ]);
+  const r = collapseCfrTreeTxDuplicates();
+  eq(r.collapsed, 0); eq(r.linkedProtected, 1);
   eq(rows('tree planting').length, 2);
 });
-t('guard reports linkedProtected/protectedTxids=0 on a tab with no links', ()=>{
+t('neither row linked -> plain txid dedup still applies (targeted, not a no-op)', ()=>{
   reset();
-  cfrSheets['tree planting']=makeSheet('tree planting',[TREE_HEADER, treeRow('U1','TX_A'), treeRow('U2','TX_A')]);
+  cfrSheets['tree planting']=makeSheet('tree planting',[
+    LH,
+    L('U1','RECORDED','TX_A',''), L('U2','RECORDED','TX_A',''), L('U3','RECORDED','TX_B',''),
+  ]);
+  const r = collapseCfrTreeTxDuplicates();
+  eq(r.collapsed, 1); eq(r.grafted, 0); eq(r.linkedProtected, 0);
+  eq(rows('tree planting').length, 2);
+});
+t('dryRun grafts NOTHING and deletes NOTHING (preview is read-only)', ()=>{
+  reset();
+  cfrSheets['tree planting']=makeSheet('tree planting',[
+    LH,
+    L('U1','INVALID','TX_A',''),
+    L('U2','LINKED','TX_A','QR_X'),
+  ]);
   const r = collapseCfrTreeTxDuplicates(true);
-  eq(r.linkedProtected, 0); eq(r.protectedTxids, 0);
+  eq(r.dryRun, true); eq(r.collapsed, 1); eq(r.grafted, 1);
+  eq(rows('tree planting').length, 2);               // untouched
+  eq(rows('tree planting')[0][tab('tree planting')[0].indexOf('Linked QR Code')], '');  // no graft on dryRun
 });
 
 console.log('\n'+pass+' passed, '+fail+' failed');

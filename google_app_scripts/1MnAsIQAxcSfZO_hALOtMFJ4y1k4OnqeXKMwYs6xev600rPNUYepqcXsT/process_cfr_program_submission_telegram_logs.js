@@ -231,45 +231,59 @@ function collapseCfrTreeTxDuplicates(dryRun) {
     var sheet = tabs[CFRSUB_TREE_TAB];
     var values = sheet.getDataRange().getValues();
     if (values.length < 2) {
-      return { success: true, dryRun: !apply, checked: 0, collapsed: 0, distinctTxIds: 0, untxRow: 0, linkedProtected: 0, protectedTxids: 0 };
+      return { success: true, dryRun: !apply, checked: 0, collapsed: 0, distinctTxIds: 0, untxRow: 0, grafted: 0, linkedProtected: 0 };
     }
     var header = values[0].map(function (h) { return String(h || '').trim(); });
     var txCol = header.indexOf('request_transaction_id');
     if (txCol < 0) throw new Error('tree planting row 1 must carry request_transaction_id');
 
-    // ---- Linkage guard (Gary, thread 35944). ------------------------------------
-    // A row that carries a QR/plot link is never collapsed away. We first collect the
-    // set of txids that have ANY linked row, then exclude those txids ENTIRELY from the
-    // collapse - so a linked tree can never be un-linked by dedup, even if its row is
-    // not the first occurrence of its txid. Leaving a duplicate is always preferable
-    // to silently dropping a sold bag's tree linkage.
-    var linkedIdx = {}, linkedProtected = 0, protectedTxids = 0;
-    for (var rl = 1; rl < values.length; rl++) {
-      if (cfrSubIsLinkedRow_(header, values[rl])) {
-        linkedProtected++;
-        var lk = cfrSubTreeTxKey_(values[rl][txCol]);
-        if (lk) linkedIdx[lk] = true;
-      }
+    // ---- Linkage-aware collapse (Gary, thread 35944). --------------------------
+    // Rule (a): the FIRST occurrence of a txid survives; later rows sharing it are
+    // duplicates. If a duplicate about to be removed CARRIES a QR/plot link and the
+    // surviving row does NOT, we RE-POINT that link onto the survivor (graft the
+    // linkage columns - linked-*, plot id AND status, so the survivor is
+    // self-consistent) before deleting, so the QR association follows the canonical
+    // record instead of being lost. If BOTH rows carry a link we leave the duplicate
+    // in place (ambiguous; never silently drop a linkage).
+    var linkCols = [];
+    for (var c = 0; c < header.length; c++) {
+      var nm = header[c];
+      if (/linked/i.test(nm) || /^status$/i.test(nm) || /^plot id$/i.test(nm)) linkCols.push(c);
     }
-    for (var lk2 in linkedIdx) protectedTxids++;
 
-    var seen = {};
-    var toDelete = [];   // 1-based sheet rows, ascending
-    var distinct = 0, untx = 0;
+    var seen = {};         // txid -> surviving 1-based sheet row
+    var toDelete = [];     // duplicate 1-based sheet rows
+    var grafts = [];       // {target, source} 1-based rows
+    var distinct = 0, untx = 0, linkedProtected = 0;
     for (var r = 1; r < values.length; r++) {
       var k = cfrSubTreeTxKey_(values[r][txCol]);
-      if (!k) { untx++; continue; }          // un-txid'd rows are never collapsed
-      if (linkedIdx[k]) continue;            // a txid with ANY linked row is left intact
-      if (seen[k]) { toDelete.push(r + 1); continue; }
-      seen[k] = true; distinct++;
+      if (!k) { untx++; continue; }                 // un-txid'd rows are never collapsed
+      if (seen[k]) {
+        var keptRow = seen[k];
+        var keptLinked = cfrSubIsLinkedRow_(header, values[keptRow - 1]);
+        var dupLinked = cfrSubIsLinkedRow_(header, values[r]);
+        if (dupLinked && keptLinked) { linkedProtected++; continue; }   // ambiguous: keep both
+        if (dupLinked) { grafts.push({ target: keptRow, source: r + 1 }); linkedProtected++; }
+        toDelete.push(r + 1);
+        continue;
+      }
+      seen[k] = r + 1; distinct++;
     }
     if (apply) {
-      // Delete bottom-up so the earlier row indices stay valid.
+      // Graft linkage onto the survivor FIRST, then delete duplicates bottom-up.
+      for (var g = 0; g < grafts.length; g++) {
+        var srcRow = values[grafts[g].source - 1];
+        for (var lc = 0; lc < linkCols.length; lc++) {
+          var ci = linkCols[lc];
+          if (!String(srcRow[ci] || '').trim()) continue;
+          sheet.getRange(grafts[g].target, ci + 1).setValue(srcRow[ci]);
+        }
+      }
       for (var d = toDelete.length - 1; d >= 0; d--) sheet.deleteRow(toDelete[d]);
     }
     return { success: true, dryRun: !apply, checked: values.length - 1,
              collapsed: toDelete.length, distinctTxIds: distinct, untxRow: untx,
-             linkedProtected: linkedProtected, protectedTxids: protectedTxids };
+             grafted: grafts.length, linkedProtected: linkedProtected };
   } catch (err) {
     Logger.log('collapseCfrTreeTxDuplicates error: ' + (err && err.message ? err.message : err));
     return { success: false, error: (err && err.message ? err.message : String(err)) };
