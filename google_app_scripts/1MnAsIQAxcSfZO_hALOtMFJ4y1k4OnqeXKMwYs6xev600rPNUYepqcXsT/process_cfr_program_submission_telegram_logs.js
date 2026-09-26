@@ -121,6 +121,59 @@ function cfrSubParseFields_(body) {
   return result;
 }
 
+/**
+ * One-shot, IDEMPOTENT migration: populate `request_transaction_id` on EXISTING
+ * `tree planting` rows by joining each row's telegram_update_id back to its intake
+ * message. Needed because transaction-level dedup can only see a txid that is STORED;
+ * rows written before the column existed carry none. Writes ONLY to the private
+ * `cfr program` sheet -- never to the read-only public intake. (Gary thread 35944.)
+ */
+function backfillCfrTreeTxIds() {
+  try {
+    var intake = SpreadsheetApp.openById(CFRSUB_TELEGRAM_SPREADSHEET_ID);
+    var tcSheet = intake.getSheetByName(CFRSUB_TELEGRAM_SHEET);
+    if (!tcSheet) throw new Error('Telegram Chat Logs sheet not found');
+    var lastRow = tcSheet.getLastRow();
+    if (lastRow < 2) return { success: true, checked: 0, changed: 0, unmatched: 0 };
+    var lastCol = Math.max(tcSheet.getLastColumn(), CFRSUB_TC_MESSAGE_COL + 1);
+    var tcVals = tcSheet.getRange(2, 1, lastRow - 1, lastCol).getValues();
+    var txByUpdateId = {};
+    for (var i = 0; i < tcVals.length; i++) {
+      var uid = String(tcVals[i][CFRSUB_TC_UPDATE_ID_COL] || '').trim();
+      if (!uid) continue;
+      var f = cfrSubParseFields_(tcVals[i][CFRSUB_TC_MESSAGE_COL]);
+      var t = cfrSubCleanValue_(f.request_transaction_id);
+      if (t) txByUpdateId[uid] = t;
+    }
+
+    var cfr = payoutRegCfrProgramSpreadsheet_();
+    var tabs = cfrSubEnsureTabs_(cfr);
+    var sheet = tabs[CFRSUB_TREE_TAB];
+    var values = sheet.getDataRange().getValues();
+    if (values.length < 2) return { success: true, checked: 0, changed: 0, unmatched: 0 };
+    var header = values[0].map(function (h) { return String(h || '').trim(); });
+    var uCol = header.indexOf('telegram_update_id');
+    var txCol = header.indexOf('request_transaction_id');
+    if (uCol < 0 || txCol < 0) {
+      throw new Error('tree planting row 1 must carry telegram_update_id and request_transaction_id');
+    }
+    var checked = 0, changed = 0, unmatched = 0;
+    for (var r = 1; r < values.length; r++) {
+      checked++;
+      var existing = String(values[r][txCol] == null ? '' : values[r][txCol]).trim();
+      if (existing) continue;  // already populated -- idempotent
+      var txid = txByUpdateId[String(values[r][uCol] || '').trim()];
+      if (!txid) { unmatched++; continue; }
+      sheet.getRange(r + 1, txCol + 1).setValue(txid);
+      changed++;
+    }
+    return { success: true, checked: checked, changed: changed, unmatched: unmatched };
+  } catch (err) {
+    Logger.log('backfillCfrTreeTxIds error: ' + (err && err.message ? err.message : err));
+    return { success: false, error: (err && err.message ? err.message : String(err)) };
+  }
+}
+
 /** The event tag: the first non-empty line's bracketed token, or '' when none. */
 function cfrSubTag_(message) {
   var lines = String(message || '').split(/\r?\n/);
@@ -187,6 +240,41 @@ function cfrSubEnsureTabs_(cfr) {
   return map;
 }
 
+/**
+ * The `tree planting` TRANSACTION key (Gary thread 35944). The unique unit is a
+ * transaction, not a transport update id: the SAME tree may be re-posted under a NEW
+ * telegram update id (15 such cases live), so keying only on the update id
+ * double-counts it.
+ *
+ * The `Request Transaction ID` is itself globally unique per tree -- verified over all
+ * 265 live rows: 172 distinct txids, ZERO appearing under more than one signer or more
+ * than one tree content. So the txid ALONE is the key; scoping by pk_hash adds no
+ * discriminating power (and the signature is already stored as pk_hash for lineage).
+ * Returns '' when the payload carries no txid, in which case only the update id dedups.
+ */
+function cfrSubTreeTxKey_(requestTransactionId) {
+  return String(requestTransactionId || '').trim();
+}
+
+/** Read the processed transaction keys for one tab (transaction-level dedup ledger). */
+function cfrSubSeenRequestTxKeys_(sheet) {
+  var keys = {};
+  try {
+    var values = sheet.getDataRange().getValues();
+    if (values.length < 2) return keys;
+    var header = values[0].map(function (h) { return String(h || '').trim(); });
+    var txCol = header.indexOf('request_transaction_id');
+    if (txCol < 0) return keys;
+    for (var r = 1; r < values.length; r++) {
+      var k = cfrSubTreeTxKey_(values[r][txCol]);
+      if (k) keys[k] = true;
+    }
+  } catch (e) {
+    Logger.log('cfrSubSeenRequestTxKeys_ error: ' + (e && e.message ? e.message : e));
+  }
+  return keys;
+}
+
 /** Read the processed Telegram update ids for one tab (dedup ledger). */
 function cfrSubSeenUpdateIds_(sheet) {
   var seen = {};
@@ -218,7 +306,8 @@ function appendCfrSubTreeRow_(sheet, p) {
     String(p.lng || ''),
     String(p.photo_url || ''),
     String(p.capture_source || ''),
-    String(p.status || '')
+    String(p.status || ''),
+    String(p.request_transaction_id || '')
   ]);
 }
 
@@ -286,6 +375,7 @@ function cfrSubBuildRow_(tab, updateId, fields, messageId) {
         lng: cfrSubCleanValue_(fields.longitude),
         photo_url: cfrSubCleanValue_(fields.photo_url),
         capture_source: cfrSubCleanValue_(fields.submission_source),
+        request_transaction_id: cfrSubCleanValue_(fields.request_transaction_id),
         status: 'RECORDED'
       }
     };
@@ -355,6 +445,10 @@ function processCfrProgramSubmissionsFromTelegramChatLogs() {
     seen[CFRSUB_MON_TAB] = cfrSubSeenUpdateIds_(tabs[CFRSUB_MON_TAB]);
     seen[CFRSUB_PLOT_TAB] = cfrSubSeenUpdateIds_(tabs[CFRSUB_PLOT_TAB]);
 
+    // Transaction-level ledger for `tree planting` ONLY (Gary thread 35944).
+    var seenTx = {};
+    seenTx[CFRSUB_TREE_TAB] = cfrSubSeenRequestTxKeys_(tabs[CFRSUB_TREE_TAB]);
+
     var lastRow = tcSheet.getLastRow();
     if (lastRow < 2) return { success: true, recorded: 0, skipped: 0, errors: 0 };
     var startRow = Math.max(2, lastRow - CFRSUB_SCAN_BATCH + 1);
@@ -375,17 +469,26 @@ function processCfrProgramSubmissionsFromTelegramChatLogs() {
 
       var updateId = String(rows[i][CFRSUB_TC_UPDATE_ID_COL] || '').trim();
       if (!updateId) { skipped++; continue; }
-      if (seen[tab][updateId]) continue;  // dedup: never process the same record twice
+      if (seen[tab][updateId]) continue;  // dedup: never process the same update twice
 
       try {
         var fields = cfrSubParseFields_(message);
         // Attribution gate (SS11.5): only submissions that came through cfr.truesight.me.
         if (!cfrSubIsCfrOrigin_(fields)) { seen[tab][updateId] = true; skipped++; continue; }
 
+        // Transaction-level dedup for `tree planting` (Gary thread 35944): the same tree
+        // may be re-posted under a NEW update id, so keying only on the update id
+        // double-counts one transaction.
+        var txKey = (tab === CFRSUB_TREE_TAB)
+          ? cfrSubTreeTxKey_(fields.request_transaction_id)
+          : '';
+        if (txKey && seenTx[tab] && seenTx[tab][txKey]) { skipped++; continue; }
+
         var built = cfrSubBuildRow_(tab, updateId, fields, rows[i][CFRSUB_TC_MESSAGE_ID_COL]);
         if (!built) { skipped++; continue; }
         built.append(tabs[tab], built.data);
         seen[tab][updateId] = true;
+        if (txKey) seenTx[tab][txKey] = true;
         recorded++;
       } catch (rowErr) {
         Logger.log('processCfrProgramSubmissionsFromTelegramChatLogs row error: ' +

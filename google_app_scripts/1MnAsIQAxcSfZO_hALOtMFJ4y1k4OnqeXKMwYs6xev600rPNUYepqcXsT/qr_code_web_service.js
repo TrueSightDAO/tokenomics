@@ -2237,6 +2237,9 @@ function doGet(e) {
       // (same Apps Script project).
       return createCORSResponse(getTreeRecipientMap());
     }
+    if (actionStr === 'backfillCfrTreeTxIds') {
+      return createCORSResponse(backfillCfrTreeTxIds());
+    }
     if (actionStr === 'backfillCfrTreeIds') {
       // One-shot: rewrite the private `tree planting` tab's tree_id to the CANONICAL
       // intake col D id, so `getTreeRecipientMap` joins the DApp tree picker (thread 35944).

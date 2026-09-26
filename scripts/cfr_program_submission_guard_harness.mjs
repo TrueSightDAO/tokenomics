@@ -244,5 +244,65 @@ t('backfill is idempotent (second run changes nothing)', ()=>{
   eq(backfillCfrTreeIds().changed, 0);
 });
 
+
+// ---- transaction-level dedup (Gary thread 35944) --------------------------------
+t('cfrSubTreeTxKey_ trims the txid; blanks on empty', ()=>{
+  eq(cfrSubTreeTxKey_('  ABC123 '), 'ABC123');
+  eq(cfrSubTreeTxKey_(''), '');
+  eq(cfrSubTreeTxKey_(undefined), '');
+});
+
+// THE FIX: the same txid re-posted under a NEW update id was double-counted; now once.
+reset();
+tcGrid=[['A','B','C','D','E','F','G'],
+  tcRow('Edgar_TX1', treePayload),
+  tcRow('Edgar_TX2', treePayload)];
+t('e2e TXDEDUP: same txid under a NEW update id records ONCE', ()=>{
+  const r = processCfrProgramSubmissionsFromTelegramChatLogs();
+  eq(r.recorded, 1); eq(rows('tree planting').length, 1);
+});
+
+// distinct txids are distinct trees -> two rows
+reset();
+tcGrid=[['A','B','C','D','E','F','G'],
+  tcRow('Edgar_TX3', treePayload),
+  tcRow('Edgar_TX4', treePayload.replace('ABC123','XYZ789'))];
+t('e2e distinct txids record TWO rows', ()=>{
+  eq(processCfrProgramSubmissionsFromTelegramChatLogs().recorded, 2);
+});
+
+// the txid is STORED on the row (so future fires can dedupe on it)
+reset();
+tcGrid=[['A','B','C','D','E','F','G'], tcRow('Edgar_TX5', treePayload)];
+t('e2e tree row stores request_transaction_id', ()=>{
+  processCfrProgramSubmissionsFromTelegramChatLogs();
+  const h=tab('tree planting')[0];
+  eq(rows('tree planting')[0][h.indexOf('request_transaction_id')], 'ABC123');
+});
+
+// a blank txid (older rows) must still dedup on the update id
+reset();
+const noTx = treePayload.replace('\n\nRequest Transaction ID: ABC123','');
+tcGrid=[['A','B','C','D','E','F','G'], tcRow('Edgar_TXB', noTx), tcRow('Edgar_TXB', noTx)];
+t('e2e blank txid still dedups on the update id', ()=>{
+  eq(processCfrProgramSubmissionsFromTelegramChatLogs().recorded, 1);
+});
+
+// ---- backfillCfrTreeTxIds populates legacy rows + is idempotent ----------------
+reset();
+tcGrid=[['A','B','C','D','E','F','G'], tcRow('Edgar_TX6', treePayload)];
+cfrSheets['tree planting']=makeSheet('tree planting',[
+  ['created_at_utc','telegram_update_id','pk_hash','tree_id','species','lat','lng','photo_url','capture_source','status','request_transaction_id'],
+  ['2026-09-24T00:00:00Z','Edgar_TX6','pk-x000000000000','Edgar_TX6','Cacao','-3.5','-51.5','http://x/o.jpg','https://cfr.truesight.me/','RECORDED','']]);
+t('backfillCfrTreeTxIds populates the txid from the intake message', ()=>{
+  const r = backfillCfrTreeTxIds();
+  eq(r.success, true); eq(r.changed, 1);
+  const h=tab('tree planting')[0];
+  eq(rows('tree planting')[0][h.indexOf('request_transaction_id')], 'ABC123');
+});
+t('backfillCfrTreeTxIds is idempotent (second run changes nothing)', ()=>{
+  eq(backfillCfrTreeTxIds().changed, 0);
+});
+
 console.log('\n'+pass+' passed, '+fail+' failed');
 process.exit(fail?1:0);
