@@ -15,7 +15,7 @@ function makeSheet(name, data) {
     getLastRow(){return grid.length;},
     getLastColumn(){return grid.reduce((m,r)=>Math.max(m,r.length),0);},
     getDataRange(){return {getValues(){return grid.map(r=>r.slice());}};},
-    getRange(r,c,nr,nc){return {getValues(){const out=[];for(let i=0;i<nr;i++){const rr=grid[r-1+i]||[];out.push(rr.slice(c-1,c-1+nc));}return out;},setValues(v){for(let i=0;i<v.length;i++){const ri=r-1+i;grid[ri]=grid[ri]||[];for(let j=0;j<v[i].length;j++)grid[ri][c-1+j]=v[i][j];}}};},
+    getRange(r,c,nr,nc){return {getValues(){const out=[];for(let i=0;i<nr;i++){const rr=grid[r-1+i]||[];out.push(rr.slice(c-1,c-1+nc));}return out;},setValues(v){for(let i=0;i<v.length;i++){const ri=r-1+i;grid[ri]=grid[ri]||[];for(let j=0;j<v[i].length;j++)grid[ri][c-1+j]=v[i][j];}},setValue(v){grid[r-1]=grid[r-1]||[];grid[r-1][c-1]=v;}};},
     appendRow(a){ grid.push(a.slice()); },
     insertSheet(){ return this; }
   };
@@ -116,7 +116,7 @@ const plotPayload = [
   'My Digital Signature: '+SIG
 ].join('\n');
 
-function tcRow(updateId, body){ return [updateId,'-100','EDGAR',updateId+'_m','Edgar','',body]; }
+function tcRow(updateId, body, messageId){ return [updateId,'-100','EDGAR',(messageId===undefined?'171':messageId),'Edgar','',body]; }
 
 // ---- tag / host / parse ----------------------------------------------------
 t('cfrSubTag_ extracts bracketed tag', ()=>eq(cfrSubTag_(treePayload), '[TREE PLANTING EVENT]'));
@@ -207,6 +207,41 @@ tcGrid = [['A','B','C','D','E','F','G'],
 t('e2e unrelated event is not mirrored', ()=>{
   const r = processCfrProgramSubmissionsFromTelegramChatLogs();
   eq(r.recorded, 0); eq(rows('tree planting').length, 0);
+});
+
+// ---- canonical tree id: intake col D, not the +1 col A (Gary thread 35944) ------
+t('cfrSubCanonicalTreeId_: prefers col D over col A when both are Edgar_', ()=>
+  eq(cfrSubCanonicalTreeId_('Edgar_20260924132440_104','Edgar_20260924132440_103'),'Edgar_20260924132440_103'));
+t('cfrSubCanonicalTreeId_: falls back to col A when col D is not Edgar_', ()=>
+  eq(cfrSubCanonicalTreeId_('Edgar_A_003','171'),'Edgar_A_003'));
+t('cfrSubCanonicalTreeId_: legacy numeric rows keep col A', ()=>
+  eq(cfrSubCanonicalTreeId_('469027268','171'),'469027268'));
+t('cfrSubCanonicalTreeId_: blank both -> empty', ()=>eq(cfrSubCanonicalTreeId_('',''),''));
+
+reset();
+tcGrid=[['A','B','C','D','E','F','G'],
+  tcRow('Edgar_20260924132440_104', treePayload, 'Edgar_20260924132440_103')];
+t('e2e tree_id stored as the CANONICAL col D id (off-by-one fixed)', ()=>{
+  processCfrProgramSubmissionsFromTelegramChatLogs();
+  const h=tab('tree planting')[0];
+  eq(rows('tree planting')[0][h.indexOf('tree_id')], 'Edgar_20260924132440_103');
+});
+
+// ---- backfill rewrites a legacy (col A) tree_id to the canonical col D id -------
+reset();
+tcGrid=[['A','B','C','D','E','F','G'],
+  tcRow('Edgar_20260924132440_104', treePayload, 'Edgar_20260924132440_103')];
+cfrSheets['tree planting']=makeSheet('tree planting',[
+  ['created_at_utc','telegram_update_id','pk_hash','tree_id','species','lat','lng','photo_url','capture_source','status'],
+  ['2026-09-24T00:00:00Z','Edgar_20260924132440_104','pk-x000000000000','Edgar_20260924132440_104','Cacao','-3.5','-51.5','http://x/o.jpg','https://cfr.truesight.me/','RECORDED']]);
+t('backfill rewrites a legacy tree_id to the canonical col D id', ()=>{
+  const r = backfillCfrTreeIds();
+  eq(r.success, true); eq(r.changed, 1);
+  const h=tab('tree planting')[0];
+  eq(rows('tree planting')[0][h.indexOf('tree_id')], 'Edgar_20260924132440_103');
+});
+t('backfill is idempotent (second run changes nothing)', ()=>{
+  eq(backfillCfrTreeIds().changed, 0);
 });
 
 console.log('\n'+pass+' passed, '+fail+' failed');

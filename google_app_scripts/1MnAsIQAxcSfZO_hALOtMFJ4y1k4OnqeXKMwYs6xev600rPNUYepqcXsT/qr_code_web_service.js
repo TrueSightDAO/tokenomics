@@ -2237,6 +2237,11 @@ function doGet(e) {
       // (same Apps Script project).
       return createCORSResponse(getTreeRecipientMap());
     }
+    if (actionStr === 'backfillCfrTreeIds') {
+      // One-shot: rewrite the private `tree planting` tab's tree_id to the CANONICAL
+      // intake col D id, so `getTreeRecipientMap` joins the DApp tree picker (thread 35944).
+      return createCORSResponse(backfillCfrTreeIds());
+    }
     if (actionStr === 'backfillPayoutRegistrations') {
       // One-shot operator lever (SS11.3 + SS11.3-bis): normalise the private tab to one
       // ACTIVE row per pk_hash (prior rows SUPERSEDED) and re-project every ACTIVE row

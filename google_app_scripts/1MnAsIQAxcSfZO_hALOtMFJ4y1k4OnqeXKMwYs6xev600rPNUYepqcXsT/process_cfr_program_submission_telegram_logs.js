@@ -251,10 +251,25 @@ function appendCfrSubPlotRow_(sheet, p) {
 }
 
 /**
+ * The CANONICAL per-tree id: the `Edgar_*`-shaped value among the intake's col A
+ * (telegram UPDATE id) and col D (telegram MESSAGE id), preferring col D. Col A is
+ * systematically +1 vs the canonical id on Edgar-direct rows, so the DApp tree picker
+ * (which selects col D ids) could never join `getTreeRecipientMap`'s tree_id output.
+ * Older Telegram-native rows carry neither shape and keep col A. (Gary thread 35944.)
+ */
+function cfrSubCanonicalTreeId_(updateId, messageId) {
+  var a = String(updateId == null ? '' : updateId).trim();
+  var d = String(messageId == null ? '' : messageId).trim();
+  if (/^Edgar_/.test(d)) return d;
+  if (/^Edgar_/.test(a)) return a;
+  return a || d;
+}
+
+/**
  * Build the tab-specific row payload from the parsed fields. Returns null when the
  * event does not map to one of the three CFR tabs.
  */
-function cfrSubBuildRow_(tab, updateId, fields) {
+function cfrSubBuildRow_(tab, updateId, fields, messageId) {
   var pkHash = cfrSubDerivePkHash_(fields.public_signature);
   if (tab === CFRSUB_TREE_TAB) {
     return {
@@ -262,9 +277,10 @@ function cfrSubBuildRow_(tab, updateId, fields) {
       data: {
         telegram_update_id: updateId,
         pk_hash: pkHash,
-        // tree_id: SSR today the per-tree identity IS the intake Telegram update id
-        // (build_tree_geojson.py keys the public index on the same value).
-        tree_id: updateId,
+        // tree_id: the CANONICAL per-tree id (intake col D), so `getTreeRecipientMap`
+        // returns ids the DApp tree picker actually selects. Falls back to col A for
+        // Telegram-native rows that carry no Edgar_ id.
+        tree_id: cfrSubCanonicalTreeId_(updateId, messageId),
         species: cfrSubCleanValue_(fields.species),
         lat: cfrSubCleanValue_(fields.latitude),
         lng: cfrSubCleanValue_(fields.longitude),
@@ -366,7 +382,7 @@ function processCfrProgramSubmissionsFromTelegramChatLogs() {
         // Attribution gate (SS11.5): only submissions that came through cfr.truesight.me.
         if (!cfrSubIsCfrOrigin_(fields)) { seen[tab][updateId] = true; skipped++; continue; }
 
-        var built = cfrSubBuildRow_(tab, updateId, fields);
+        var built = cfrSubBuildRow_(tab, updateId, fields, rows[i][CFRSUB_TC_MESSAGE_ID_COL]);
         if (!built) { skipped++; continue; }
         built.append(tabs[tab], built.data);
         seen[tab][updateId] = true;
@@ -395,4 +411,53 @@ function ensureCfrSubHourlyTriggerInstalled_() {
     if (triggers[i].getHandlerFunction() === fn) return;
   }
   ScriptApp.newTrigger(fn).timeBased().everyHours(1).create();
+}
+
+/**
+ * One-shot operator lever. The `tree planting` tab historically stored `tree_id` = the
+ * intake Telegram UPDATE id (col A), but the canonical per-tree id is the MESSAGE id
+ * (col D) -- col A is systematically +1 on Edgar-direct rows, so `getTreeRecipientMap`
+ * returned ids the DApp picker never selects and recipient auto-fill silently no-op'd.
+ * This rewrites each row's `tree_id` to the `Edgar_*`-shaped value among
+ * {col A, col D}, preferring col D. Idempotent. Exposed as `?action=backfillCfrTreeIds`.
+ */
+function backfillCfrTreeIds() {
+  var lock = LockService.getScriptLock();
+  if (!lock.tryLock(180000)) return { success: false, error: 'busy' };
+  try {
+    var intake = SpreadsheetApp.openById(CFRSUB_TELEGRAM_SPREADSHEET_ID);
+    var tc = intake.getSheetByName(CFRSUB_TELEGRAM_SHEET);
+    if (!tc) throw new Error('Telegram Chat Logs sheet not found');
+    var tv = tc.getDataRange().getValues();
+    var msgById = {};
+    for (var r = 1; r < tv.length; r++) {
+      var uid = String(tv[r][CFRSUB_TC_UPDATE_ID_COL] || '').trim();
+      var mid = String(tv[r][CFRSUB_TC_MESSAGE_ID_COL] || '').trim();
+      if (uid && !msgById[uid]) msgById[uid] = mid;
+    }
+    var cfr = payoutRegCfrProgramSpreadsheet_();
+    var sheet = cfr.getSheetByName(CFRSUB_TREE_TAB);
+    if (!sheet) return { success: true, checked: 0, changed: 0 };
+    var v = sheet.getDataRange().getValues();
+    if (v.length < 2) return { success: true, checked: 0, changed: 0 };
+    var header = v[0].map(function (h) { return String(h || '').trim(); });
+    var idCol = header.indexOf('tree_id');
+    var upCol = header.indexOf('telegram_update_id');
+    if (idCol < 0) return { success: true, checked: 0, changed: 0 };
+    var changed = 0;
+    for (var r2 = 1; r2 < v.length; r2++) {
+      var cur = String(v[r2][idCol] == null ? '' : v[r2][idCol]).trim();
+      var u = upCol >= 0 ? String(v[r2][upCol] == null ? '' : v[r2][upCol]).trim() : '';
+      var canonical = cfrSubCanonicalTreeId_(cur, msgById[u] || '');
+      if (canonical && canonical !== cur) {
+        sheet.getRange(r2 + 1, idCol + 1).setValue(canonical);
+        changed++;
+      }
+    }
+    return { success: true, checked: v.length - 1, changed: changed };
+  } catch (err) {
+    return { success: false, error: (err && err.message ? err.message : String(err)) };
+  } finally {
+    try { lock.releaseLock(); } catch (e) {}
+  }
 }
