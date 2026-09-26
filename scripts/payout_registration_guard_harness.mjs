@@ -199,5 +199,63 @@ t('read endpoint omits the plaintext pix_key', ()=>{
   eq(out.data.items[0].pix_key_masked,'***.***.***-35');
 });
 
+// ---- SS11.3 + SS11.3-bis BACKFILL lever (legacy RECORDED/UPDATED -> ACTIVE/SUPERSEDED) ----
+const LEGACY_H = ['created_at_utc','telegram_update_id','pk_hash','program_slug','pix_key_type','pix_key','pix_key_masked','submission_source','status','supersedes_row','error_message'];
+function seedLegacyPayoutTab(rows){
+  cfrSheets['payout registrations'] = makeSheet('payout registrations', [LEGACY_H].concat(rows||[]));
+}
+const legacy4 = [
+  ['2026-09-24T16:05:00.000Z','Edgar_1','pk-abc','crf-anapu','CPF','111.444.777-35','***.***.***-35','src','RECORDED','',''],
+  ['2026-09-24T16:06:00.000Z','Edgar_2','pk-abc','crf-anapu','CPF','222.555.888-44','***.***.***-44','src','UPDATED','2',''],
+  ['2026-09-24T16:07:00.000Z','Edgar_3','pk-abc','crf-anapu','CPF','333.666.999-55','***.***.***-55','src','UPDATED','3',''],
+  ['2026-09-24T16:07:21.290Z','Edgar_4','pk-abc','crf-anapu','CPF','444.777.111-66','***.***.***-66','src','UPDATED','4','']
+];
+
+reset(); seedLegacyPayoutTab(legacy4);
+t('backfill: legacy 4-row pk_hash collapses to 1 ACTIVE + 3 SUPERSEDED', ()=>{
+  const r = backfillPayoutRegistrations();
+  eq(r.success, true); eq(r.active, 1, 'active'); eq(r.superseded, 3, 'superseded');
+  const rows = payoutRows(); const si = rows[0].indexOf('status');
+  const st = rows.slice(1).map(x=>String(x[si]));
+  eq(st.filter(s=>s==='ACTIVE').length, 1, 'ACTIVE rows');
+  eq(st.filter(s=>s==='SUPERSEDED').length, 3, 'SUPERSEDED rows');
+  if(st.indexOf('RECORDED')>=0 || st.indexOf('UPDATED')>=0) throw new Error('legacy statuses survived');
+});
+t('backfill: latest row (by created_at_utc) is the ACTIVE one', ()=>{
+  const rows = payoutRows(); const si = rows[0].indexOf('status'); const ui = rows[0].indexOf('telegram_update_id');
+  const winner = rows.slice(1).find(r=>String(r[si])==='ACTIVE');
+  eq(String(winner[ui]), 'Edgar_4');
+});
+t('backfill: mirror tab created, schema-identical, one ACTIVE row', ()=>{
+  const rows = mirrorRows();
+  if(!rows.length) throw new Error('mirror tab not created');
+  eq(rows[0].join(','), LEGACY_H.join(','), 'mirror header');
+  const si = rows[0].indexOf('status');
+  eq(rows.slice(1).filter(r=>String(r[si])==='ACTIVE').length, 1, 'mirror ACTIVE rows');
+});
+t('backfill: winning row raw PIX is mirrored (parity with private tab)', ()=>{
+  const all = mirrorRows().flat().join('|');
+  if(!all.includes('444.777.111-66')) throw new Error('winning raw PIX not mirrored');
+});
+t('backfill: idempotent (second run changes nothing)', ()=>{
+  const before = JSON.stringify(payoutRows());
+  const r = backfillPayoutRegistrations();
+  eq(r.success, true); eq(r.changed, 0, 'second-run writes');
+  eq(JSON.stringify(payoutRows()), before, 'payout tab unchanged');
+});
+t('backfill: REJECTED_* / no-pk_hash rows are left untouched', ()=>{
+  reset();
+  seedLegacyPayoutTab(legacy4.concat([
+    ['2026-09-24T16:08:00.000Z','Edgar_5','','','','','','src','REJECTED_MISSING_PK_HASH','','no pk'],
+    ['2026-09-24T16:09:00.000Z','Edgar_6','pk-zzz','crf-anapu','CPF','999.888.777-66','***.***.***-66','src','ACTIVE','','']
+  ]));
+  const r = backfillPayoutRegistrations();
+  eq(r.success, true); eq(r.active, 2, 'ACTIVE (pk-abc + pk-zzz)');
+  const rows = payoutRows(); const si = rows[0].indexOf('status'); const pi = rows[0].indexOf('pk_hash');
+  const rej = rows.slice(1).find(x=>String(x[pi]).trim()==='');
+  eq(String(rej[si]), 'REJECTED_MISSING_PK_HASH', 'terminal row untouched');
+});
+t('backfill: never writes the Telegram Chat Logs tab', ()=>{ eq(tcTabWrites, 0, 'Telegram Chat Logs tab writes'); });
+
 console.log('\n'+pass+' passed, '+fail+' failed');
 process.exit(fail?1:0);

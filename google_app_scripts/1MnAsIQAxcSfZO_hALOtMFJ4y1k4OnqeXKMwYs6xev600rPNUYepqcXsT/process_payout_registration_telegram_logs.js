@@ -613,7 +613,7 @@ function backfillPayoutRegistrations() {
 
     var values = prSheet.getDataRange().getValues();
     if (values.length < 2) {
-      return { success: true, pk_hashes: 0, active: 0, superseded: 0, mirror_written: 0 };
+      return { success: true, pk_hashes: 0, active: 0, superseded: 0, changed: 0, mirror_written: 0 };
     }
     var header = values[0].map(function (h) { return String(h || '').trim(); });
     var idx = {};
@@ -633,7 +633,7 @@ function backfillPayoutRegistrations() {
       groups[ph].push({ row: r + 1, created: String(values[r][createdCol] || '') });
     }
 
-    var active = 0, superseded = 0;
+    var active = 0, superseded = 0, changed = 0;
     for (var key in groups) {
       if (!groups.hasOwnProperty(key)) continue;
       var list = groups[key];
@@ -648,7 +648,7 @@ function backfillPayoutRegistrations() {
         var g = list[j];
         var want = (g.row === winner.row) ? PAYOUT_REG_STATUS_ACTIVE : PAYOUT_REG_STATUS_SUPERSEDED;
         var have = String(values[g.row - 1][stCol] || '').trim().toUpperCase();
-        if (have !== want) writePayoutRegCell_(prSheet, g.row, stCol, want);
+        if (have !== want) { writePayoutRegCell_(prSheet, g.row, stCol, want); changed++; }
         if (g.row === winner.row) active++; else superseded++;
       }
     }
@@ -687,6 +687,7 @@ function backfillPayoutRegistrations() {
       pk_hashes: active,
       active: active,
       superseded: superseded,
+      changed: changed,
       mirror_written: mirrorWritten
     };
   } catch (err) {

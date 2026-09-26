@@ -170,6 +170,14 @@ def test_router_wires_both_actions():
     assert "getPendingPayoutRegistrations" in src
 
 
+def test_backfill_lever_defined_and_routed():
+    """SS11.3 + SS11.3-bis normalisation lever exists and is reachable over HTTP."""
+    assert "function backfillPayoutRegistrations(" in _src()
+    assert "backfillPayoutRegistrations" in ROUTER.read_text(encoding="utf-8")
+    # the lever must reuse the shared mirror upsert (never a bespoke writer)
+    assert "appendPayoutRegistrationMirrorRow_(intake, p)" in _src()
+
+
 def test_behavioral_harness():
     node = shutil.which("node")
     if node is None:
