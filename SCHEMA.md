@@ -35,7 +35,8 @@ see [Tree-Planting Ledger Literals](#tree-planting-ledger-literals) below):
 | Sheet | New column | Purpose |
 |-------|-----------|---------|
 | `Agroverse QR codes` | **AC — `Linked Plot ID`** | Plot-fallback link target (plan PR6). Blank for the existing tree-level link path. |
-| `SunMint Tree Planting` | **U — `Payment Event Ref`** | References the `[TREE PURCHASE EVENT]` / `[FARMER PAYMENT EVENT]` that funded this confirmed tree (its Telegram Update ID or `Asset Receipts` / `payouts` row ref). `Cost of Tree` (col P) records an amount only, not a reference. |
+| `SunMint Tree Planting` | **U — `Submission Source` (LIVE) / `Payment Event Ref` (PR3, PARKED) — conflict** | The **live** tab's col U header is `Submission Source`. The PARKED PR3 reconciliation treats U as `Payment Event Ref` (`SUNMINT_PAYMENT_EVENT_REF_COL = 20`). Reconcile before either writes U. |
+| `SunMint Tree Planting` | **V — `request_transaction_id`** | The signed `Request Transaction ID` — the canonical **dedup key** (do NOT key on the transport ids in cols A/D/H). Trailing column, located by header name so no column is reordered. Written by `process_tree_planting_telegram_logs.js`; backfill via `?action=backfillSunMintTreeTxIds&apply=1`. Convention: `agentic_ai_context/conventions/DEDUP_KEY_CONVENTION.md`. |
 
 **Also added below (first-time `SCHEMA.md` coverage of live tabs):** `SunMint Plots`, `Asset Receipts`,
 `payouts`; plus `SunMint Tree Planting`'s previously-undocumented `Plot ID` column.

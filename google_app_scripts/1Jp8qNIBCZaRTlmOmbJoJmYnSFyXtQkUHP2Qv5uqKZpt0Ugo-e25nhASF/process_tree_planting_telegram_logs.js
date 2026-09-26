@@ -49,6 +49,14 @@ function extractPlotId(contributionText) {
   return match ? match[1].trim() : '';
 }
 
+// Helper: extract the signed Request Transaction ID — the canonical dedup key.
+// Convention: agentic_ai_context/conventions/DEDUP_KEY_CONVENTION.md
+// (NEVER key dedup on the transport ids: Telegram Update ID / Message ID / File ID.)
+function extractRequestTransactionId(contributionText) {
+  const match = String(contributionText || '').match(/Request Transaction ID:\s*([^\n]+)/i);
+  return match ? match[1].trim() : '';
+}
+
 // Send Telegram notification
 function sendTreePlantingNotification(rowData, treePlantingRowNumber) {
   Logger.log("Sending tree planting notification");
@@ -109,6 +117,47 @@ function getProcessedMessageIds(sunMintTab) {
   if (lastRow < 2) return [];
   const messageIds = sunMintTab.getRange(2, 4, lastRow - 1, 1).getValues().flat();
   return messageIds.filter(id => id !== "");
+}
+
+// ---- Request-Transaction-ID column (the dedup key). --------------------------------
+// Migration-safe: the column is located by HEADER NAME, never by position, and created at the
+// FIRST FREE column (col V on the live tab) so no existing column is ever reordered.
+// Convention: agentic_ai_context/conventions/DEDUP_KEY_CONVENTION.md
+const SUNMINT_REQUEST_TX_HEADER = 'request_transaction_id';
+
+function sunmintFindHeaderCol_(sunMintTab, headerName) {
+  const lastCol = sunMintTab.getLastColumn();
+  if (lastCol < 1) return -1;
+  const hdr = sunMintTab.getRange(1, 1, 1, lastCol).getValues()[0];
+  for (let i = 0; i < hdr.length; i++) {
+    if (String(hdr[i] || '').trim().toLowerCase() === headerName.toLowerCase()) return i; // 0-based
+  }
+  return -1;
+}
+
+function ensureSunMintRequestTxColumn_(sunMintTab) {
+  let col = sunmintFindHeaderCol_(sunMintTab, SUNMINT_REQUEST_TX_HEADER);
+  if (col >= 0) return col;
+  const newCol1Based = sunMintTab.getLastColumn() + 1;
+  sunMintTab.getRange(1, newCol1Based).setValue(SUNMINT_REQUEST_TX_HEADER);
+  return newCol1Based - 1; // 0-based
+}
+
+function getProcessedRequestTxIds_(sunMintTab, txCol) {
+  const lastRow = sunMintTab.getLastRow();
+  if (lastRow < 2 || txCol < 0) return [];
+  return sunMintTab.getRange(2, txCol + 1, lastRow - 1, 1).getValues()
+    .map(function (r) { return String(r[0] || '').trim(); })
+    .filter(function (v) { return v !== ''; });
+}
+
+// Build the tail of an appendRow() array so the txid lands in txCol (0-based), padding any gap
+// columns (e.g. col U) with blanks — never writing a column out of order.
+function sunmintTxColumnTail_(txCol, requestTxId) {
+  const tail = [];
+  for (let i = 20; i < txCol; i++) tail.push(''); // indices 0..19 are the fixed A..T values
+  tail.push(requestTxId || '');
+  return tail;
 }
 
 // Get processed file IDs
@@ -225,7 +274,7 @@ function processTelegramLogsLocked_() {
   // Create tab if not exists
   if (!sunMintTab) {
     sunMintTab = sheet.insertSheet(sunMintTabName);
-    sunMintTab.getRange("A1:T1").setValues([[
+    sunMintTab.getRange("A1:V1").setValues([[
       "Telegram Update ID",      // A
       "Chatroom ID",             // B
       "Chatroom Name",           // C
@@ -245,9 +294,16 @@ function processTelegramLogsLocked_() {
       "Planting Time",           // Q
       "Linked QR Code",          // R (owned by process_tree_planting_link.js)
       "Linked At",               // S (owned by process_tree_planting_link.js)
-      "Plot ID"                  // T (optional — SunMint plot association)
+      "Plot ID",                 // T (optional — SunMint plot association)
+      "Submission Source",       // U (owned by the submission-source / CFR work; NOT written here)
+      "request_transaction_id"   // V (signed Request Transaction ID — the dedup key)
     ]]);
   }
+
+  // Ensure the Request-Transaction-ID column exists (migration-safe; appended, never reordered),
+  // then seed the txid dedup set from it.
+  const sunMintRequestTxCol = ensureSunMintRequestTxColumn_(sunMintTab);
+  const processedRequestTxIds = getProcessedRequestTxIds_(sunMintTab, sunMintRequestTxCol);
 
   const processedFileIds = getProcessedFileIds(sunMintTab);
   const processedMessageIds = getProcessedMessageIds(sunMintTab);
@@ -267,6 +323,15 @@ function processTelegramLogsLocked_() {
     const messageId = row[3]; // Column D
     const fileIdsString = row[14]; // Column O
 
+    // PRIMARY dedup key: the signed Request Transaction ID (NOT the transport ids).
+    // One update id can map to many rows, and a re-post arrives under a NEW update id.
+    const requestTxId = extractRequestTransactionId(contributionMade);
+    if (requestTxId && processedRequestTxIds.includes(requestTxId)) {
+      Logger.log(`Request Transaction ID already processed: ${requestTxId}`);
+      return;
+    }
+
+    // Secondary guards (belt-and-braces): transport ids observed already-processed.
     if (processedMessageIds.includes(messageId)) {
       Logger.log(`Message ID already processed: ${messageId}`);
       return;
@@ -343,7 +408,7 @@ function processTelegramLogsLocked_() {
                 "", // R (Linked QR Code — written by process_tree_planting_link.js)
                 "", // S (Linked At — written by process_tree_planting_link.js)
                 plotId // T (Plot ID — optional SunMint plot association)
-              ]);
+              ].concat(sunmintTxColumnTail_(sunMintRequestTxCol, requestTxId)));
 
               const treePlantingRowNumber = sunMintTab.getLastRow();
               if (rowStatus === 'NEW') reconcileTreePlanting_(contributorName, treePlantingRowNumber); // PR3
@@ -357,6 +422,7 @@ function processTelegramLogsLocked_() {
               // read once at the top and never updated, so a fileId reused by a later
               // source row in the same run could slip through and append twice.
               processedMessageIds.push(row[3]);
+              if (requestTxId) processedRequestTxIds.push(requestTxId);
               if (fileId !== 'N/A') processedFileIds.push(fileId);
               Logger.log(`Processed file_id: ${fileId}, filename: ${fileNameToUse}`);
             } catch (err) {
@@ -419,7 +485,7 @@ function processTelegramLogsLocked_() {
             "", // R (Linked QR Code — written by process_tree_planting_link.js)
             "", // S (Linked At — written by process_tree_planting_link.js)
             plotId // T (Plot ID — optional SunMint plot association)
-          ]);
+          ].concat(sunmintTxColumnTail_(sunMintRequestTxCol, requestTxId)));
 
           const treePlantingRowNumber = sunMintTab.getLastRow();
           if (rowStatus === 'NEW') reconcileTreePlanting_(contributorName, treePlantingRowNumber); // PR3
@@ -430,6 +496,7 @@ function processTelegramLogsLocked_() {
           ], treePlantingRowNumber);
 
           processedMessageIds.push(row[3]);
+          if (requestTxId) processedRequestTxIds.push(requestTxId);
           if (fileId !== 'N/A') processedFileIds.push(fileId);
           Logger.log(`Processed record without file attachment: ${fileId}, filename: ${fileNameToUse}`);
         } catch (err) {
@@ -645,6 +712,46 @@ function doGet(e) {
         status: 'error',
         message: 'Tree planting processing error: ' + err.message
       })).setMimeType(ContentService.MimeType.JSON);
+    }
+  }
+
+  if (action === 'backfillSunMintTreeTxIds') {
+    // One-shot, IDEMPOTENT migration: populate `request_transaction_id` (col V) on EXISTING rows
+    // from the signed `Request Transaction ID:` line in col F. Preview by default; pass &apply=1
+    // to write. Returns counts only — never txid strings.
+    try {
+      const sheet = SpreadsheetApp.openById(creds.SHEET_ID);
+      const sunMintTab = sheet.getSheetByName(sunMintTabName);
+      if (!sunMintTab) {
+        return ContentService.createTextOutput(JSON.stringify({ status: 'error', message: 'tab not found' }))
+          .setMimeType(ContentService.MimeType.JSON);
+      }
+      const txCol = ensureSunMintRequestTxColumn_(sunMintTab);
+      const lastRow = sunMintTab.getLastRow();
+      const apply = e && e.parameter ? String(e.parameter['apply'] || '') === '1' : false;
+      const stats = { scanned: 0, filled: 0, alreadyFilled: 0, noTxid: 0, applied: apply };
+      if (lastRow >= 2) {
+        const contribs = sunMintTab.getRange(2, 6, lastRow - 1, 1).getValues(); // col F
+        const existing = sunMintTab.getRange(2, txCol + 1, lastRow - 1, 1).getValues();
+        const writes = [];
+        for (let i = 0; i < contribs.length; i++) {
+          stats.scanned++;
+          const txid = extractRequestTransactionId(contribs[i][0]);
+          if (!txid) { stats.noTxid++; continue; }
+          if (String(existing[i][0] || '').trim() !== '') { stats.alreadyFilled++; continue; }
+          stats.filled++;
+          writes.push([i + 2, txid]);
+        }
+        if (apply) {
+          writes.forEach(function (w) { sunMintTab.getRange(w[0], txCol + 1).setValue(w[1]); });
+        }
+      }
+      return ContentService.createTextOutput(JSON.stringify({ status: 'success', stats: stats }))
+        .setMimeType(ContentService.MimeType.JSON);
+    } catch (err) {
+      Logger.log(`doGet(backfillSunMintTreeTxIds) error: ${err.message}`);
+      return ContentService.createTextOutput(JSON.stringify({ status: 'error', message: err.message }))
+        .setMimeType(ContentService.MimeType.JSON);
     }
   }
 
