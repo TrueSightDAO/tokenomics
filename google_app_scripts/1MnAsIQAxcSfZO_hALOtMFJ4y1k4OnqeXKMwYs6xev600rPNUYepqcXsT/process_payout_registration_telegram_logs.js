@@ -24,9 +24,16 @@
  *       `cfr program` spreadsheet, which is never link-shared and never republished.
  *       There is no RSA-OAEP cipher and no governor-private-key decrypt step (the
  *       `pix_key_cipher` column is DROPPED).
- *     * The Telegram Chat Logs intake workbook IS publicly republished
- *       (ADVISORY_SNAPSHOT + the `truesight.me/notarizations` redirect), so this
- *       scanner NEVER writes back to it -- it is strictly read-only.
+ *     * The `Telegram Chat Logs` TAB is strictly READ-ONLY (never written back).
+ *       The workbook itself was ACL-privatised 2026-09-18 (no anyone/link/domain
+ *       grant; anonymous gviz/edit/export now 401), so this scanner MAY write a
+ *       dedicated MIRROR tab on that same workbook -- see SS11.3-bis.
+ *     * The SS11.3-bis MIRROR tab (`payout registrations` on the intake workbook)
+ *       carries the SAME raw PIX as the private sheet, on Gary's explicit
+ *       2026-09-25 decision: CFR Anapu is only a SUBSET of SunMint, so farmers
+ *       OUTSIDE the CFR cohort must be payable from one navigable place. This is
+ *       safe ONLY because the workbook is private-by-ACL -- if it is ever publicly
+ *       republished again, this tab MUST be excluded from the projection.
  *     * The PUBLIC JSON-cache generators must never emit `[PAYOUT REGISTRATION]`
  *       (SS11.4; enforced upstream in sync_sunmint_signatures.py / ledger_emit.py /
  *       generate_advisory_snapshot.py).
@@ -43,7 +50,8 @@
  *   Mirrors process_program_registration_telegram_logs.gs (same Apps Script project).
  */
 
-/** Canonical Telegram intake workbook -- READ ONLY (it is publicly republished). */
+/** Canonical intake workbook. The `Telegram Chat Logs` TAB is read-only; the
+ *  SS11.3-bis mirror tab on this (ACL-private) workbook IS a write target. */
 var PAYOUT_REG_TELEGRAM_SPREADSHEET_ID = '1qbZZhf-_7xzmDTriaJVWj6OZshyQsFkdsAV8-pyzASQ';
 var PAYOUT_REG_TELEGRAM_SHEET = 'Telegram Chat Logs';
 
@@ -111,6 +119,19 @@ var PAYOUT_REG_TABS = {
 /** The tab this scanner writes (the payout-registration review surface). */
 var PAYOUT_REG_SHEET = 'payout registrations';
 var PAYOUT_REG_HEADERS = PAYOUT_REG_TABS[PAYOUT_REG_SHEET];
+
+/**
+ * SS11.3-bis MIRROR tab (Gary, 2026-09-25). CFR Anapu is only a SUBSET of the
+ * SunMint program, so a registration for a farmer OUTSIDE the CFR cohort has no
+ * home today. The identical schema is mirrored onto the intake workbook so an
+ * operator can filter `status = ACTIVE` there too and pay from one place.
+ *
+ * PRIVACY: this mirror carries the RAW PIX key, exactly like the private `cfr
+ * program` tab. That is safe ONLY because the intake workbook was ACL-privatised
+ * 2026-09-18 (no anyone/link/domain grant; anonymous gviz/edit/export = 401). If
+ * that workbook is ever republished, exclude this tab from the projection.
+ */
+var PAYOUT_REG_MIRROR_SHEET = 'payout registrations';
 
 /** Per-fire scan window. Matches the program-registration / donation-mint scanners. */
 var PAYOUT_REG_SCAN_BATCH = 200;
@@ -251,6 +272,42 @@ function supersedePriorPayoutRows_(sheet, pkHash, pkCol, statusCol) {
 }
 
 /**
+ * Zero-based column index of a schema field, from the canonical header list. Lets
+ * the mirror tab (a different sheet, identical schema) avoid a duplicate column map.
+ */
+function payoutRegColIndex_(name) {
+  return PAYOUT_REG_HEADERS.indexOf(name);
+}
+
+/**
+ * Upsert one registration row into `sheet`: flip every prior row for the same
+ * pk_hash to SUPERSEDED, then append the new row -- so ANY sheet carrying the
+ * canonical schema (the private tab or the SS11.3-bis mirror) ends with exactly
+ * one ACTIVE row per pk_hash. Refusal/error rows have no pk_hash and are appended
+ * by the caller without supersession. Never touches the raw PIX column.
+ */
+function upsertPayoutRegistrationRow_(sheet, p) {
+  var pkCol = payoutRegColIndex_('pk_hash');
+  var statusCol = payoutRegColIndex_('status');
+  if (String(p.pk_hash || '').trim() !== '' && pkCol >= 0 && statusCol >= 0) {
+    supersedePriorPayoutRows_(sheet, p.pk_hash, pkCol, statusCol);
+  }
+  appendPayoutRegistrationRow_(sheet, p);
+}
+
+/**
+ * Append one successful registration to the SS11.3-bis MIRROR tab on the intake
+ * workbook, creating the tab + headers on first use. Schema-identical to the
+ * private tab and superseded the same way, so the same `status = ACTIVE` filter
+ * works on both. Returns the mirror sheet.
+ */
+function appendPayoutRegistrationMirrorRow_(opsSpreadsheet, p) {
+  var sheet = ensurePayoutRegTab_(opsSpreadsheet, PAYOUT_REG_MIRROR_SHEET, PAYOUT_REG_HEADERS);
+  upsertPayoutRegistrationRow_(sheet, p);
+  return sheet;
+}
+
+/**
  * Normalise a `- Field: value` label into a canonical snake_case key, folding the
  * human-readable aliases used by the redacted summary into the canonical names.
  */
@@ -368,7 +425,9 @@ function processPayoutRegistrationsFromTelegramChatLogs() {
         (triggerErr && triggerErr.message ? triggerErr.message : triggerErr) + ' - proceeding with scan.');
     }
 
-    // Intake: canonical Telegram Chat Logs (read-only; publicly republished).
+    // Intake workbook. Its `Telegram Chat Logs` TAB is strictly read-only; the
+    // workbook is ACL-private (2026-09-18), so its SS11.3-bis mirror tab IS a
+    // write target.
     var intake = SpreadsheetApp.openById(PAYOUT_REG_TELEGRAM_SPREADSHEET_ID);
     var tcSheet = intake.getSheetByName(PAYOUT_REG_TELEGRAM_SHEET);
     if (!tcSheet) throw new Error('Telegram Chat Logs sheet not found');
@@ -449,9 +508,17 @@ function processPayoutRegistrationsFromTelegramChatLogs() {
         if (rowByPkHash[base.pk_hash]) supersedes = String(rowByPkHash[base.pk_hash]);
         base.supersedes_row = supersedes;
         base.status = PAYOUT_REG_STATUS_ACTIVE;
-        supersedePriorPayoutRows_(prSheet, base.pk_hash, idx['pk_hash'], idx['status']);
-        appendPayoutRegistrationRow_(prSheet, base);
+        // Canonical private, governor-only tab (SS11.2/SS11.3).
+        upsertPayoutRegistrationRow_(prSheet, base);
         rowByPkHash[base.pk_hash] = prSheet.getLastRow();
+        // SS11.3-bis mirror on the (ACL-private) intake workbook. A mirror failure
+        // must never block the canonical private write -- it is a convenience surface.
+        try {
+          appendPayoutRegistrationMirrorRow_(intake, base);
+        } catch (mirrorErr) {
+          Logger.log('payout mirror write failed: ' +
+            (mirrorErr && mirrorErr.message ? mirrorErr.message : mirrorErr));
+        }
         seenUpdateId[updateId] = true;
         if (supersedes) updated++; else recorded++;
       } catch (rowErr) {

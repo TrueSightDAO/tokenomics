@@ -2,32 +2,41 @@ import fs from 'fs';
 const src = fs.readFileSync(process.argv[2], 'utf8');
 
 // ---- minimal GAS stubs -----------------------------------------------------
-// Two distinct workbooks: the PUBLIC intake (Telegram Chat Logs) and the PRIVATE
-// `cfr program` sheet. The harness records every write so a test can prove the
-// public intake is never written to.
-let intakeWrites = 0;
-function makeSheet(name, data) {
+// Two workbooks: the intake workbook (Telegram Chat Logs tab + the SS11.3-bis
+// MIRROR tab) and the PRIVATE `cfr program` sheet. The harness records every write
+// per tab so a test can prove the `Telegram Chat Logs` TAB is never written to,
+// while the mirror tab IS (that is the SS11.3-bis decision, Gary 2026-09-25).
+let tcTabWrites = 0;      // writes to the read-only `Telegram Chat Logs` tab
+let mirrorWrites = 0;     // writes to the mirror tab on the intake workbook
+function makeSheet(name, data, onWrite) {
   let grid = data ? data.map(r => r.slice()) : [];
+  const hook = typeof onWrite === 'function' ? onWrite : function(){};
   return {
     _name: name, _grid: grid,
     getName(){return name;},
     getLastRow(){return grid.length;},
     getLastColumn(){return grid.reduce((m,r)=>Math.max(m,r.length),0);},
     getDataRange(){return {getValues(){return grid.map(r=>r.slice());}};},
-    getRange(r,c,nr,nc){return {getValues(){const out=[];for(let i=0;i<nr;i++){const rr=grid[r-1+i]||[];out.push(rr.slice(c-1,c-1+nc));}return out;},setValues(v){for(let i=0;i<v.length;i++){const ri=r-1+i;grid[ri]=grid[ri]||[];for(let j=0;j<v[i].length;j++)grid[ri][c-1+j]=v[i][j];}}};},
-    appendRow(a){ grid.push(a.slice()); },
+    getRange(r,c,nr,nc){return {getValues(){const out=[];for(let i=0;i<nr;i++){const rr=grid[r-1+i]||[];out.push(rr.slice(c-1,c-1+nc));}return out;},setValues(v){hook();for(let i=0;i<v.length;i++){const ri=r-1+i;grid[ri]=grid[ri]||[];for(let j=0;j<v[i].length;j++)grid[ri][c-1+j]=v[i][j];}}};},
+    appendRow(a){ hook(); grid.push(a.slice()); },
     insertSheet(){ return this; }
   };
 }
 let tcGrid = [];
 let cfrSheets = {};               // name -> sheet (the private cfr program workbook)
+let intakeSheets = {};            // name -> sheet (mirror tabs on the intake workbook)
 const INTAKE_ID = '1qbZZhf-_7xzmDTriaJVWj6OZshyQsFkdsAV8-pyzASQ';
 const CFR_ID = 'CFR_PRIVATE_SHEET_ID';
 globalThis.SpreadsheetApp = {
   openById(id){
     if (id === INTAKE_ID) {
-      return { getSheetByName(n){ return n==='Telegram Chat Logs' ? makeSheet(n, tcGrid) : null; },
-               insertSheet(n){ intakeWrites++; return makeSheet(n); } };
+      return {
+        getSheetByName(n){
+          if (n === 'Telegram Chat Logs') return makeSheet(n, tcGrid, ()=>{ tcTabWrites++; });
+          return intakeSheets[n] || null;
+        },
+        insertSheet(n){ intakeSheets[n] = makeSheet(n, null, ()=>{ mirrorWrites++; }); return intakeSheets[n]; }
+      };
     }
     if (id === CFR_ID) {
       return { getSheetByName(n){ return cfrSheets[n] || null; },
@@ -77,8 +86,9 @@ t('mask: email', ()=>eq(payoutRegMaskKey_('maria@example.com','EMAIL'),'m***@exa
 t('mask: never returns the raw key', ()=>{ if(payoutRegMaskKey_('111.444.777-35','CPF').includes('111.444')) throw new Error('mask leaked raw'); });
 
 // ---- end-to-end ------------------------------------------------------------
-function reset(){ tcGrid=[]; cfrSheets={}; intakeWrites=0; }
+function reset(){ tcGrid=[]; cfrSheets={}; intakeSheets={}; tcTabWrites=0; mirrorWrites=0; }
 function payoutRows(){ const s=cfrSheets['payout registrations']; return s ? s.getDataRange().getValues() : []; }
+function mirrorRows(){ const s=intakeSheets['payout registrations']; return s ? s.getDataRange().getValues() : []; }
 
 reset();
 tcGrid = [['A','B','C','D','E','F','G'],['Edgar_1','-','EDGAR','msg1','Edgar','',''+payload]];
@@ -92,7 +102,16 @@ t('e2e RAW PIX is persisted in the PRIVATE sheet', ()=>{
   const all = payoutRows().flat().join('|');
   if(!all.includes('111.444.777-35')) throw new Error('raw PIX not persisted in private sheet');
 });
-t('e2e PUBLIC intake is never written to', ()=>{ eq(intakeWrites,0,'intake writes'); });
+// ---- SS11.3-bis: the `Telegram Chat Logs` TAB stays read-only; the MIRROR tab is written
+t('e2e Telegram Chat Logs tab is never written to', ()=>{ eq(tcTabWrites,0,'Telegram Chat Logs tab writes'); });
+t('e2e SS11.3-bis mirror tab IS written', ()=>{ if(mirrorWrites<1) throw new Error('mirror tab not written'); });
+t('e2e mirror tab carries the raw PIX (parity with the private tab)', ()=>{
+  const all = mirrorRows().flat().join('|');
+  if(!all.includes('111.444.777-35')) throw new Error('raw PIX missing from mirror tab');
+});
+t('e2e mirror tab schema matches the private tab', ()=>{
+  eq(mirrorRows()[0].join(','), payoutRows()[0].join(','), 'mirror header');
+});
 t('e2e masked echo is derived and display-safe', ()=>{
   const rows = payoutRows();
   const header = rows[0];
@@ -129,6 +148,12 @@ t('e2e LIFECYCLE: one ACTIVE row, prior row SUPERSEDED (same pk_hash)', ()=>{
   const st = rows.slice(1).map(r=>String(r[si]));
   eq(st.filter(s=>s==='ACTIVE').length, 1, 'ACTIVE rows');
   eq(st.filter(s=>s==='SUPERSEDED').length, 1, 'SUPERSEDED rows');
+});
+t('e2e MIRROR LIFECYCLE: mirror tab also holds one ACTIVE per pk_hash', ()=>{
+  const rows = mirrorRows(); const h = rows[0]; const si = h.indexOf('status');
+  const st = rows.slice(1).map(r=>String(r[si]));
+  eq(st.filter(s=>s==='ACTIVE').length, 1, 'mirror ACTIVE rows');
+  eq(st.filter(s=>s==='SUPERSEDED').length, 1, 'mirror SUPERSEDED rows');
 });
 reset();
 tcGrid = [['A','B','C','D','E','F','G'],['Edgar_1','-','EDGAR','msg1','Edgar','',''+payload]];
