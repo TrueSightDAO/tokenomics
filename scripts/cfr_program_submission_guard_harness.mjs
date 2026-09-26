@@ -317,5 +317,42 @@ t('backfillCfrTreeTxIds is idempotent (second run changes nothing)', ()=>{
   eq(backfillCfrTreeTxIds().changed, 0);
 });
 
+// dryRun: preview WITHOUT writing. Must report the same counts but leave the cell blank.
+reset();
+tcGrid=[['A','B','C','D','E','F','G'], tcRow('Edgar_TX6', treePayload)];
+cfrSheets['tree planting']=makeSheet('tree planting',[
+  ['created_at_utc','telegram_update_id','pk_hash','tree_id','species','lat','lng','photo_url','capture_source','status','request_transaction_id'],
+  ['2026-09-24T00:00:00Z','Edgar_TX6','pk-x000000000000','Edgar_TX6','Cacao','-3.5','-51.5','http://x/o.jpg','https://cfr.truesight.me/','RECORDED','']]);
+t('backfillCfrTreeTxIds dryRun reports changed but writes NOTHING', ()=>{
+  const r = backfillCfrTreeTxIds(true);
+  eq(r.success, true); eq(r.dryRun, true); eq(r.changed, 1);
+  const h=tab('tree planting')[0];
+  eq(rows('tree planting')[0][h.indexOf('request_transaction_id')], '');  // untouched
+});
+// after a preview, a real run still applies (dryRun must not consume the change)
+reset();
+tcGrid=[['A','B','C','D','E','F','G'], tcRow('Edgar_TX6', treePayload)];
+cfrSheets['tree planting']=makeSheet('tree planting',[
+  ['created_at_utc','telegram_update_id','pk_hash','tree_id','species','lat','lng','photo_url','capture_source','status','request_transaction_id'],
+  ['2026-09-24T00:00:00Z','Edgar_TX6','pk-x000000000000','Edgar_TX6','Cacao','-3.5','-51.5','http://x/o.jpg','https://cfr.truesight.me/','RECORDED','']]);
+t('backfillCfrTreeTxIds dryRun then live: preview does not consume the change', ()=>{
+  eq(backfillCfrTreeTxIds(true).changed, 1);
+  const r2 = backfillCfrTreeTxIds();
+  eq(r2.dryRun, false); eq(r2.changed, 1);
+  const h=tab('tree planting')[0];
+  eq(rows('tree planting')[0][h.indexOf('request_transaction_id')], 'ABC123');
+});
+// distinctTxIds / duplicateRows: two rows sharing one txid -> 1 distinct, 1 duplicate
+reset();
+tcGrid=[['A','B','C','D','E','F','G'], tcRow('Edgar_TX7', treePayload)];
+cfrSheets['tree planting']=makeSheet('tree planting',[
+  ['created_at_utc','telegram_update_id','pk_hash','tree_id','species','lat','lng','photo_url','capture_source','status','request_transaction_id'],
+  ['2026-09-24T00:00:00Z','Edgar_TX7','pk-x000000000000','Edgar_TX7','Cacao','-3.5','-51.5','http://x/o.jpg','https://cfr.truesight.me/','RECORDED',''],
+  ['2026-09-24T00:00:01Z','Edgar_TX7','pk-y000000000000','Edgar_TX7','Cacao','-3.5','-51.5','http://x/o.jpg','https://cfr.truesight.me/','RECORDED','']]);
+t('backfillCfrTreeTxIds reports distinctTxIds + duplicateRows (verification metrics)', ()=>{
+  const r = backfillCfrTreeTxIds(true);
+  eq(r.distinctTxIds, 1); eq(r.duplicateRows, 1);
+});
+
 console.log('\n'+pass+' passed, '+fail+' failed');
 process.exit(fail?1:0);
