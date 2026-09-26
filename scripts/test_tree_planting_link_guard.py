@@ -177,8 +177,21 @@ def test_pr6_plot_branch_uses_pr5_booker_and_skips_transfer_amount():
 
 def test_pr6_guard_allows_plot_id_without_sunmint_id():
     src = _src()
-    assert "(!parsed.sunmintMessageId && !parsed.plotId)" in src, (
-        "the early guard must accept a Plot ID in place of a SunMint submission id"
+    assert "(!parsed.sunmintMessageId && !parsed.sunmintTxid && !parsed.plotId)" in src, (
+        "the early guard must accept a Plot ID — or a txid — in place of a SunMint submission id"
+    )
+
+
+def test_guard_resolves_sunmint_row_by_txid_with_msgid_fallback():
+    """Gary, thread 35944: link by request_transaction_id (col V), not just Telegram Message ID."""
+    src = _src()
+    assert "TPL_SUNMINT_TXID_COL = 21" in src, "col V (request_transaction_id) must be declared"
+    assert "function tplResolveSunmintRowIndex_(" in src, "the txid-primary resolver must exist"
+    assert "hits.push(k + 1)" in src and "ambiguous transaction id" in src, (
+        "the resolver must detect the non-unique-txid case and fail closed"
+    )
+    assert "SunMint Submission Transaction ID:" in src, (
+        "the parser must accept the new txid label"
     )
 
 
