@@ -288,6 +288,19 @@ t('e2e blank txid still dedups on the update id', ()=>{
   eq(processCfrProgramSubmissionsFromTelegramChatLogs().recorded, 1);
 });
 
+// THE REAL PRODUCTION PATH: the txid ledger is SEEDED FROM THE SHEET, so a re-post of
+// the same txid under a NEW update id is caught on a SUBSEQUENT fire -- not only within
+// one fire. This is exactly what cfrSubSeenRequestTxKeys_ (the sheet read) buys us; the
+// in-fire test above would still pass if that seeding were broken.
+reset();
+tcGrid=[['A','B','C','D','E','F','G'], tcRow('Edgar_TX7', treePayload)];
+processCfrProgramSubmissionsFromTelegramChatLogs();
+tcGrid=[['A','B','C','D','E','F','G'], tcRow('Edgar_TX7', treePayload), tcRow('Edgar_TX8', treePayload)];
+t('e2e TXDEDUP across FIRES: same txid under a NEW update id caught by the sheet-seeded ledger', ()=>{
+  const r = processCfrProgramSubmissionsFromTelegramChatLogs();
+  eq(r.recorded, 0); eq(rows('tree planting').length, 1);
+});
+
 // ---- backfillCfrTreeTxIds populates legacy rows + is idempotent ----------------
 reset();
 tcGrid=[['A','B','C','D','E','F','G'], tcRow('Edgar_TX6', treePayload)];
