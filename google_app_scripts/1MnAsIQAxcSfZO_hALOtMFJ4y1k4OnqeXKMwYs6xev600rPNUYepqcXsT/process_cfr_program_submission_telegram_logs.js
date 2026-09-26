@@ -186,6 +186,55 @@ function backfillCfrTreeTxIds(dryRun) {
   }
 }
 
+/**
+ * One-shot, IDEMPOTENT lever (Gary thread 35944): COLLAPSE pre-existing duplicate
+ * `tree planting` rows that share a Request Transaction ID -- keeping the FIRST
+ * occurrence of each. `backfillCfrTreeTxIds` only POPULATES the txid column; this
+ * removes the duplicate rows that the txid dedupe prevents going forward, so the
+ * tab actually TRACKS UNIQUE ROWS rather than merely labelling them.
+ *
+ * Destructive (deletes rows from the PRIVATE ledger), so the router is
+ * preview-by-default: the live path requires `?apply=1`. Counts only, never txids.
+ */
+function collapseCfrTreeTxDuplicates(dryRun) {
+  var apply = !dryRun;
+  var lock = LockService.getScriptLock();
+  if (!lock.tryLock(180000)) return { success: false, error: 'busy' };
+  try {
+    var cfr = payoutRegCfrProgramSpreadsheet_();
+    var tabs = cfrSubEnsureTabs_(cfr);
+    var sheet = tabs[CFRSUB_TREE_TAB];
+    var values = sheet.getDataRange().getValues();
+    if (values.length < 2) {
+      return { success: true, dryRun: !apply, checked: 0, collapsed: 0, distinctTxIds: 0, untxRow: 0 };
+    }
+    var header = values[0].map(function (h) { return String(h || '').trim(); });
+    var txCol = header.indexOf('request_transaction_id');
+    if (txCol < 0) throw new Error('tree planting row 1 must carry request_transaction_id');
+
+    var seen = {};
+    var toDelete = [];   // 1-based sheet rows, ascending
+    var distinct = 0, untx = 0;
+    for (var r = 1; r < values.length; r++) {
+      var k = cfrSubTreeTxKey_(values[r][txCol]);
+      if (!k) { untx++; continue; }          // un-txid'd rows are never collapsed
+      if (seen[k]) { toDelete.push(r + 1); continue; }
+      seen[k] = true; distinct++;
+    }
+    if (apply) {
+      // Delete bottom-up so the earlier row indices stay valid.
+      for (var d = toDelete.length - 1; d >= 0; d--) sheet.deleteRow(toDelete[d]);
+    }
+    return { success: true, dryRun: !apply, checked: values.length - 1,
+             collapsed: toDelete.length, distinctTxIds: distinct, untxRow: untx };
+  } catch (err) {
+    Logger.log('collapseCfrTreeTxDuplicates error: ' + (err && err.message ? err.message : err));
+    return { success: false, error: (err && err.message ? err.message : String(err)) };
+  } finally {
+    try { lock.releaseLock(); } catch (e) {}
+  }
+}
+
 /** The event tag: the first non-empty line's bracketed token, or '' when none. */
 function cfrSubTag_(message) {
   var lines = String(message || '').split(/\r?\n/);

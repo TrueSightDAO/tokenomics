@@ -2242,6 +2242,14 @@ function doGet(e) {
       var bfDry = getQueryParam_(e, 'dryRun');
       return createCORSResponse(backfillCfrTreeTxIds(bfDry === '1' || bfDry === 'true'));
     }
+    if (actionStr === 'collapseCfrTreeTxDuplicates') {
+      // DESTRUCTIVE one-shot: DELETES duplicate `tree planting` rows that share a
+      // Request Transaction ID (keeps the first). Preview-by-default -- the live
+      // path requires ?apply=1. Counts only, no txids. (Gary thread 35944.)
+      var collApply = getQueryParam_(e, 'apply');
+      return createCORSResponse(
+        collapseCfrTreeTxDuplicates(!(collApply === '1' || collApply === 'true')));
+    }
     if (actionStr === 'backfillCfrTreeIds') {
       // One-shot: rewrite the private `tree planting` tab's tree_id to the CANONICAL
       // intake col D id, so `getTreeRecipientMap` joins the DApp tree picker (thread 35944).

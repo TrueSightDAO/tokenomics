@@ -17,6 +17,7 @@ function makeSheet(name, data) {
     getDataRange(){return {getValues(){return grid.map(r=>r.slice());}};},
     getRange(r,c,nr,nc){return {getValues(){const out=[];for(let i=0;i<nr;i++){const rr=grid[r-1+i]||[];out.push(rr.slice(c-1,c-1+nc));}return out;},setValues(v){for(let i=0;i<v.length;i++){const ri=r-1+i;grid[ri]=grid[ri]||[];for(let j=0;j<v[i].length;j++)grid[ri][c-1+j]=v[i][j];}},setValue(v){grid[r-1]=grid[r-1]||[];grid[r-1][c-1]=v;}};},
     appendRow(a){ grid.push(a.slice()); },
+    deleteRow(r){ grid.splice(r-1,1); },
     insertSheet(){ return this; }
   };
 }
@@ -352,6 +353,43 @@ cfrSheets['tree planting']=makeSheet('tree planting',[
 t('backfillCfrTreeTxIds reports distinctTxIds + duplicateRows (verification metrics)', ()=>{
   const r = backfillCfrTreeTxIds(true);
   eq(r.distinctTxIds, 1); eq(r.duplicateRows, 1);
+});
+
+// ---- collapseCfrTreeTxDuplicates: delete rows sharing a txid, keep the FIRST ----
+const TREE_HEADER = ['created_at_utc','telegram_update_id','pk_hash','tree_id','species','lat','lng','photo_url','capture_source','status','request_transaction_id'];
+function treeRow(uid, txid){ return ['2026-09-24T00:00:00Z',uid,'pk-x000000000000',uid,'Cacao','-3.5','-51.5','http://x/o.jpg','https://cfr.truesight.me/','RECORDED', txid]; }
+reset();
+cfrSheets['tree planting']=makeSheet('tree planting',[
+  TREE_HEADER,
+  treeRow('U1','TX_A'), treeRow('U2','TX_A'), treeRow('U3','TX_B'), treeRow('U4','TX_A')
+]);
+t('collapseCfrTreeTxDuplicates (dryRun) reports the dupe count but deletes NOTHING', ()=>{
+  const r = collapseCfrTreeTxDuplicates(true);
+  eq(r.success, true); eq(r.dryRun, true);
+  eq(r.checked, 4); eq(r.collapsed, 2); eq(r.distinctTxIds, 2);
+  eq(rows('tree planting').length, 4);   // untouched
+});
+t('collapseCfrTreeTxDuplicates (apply) removes rows sharing a txid, keeping the FIRST', ()=>{
+  const r = collapseCfrTreeTxDuplicates();
+  eq(r.dryRun, false); eq(r.collapsed, 2);
+  const body = rows('tree planting');   // rows() already drops the header
+  eq(body.length, 2);
+  const h = tab('tree planting')[0];
+  var txIdx = h.indexOf('request_transaction_id'), uidIdx = h.indexOf('telegram_update_id');
+  eq(body.map(x=>x[txIdx]).join(','), 'TX_A,TX_B');
+  eq(body.map(x=>x[uidIdx]).join(','), 'U1,U3');   // FIRST occurrence of each kept
+});
+t('collapseCfrTreeTxDuplicates is idempotent (second apply collapses 0)', ()=>{
+  eq(collapseCfrTreeTxDuplicates().collapsed, 0);
+});
+t('collapseCfrTreeTxDuplicates NEVER touches un-txid\'d rows', ()=>{
+  reset();
+  cfrSheets['tree planting']=makeSheet('tree planting',[
+    TREE_HEADER, treeRow('U1',''), treeRow('U2',''), treeRow('U3','TX_Z'), treeRow('U4','TX_Z')
+  ]);
+  const r = collapseCfrTreeTxDuplicates();
+  eq(r.untxRow, 2); eq(r.collapsed, 1);
+  eq(rows('tree planting').length, 3);   // the two blank-txid rows survive
 });
 
 console.log('\n'+pass+' passed, '+fail+' failed');
