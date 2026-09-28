@@ -242,6 +242,40 @@ function uploadToGitHub(token, imageBlob, filename, contributionMade) {
   return responseData.commit.html_url; // Return the commit URL
 }
 
+/**
+ * Kick the sunmint repo's 'tree-index-rebuild' GitHub Actions work so trees/index.geojson
+ * (and therefore /my-trees/) reflects a just-ingested planting within minutes instead of
+ * waiting for the daily 06:00 UTC safety-net cron. Best-effort: needs a GH PAT in Script
+ * Properties (GH_PAT / SUNMINT_GH_PAT, else the project's GITHUB_API_TOKEN); logs + returns
+ * false on failure and NEVER throws, so a dispatch hiccup cannot break ingestion.
+ * Mirrors pingPlotsIndexRebuild_ in process_farm_boundary_evidence.gs.
+ */
+const SUNMINT_TREE_INDEX_REPO = 'TrueSightDAO/sunmint';
+function pingTreeIndexRebuild_() {
+  try {
+    const props = PropertiesService.getScriptProperties();
+    const token = props.getProperty('GH_PAT') || props.getProperty('SUNMINT_GH_PAT') ||
+      (typeof creds !== 'undefined' && creds ? creds.GITHUB_API_TOKEN : '');
+    if (!token) { Logger.log('tree-index ping skipped: no GH PAT available'); return false; }
+    const res = UrlFetchApp.fetch('https://api.github.com/repos/' + SUNMINT_TREE_INDEX_REPO + '/dispatches', {
+      method: 'post',
+      contentType: 'application/json',
+      headers: {
+        'Authorization': 'Bearer ' + token,
+        'Accept': 'application/vnd.github+json',
+        'User-Agent': 'truesight-autopilot'
+      },
+      payload: JSON.stringify({ event_type: 'tree-index-rebuild' }),
+      muteHttpExceptions: true
+    });
+    Logger.log('tree-index-rebuild ping -> ' + res.getResponseCode());
+    return res.getResponseCode() === 204 || res.getResponseCode() === 202;
+  } catch (e) {
+    Logger.log('tree-index-rebuild ping error: ' + e.message);
+    return false;
+  }
+}
+
 // Main processing function
 function processTelegramLogs() {
   // IDEMPOTENCY HARDENING: serialize invocations. Without this, two overlapping
@@ -307,6 +341,9 @@ function processTelegramLogsLocked_() {
 
   const processedFileIds = getProcessedFileIds(sunMintTab);
   const processedMessageIds = getProcessedMessageIds(sunMintTab);
+
+  // Baseline row count for the end-of-run tree-index rebuild ping (see pingTreeIndexRebuild_).
+  const sunmintRowsBefore = sunMintTab.getLastRow();
 
   const lastRow = telegramLogTab.getLastRow();
   if (lastRow < 2) {
@@ -505,6 +542,12 @@ function processTelegramLogsLocked_() {
       }
     }
   });
+
+  // End of run: if this invocation appended any new planting row, kick sunmint's tree-index
+  // rebuild so the new tree reaches trees/index.geojson (and /my-trees/) in minutes rather than
+  // waiting for the daily 06:00 UTC safety-net cron. Best-effort + LAST, so a dispatch failure
+  // can never break ingestion; a no-op (no fetch) when no row changed.
+  if (sunMintTab.getLastRow() > sunmintRowsBefore) pingTreeIndexRebuild_();
 }
 
 // =====================================================================================
