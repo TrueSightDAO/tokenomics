@@ -124,6 +124,12 @@ function getProcessedMessageIds(sunMintTab) {
 // FIRST FREE column (col V on the live tab) so no existing column is ever reordered.
 // Convention: agentic_ai_context/conventions/DEDUP_KEY_CONVENTION.md
 const SUNMINT_REQUEST_TX_HEADER = 'request_transaction_id';
+// Signer's public key (SPKI, base64) read verbatim from the "My Digital Signature:" line.
+// Own column (W on the live tab) so a tree's planting identity is self-contained instead of
+// only recoverable by re-parsing the free-text contribution cell (col F). The header text
+// matches build_tree_geojson.py's `c_sig = idx(header, "my digital signature", ...)` needle,
+// so the index build consumes it with no further change. See DEDUP_KEY_CONVENTION.md.
+const SUNMINT_SIGNATURE_HEADER = 'my digital signature';
 
 function sunmintFindHeaderCol_(sunMintTab, headerName) {
   const lastCol = sunMintTab.getLastColumn();
@@ -143,6 +149,16 @@ function ensureSunMintRequestTxColumn_(sunMintTab) {
   return newCol1Based - 1; // 0-based
 }
 
+// Signature (public key) column: same migration-safe contract -- located by header name,
+// created at the first free column if absent, never reordering an existing column.
+function ensureSunMintSignatureColumn_(sunMintTab) {
+  let col = sunmintFindHeaderCol_(sunMintTab, SUNMINT_SIGNATURE_HEADER);
+  if (col >= 0) return col;
+  const newCol1Based = sunMintTab.getLastColumn() + 1;
+  sunMintTab.getRange(1, newCol1Based).setValue(SUNMINT_SIGNATURE_HEADER);
+  return newCol1Based - 1; // 0-based
+}
+
 function getProcessedRequestTxIds_(sunMintTab, txCol) {
   const lastRow = sunMintTab.getLastRow();
   if (lastRow < 2 || txCol < 0) return [];
@@ -153,10 +169,15 @@ function getProcessedRequestTxIds_(sunMintTab, txCol) {
 
 // Build the tail of an appendRow() array so the txid lands in txCol (0-based), padding any gap
 // columns (e.g. col U) with blanks — never writing a column out of order.
-function sunmintTxColumnTail_(txCol, requestTxId) {
-  const tail = [];
-  for (let i = 20; i < txCol; i++) tail.push(''); // indices 0..19 are the fixed A..T values
-  tail.push(requestTxId || '');
+function sunmintTxAndSigColumnTail_(txCol, requestTxId, sigCol, sigVal) {
+  // Indices 0..19 are the fixed A..T values; the tail spans to the highest managed column
+  // so either can exist on its own. Gap columns stay blank (never out of order); sigVal is
+  // '' for unsigned legacy rows (no "My Digital Signature:" line).
+  // Cells needed AFTER col T (index 19). 0 when neither managed column exists.
+  const n = Math.max(0, txCol - 19, sigCol - 19);
+  const tail = new Array(n).fill('');
+  if (txCol >= 0) tail[txCol - 20] = requestTxId || '';
+  if (sigCol >= 0) tail[sigCol - 20] = sigVal || '';
   return tail;
 }
 
@@ -337,6 +358,7 @@ function processTelegramLogsLocked_() {
   // Ensure the Request-Transaction-ID column exists (migration-safe; appended, never reordered),
   // then seed the txid dedup set from it.
   const sunMintRequestTxCol = ensureSunMintRequestTxColumn_(sunMintTab);
+  const sunMintSigCol = ensureSunMintSignatureColumn_(sunMintTab);
   const processedRequestTxIds = getProcessedRequestTxIds_(sunMintTab, sunMintRequestTxCol);
 
   const processedFileIds = getProcessedFileIds(sunMintTab);
@@ -445,7 +467,7 @@ function processTelegramLogsLocked_() {
                 "", // R (Linked QR Code — written by process_tree_planting_link.js)
                 "", // S (Linked At — written by process_tree_planting_link.js)
                 plotId // T (Plot ID — optional SunMint plot association)
-              ].concat(sunmintTxColumnTail_(sunMintRequestTxCol, requestTxId)));
+              ].concat(sunmintTxAndSigColumnTail_(sunMintRequestTxCol, requestTxId, sunMintSigCol, publicSignature === 'N/A' ? '' : publicSignature)));
 
               const treePlantingRowNumber = sunMintTab.getLastRow();
               if (rowStatus === 'NEW') reconcileTreePlanting_(contributorName, treePlantingRowNumber); // PR3
@@ -522,7 +544,7 @@ function processTelegramLogsLocked_() {
             "", // R (Linked QR Code — written by process_tree_planting_link.js)
             "", // S (Linked At — written by process_tree_planting_link.js)
             plotId // T (Plot ID — optional SunMint plot association)
-          ].concat(sunmintTxColumnTail_(sunMintRequestTxCol, requestTxId)));
+          ].concat(sunmintTxAndSigColumnTail_(sunMintRequestTxCol, requestTxId, sunMintSigCol, publicSignature === 'N/A' ? '' : publicSignature)));
 
           const treePlantingRowNumber = sunMintTab.getLastRow();
           if (rowStatus === 'NEW') reconcileTreePlanting_(contributorName, treePlantingRowNumber); // PR3
