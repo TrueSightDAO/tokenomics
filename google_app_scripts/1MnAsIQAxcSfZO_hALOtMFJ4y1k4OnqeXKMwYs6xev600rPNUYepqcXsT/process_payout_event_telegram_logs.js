@@ -369,7 +369,8 @@ function payoutEventCollectBankRefs_(values) {
  *
  *   committed + QR ledger != main -> cross-ledger TRANSFER (SS0.11): -cash on the QR's own ledger,
  *                                    +cash on main, -1 "Cacao Tree - To Be Paid For" on main.
- *   committed + QR ledger  = main -> the two cash legs collapse; only -1 To Be Paid For remains.
+ *   committed + QR ledger  = main -> -cash on main + -1 "Cacao Tree - To Be Paid For" on main
+ *                                    (same-ledger settlement draws main's own cash down).
  *   uncommitted                   -> -cash, -1 To Be Paid For, +1 "Cacao Tree Planted - Unassigned",
  *                                    all on main.
  *
@@ -397,7 +398,13 @@ function fpeComputeLegs_(opts) {
   }
   if (opts.committed) {
     if (opts.qrLedgerIsMain) {
-      return [inv('main', -1, FPE_TO_BE_PAID_LITERAL)];
+      // Same-ledger committed settlement: the tree's cash provision already sits on MAIN
+      // (the QR's own sale booked the revenue there), so paying the farmer draws main's
+      // cash down directly - book the cash-out leg alongside the farmer-liability discharge.
+      return [
+        cash('main', -amount),
+        inv('main', -1, FPE_TO_BE_PAID_LITERAL)
+      ];
     }
     return [
       cash('qr', -amount),
