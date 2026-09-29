@@ -114,8 +114,11 @@ def test_dedup_layer2_business_key_bank_ref():
     assert "payoutEventCollectBankRefs_" in src
     assert "seenBankRefs" in src
     assert "DUPLICATE_BANK_REF" in src
-    assert re.search(r"if \(seenBankRefs\[base\.bank_ref\]\)", src), (
-        "no bank_ref dedup branch"
+    # PR #576 replaced bank_ref-only dedup with the composite (bank_ref, tree_planting_id)
+    # key so one transfer can settle N trees without the 2nd..Nth being rejected as dups.
+    assert "payoutEventDedupKey_" in src, "missing composite dedup key builder"
+    assert re.search(r"if \(seenBankRefs\[dedupKey\]\)", src), (
+        "no composite (bank_ref, tree_planting_id) dedup branch"
     )
 
 
