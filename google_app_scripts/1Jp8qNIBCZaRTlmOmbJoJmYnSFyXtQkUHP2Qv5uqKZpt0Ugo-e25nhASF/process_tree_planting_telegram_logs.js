@@ -181,6 +181,110 @@ function sunmintTxAndSigColumnTail_(txCol, requestTxId, sigCol, sigVal) {
   return tail;
 }
 
+// ---- Duplicate-row collapse (Gary, thread 35944: a QR link must survive a dedup). -------------
+// The going-forward txid dedup (getProcessedRequestTxIds_) stops NEW duplicate rows, but it
+// cannot remove rows already written before it existed. This one-shot, IDEMPOTENT lever
+// COLLAPSES pre-existing duplicate rows that share a Request Transaction ID (col V), keeping the
+// FIRST occurrence of each -- and NEVER drops a row's QR/plot linkage: if the duplicate being
+// removed carries a linkage and the survivor does not, the linkage is GRAFTED onto the survivor
+// first; if BOTH carry a linkage the duplicate is left in place (ambiguous -- never silently
+// drop a linkage). Mirrors the CFR lever collapseCfrTreeTxDuplicates() (Gary, thread 35944).
+
+/** Dedup key for a tree-planting row: the trimmed Request Transaction ID, or '' when absent. */
+function sunmintTreeTxKey_(requestTransactionId) {
+  return String(requestTransactionId == null ? '' : requestTransactionId).trim();
+}
+
+/**
+ * True when a tree row carries evidence of a QR/plot LINKAGE and so must NEVER be removed by a
+ * dedup/collapse (Gary, thread 35944: "make sure the trees already associated with QR code don't
+ * get dedup away"). Detects either (a) any /linked/i column holding a NON-EMPTY value ("Linked QR
+ * Code" / "Linked At"), or (b) a Status column in a linked state (LINKED / ASSIGNED_TO_TREE).
+ * Fails safe: ordinary rows return false and collapse as before.
+ */
+function sunmintIsLinkedRow_(header, row) {
+  for (let c = 0; c < header.length; c++) {
+    const name = String(header[c] || '').trim();
+    const val = String((row && row[c]) || '').trim();
+    if (!val) continue;
+    if (/linked/i.test(name)) return true;
+    if (/^status$/i.test(name) && /^(linked|assigned_to_tree)$/i.test(val)) return true;
+  }
+  return false;
+}
+
+/**
+ * One-shot, IDEMPOTENT: COLLAPSE pre-existing duplicate `SunMint Tree Planting` rows that share a
+ * Request Transaction ID (col V), keeping the FIRST occurrence of each. Destructive (deletes rows
+ * from the live ledger), so the doGet router is preview-by-default: the live path requires
+ * `?apply=1`. Returns COUNTS only -- never txids, never PII.
+ */
+function collapseSunMintTreeTxDuplicates(dryRun) {
+  const apply = !dryRun;
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(180000)) return { success: false, error: 'busy' };
+  try {
+    const sheet = SpreadsheetApp.openById(creds.SHEET_ID);
+    const sunMintTab = sheet.getSheetByName(sunMintTabName);
+    if (!sunMintTab) return { success: false, error: 'tab not found' };
+    const values = sunMintTab.getDataRange().getValues();
+    if (values.length < 2) {
+      return { success: true, dryRun: !apply, checked: 0, collapsed: 0, distinctTxIds: 0,
+               untxRow: 0, grafted: 0, linkedProtected: 0 };
+    }
+    const header = values[0].map(function (h) { return String(h || '').trim(); });
+    const txCol = sunmintFindHeaderCol_(sunMintTab, SUNMINT_REQUEST_TX_HEADER);
+    if (txCol < 0) throw new Error('tree planting row 1 must carry ' + SUNMINT_REQUEST_TX_HEADER);
+
+    // Linkage columns: any /linked/i header, Status, and Plot ID -- grafted as a self-consistent set.
+    const linkCols = [];
+    for (let c = 0; c < header.length; c++) {
+      const nm = header[c];
+      if (/linked/i.test(nm) || /^status$/i.test(nm) || /^plot id$/i.test(nm)) linkCols.push(c);
+    }
+
+    const seen = {};        // txid -> surviving 1-based sheet row
+    const toDelete = [];    // duplicate 1-based sheet rows
+    const grafts = [];      // {target, source} 1-based rows
+    let distinct = 0, untx = 0, linkedProtected = 0;
+    for (let r = 1; r < values.length; r++) {
+      const k = sunmintTreeTxKey_(values[r][txCol]);
+      if (!k) { untx++; continue; }             // un-txid'd rows are never collapsed
+      if (seen[k]) {
+        const keptRow = seen[k];
+        const keptLinked = sunmintIsLinkedRow_(header, values[keptRow - 1]);
+        const dupLinked = sunmintIsLinkedRow_(header, values[r]);
+        if (dupLinked && keptLinked) { linkedProtected++; continue; }   // ambiguous: keep both
+        if (dupLinked) { grafts.push({ target: keptRow, source: r + 1 }); linkedProtected++; }
+        toDelete.push(r + 1);
+        continue;
+      }
+      seen[k] = r + 1; distinct++;
+    }
+    if (apply) {
+      // Graft linkage onto the survivor FIRST, then delete duplicates bottom-up.
+      for (let g = 0; g < grafts.length; g++) {
+        const srcRow = values[grafts[g].source - 1];
+        for (let lc = 0; lc < linkCols.length; lc++) {
+          const ci = linkCols[lc];
+          if (!String(srcRow[ci] || '').trim()) continue;
+          sunMintTab.getRange(grafts[g].target, ci + 1).setValue(srcRow[ci]);
+        }
+      }
+      for (let d = toDelete.length - 1; d >= 0; d--) sunMintTab.deleteRow(toDelete[d]);
+    }
+    return { success: true, dryRun: !apply, checked: values.length - 1,
+             collapsed: toDelete.length, distinctTxIds: distinct, untxRow: untx,
+             grafted: grafts.length, linkedProtected: linkedProtected };
+  } catch (err) {
+    Logger.log('collapseSunMintTreeTxDuplicates error: ' + (err && err.message ? err.message : err));
+    return { success: false, error: (err && err.message ? err.message : String(err)) };
+  } finally {
+    try { lock.releaseLock(); } catch (e) {}
+  }
+}
+
+
 // Get processed file IDs
 function getProcessedFileIds(sunMintTab) {
   const lastRow = sunMintTab.getLastRow();
@@ -777,6 +881,25 @@ function doGet(e) {
         status: 'error',
         message: 'Tree planting processing error: ' + err.message
       })).setMimeType(ContentService.MimeType.JSON);
+    }
+  }
+
+  if (action === 'collapseSunMintTreeTxDuplicates') {
+    // One-shot, IDEMPOTENT cleanup: COLLAPSE pre-existing duplicate rows sharing a Request
+    // Transaction ID (col V), keeping the FIRST, grafting any QR/plot linkage onto the survivor
+    // so no linkage is lost. Destructive => governor-key gated, preview by default (pass
+    // &apply=1 to write). Returns counts only -- never txids or PII.
+    if (!isAuthorizedGovernorReadRequest_(e)) {
+      return ContentService.createTextOutput(JSON.stringify({ status: 'error', message: 'Unauthorized: missing or invalid governor_key' }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+    const collApply = String((e.parameter && e.parameter['apply']) || '');
+    try {
+      const res = collapseSunMintTreeTxDuplicates(!(collApply === '1' || collApply === 'true'));
+      return ContentService.createTextOutput(JSON.stringify(res)).setMimeType(ContentService.MimeType.JSON);
+    } catch (err) {
+      return ContentService.createTextOutput(JSON.stringify({ status: 'error', message: 'collapse error: ' + err.message }))
+        .setMimeType(ContentService.MimeType.JSON);
     }
   }
 
