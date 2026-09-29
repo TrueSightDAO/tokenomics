@@ -32,13 +32,21 @@
  * DEDUP (SS12.3) - TWO layers, BOTH required:
  *   (1) intake-row gate: col R marker `PROCESSED:PAYOUT_EVENT` (the canonical
  *       Telegram Chat Logs convention), so one intake row is handled once.
- *   (2) business key `bank_ref` (the PIX E2E id / TXID - the reconciliation
- *       anchor). Edgar mints a FRESH telegram_update_id on every POST, so the
- *       DApp's submitWithRetry(attempts:3) can produce TWO intake rows for ONE
- *       transfer when a delivery confirmation is lost. Layer (1) cannot catch
- *       that (two distinct update ids); a bank_ref already present on the target
- *       tab is therefore treated as a duplicate and NOT re-booked. This is the
- *       acceptance criterion that makes the 3x retry safe.
+ *   (2) business key `(bank_ref, tree_planting_id)` (the PIX E2E id / TXID -
+ *       the reconciliation anchor - PAIRED with the settled tree). Edgar mints a
+ *       FRESH telegram_update_id on every POST, so the DApp's
+ *       submitWithRetry(attempts:3) can produce TWO intake rows for ONE transfer
+ *       when a delivery confirmation is lost. Layer (1) cannot catch that (two
+ *       distinct update ids); a (bank_ref, tree) pair already present on the
+ *       target tab is therefore treated as a duplicate and NOT re-booked. This is
+ *       the acceptance criterion that makes the 3x retry safe.
+ *
+ *       WHY THE PAIR, NOT bank_ref ALONE (Gary, 2026-09-29): ONE bank transfer
+ *       legitimately settles MANY trees. The DApp's batch backfill splits a single
+ *       total into N per-tree [PAYOUT EVENT]s that all share the SAME bank_ref. A
+ *       bank_ref-only key books the FIRST tree and REJECTS the other N-1 as
+ *       DUPLICATE_BANK_REF. Pairing with tree_planting_id keeps the retry gate
+ *       intact (same tree -> same key) while letting the batch book through.
  *
  * status domain: for a booked transfer the col carries the event's own Status
  * (`live` = captured live, `backfill` = reconstructed) so an auditor can tell
@@ -316,8 +324,24 @@ function appendPayoutEventRow_(sheet, p, tier2) {
 }
 
 /**
- * Scan the `bank_ref` column of an already-loaded grid -> set of seen values.
- * Used for the SS12.3 layer-(2) business-key dedup.
+ * Composite SS12.3 layer-(2) business key: `bank_ref` PAIRED with the settled
+ * `tree_planting_id` (NUL-separated so the two parts can never bleed into one
+ * another).
+ *
+ * ONE transfer (one PIX E2E id) may settle MANY trees - the DApp's batch backfill
+ * emits N per-tree [PAYOUT EVENT]s that all share the same bank_ref (Gary,
+ * 2026-09-29). Keying on bank_ref ALONE would book only the first tree and reject
+ * the rest as DUPLICATE_BANK_REF. The pair preserves retry-dedup (a re-POST of the
+ * SAME tree/transfer is still the same key) while letting each OTHER tree in the
+ * batch book normally.
+ */
+function payoutEventDedupKey_(bankRef, treeIds) {
+  return String(bankRef || '').trim() + '\u0000' + payoutEventNormaliseTreeIds_(treeIds);
+}
+
+/**
+ * Scan the `bank_ref` + `tree_planting_id` columns of an already-loaded grid ->
+ * set of seen composite keys. Used for the SS12.3 layer-(2) business-key dedup.
  */
 function payoutEventCollectBankRefs_(values) {
   var seen = {};
@@ -326,10 +350,13 @@ function payoutEventCollectBankRefs_(values) {
   var idx = {};
   header.forEach(function (h, i) { if (h) idx[h] = i; });
   var bIdx = idx['bank_ref'];
+  var tIdx = idx['tree_planting_id'];
   if (bIdx == null) return seen;
   for (var r = 1; r < values.length; r++) {
     var v = String(values[r][bIdx] || '').trim();
-    if (v) seen[v] = true;
+    if (!v) continue;
+    var t = (tIdx == null) ? '' : String(values[r][tIdx] || '').trim();
+    seen[payoutEventDedupKey_(v, t)] = true;
   }
   return seen;
 }
@@ -703,12 +730,16 @@ function processPayoutEventsFromTelegramChatLogs() {
           continue;
         }
 
-        // Layer (2): business-key dedup. A retried POST (same transfer, NEW
-        // telegram_update_id) must not book a second row.
-        if (seenBankRefs[base.bank_ref]) {
+        // Layer (2): business-key dedup on the PAIR (bank_ref, tree_planting_id).
+        // A retried POST (same tree, same transfer, NEW telegram_update_id) must
+        // not book a second row; but a DIFFERENT tree in the same batch (same
+        // bank_ref) legitimately books its own row.
+        var dedupKey = payoutEventDedupKey_(base.bank_ref, base.tree_planting_id);
+        if (seenBankRefs[dedupKey]) {
           duplicates++;
           base.status = 'DUPLICATE_BANK_REF';
-          base.error_message = 'bank_ref ' + base.bank_ref + ' already booked; treated as a retry of the same transfer.';
+          base.error_message = 'bank_ref ' + base.bank_ref + ' for tree(s) ' +
+            base.tree_planting_id + ' already booked; treated as a retry of the same transfer.';
           // NOTE: not appended to the ledger - it is the same money movement.
           seenUpdateId[updateId] = true;
           markPayoutEventProcessed_(tcSheet, physicalRow);
@@ -727,7 +758,7 @@ function processPayoutEventsFromTelegramChatLogs() {
         }
 
         appendPayoutEventRow_(tier1Sheet, base, false);
-        seenBankRefs[base.bank_ref] = true;
+        seenBankRefs[dedupKey] = true;
         seenUpdateId[updateId] = true;
         recorded++;
 
