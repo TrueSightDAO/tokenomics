@@ -392,13 +392,14 @@ function isGovernorByName_(contributorName) {
 
 /**
  * Scored Expense column N: authorized if Telegram Governor is YES, reporter matches DAO Member,
- * or reporter is a registered DAO governor.
+ * reporter is a registered DAO governor, or reporter is a registered Sentinel (who may file
+ * for ANY member as of the 2026-10-08 policy change).
  */
 function computeExpenseProcessingStatus_(telegramRow, reporterName, daoMemberName) {
   if (isTelegramGovernorYesFromRow_(telegramRow)) return 'authorized';
   if (authNamesMatchForExpense_(reporterName, daoMemberName)) return 'authorized';
   if (isGovernorByName_(reporterName)) return 'authorized';
-  if (isAgentFilingForGovernor_(reporterName, daoMemberName)) return 'authorized';
+  if (isSentinelFilingForMember_(reporterName, daoMemberName)) return 'authorized';
   return 'unauthorized';
 }
 
@@ -434,14 +435,26 @@ function isSentinelByName_(contributorName) {
 }
 
 /**
- * True when the reporter is a registered Sentinel (autopilot agent) filing on behalf
- * of a DAO member who is themselves a registered governor. Least-privilege: a sentinel
- * may only authorize expenses for governors who direct the agent, not for arbitrary
- * members. Replaces the old hardcoded DAO_AGENT_REPORTERS_ list.
+ * True when the reporter is a registered Sentinel (autopilot agent).
+ *
+ * Policy change 2026-10-08 (governor Gary Teh, thread 41062): sentinels may file
+ * inventory-expense events on behalf of ALL members, not only governors. The Sentinel
+ * registry flag ("Is Sentinel" = TRUE on "Contributors contact information") is the
+ * sole gate; the named DAO member is debited exactly as before. This supersedes the
+ * earlier least-privilege governor-only restriction and the even older hardcoded
+ * DAO_AGENT_REPORTERS_ list.
+ *
+ * The other authorization paths (Governor = YES on the source row, reporter == DAO
+ * Member, reporter is a registered governor) are unchanged.
+ *
+ * @param {string} reporterName - Reporter/contributor name to check.
+ * @param {string} daoMemberName - Named member being debited (kept for call-site
+ *   compatibility; no longer restricts authorization).
+ * @return {boolean} True when the reporter is a registry-backed Sentinel.
  */
-function isAgentFilingForGovernor_(reporterName, daoMemberName) {
+function isSentinelFilingForMember_(reporterName, daoMemberName) {
   if (!isSentinelByName_(reporterName)) return false;
-  return isGovernorByName_(daoMemberName);
+  return true;
 }
 
 function findContributorByDigitalSignature(digitalSignature) {
