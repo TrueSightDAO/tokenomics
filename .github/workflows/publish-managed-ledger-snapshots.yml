@@ -1,0 +1,67 @@
+# Automates the managed-ledger snapshot: reads the "Shipment Ledger Listing"
+# from the Main Ledger (Google Sheets) and republishes
+# TrueSightDAO/treasury-cache/managed-ledgers/<LEDGER>.json + _index.json.
+#
+# This is PR4 of plans/CURRENCY_CONVERSION_STALE_CURRENCIES_JSON_PLAN.md (§7):
+# snapshot_managed_ledgers.py was a manual laptop script (paths under
+# ~/Applications/..., creds under ~/Applications/sentiment_importer/...) with no
+# scheduler, so the managed-ledger cache went stale for months. This workflow
+# gives it the same scheduled-publisher treatment the rest of treasury-cache has.
+#
+# Required repository secrets (tokenomics):
+#   GOOGLE_CREDENTIALS        — service-account JSON with Sheets read on the Main
+#                               Ledger (same value other tokenomics workflows use).
+#   TREASURY_CACHE_PUSH_TOKEN — fine-grained PAT with Contents: Read and write on
+#                               TrueSightDAO/treasury-cache. GITHUB_TOKEN cannot
+#                               push to a different repo, so a PAT is required.
+
+name: Publish managed-ledger snapshots
+
+on:
+  workflow_dispatch:
+  schedule:
+    # 06:30 UTC daily — offset from the sibling inventory (06:15) and currencies
+    # (06:45) jobs to spread Google Sheets API bursts.
+    - cron: "30 6 * * *"
+
+concurrency:
+  group: managed-ledger-snapshot
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout tokenomics
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install "gspread>=5.12" "google-auth>=2.23"
+
+      - name: Write Google credentials
+        run: echo '${{ secrets.GOOGLE_CREDENTIALS }}' > google_credentials.json
+
+      - name: Snapshot managed ledgers and publish to treasury-cache
+        env:
+          MANAGED_LEDGER_OUT_DIR: ${{ runner.temp }}/managed-ledgers
+          MANAGED_LEDGER_CREDS_PATH: ${{ github.workspace }}/google_credentials.json
+          TREASURY_CACHE_TOKEN: ${{ secrets.TREASURY_CACHE_PUSH_TOKEN }}
+        run: |
+          python3 python_scripts/tdg_asset_management/snapshot_managed_ledgers.py
+
+      - name: Notify on failure
+        if: failure()
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const { context } = require('@actions/github');
+            console.log(`Workflow failed: ${context.job}`);
