@@ -7,7 +7,7 @@
  *   1. cash OUT  : -amount          (the advance leaves main; Is Revenue BLANK)
  *   2. pool mint : +N 'Cacao Tree Planted - Unassigned'  (Is Revenue 'N')
  *
- * It also SEEDS the `SunMint Plots` registry (col T `Contributor Name`) with the farmer, which is
+ * It also SEEDS the `SunMint Plots` registry (col T `Farmer`) with the farmer, which is
  * what makes downstream plot links bookable - PR6's plot link fails closed while col T is blank.
  *
  * FAIL-CLOSED: if the plot row cannot be positively resolved, or the amount/tree-count are not
@@ -26,7 +26,7 @@ var PF_MAIN_LEDGER_SPREADSHEET_ID = '1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6P
 var PF_MAIN_OFFCHAIN_TAB = 'offchain transactions';
 var PF_PLOTS_TAB = 'SunMint Plots';
 var PF_PLOTS_PLOT_ID_COL = 0;                 // Column A - Plot ID
-var PF_PLOTS_CONTRIBUTOR_NAME_COL = 19;       // Column T - Contributor Name (registry-held farmer)
+var PF_PLOTS_FARMER_COL = 19;       // Column T - Farmer (registry-held farmer identity; a MAIN-ledger Fund Handler account name)
 var PF_TRACKING_TAB = 'Plot Financing';
 
 var PF_TAG = '[PLOT FINANCING EVENT]';
@@ -102,7 +102,7 @@ function pfResolvePlotRow_(plotId) {
     var data = sh.getDataRange().getValues();
     for (var i = 1; i < data.length; i++) {
       if (String(data[i][PF_PLOTS_PLOT_ID_COL] || '').trim() === want) {
-        return { rowNumber: i + 1, contributorName: String(data[i][PF_PLOTS_CONTRIBUTOR_NAME_COL] || '').trim() };
+        return { rowNumber: i + 1, farmer: String(data[i][PF_PLOTS_FARMER_COL] || '').trim() };
       }
     }
     return null;
@@ -150,20 +150,20 @@ function pfWriteLeg_(leg, ctx) {
 }
 
 /** Seed the plot registry (col T) with the farmer. Never overwrites a non-blank value. */
-function pfSeedPlotContributor_(plotRow, farmer) {
+function pfSeedPlotFarmer_(plotRow, farmer) {
   var name = String(farmer || '').trim();
   if (!name) return { seeded: false, reason: 'NO_FARMER_IN_EVENT' };
-  if (plotRow.contributorName) {
-    return { seeded: false, reason: plotRow.contributorName === name ? 'ALREADY_SET' : 'MISMATCH_EXISTING' };
+  if (plotRow.farmer) {
+    return { seeded: false, reason: plotRow.farmer === name ? 'ALREADY_SET' : 'MISMATCH_EXISTING' };
   }
   try {
     var ss = SpreadsheetApp.openById(PF_OPS_SPREADSHEET_ID);
     var sh = ss.getSheetByName(PF_PLOTS_TAB);
     if (!sh) return { seeded: false, reason: 'PLOTS_TAB_MISSING' };
-    sh.getRange(plotRow.rowNumber, PF_PLOTS_CONTRIBUTOR_NAME_COL + 1).setValue(name);
+    sh.getRange(plotRow.rowNumber, PF_PLOTS_FARMER_COL + 1).setValue(name);
     return { seeded: true };
   } catch (e) {
-    Logger.log('pfSeedPlotContributor_ failed: ' + (e && e.message ? e.message : e));
+    Logger.log('pfSeedPlotFarmer_ failed: ' + (e && e.message ? e.message : e));
     return { seeded: false, reason: 'SEED_ERROR' };
   }
 }
@@ -192,7 +192,7 @@ function pfBookLedger_(base) {
     if (written !== legs.length) {
       return { booked: false, reason: 'PARTIAL_WRITE_' + written + '_OF_' + legs.length };
     }
-    var seed = pfSeedPlotContributor_(plot, base.farmer);
+    var seed = pfSeedPlotFarmer_(plot, base.farmer);
     return { booked: true, legs: written, seeded: seed.seeded, seedReason: seed.reason };
   } catch (e) {
     Logger.log('pfBookLedger_ failed: ' + (e && e.message ? e.message : e));

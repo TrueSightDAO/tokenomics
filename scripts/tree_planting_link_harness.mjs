@@ -62,8 +62,8 @@ globalThis.UrlFetchApp = { fetch(){ return { getResponseCode(){ return __mediaRe
 const EXPORTS = ['tplComputeLegs_','tplResolveSource_','tplWriteLegs_','appendTreePlantingLedgerFulfillment_','tplNormalizeAmount_','tplResolveTreeCharge_','TPL_TREE_CHARGE_COL','TPL_CURRENCIES_TAB',
   'TPL_MAIN_DAO_LEDGER_URL','TPL_MAIN_DAO_OFFCHAIN_TAB','TPL_TRANSACTIONS_TAB','TPL_POOL_LITERAL',
   'TPL_CUSTOMER_LIABILITY_LITERAL','TPL_TRANSFER_CURRENCY','TPL_MAIN_LEDGER_LEDGER_URLS',
-  'tplResolvePlotContributor_','tplPickPlotImage_','tplResolvePlotImage_','tplIsPlotStatusInvalid_',
-  'TPL_PLOTS_TAB','TPL_PLOTS_CONTRIBUTOR_NAME_COL','TPL_LINKED_PLOT_ID_COL'];
+  'tplResolvePlotFarmer_','tplPickPlotImage_','tplResolvePlotImage_','tplIsPlotStatusInvalid_',
+  'TPL_PLOTS_TAB','TPL_PLOTS_FARMER_COL','TPL_LINKED_PLOT_ID_COL'];
 (0, eval)(src + "\n;Object.assign(globalThis, {" + EXPORTS.join(',') + "});");
 
 const tplComputeLegs_ = globalThis.tplComputeLegs_;
@@ -72,11 +72,11 @@ const tplWriteLegs_ = globalThis.tplWriteLegs_;
 const appendTreePlantingLedgerFulfillment_ = globalThis.appendTreePlantingLedgerFulfillment_;
 const TPL_POOL_LITERAL = globalThis.TPL_POOL_LITERAL;
 const TPL_CUSTOMER_LIABILITY_LITERAL = globalThis.TPL_CUSTOMER_LIABILITY_LITERAL;
-const tplResolvePlotContributor_ = globalThis.tplResolvePlotContributor_;
+const tplResolvePlotFarmer_ = globalThis.tplResolvePlotFarmer_;
 const tplPickPlotImage_ = globalThis.tplPickPlotImage_;
 const tplResolvePlotImage_ = globalThis.tplResolvePlotImage_;
 const tplIsPlotStatusInvalid_ = globalThis.tplIsPlotStatusInvalid_;
-const TPL_PLOTS_CONTRIBUTOR_NAME_COL = globalThis.TPL_PLOTS_CONTRIBUTOR_NAME_COL;
+const TPL_PLOTS_FARMER_COL = globalThis.TPL_PLOTS_FARMER_COL;
 const TPL_LINKED_PLOT_ID_COL = globalThis.TPL_LINKED_PLOT_ID_COL;
 const tplNormalizeAmount_ = globalThis.tplNormalizeAmount_;
 const tplResolveTreeCharge_ = globalThis.tplResolveTreeCharge_;
@@ -260,28 +260,28 @@ t('unknown plot -> empty', () => { eq(tplPickPlotImage_({plots:{}}, 'ZZ'), ''); 
 t('no media -> empty', () => { eq(tplPickPlotImage_({plots:{'P1':{media:[]}}}, 'P1'), ''); });
 t('malformed -> empty (never throws)', () => { eq(tplPickPlotImage_(null, 'P1'), ''); });
 
-console.log('== PR6 tplResolvePlotContributor_ ==');
-t('registered contributor name -> resolved', () => {
+console.log('== PR6 tplResolvePlotFarmer_ ==');
+t('registered farmer -> resolved', () => {
   reset();
   const g = plotsGrid(); g.push(['FC-P1','fazenda-clara-bahia','', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', 'Fernando Soller Gimenez']);
   setSource(TPL_PLOTS_TAB, g);
-  const r = tplResolvePlotContributor_('FC-P1');
-  eq(r.contributorName, 'Fernando Soller Gimenez'); eq(r.plotId, 'FC-P1');
+  const r = tplResolvePlotFarmer_('FC-P1');
+  eq(r.farmer, 'Fernando Soller Gimenez'); eq(r.plotId, 'FC-P1');
 });
-t('blank contributor name -> null (fail closed)', () => {
+t('blank farmer -> null (fail closed)', () => {
   reset();
   const g = plotsGrid(); g.push(['PL-002','fazenda-bom-sucesso']);
   setSource(TPL_PLOTS_TAB, g);
-  eq(tplResolvePlotContributor_('PL-002'), null);
+  eq(tplResolvePlotFarmer_('PL-002'), null);
 });
 t('unknown plot -> null', () => {
   reset(); setSource(TPL_PLOTS_TAB, plotsGrid());
-  eq(tplResolvePlotContributor_('NOPE'), null);
+  eq(tplResolvePlotFarmer_('NOPE'), null);
 });
 t('missing registry tab -> null (never throws)', () => {
-  reset(); eq(tplResolvePlotContributor_('FC-P1'), null);
+  reset(); eq(tplResolvePlotFarmer_('FC-P1'), null);
 });
-t('empty plot id -> null', () => { eq(tplResolvePlotContributor_(''), null); });
+t('empty plot id -> null', () => { eq(tplResolvePlotFarmer_(''), null); });
 
 console.log('== PR6.2 tplIsPlotStatusInvalid_ ==');
 t('PR6.2: status invalid detection is trimmed + case-insensitive', () => {
@@ -296,14 +296,14 @@ t('PR6.2: an invalidated plot is NOT linkable (fail closed)', () => {
   reset();
   const g = plotsGrid(); g.push(['FC-P1','fazenda-clara-bahia','','','invalid','','','','','','','','','','','','','','','Fernando Soller Gimenez']);
   setSource(TPL_PLOTS_TAB, g);
-  eq(tplResolvePlotContributor_('FC-P1'), null);
+  eq(tplResolvePlotFarmer_('FC-P1'), null);
 });
 t('PR6.2: a non-invalidated plot with a farmer IS linkable', () => {
   reset();
   const g = plotsGrid(); g.push(['FC-P1','fazenda-clara-bahia','','','active','','','','','','','','','','','','','','','Fernando Soller Gimenez']);
   setSource(TPL_PLOTS_TAB, g);
-  const r = tplResolvePlotContributor_('FC-P1');
-  eq(r && r.contributorName, 'Fernando Soller Gimenez');
+  const r = tplResolvePlotFarmer_('FC-P1');
+  eq(r && r.farmer, 'Fernando Soller Gimenez');
 });
 
 console.log('== PR6 tplResolvePlotImage_ ==');
@@ -317,7 +317,7 @@ t('fetch non-200 -> empty (fail closed)', () => {
 
 console.log('== PR6 constants ==');
 t('Linked Plot ID is column AC (index 28)', () => { eq(TPL_LINKED_PLOT_ID_COL, 28); });
-t('plot contributor name is column T (index 19)', () => { eq(TPL_PLOTS_CONTRIBUTOR_NAME_COL, 19); });
+t('plot farmer is column T (index 19)', () => { eq(TPL_PLOTS_FARMER_COL, 19); });
 
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);

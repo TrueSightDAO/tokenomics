@@ -90,10 +90,10 @@ const TPL_SUNMINT_CONTRIBUTOR_NAME_COL = 9; // Column J - Contributor Name (plan
 // submission - the batch tool's repeat/no-email case. Farmer identity is resolved from the plot
 // REGISTRY, never from the submission payload (Envoy 2026-09-20: on money-adjacent logic the
 // registry holds the fact; an externally-asserted attribution could discharge the wrong farmer's
-// balance). Fails closed when the plot has no registered Contributor Name.
+// balance). Fails closed when the plot has no registered Farmer.
 const TPL_PLOTS_TAB = 'SunMint Plots';                    // lives on SOURCE_SHEET_URL's spreadsheet (plan 1.7)
 const TPL_PLOTS_PLOT_ID_COL = 0;                          // Column A - Plot ID
-const TPL_PLOTS_CONTRIBUTOR_NAME_COL = 19;                // Column T - Contributor Name (NEW 2026-09-20; registry-held farmer identity)
+const TPL_PLOTS_FARMER_COL = 19;                // Column T - Farmer (NEW 2026-09-20; registry-held farmer identity; a MAIN-ledger Fund Handler account name)
 const TPL_PLOTS_STATUS_COL = 4;                           // Column E - Status ('invalid' = retracted; PR6.2 eligibility filter, Q6)
 const TPL_LINKED_PLOT_ID_COL = 28;                        // Column AC on "Agroverse QR codes" (PR1; SCHEMA.md)
 const TPL_PLOTS_MEDIA_RAW_URL = 'https://raw.githubusercontent.com/TrueSightDAO/sunmint/main/plots/media.json';
@@ -557,12 +557,12 @@ function tplWriteLegs_(legs, ctx) {
 /**
  * PR6 (plan 1.6) - resolve a plot id to its registered farmer via the "SunMint Plots" registry.
  * The registry holds the fact (Envoy 2026-09-20); the submission payload never asserts it. Fails
- * closed (null) when the plot is unknown OR has no Contributor Name, so a link can never book a
+ * closed (null) when the plot is unknown OR has no Farmer, so a link can never book a
  * ledger effect against an unattributed/unknown farmer.
  * @param {string} plotId
- * @return {{plotId: string, contributorName: string}|null}
+ * @return {{plotId: string, farmer: string}|null}
  */
-function tplResolvePlotContributor_(plotId) {
+function tplResolvePlotFarmer_(plotId) {
   try {
     const want = String(plotId || '').trim();
     if (!want) return null;
@@ -576,13 +576,13 @@ function tplResolvePlotContributor_(plotId) {
       // process_plot_invalidation.gs; such a plot is hard-rejected here, so a link can never book a
       // ledger effect against a retracted plot (Q3: a bad target is refused, not silently booked).
       if (tplIsPlotStatusInvalid_(data[i][TPL_PLOTS_STATUS_COL])) return null;
-      const name = (data[i][TPL_PLOTS_CONTRIBUTOR_NAME_COL] || '').toString().trim();
+      const name = (data[i][TPL_PLOTS_FARMER_COL] || '').toString().trim();
       if (!name) return null; // fail closed: registry has no farmer for this plot yet
-      return { plotId: want, contributorName: name };
+      return { plotId: want, farmer: name };
     }
     return null;
   } catch (e) {
-    Logger.log('tplResolvePlotContributor_ failed: ' + e.message);
+    Logger.log('tplResolvePlotFarmer_ failed: ' + e.message);
     return null;
   }
 }
@@ -879,10 +879,10 @@ function processTreePlantingLinksFromTelegramChatLogs() {
       // trees' worth of supply) instead of a single tree submission - the batch tool's repeat/no-email
       // case. Farmer identity comes from the plot registry (Envoy 2026-09-20), never the payload.
       if (!parsed.sunmintMessageId && parsed.plotId) {
-        const plot = tplResolvePlotContributor_(parsed.plotId);
+        const plot = tplResolvePlotFarmer_(parsed.plotId);
         if (!plot) {
-          Logger.log(`Row ${rowNumber}: plot "${parsed.plotId}" not found, invalidated, or has no registered Contributor Name - rejecting`);
-          recordOutcome('REJECTED', `Plot "${parsed.plotId}" not found, invalidated, or missing Contributor Name`);
+          Logger.log(`Row ${rowNumber}: plot "${parsed.plotId}" not found, invalidated, or has no registered Farmer - rejecting`);
+          recordOutcome('REJECTED', `Plot "${parsed.plotId}" not found, invalidated, or missing Farmer`);
           result.rejected++;
           continue;
         }
@@ -912,7 +912,7 @@ function processTreePlantingLinksFromTelegramChatLogs() {
         //    resolved above; null only when the QR routes to main, where no transfer is needed).
         //    Reuses PR5's booker.
         const plotLedgerBooked = appendTreePlantingLedgerFulfillment_(
-          transactionsUrl, message, contributorName, ledgerUrl, plot.contributorName, plotCharge);
+          transactionsUrl, message, contributorName, ledgerUrl, plot.farmer, plotCharge);
         // 3. Owner notification (best-effort; a mail failure never rolls back the writes above).
         let plotEmailSent = false;
         if (ownerEmail) {
@@ -929,7 +929,7 @@ function processTreePlantingLinksFromTelegramChatLogs() {
         }
         recordOutcome('LINKED', plotOutcome);
         result.processed++;
-        Logger.log(`Row ${rowNumber}: linked QR "${parsed.qrCode}" to plot "${plot.plotId}" (farmer: ${plot.contributorName}, governor: ${contributorName})`);
+        Logger.log(`Row ${rowNumber}: linked QR "${parsed.qrCode}" to plot "${plot.plotId}" (farmer: ${plot.farmer}, governor: ${contributorName})`);
         continue;
       }
 

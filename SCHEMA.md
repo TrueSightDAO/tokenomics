@@ -34,7 +34,7 @@ see [Tree-Planting Ledger Literals](#tree-planting-ledger-literals) below):
 **PR9 addendum (2026-09-20) — two columns + a correction:**
 - New `Currencies` column **U `Tree Charge`** — the per-tree infra charge booked at link time (col U;
   *not* col B retail/AUM, *not* `SunMint Tree Planting` col P farm cost). See the `Currencies` section.
-- New `SunMint Plots` column **T `Contributor Name`** — the registry-held farmer identity for plot-level
+- New `SunMint Plots` column **T `Farmer`** — the registry-held farmer identity for plot-level
   links, plus the **invalidated-plot eligibility filter** (`Status` col E `= invalid` ⇒ not linkable).
 - **Correction:** the tree-planting literals note below previously read *"never a `Currencies` tab row."*
   That is true for the three **line-item** literals, but the two **tree-charge** literals
@@ -667,7 +667,7 @@ See [`python_scripts/schema_validation/README.md`](./python_scripts/schema_valid
 | Q | (blank) | - | Reserved / currently unused |
 | R | Invalidated At | Date | When invalidated |
 | S | Invalidated Reason | String | Why invalidated |
-| T | Contributor Name | String | Registry-held **farmer identity** for the plot — the farmer a plot-level link pays, resolved server-side from this cell (never asserted in the event payload). Populated by the proximity-computed backfill (see `OPEN_FOLLOWUPS.md`). A plot-level link (`process_tree_planting_link.js`) requires this cell to be non-blank **and** `Status` (col E) to not be `invalid`; otherwise the link **fails CLOSED** (`REJECTED`, no writes). Added by `SUNMINT_FARMER_SETTLEMENT_AND_BATCH_LINK_PLAN.md` PR6; the invalidated-plot eligibility filter is PR6.2. |
+| T | Farmer | String | Registry-held **farmer identity** (a MAIN-ledger `Fund Handler` account name) for the plot — the farmer a plot-level link pays, resolved server-side from this cell (never asserted in the event payload). Populated by the proximity-computed backfill (see `OPEN_FOLLOWUPS.md`). A plot-level link (`process_tree_planting_link.js`) requires this cell to be non-blank **and** `Status` (col E) to not be `invalid`; otherwise the link **fails CLOSED** (`REJECTED`, no writes). Added by `SUNMINT_FARMER_SETTLEMENT_AND_BATCH_LINK_PLAN.md` PR6; the invalidated-plot eligibility filter is PR6.2. |
 
 **Used by:**
 - `SUNMINT_FARMER_SETTLEMENT_AND_BATCH_LINK_PLAN.md` PR6 (plot-level link + representative image resolution)
@@ -696,7 +696,7 @@ See [`python_scripts/schema_validation/README.md`](./python_scripts/schema_valid
 | K | Status | String | Outcome (`BOOKED` / `REJECTED` / `FAILED`) |
 | L | Error Message | String | Fail-closed reason when not booked |
 
-**Notes:** Written by `process_plot_financing_event_telegram_logs.js` (GAS project `1MnAsIQAxcSfZO_hALOtMFJ4y1k4OnqeXKMwYs6xev600rPNUYepqcXsT`; PR10b). An advance books exactly **two legs on the MAIN ledger** — cash OUT `-amount` (Is Revenue **blank**, matching PR4's cash-out convention) and a pool mint `+N \`Cacao Tree Planted - Unassigned\`` (Is Revenue `N`, matching PR3's settlement rows) — and it **seeds `SunMint Plots` col T `Contributor Name`** with the farmer, which is what makes a downstream plot-level link bookable (a plot link **fails closed** while col T is blank). Financing is **per plot** — a farmer may hold many plots (Decision 0.14). **FAIL-CLOSED**: an unresolved plot row, a non-positive amount / tree count, or a leg write that does not land books **nothing** and flags the tracking row — a wrong booking is worse than no booking. The per-tree infrastructure charge (`Currencies` col **U `Tree Charge`**) that a downstream `[TREE PLANTING LINK EVENT]` transfers off a managed ledger is a **separate** number — never conflated with this advance (see §8.5 / Q7v5).
+**Notes:** Written by `process_plot_financing_event_telegram_logs.js` (GAS project `1MnAsIQAxcSfZO_hALOtMFJ4y1k4OnqeXKMwYs6xev600rPNUYepqcXsT`; PR10b). An advance books exactly **two legs on the MAIN ledger** — cash OUT `-amount` (Is Revenue **blank**, matching PR4's cash-out convention) and a pool mint `+N \`Cacao Tree Planted - Unassigned\`` (Is Revenue `N`, matching PR3's settlement rows) — and it **seeds `SunMint Plots` col T `Farmer`** with the farmer, which is what makes a downstream plot-level link bookable (a plot link **fails closed** while col T is blank). Financing is **per plot** — a farmer may hold many plots (Decision 0.14). **FAIL-CLOSED**: an unresolved plot row, a non-positive amount / tree count, or a leg write that does not land books **nothing** and flags the tracking row — a wrong booking is worse than no booking. The per-tree infrastructure charge (`Currencies` col **U `Tree Charge`**) that a downstream `[TREE PLANTING LINK EVENT]` transfers off a managed ledger is a **separate** number — never conflated with this advance (see §8.5 / Q7v5).
 
 **Used by:**
 - `[PLOT FINANCING EVENT]` (`process_plot_financing_event_telegram_logs.js`, PR10b)
@@ -1950,7 +1950,7 @@ Introduced/tracked by `SUNMINT_FARMER_SETTLEMENT_AND_BATCH_LINK_PLAN.md`.
 | `Cacao Tree - To Be Paid For` | Liability | A planting confirmed before payment was made (accrued obligation). **Always sits on the main ledger.** Discharged `-1` by `[FARMER PAYMENT EVENT]`. |
 | `Cacao Tree Planted - Unassigned` | Asset (settled pool) | Confirmed tree with no QR claimed yet — the pool the link event draws from. |
 
-**Where the pool unit is minted vs consumed.** `Cacao Tree Planted - Unassigned` is **created** by a reconciliation match (PR3, Path A), by a `[FARMER PAYMENT EVENT]` settlement of an uncommitted unit (PR4, Path B), and by a **`[PLOT FINANCING EVENT]` advance** (PR10b) — the DAO financing N trees up front (`-amount` cash + `+N Planted - Unassigned`, both on **main**). It is **consumed** `-1` when a `[TREE PLANTING LINK EVENT]` draws on it. A `[PLOT FINANCING EVENT]` additionally seeds the `SunMint Plots` col T `Contributor Name` registry (see the `Plot Financing` sheet section).
+**Where the pool unit is minted vs consumed.** `Cacao Tree Planted - Unassigned` is **created** by a reconciliation match (PR3, Path A), by a `[FARMER PAYMENT EVENT]` settlement of an uncommitted unit (PR4, Path B), and by a **`[PLOT FINANCING EVENT]` advance** (PR10b) — the DAO financing N trees up front (`-amount` cash + `+N Planted - Unassigned`, both on **main**). It is **consumed** `-1` when a `[TREE PLANTING LINK EVENT]` draws on it. A `[PLOT FINANCING EVENT]` additionally seeds the `SunMint Plots` col T `Farmer` registry (see the `Plot Financing` sheet section).
 
 ---
 

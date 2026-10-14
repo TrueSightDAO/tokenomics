@@ -126,19 +126,15 @@ def test_pr5_managed_ledger_upfront_resolution_still_before_writes():
 def test_pr6_plot_registry_is_the_farmer_source():
     """PR6: farmer identity must come from the plot registry, never the payload (Envoy 2026-09-20)."""
     src = _src()
-    assert "function tplResolvePlotContributor_" in src
-    assert "const TPL_PLOTS_CONTRIBUTOR_NAME_COL = 19;" in src
-    body = src.split("function tplResolvePlotContributor_", 1)[1].split(
-        "\nfunction ", 1
-    )[0]
+    assert "function tplResolvePlotFarmer_" in src
+    assert "const TPL_PLOTS_FARMER_COL = 19;" in src
+    body = src.split("function tplResolvePlotFarmer_", 1)[1].split("\nfunction ", 1)[0]
     assert "TPL_PLOTS_TAB" in body, "must read the SunMint Plots registry"
 
 
 def test_pr6_fails_closed_without_registered_contributor():
     body = (
-        _src()
-        .split("function tplResolvePlotContributor_", 1)[1]
-        .split("\nfunction ", 1)[0]
+        _src().split("function tplResolvePlotFarmer_", 1)[1].split("\nfunction ", 1)[0]
     )
     assert "catch" in body, "must never throw (fail closed)"
     assert "return null" in body, "must fail closed (null) on unknown/unattributed plot"
@@ -166,7 +162,7 @@ def test_pr6_plot_branch_uses_pr5_booker_and_skips_transfer_amount():
     branch = src.split("if (!parsed.sunmintMessageId && parsed.plotId)", 1)[1]
     branch = branch.split("continue;\n      }", 1)[0]
     assert "appendTreePlantingLedgerFulfillment_(" in branch
-    assert "plot.contributorName, plotCharge)" in branch, (
+    assert "plot.farmer, plotCharge)" in branch, (
         "PR6.2: a plot link books the resolved col-U charge, same as a tree-level link"
     )
     assert (
@@ -204,7 +200,7 @@ def test_pr62_plot_eligibility_filter_excludes_invalidated():
     src = _src()
     assert "const TPL_PLOTS_STATUS_COL = 4;" in src
     assert "function tplIsPlotStatusInvalid_" in src
-    body = src.split("function tplResolvePlotContributor_", 1)[1].split(
+    body = src.split("function tplResolvePlotFarmer_", 1)[1].split(
         "function tplIsPlotStatusInvalid_", 1
     )[0]
     assert "tplIsPlotStatusInvalid_(data[i][TPL_PLOTS_STATUS_COL])" in body, (

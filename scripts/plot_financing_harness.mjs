@@ -170,7 +170,7 @@ t('e2e: existing registry name is never overwritten', ()=>{
   reset();
   setOps('SunMint Plots', plotsGrid([['RM-P3','','','','','','','','','','','','','','','','','','','Already Set']]));
   setMain('offchain transactions',[]);
-  const seed=pfSeedPlotContributor_({rowNumber:2, contributorName:'Already Set'}, 'Someone Else');
+  const seed=pfSeedPlotFarmer_({rowNumber:2, farmer:'Already Set'}, 'Someone Else');
   eq(seed.seeded,false); eq(seed.reason,'MISMATCH_EXISTING');
   eq(opsSheets['SunMint Plots'].getDataRange().getValues()[1][19],'Already Set');
 });
