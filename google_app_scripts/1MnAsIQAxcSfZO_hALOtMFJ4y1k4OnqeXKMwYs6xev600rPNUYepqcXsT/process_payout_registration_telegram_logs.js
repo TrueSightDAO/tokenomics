@@ -24,9 +24,16 @@
  *       `cfr program` spreadsheet, which is never link-shared and never republished.
  *       There is no RSA-OAEP cipher and no governor-private-key decrypt step (the
  *       `pix_key_cipher` column is DROPPED).
- *     * The Telegram Chat Logs intake workbook IS publicly republished
- *       (ADVISORY_SNAPSHOT + the `truesight.me/notarizations` redirect), so this
- *       scanner NEVER writes back to it -- it is strictly read-only.
+ *     * The `Telegram Chat Logs` TAB is strictly READ-ONLY (never written back).
+ *       The workbook itself was ACL-privatised 2026-09-18 (no anyone/link/domain
+ *       grant; anonymous gviz/edit/export now 401), so this scanner MAY write a
+ *       dedicated MIRROR tab on that same workbook -- see SS11.3-bis.
+ *     * The SS11.3-bis MIRROR tab (`payout registrations` on the intake workbook)
+ *       carries the SAME raw PIX as the private sheet, on Gary's explicit
+ *       2026-09-25 decision: CFR Anapu is only a SUBSET of SunMint, so farmers
+ *       OUTSIDE the CFR cohort must be payable from one navigable place. This is
+ *       safe ONLY because the workbook is private-by-ACL -- if it is ever publicly
+ *       republished again, this tab MUST be excluded from the projection.
  *     * The PUBLIC JSON-cache generators must never emit `[PAYOUT REGISTRATION]`
  *       (SS11.4; enforced upstream in sync_sunmint_signatures.py / ledger_emit.py /
  *       generate_advisory_snapshot.py).
@@ -43,7 +50,8 @@
  *   Mirrors process_program_registration_telegram_logs.gs (same Apps Script project).
  */
 
-/** Canonical Telegram intake workbook -- READ ONLY (it is publicly republished). */
+/** Canonical intake workbook. The `Telegram Chat Logs` TAB is read-only; the
+ *  SS11.3-bis mirror tab on this (ACL-private) workbook IS a write target. */
 var PAYOUT_REG_TELEGRAM_SPREADSHEET_ID = '1qbZZhf-_7xzmDTriaJVWj6OZshyQsFkdsAV8-pyzASQ';
 var PAYOUT_REG_TELEGRAM_SHEET = 'Telegram Chat Logs';
 
@@ -84,7 +92,10 @@ var PAYOUT_REG_TABS = {
     'lng',
     'photo_url',
     'capture_source',
-    'status'
+    'status',
+    // Trailing (never reordered): the TRANSACTION key. Gary thread 35944 -- one
+    // telegram_update_id can map to multiple rows; the unique unit is a transaction.
+    'request_transaction_id'
   ],
   'tree monitoring': [
     'created_at_utc',
@@ -112,6 +123,19 @@ var PAYOUT_REG_TABS = {
 var PAYOUT_REG_SHEET = 'payout registrations';
 var PAYOUT_REG_HEADERS = PAYOUT_REG_TABS[PAYOUT_REG_SHEET];
 
+/**
+ * SS11.3-bis MIRROR tab (Gary, 2026-09-25). CFR Anapu is only a SUBSET of the
+ * SunMint program, so a registration for a farmer OUTSIDE the CFR cohort has no
+ * home today. The identical schema is mirrored onto the intake workbook so an
+ * operator can filter `status = ACTIVE` there too and pay from one place.
+ *
+ * PRIVACY: this mirror carries the RAW PIX key, exactly like the private `cfr
+ * program` tab. That is safe ONLY because the intake workbook was ACL-privatised
+ * 2026-09-18 (no anyone/link/domain grant; anonymous gviz/edit/export = 401). If
+ * that workbook is ever republished, exclude this tab from the projection.
+ */
+var PAYOUT_REG_MIRROR_SHEET = 'payout registrations';
+
 /** Per-fire scan window. Matches the program-registration / donation-mint scanners. */
 var PAYOUT_REG_SCAN_BATCH = 200;
 
@@ -121,6 +145,17 @@ var PAYOUT_REG_TC_MESSAGE_ID_COL = 3;
 var PAYOUT_REG_TC_MESSAGE_COL = 6;
 
 var PAYOUT_REG_EVENT_TAG = '[PAYOUT REGISTRATION]';
+
+/**
+ * Status lifecycle (SS11.3, col I). The tab holds exactly ONE `ACTIVE` row per
+ * `pk_hash`: the moment a correction arrives, the new row is written `ACTIVE` and
+ * every earlier row for that same planter is flipped to `SUPERSEDED`. A governor
+ * can therefore filter the tab on `status = ACTIVE` and see exactly the payable
+ * set, instead of wading through stale RECORDED/UPDATED rows. Terminal refusals
+ * keep their `REJECTED_*` status and are never superseded.
+ */
+var PAYOUT_REG_STATUS_ACTIVE = 'ACTIVE';
+var PAYOUT_REG_STATUS_SUPERSEDED = 'SUPERSEDED';
 
 /** Governor-gated: the only non-governor principal granted access to the private sheet. */
 var PAYOUT_REG_SHARED_SA = 'agroverse-ledger-manager@get-data-io.iam.gserviceaccount.com';
@@ -170,6 +205,21 @@ function ensurePayoutRegTab_(spreadsheet, tabName, headers) {
     if (String(firstRow[i] || '').trim() !== headers[i]) { matches = false; break; }
   }
   if (matches) return sheet;
+  // A strict PREFIX is compatible: the header gained TRAILING columns since this tab
+  // was created (e.g. tree planting gained request_transaction_id, thread 35944), so
+  // extend row 1 in place rather than throwing -- existing data rows keep their columns.
+  var sheetCols = Math.max(sheet.getLastColumn(), 0);
+  if (sheetCols > 0 && sheetCols < headers.length) {
+    var existing = sheet.getRange(1, 1, 1, sheetCols).getValues()[0];
+    var prefixOk = true;
+    for (var p = 0; p < sheetCols; p++) {
+      if (String(existing[p] || '').trim() !== headers[p]) { prefixOk = false; break; }
+    }
+    if (prefixOk) {
+      sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+      return sheet;
+    }
+  }
   if (lastRow <= 1) {
     sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
     return sheet;
@@ -207,6 +257,74 @@ function appendPayoutRegistrationRow_(sheet, p) {
   ]);
 }
 
+/** Read one cell (0-based column index) as a trimmed string. */
+function readPayoutRegCell_(sheet, row, colZero) {
+  if (colZero == null || colZero < 0) return '';
+  var v = sheet.getRange(row, colZero + 1, 1, 1).getValues();
+  return (v && v[0] && v[0][0] != null) ? v[0][0] : '';
+}
+
+/** Write one cell (0-based column index). */
+function writePayoutRegCell_(sheet, row, colZero, value) {
+  if (colZero == null || colZero < 0) return;
+  sheet.getRange(row, colZero + 1, 1, 1).setValues([[value]]);
+}
+
+/**
+ * Flip every prior row for `pkHash` to `SUPERSEDED` (col I). Called just before
+ * the new ACTIVE row is appended, so the tab ends with exactly one ACTIVE row per
+ * `pk_hash`. Rows already `SUPERSEDED` and terminal `REJECTED_*` rows are left
+ * alone. Never touches the raw PIX column. Idempotent.
+ */
+function supersedePriorPayoutRows_(sheet, pkHash, pkCol, statusCol) {
+  var hash = String(pkHash || '').trim();
+  if (!hash || pkCol == null || statusCol == null) return;
+  var last = sheet.getLastRow();
+  for (var r = 2; r <= last; r++) {
+    if (String(readPayoutRegCell_(sheet, r, pkCol) || '').trim() !== hash) continue;
+    var cur = String(readPayoutRegCell_(sheet, r, statusCol) || '').trim().toUpperCase();
+    if (cur === PAYOUT_REG_STATUS_SUPERSEDED) continue;
+    if (cur.indexOf('REJECTED_') === 0) continue;
+    writePayoutRegCell_(sheet, r, statusCol, PAYOUT_REG_STATUS_SUPERSEDED);
+  }
+}
+
+/**
+ * Zero-based column index of a schema field, from the canonical header list. Lets
+ * the mirror tab (a different sheet, identical schema) avoid a duplicate column map.
+ */
+function payoutRegColIndex_(name) {
+  return PAYOUT_REG_HEADERS.indexOf(name);
+}
+
+/**
+ * Upsert one registration row into `sheet`: flip every prior row for the same
+ * pk_hash to SUPERSEDED, then append the new row -- so ANY sheet carrying the
+ * canonical schema (the private tab or the SS11.3-bis mirror) ends with exactly
+ * one ACTIVE row per pk_hash. Refusal/error rows have no pk_hash and are appended
+ * by the caller without supersession. Never touches the raw PIX column.
+ */
+function upsertPayoutRegistrationRow_(sheet, p) {
+  var pkCol = payoutRegColIndex_('pk_hash');
+  var statusCol = payoutRegColIndex_('status');
+  if (String(p.pk_hash || '').trim() !== '' && pkCol >= 0 && statusCol >= 0) {
+    supersedePriorPayoutRows_(sheet, p.pk_hash, pkCol, statusCol);
+  }
+  appendPayoutRegistrationRow_(sheet, p);
+}
+
+/**
+ * Append one successful registration to the SS11.3-bis MIRROR tab on the intake
+ * workbook, creating the tab + headers on first use. Schema-identical to the
+ * private tab and superseded the same way, so the same `status = ACTIVE` filter
+ * works on both. Returns the mirror sheet.
+ */
+function appendPayoutRegistrationMirrorRow_(opsSpreadsheet, p) {
+  var sheet = ensurePayoutRegTab_(opsSpreadsheet, PAYOUT_REG_MIRROR_SHEET, PAYOUT_REG_HEADERS);
+  upsertPayoutRegistrationRow_(sheet, p);
+  return sheet;
+}
+
 /**
  * Normalise a `- Field: value` label into a canonical snake_case key, folding the
  * human-readable aliases used by the redacted summary into the canonical names.
@@ -238,7 +356,10 @@ function parsePayoutRegistrationEventText_(body) {
     var line = lines[i].trim();
     if (!line) continue;
     if (line.indexOf(PAYOUT_REG_EVENT_TAG) === 0) continue;
-    if (line === '--------') continue;
+    // The payload terminator: STOP accumulating the previous field here, so the
+    // trailing `My Digital Signature:` / `Request Transaction ID:` / footer prose
+    // (which are NOT `- Field:` lines) are never folded into the last real field.
+    if (line === '--------') { lastKey = null; continue; }
     var isField = line.charAt(0) === '-';
     var probe = isField ? line.substring(1).trim() : line;
     var m = probe.match(/^([A-Za-z][A-Za-z0-9_\s\/\-()]*):\s*(.*)$/);
@@ -322,7 +443,9 @@ function processPayoutRegistrationsFromTelegramChatLogs() {
         (triggerErr && triggerErr.message ? triggerErr.message : triggerErr) + ' - proceeding with scan.');
     }
 
-    // Intake: canonical Telegram Chat Logs (read-only; publicly republished).
+    // Intake workbook. Its `Telegram Chat Logs` TAB is strictly read-only; the
+    // workbook is ACL-private (2026-09-18), so its SS11.3-bis mirror tab IS a
+    // write target.
     var intake = SpreadsheetApp.openById(PAYOUT_REG_TELEGRAM_SPREADSHEET_ID);
     var tcSheet = intake.getSheetByName(PAYOUT_REG_TELEGRAM_SHEET);
     if (!tcSheet) throw new Error('Telegram Chat Logs sheet not found');
@@ -396,13 +519,24 @@ function processPayoutRegistrationsFromTelegramChatLogs() {
           seenUpdateId[updateId] = true; rejected++; continue;
         }
 
-        // Upsert by pk_hash: a later correction for the same planter supersedes.
+        // Upsert by pk_hash: a later correction supersedes the prior row. The new
+        // row is ACTIVE; every earlier row for this pk_hash is flipped to SUPERSEDED
+        // (col I), so the tab holds exactly one ACTIVE row per pk_hash.
         var supersedes = '';
         if (rowByPkHash[base.pk_hash]) supersedes = String(rowByPkHash[base.pk_hash]);
         base.supersedes_row = supersedes;
-        base.status = supersedes ? 'UPDATED' : 'RECORDED';
-        appendPayoutRegistrationRow_(prSheet, base);
+        base.status = PAYOUT_REG_STATUS_ACTIVE;
+        // Canonical private, governor-only tab (SS11.2/SS11.3).
+        upsertPayoutRegistrationRow_(prSheet, base);
         rowByPkHash[base.pk_hash] = prSheet.getLastRow();
+        // SS11.3-bis mirror on the (ACL-private) intake workbook. A mirror failure
+        // must never block the canonical private write -- it is a convenience surface.
+        try {
+          appendPayoutRegistrationMirrorRow_(intake, base);
+        } catch (mirrorErr) {
+          Logger.log('payout mirror write failed: ' +
+            (mirrorErr && mirrorErr.message ? mirrorErr.message : mirrorErr));
+        }
         seenUpdateId[updateId] = true;
         if (supersedes) updated++; else recorded++;
       } catch (rowErr) {
@@ -468,5 +602,162 @@ function getPendingPayoutRegistrations(statusFilter) {
     return { status: 'success', data: { count: items.length, items: items } };
   } catch (err) {
     return { status: 'error', message: (err && err.message ? err.message : String(err)) };
+  }
+}
+
+/**
+ * Governor/DApp read: the `tree_id` -> `pk_hash` map for the CFR program cohort.
+ *
+ * A tree's `pk_hash` (the one-way hash of the submitting farmer's public key,
+ * derived at intake by cfrSubDerivePkHash_) is the SAME identity the payout
+ * register keys on. Surfacing the map lets the DApp payout page AUTO-FILL the
+ * recipient `pk_hash` the moment an operator selects a tree -- today they must
+ * transcribe or hand-pick it, and a wrong hash still pays the wrong account
+ * (the raw PIX key never travels, but the hash is what the sink resolves against).
+ *
+ * Returns ONLY `{ tree_id, pk_hash }` -- no raw PII (no PIX key, no CPF, no email).
+ * Trees with no `pk_hash`, and trees outside the CFR cohort, are simply absent
+ * from the map; the caller leaves the field blank and the manual pick still works.
+ */
+function getTreeRecipientMap() {
+  try {
+    var treeTab = (typeof CFRSUB_TREE_TAB !== 'undefined' && CFRSUB_TREE_TAB)
+      ? String(CFRSUB_TREE_TAB) : 'tree planting';
+    var ss = payoutRegCfrProgramSpreadsheet_();
+    var sheet = ss.getSheetByName(treeTab);
+    if (!sheet) return { status: 'success', data: { count: 0, items: [] } };
+    var values = sheet.getDataRange().getValues();
+    if (values.length < 2) return { status: 'success', data: { count: 0, items: [] } };
+    var header = values[0].map(function (h) { return String(h || '').trim(); });
+    var idx = {};
+    header.forEach(function (h, i) { if (h) idx[h] = i; });
+    var tCol = idx['tree_id'];
+    var pCol = idx['pk_hash'];
+    if (tCol === undefined || pCol === undefined) {
+      return { status: 'success', data: { count: 0, items: [] } };
+    }
+    var items = [];
+    var seen = {};
+    for (var r = 1; r < values.length; r++) {
+      var treeId = String(values[r][tCol] == null ? '' : values[r][tCol]).trim();
+      var pk = String(values[r][pCol] == null ? '' : values[r][pCol]).trim();
+      if (!treeId || !pk || seen[treeId]) continue;
+      seen[treeId] = 1;
+      items.push({ tree_id: treeId, pk_hash: pk });
+    }
+    return { status: 'success', data: { count: items.length, items: items } };
+  } catch (err) {
+    return { status: 'error', message: (err && err.message ? err.message : String(err)) };
+  }
+}
+
+/**
+ * One-shot operator lever (SS11.3 + SS11.3-bis normalisation). Rewrites the private
+ * `payout registrations` tab so each `pk_hash` has exactly ONE `ACTIVE` row -- its
+ * latest by `created_at_utc` (tie-break: highest row number) -- and every earlier row
+ * for that `pk_hash` is `SUPERSEDED`. This is what converts the legacy RECORDED/UPDATED
+ * statuses the pre-lifecycle sink wrote. It then re-projects every `ACTIVE` row onto the
+ * SS11.3-bis mirror tab (creating it on first use).
+ *
+ * Rows with no `pk_hash` (terminal `REJECTED_*` / error rows) are left untouched. The raw
+ * PIX column is never altered. Idempotent: a second run is a no-op (each group already
+ * holds one ACTIVE), so `changed` returns 0.
+ *
+ * Exposed as `?action=backfillPayoutRegistrations` (operator lever).
+ */
+function backfillPayoutRegistrations() {
+  var lock = LockService.getScriptLock();
+  if (!lock.tryLock(180000)) {
+    return { success: false, error: 'busy' };
+  }
+  try {
+    var cfr = payoutRegCfrProgramSpreadsheet_();
+    var prSheet = ensurePayoutRegistrationsSheet_(cfr);
+    if (!prSheet) throw new Error('Could not ensure the payout registrations tab.');
+
+    var values = prSheet.getDataRange().getValues();
+    if (values.length < 2) {
+      return { success: true, pk_hashes: 0, active: 0, superseded: 0, changed: 0, mirror_written: 0 };
+    }
+    var header = values[0].map(function (h) { return String(h || '').trim(); });
+    var idx = {};
+    header.forEach(function (h, i) { if (h) idx[h] = i; });
+    var pkCol = idx['pk_hash'];
+    var stCol = idx['status'];
+    var createdCol = idx['created_at_utc'];
+
+    // Group non-terminal rows by pk_hash.
+    var groups = {};
+    for (var r = 1; r < values.length; r++) {
+      var ph = String(values[r][pkCol] || '').trim();
+      if (!ph) continue;
+      var cur = String(values[r][stCol] || '').trim().toUpperCase();
+      if (cur.indexOf('REJECTED_') === 0) continue;
+      if (!groups[ph]) groups[ph] = [];
+      groups[ph].push({ row: r + 1, created: String(values[r][createdCol] || '') });
+    }
+
+    var active = 0, superseded = 0, changed = 0;
+    for (var key in groups) {
+      if (!groups.hasOwnProperty(key)) continue;
+      var list = groups[key];
+      var winner = list[0];
+      for (var i = 1; i < list.length; i++) {
+        var a = list[i];
+        if (a.created > winner.created || (a.created === winner.created && a.row > winner.row)) {
+          winner = a;
+        }
+      }
+      for (var j = 0; j < list.length; j++) {
+        var g = list[j];
+        var want = (g.row === winner.row) ? PAYOUT_REG_STATUS_ACTIVE : PAYOUT_REG_STATUS_SUPERSEDED;
+        var have = String(values[g.row - 1][stCol] || '').trim().toUpperCase();
+        if (have !== want) { writePayoutRegCell_(prSheet, g.row, stCol, want); changed++; }
+        if (g.row === winner.row) active++; else superseded++;
+      }
+    }
+
+    // Re-project every ACTIVE row onto the SS11.3-bis mirror tab (intake workbook).
+    var intake = SpreadsheetApp.openById(PAYOUT_REG_TELEGRAM_SPREADSHEET_ID);
+    var refreshed = prSheet.getDataRange().getValues();
+    var rIdx = {};
+    refreshed[0].forEach(function (h, k) { if (String(h || '').trim()) rIdx[String(h).trim()] = k; });
+    var mirrorWritten = 0;
+    for (var m = 1; m < refreshed.length; m++) {
+      if (String(refreshed[m][rIdx['status']] || '').trim().toUpperCase() !== PAYOUT_REG_STATUS_ACTIVE) continue;
+      var p = {
+        telegram_update_id: String(refreshed[m][rIdx['telegram_update_id']] || ''),
+        pk_hash: String(refreshed[m][rIdx['pk_hash']] || ''),
+        program_slug: String(refreshed[m][rIdx['program_slug']] || ''),
+        pix_key_type: String(refreshed[m][rIdx['pix_key_type']] || ''),
+        pix_key: String(refreshed[m][rIdx['pix_key']] || ''),
+        pix_key_masked: String(refreshed[m][rIdx['pix_key_masked']] || ''),
+        submission_source: String(refreshed[m][rIdx['submission_source']] || ''),
+        status: PAYOUT_REG_STATUS_ACTIVE,
+        supersedes_row: '',
+        error_message: ''
+      };
+      try {
+        appendPayoutRegistrationMirrorRow_(intake, p);
+        mirrorWritten++;
+      } catch (mirrorErr) {
+        Logger.log('backfill mirror projection failed for ' + p.pk_hash + ': ' +
+          (mirrorErr && mirrorErr.message ? mirrorErr.message : mirrorErr));
+      }
+    }
+
+    return {
+      success: true,
+      pk_hashes: active,
+      active: active,
+      superseded: superseded,
+      changed: changed,
+      mirror_written: mirrorWritten
+    };
+  } catch (err) {
+    Logger.log('backfillPayoutRegistrations error: ' + (err && err.message ? err.message : err));
+    return { success: false, error: (err && err.message ? err.message : String(err)) };
+  } finally {
+    lock.releaseLock();
   }
 }

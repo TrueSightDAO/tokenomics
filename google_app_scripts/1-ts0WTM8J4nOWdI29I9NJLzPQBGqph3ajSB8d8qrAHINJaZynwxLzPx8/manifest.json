@@ -1,13 +1,14 @@
 {
   "scriptId": "1-ts0WTM8J4nOWdI29I9NJLzPQBGqph3ajSB8d8qrAHINJaZynwxLzPx8",
-  "name": "TBC \u2014 confirm display name in GAS UI for 1-ts0WTM8J4n\u2026",
+  "name": "Scored Chatlogs -> Main Ledger transfer",
   "owner_email": "garyjob@agroverse.shop",
   "post_push_hooks": [],
   "candidate_cache_refresh_hooks": [],
   "deployments": {
-    "head": "TBC \u2014 list every /exec URL for this scriptId in pre-flight"
+    "head": "AKfycbxNbCEdUmy1t5R_rlNy1gBJ13WSrVTtBWjsToU7Ur00vg4fhvmuvEj3Ka8ZGpip7zehDA (@12)"
   },
   "source_files": [
-    "transfer_scored_contributions_to_main_ledger.gs"
+    "Code.js",
+    "Version.gs"
   ]
 }

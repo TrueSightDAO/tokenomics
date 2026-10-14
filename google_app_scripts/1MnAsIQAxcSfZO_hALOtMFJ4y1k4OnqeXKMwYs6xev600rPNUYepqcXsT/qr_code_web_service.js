@@ -45,8 +45,10 @@ var LOOKUP_PARAM = 'lookup';
 /**
  * GET list_sold_pending_tree=true&governor_key=... — governor-only. Returns QR codes where column D is
  * 'SOLD', column L (Owner Email) is non-empty, and column N (Tree Planting Date) is empty — i.e. sold
- * pledges not yet linked to a planted tree. Sorted by column W (Sold Date) descending (most recent
- * first). Gated by GOVERNOR_READ_KEY (Script Property) since the response includes owner emails.
+ * pledges not yet linked to a planted tree. Also returns product context (columns B/I/S/T/U: landing
+ * page, item descriptor, product image, price, manager) so the governor sees what was sold. Sorted by
+ * column W (Sold Date) descending (most recent first). Gated by GOVERNOR_READ_KEY (Script Property)
+ * since the response includes owner emails.
  * Part of the Sunmint tree-planting -> QR linking roadmap
  * (agentic_ai_context/plans/SUNMINT_TREE_QR_LINKING_PLAN.md, PR3).
  */
@@ -126,8 +128,10 @@ function doOptionsWebLedger_(e) {
  *   dao_client can prefill those fields when an operator picks a session, without a second round trip.
  * - 'list_contributor_names=true' returns { status, names: string[] } from **Contributors Digital Signatures** (batch QR manager dropdown).
  * - 'list_sold_pending_tree=true&governor_key=...' (governor-only, see GOVERNOR_READ_KEY_PROPERTY) returns
- *   { status, items: [{ qr_code, owner_email, sold_date, ledger_name }] } for SOLD QRs with an owner email
- *   and no Tree Planting Date yet, sorted by Sold Date descending.
+ *   { status, items: [{ qr_code, owner_email, sold_date, ledger_name, product, landing_page,
+ *   product_image, price, manager_name }] } for SOLD QRs with an owner email and no Tree Planting
+ *   Date yet, sorted by Sold Date descending. The product-context fields (Gary 2026-09-25, thread
+ *   35944) are additive; the response is already governor-gated because it carries owner emails.
  *
  * @param {Object} e Event object containing parameters.
  * @return {ContentService.TextOutput} JSON response with results or error.
@@ -290,7 +294,17 @@ function doGetWebLedger_(e) {
             owner_email: ownerEmail,
             ledger_name: row[21] || '',
             status: status,
-            sold_date: row[22] instanceof Date ? row[22].toISOString() : (row[22] || '')
+            sold_date: row[22] instanceof Date ? row[22].toISOString() : (row[22] || ''),
+            // Product context (Gary 2026-09-25, thread 35944): the QR record already carries the
+            // product descriptor (col I), product landing page (col B), product image (col S),
+            // sale price (col T) and manager (col U). Surfacing them here lets the governor see
+            // *what was sold* when linking a tree / paying out, instead of a bare QR code.
+            // Governor-only endpoint (owner emails are already PII-gated by GOVERNOR_READ_KEY).
+            product: row[8] || '',          // col I - item descriptor
+            landing_page: row[1] || '',     // col B - product landing page
+            product_image: row[18] || '',   // col S - product image URL
+            price: row[19] || '',           // col T - price the product sold at
+            manager_name: row[20] || ''     // col U - manager name
           });
         }
       }
@@ -2083,6 +2097,108 @@ function forwardProcessQrGenerationTelegramLogs_() {
     .setMimeType(ContentService.MimeType.JSON);
 }
 
+// ===== Scanner exposure registry (STANDING CONVENTION — see AGENTS.md) =====
+// Every async scanner in this project MUST be reachable via a doGet `?action=`
+// branch (so it is webhook-triggerable AND re-armable over HTTP) and MUST carry an
+// idempotent in-run hourly self-installer. This block is the single source of the
+// scanner list; scripts/test_gas_scanner_exposure.py guards it.
+
+/** HTTP wrapper: run the onboarding batch sender and always return JSON. */
+function processBatchSummary_() {
+  try {
+    processBatch();
+    return { success: true, scanner: 'processBatch' };
+  } catch (e) {
+    // processBatch re-throws after sending its own alert email; surface it as JSON.
+    return {
+      success: false,
+      scanner: 'processBatch',
+      error: (e && e.message) ? e.message : String(e)
+    };
+  }
+}
+
+/** The canonical scanner list for this project (feature-detected by the guard test). */
+function scannerFunctions_() {
+  return [
+    'processBatch',
+    'processDonationMintsFromTelegramChatLogs',
+    'processProgramRegistrationsFromTelegramChatLogs',
+    'processPayoutEventsFromTelegramChatLogs',
+    'processPayoutRegistrationsFromTelegramChatLogs',
+    'processPlotFinancingEventsFromTelegramChatLogs',
+    'processCfrProgramSubmissionsFromTelegramChatLogs'
+  ];
+}
+
+/** scanner fn -> its idempotent in-run self-installer (all defined in this project). */
+function scannerTriggerInstallers_() {
+  return {
+    'processBatch': ensureProcessBatchHourlyTriggerInstalled_,
+    'processDonationMintsFromTelegramChatLogs': ensureDonationMintHourlyTriggerInstalled_,
+    'processProgramRegistrationsFromTelegramChatLogs': ensureProgramRegHourlyTriggerInstalled_,
+    'processPayoutEventsFromTelegramChatLogs': ensurePayoutEventHourlyTriggerInstalled_,
+    'processPayoutRegistrationsFromTelegramChatLogs': ensurePayoutRegHourlyTriggerInstalled_,
+    'processPlotFinancingEventsFromTelegramChatLogs': ensurePlotFinancingHourlyTriggerInstalled_,
+    'processCfrProgramSubmissionsFromTelegramChatLogs': ensureCfrSubHourlyTriggerInstalled_
+  };
+}
+
+/**
+ * Read-only operator endpoint: report which scanners currently have a live hourly
+ * trigger in THIS project. Apps Script exposes no API to list triggers, so this is
+ * how the deployment is verified over HTTP (the counterpart to
+ * ?action=installAllScannerHourlyTriggers). `missing` non-empty => call the installer.
+ * Returns { success, count, totalScanners, installed: [...], missing: [...], byFunction }.
+ */
+function getInstalledScannerTriggers_() {
+  var fns = scannerFunctions_();
+  var triggers = ScriptApp.getProjectTriggers();
+  var handlers = {};
+  for (var i = 0; i < triggers.length; i++) {
+    var h = triggers[i].getHandlerFunction();
+    handlers[h] = (handlers[h] || 0) + 1;
+  }
+  var installed = [];
+  var missing = [];
+  for (var j = 0; j < fns.length; j++) {
+    if (handlers[fns[j]]) {
+      installed.push(fns[j]);
+    } else {
+      missing.push(fns[j]);
+    }
+  }
+  return {
+    success: true,
+    count: installed.length,
+    totalScanners: fns.length,
+    installed: installed,
+    missing: missing,
+    byFunction: handlers
+  };
+}
+
+/**
+ * One-shot bulk installer: ensure the hourly safety-net trigger exists for EVERY
+ * scanner. Idempotent (each installer is existence-guarded) — safe to call
+ * repeatedly, and the fix after an operator deletes triggers (2026-09-24).
+ * Returns { success, scanners: { fn: 'installed'|'present'|'error: …' } }.
+ */
+function ensureAllScannerHourlyTriggersInstalled_() {
+  var installers = scannerTriggerInstallers_();
+  var fns = scannerFunctions_();
+  var report = {};
+  for (var i = 0; i < fns.length; i++) {
+    var fn = fns[i];
+    try {
+      report[fn] = installers[fn] ? String(installers[fn]()) : 'error: no installer';
+    } catch (e) {
+      report[fn] = 'error: ' + (e && e.message ? e.message : String(e));
+    }
+  }
+  return { success: true, scanners: report };
+}
+
 function doGet(e) {
   try {
     var actionRaw = getQueryParam_(e, 'action');
@@ -2115,6 +2231,45 @@ function doGet(e) {
       // DApp review page reads recorded payout registrations (masked fields only).
       return createCORSResponse(getPendingPayoutRegistrations(getQueryParam_(e, 'status')));
     }
+    if (actionStr === 'getTreeRecipientMap') {
+      // DApp payout page: `tree_id` -> `pk_hash` so picking a tree auto-fills the
+      // recipient. Hash-only, no raw PII. See process_payout_registration_telegram_logs.js
+      // (same Apps Script project).
+      return createCORSResponse(getTreeRecipientMap());
+    }
+    if (actionStr === 'backfillCfrTreeTxIds') {
+      // ?dryRun=1 previews without writing (counts only, no txids). Default is live.
+      var bfDry = getQueryParam_(e, 'dryRun');
+      return createCORSResponse(backfillCfrTreeTxIds(bfDry === '1' || bfDry === 'true'));
+    }
+    if (actionStr === 'collapseCfrTreeTxDuplicates') {
+      // DESTRUCTIVE one-shot: DELETES duplicate `tree planting` rows that share a
+      // Request Transaction ID (keeps the first). Preview-by-default -- the live
+      // path requires ?apply=1. Counts only, no txids. (Gary thread 35944.)
+      var collApply = getQueryParam_(e, 'apply');
+      return createCORSResponse(
+        collapseCfrTreeTxDuplicates(!(collApply === '1' || collApply === 'true')));
+    }
+    if (actionStr === 'backfillCfrTreeIds') {
+      // One-shot: rewrite the private `tree planting` tab's tree_id to the CANONICAL
+      // intake col D id, so `getTreeRecipientMap` joins the DApp tree picker (thread 35944).
+      return createCORSResponse(backfillCfrTreeIds());
+    }
+    if (actionStr === 'backfillPayoutRegistrations') {
+      // One-shot operator lever (SS11.3 + SS11.3-bis): normalise the private tab to one
+      // ACTIVE row per pk_hash (prior rows SUPERSEDED) and re-project every ACTIVE row
+      // onto the intake workbook's SS11.3-bis mirror tab. Idempotent.
+      // See process_payout_registration_telegram_logs.js (same project).
+      return createCORSResponse(backfillPayoutRegistrations());
+    }
+    if (actionStr === 'processCfrProgramSubmissionsFromTelegramChatLogs') {
+      // Triggered by Edgar after a CFR-origin tree-planting / growth-monitoring /
+      // plot-boundary submission lands on Telegram Chat Logs. Mirrors ONLY
+      // cfr.truesight.me-origin submissions into the private `cfr program` sheet's
+      // tree planting / tree monitoring / plot registrations tabs (SS11.5).
+      // See process_cfr_program_submission_telegram_logs.js (same Apps Script project).
+      return createCORSResponse(processCfrProgramSubmissionsFromTelegramChatLogs());
+    }
     if (actionStr === 'processPayoutEventsFromTelegramChatLogs') {
       // Triggered by Edgar after a [PAYOUT EVENT] lands on Telegram Chat Logs.
       // Dual-writes Tier-1 `payouts` (Ops) + Tier-2 `payout events` (CFR). See
@@ -2126,6 +2281,25 @@ function doGet(e) {
       // Books the DAO's cash advance on the main ledger + seeds the SunMint Plots registry.
       // See process_plot_financing_event_telegram_logs.js (same Apps Script project), PR10b.
       return createCORSResponse(processPlotFinancingEventsFromTelegramChatLogs());
+    }
+    if (actionStr === 'processBatch') {
+      // Onboarding-email batch sender. Standing convention (AGENTS.md): EVERY scanner
+      // in this project is reachable via a doGet `?action=` branch so it is both
+      // webhook-triggerable and re-armable over HTTP. Uses a Summary_ wrapper because
+      // processBatch re-throws on failure (so a TRIGGER run is flagged failed); a
+      // webhook caller must always get a JSON body, never a poisoned 500.
+      return createCORSResponse(processBatchSummary_());
+    }
+    if (actionStr === 'installAllScannerHourlyTriggers') {
+      // One-shot operator lever: idempotently ensure the hourly safety-net trigger
+      // exists for EVERY scanner in this project. Reading = re-arm. See AGENTS.md.
+      return createCORSResponse(ensureAllScannerHourlyTriggersInstalled_());
+    }
+    if (actionStr === 'getInstalledScannerTriggers') {
+      // Read-only operator verification: which scanners currently have a live hourly
+      // trigger. Apps Script exposes NO API to list triggers, so this is the only way
+      // to confirm a deploy/trigger state over HTTP. See AGENTS.md 1.
+      return createCORSResponse(getInstalledScannerTriggers_());
     }
     if (actionStr === 'getPayoutEvents') {
       // DApp review surface reads booked payout events (no raw PII is present).

@@ -10,9 +10,22 @@
  * based on hash_key matching and specific conditions.
  */
 
+function _json(obj) {
+  return ContentService.createTextOutput(JSON.stringify(obj))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+/**
+ * HTTP entrypoint (web app, ANYONE_ANONYMOUS). GAS web apps 302-redirect to
+ * script.googleusercontent.com, so callers MUST follow redirects (curl -L).
+ *   ?ping=1 -> liveness; ?limit=N -> transfer up to N; ?schedule=1 -> arm 30s trigger.
+ * Always returns JSON, including on error.
+ */
 function doGet(e) {
-  const limit = parseInt(e?.parameter?.limit || '0') || 0;
-  const schedule = e?.parameter?.schedule || '';
+  try {
+    const p = (e && e.parameter) || {};
+    const limit = parseInt(p.limit || '0', 10) || 0;
+    const schedule = p.schedule || '';
 
   // Schedule a one-shot trigger to run the transfer asynchronously.
   // Web requests timeout before large transfers finish.
@@ -26,13 +39,15 @@ function doGet(e) {
     })).setMimeType(ContentService.MimeType.JSON);
   }
 
-  if (e?.parameter?.ping) {
-    return ContentService.createTextOutput(JSON.stringify({status:'ok'}))
-      .setMimeType(ContentService.MimeType.JSON);
-  }
+    if (p.ping) return _json({ status: 'ok', ts: new Date().toISOString() });
 
-  return ContentService.createTextOutput(JSON.stringify(processAllReviewedRows(limit)))
-    .setMimeType(ContentService.MimeType.JSON);
+    const result = processAllReviewedRows(limit);
+    return _json(result && typeof result === 'object'
+      ? result
+      : { status: 'error', error: 'processAllReviewedRows returned no result' });
+  } catch (err) {
+    return _json({ status: 'error', error: String((err && err.message) || err) });
+  }
 }
 
 /** Trigger wrapper — processes a batch then re-schedules if more remain. */
@@ -66,7 +81,12 @@ const REVIEWED_STATUS = 'Reviewed';
 const COMPLETED_STATUS = 'Successfully Completed / Full Provision Awarded';
 const TRANSFERRED_STATUS = 'Transferred to Main Ledger';
 const ERROR_STATUS = 'Entry Error';
-const ERROR_CONTRIBUTOR_NOT_FOUND = 'Entry Error - Contributor Not Found';
+// NOTE: origin col F has STRICT data validation (=States!$A$2:$A$1009) and the
+// States list offers 'Entry Error' -- NOT this longer descriptive string. Writing
+// an out-of-list value THROWS; with no per-row catch that single row aborted the
+// ENTIRE transfer run (root cause of the partial ~66-row drains). Keep this a
+// valid state; the descriptive reason stays visible via col I ('RESOLVE FAILED').
+const ERROR_CONTRIBUTOR_NOT_FOUND = ERROR_STATUS;
 const IGNORED_STATUS = 'Ignored';
 
 /**
@@ -292,6 +312,13 @@ function transferRowByHashKey(hash_key) {
  */
 function processAllReviewedRows(limit = 0) {
   Logger.log('Starting transfer' + (limit > 0 ? ' (limit: ' + limit + ')' : '') + '.');
+  // Serialize concurrent runs: the 30s re-arm, a cron, and a manual drain can
+  // otherwise overlap and each append against its own pre-append snapshot.
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(30000)) {
+    Logger.log('Could not obtain script lock - another transfer run is in progress. Aborting.');
+    return { status: 'locked', processed: 0 };
+  }
   try {
     const originSS = SpreadsheetApp.openById(ORIGIN_SPREADSHEET_ID);
     const originSheet = originSS.getSheetByName(ORIGIN_SHEET_NAME);
@@ -312,24 +339,57 @@ function processAllReviewedRows(limit = 0) {
       contribByName[nm] = true;
       const h = contribData[c][7]; if (h) contribByHandle[h] = nm;
     }
-    const destHashSeen = {};
+    // Duplicate guard. The signed Request Transaction ID embedded in the
+    // contribution body (Column C) is the strongest de-dup key: a re-appended
+    // copy of the SAME submission carries a byte-identical ID. Fall back to
+    // (contributor || normalized body || TDG || date) for legacy unsigned rows.
+    // NOTE: this map was previously BUILT AND WRITTEN BUT NEVER READ, so no
+    // duplicate was ever skipped. It is now enforced in the row loop below.
+    const txnIdOf_ = (body) => {
+      const m = String(body || '').match(/Request Transaction ID:\s*([A-Za-z0-9+/=]{16,})/);
+      return m ? m[1] : '';
+    };
+    const destSeen = {};
+    const destTxnSeen = {};
+    // Column P = Scoring Hash Key: the durable dedup key (never overwritten by
+    // airdrop processing, unlike Column I 'Solana Transfer Hash').
+    const destHashKeySeen = {};
+    const dupKey_ = (a, c, e, h) => String(a || '').trim().toLowerCase() + '||' +
+      String(c || '').trim().toLowerCase().replace(/\s+/g, ' ') + '||' +
+      String(e || '').trim() + '||' + String(h || '').trim();
     for (let d = 1; d < destData.length; d++) {
-      const hk = String(destData[d][8] || '').trim();
-      if (hk) destHashSeen[hk] = true;
+      if (destData[d][0]) destSeen[dupKey_(destData[d][0], destData[d][2], destData[d][4], destData[d][7])] = d + 1;
+      const t0 = txnIdOf_(destData[d][2]);
+      if (t0) destTxnSeen[t0] = d + 1;
+      const h0 = String(destData[d][15] || '').trim();
+      if (h0) destHashKeySeen[h0] = d + 1;
     }
 
     // --- Single pass: compute everything in-memory ---
     // Process newest-first. Commit origin status + destination row immediately
     // per row: if interrupted, the next run skips already-transferred rows.
     let processedCount = 0;
+    let skippedResolveFailed = 0;
     let destAppendRow = destData.length + 1;
 
+    let rowErrors = 0;
+    let duplicatesSkipped = 0;
     for (let i = originData.length - 1; i >= 1; i--) {
+      try {
       const status = String(originData[i][5] || '').trim();
       const hash_key = String(originData[i][10] || '').trim();
       const colI = String(originData[i][8] || '').trim();
 
-      if (colI === 'RESOLVE FAILED' && status !== REVIEWED_STATUS) continue;
+      // Fail closed on unresolved contributor identity. A row the scorer
+      // flagged RESOLVE FAILED (could not verify the contributor) must NEVER
+      // auto-pay, even if it was later stamped Reviewed with G>0. The previous
+      // guard here was dead code: its condition was always false for Reviewed
+      // rows, and every non-Reviewed row is skipped by the next line anyway.
+      if (colI === 'RESOLVE FAILED') {
+        skippedResolveFailed++;
+        Logger.log('Row ' + (i + 1) + ' skipped: RESOLVE FAILED (contributor unresolved).');
+        continue;
+      }
       if (status !== REVIEWED_STATUS || !hash_key) continue;
 
       const tdg = parseFloat(originData[i][6]) || 0;
@@ -338,14 +398,11 @@ function processAllReviewedRows(limit = 0) {
         originSheet.getRange(i + 1, 6).setValue(IGNORED_STATUS);
         continue;
       }
-      if (destHashSeen[hash_key]) {
-        originSheet.getRange(i + 1, 6).setValue(TRANSFERRED_STATUS);
-        continue;
-      }
 
+      // Resolve contributor name FIRST (Column A exact, then Column H handle).
       let contribName = originData[i][0];
       if (!contribByName[contribName]) {
-        const h = contribName.startsWith('@') ? contribName.slice(1) : contribName;
+        const h = String(contribName || '').startsWith('@') ? contribName.slice(1) : contribName;
         if (contribByHandle[h]) contribName = contribByHandle[h];
         else if (contribByHandle['@' + h]) contribName = contribByHandle['@' + h];
         else {
@@ -354,31 +411,58 @@ function processAllReviewedRows(limit = 0) {
         }
       }
 
-      destSheet.getRange(destAppendRow, 1, 1, 9).setValues([[
-        String(originData[i][8] || '').trim(),
-        contribName,
-        originData[i][2],
-        '',
-        originData[i][6],
-        'Scored Chatlogs',
-        originData[i][9],
-        originData[i][1],
-        hash_key,
-      ]]);
-      destHashSeen[hash_key] = true;
+      // DUPLICATE GUARD (the previously-missing READ). Skip a row whose
+      // submission is already in the Ledger - matched by signed txn ID first,
+      // then by (contributor, body, TDG, date). Fail closed: never re-append.
+      const bodyC = originData[i][2];
+      const txnId = txnIdOf_(bodyC);
+      const tdgC = Math.round((parseFloat(originData[i][6]) || 0) * 100) / 100;
+      const dKey = dupKey_(contribName, bodyC, tdgC, originData[i][7]);
+      const existingLedgerRow = (hash_key && destHashKeySeen[hash_key]) ||
+        (txnId && destTxnSeen[txnId]) || destSeen[dKey] || 0;
+      if (existingLedgerRow) {
+        duplicatesSkipped++;
+        originSheet.getRange(i + 1, 6).setValue(TRANSFERRED_STATUS);
+        originSheet.getRange(i + 1, 12).setValue(existingLedgerRow);
+        Logger.log('Row ' + (i + 1) + ' skipped: already in Ledger at row ' + existingLedgerRow + '.');
+        continue;
+      }
+
+      const tdgRounded = Math.round((parseFloat(originData[i][6]) || 0) * 100) / 100;
+      const destRow = new Array(16).fill('');
+      destRow[0] = contribName;        // A: Contributor Name (validated)
+      destRow[1] = originData[i][1];   // B: Project Name
+      destRow[2] = originData[i][2];   // C: Contribution Made
+      destRow[3] = originData[i][3];   // D: Rubric classification
+      destRow[4] = tdgRounded;         // E: TDGs Provisioned
+      destRow[5] = COMPLETED_STATUS;   // F: Status
+      destRow[6] = tdgRounded;         // G: TDGs Issued
+      destRow[7] = originData[i][7];   // H: Status date
+      destRow[15] = hash_key;          // P: Scoring Hash Key (durable dedup key)
+      destSheet.getRange(destAppendRow, 1, 1, 16).setValues([destRow]);
+      destSeen[dKey] = destAppendRow;
+      if (txnId) destTxnSeen[txnId] = destAppendRow;
+      if (hash_key) destHashKeySeen[hash_key] = destAppendRow;
       originSheet.getRange(i + 1, 6).setValue(TRANSFERRED_STATUS);
-      originSheet.getRange(i + 1, 13).setValue(destAppendRow);
+      originSheet.getRange(i + 1, 12).setValue(destAppendRow); // col L: Main Ledger Row Number
       destAppendRow++;
       processedCount++;
 
       if (limit > 0 && processedCount >= limit) break;
+      } catch (rowErr) {
+        // One bad row must never abort the whole run: log, count, continue.
+        rowErrors++;
+        Logger.log('Row ' + (i + 1) + ' skipped (write error): ' + rowErr.message);
+      }
     }
 
     Logger.log('Transferred ' + processedCount + ' rows.');
-    return { status: 'ok', processed: processedCount };
+    return { status: 'ok', processed: processedCount, skippedResolveFailed: skippedResolveFailed, duplicatesSkipped: duplicatesSkipped, rowErrors: rowErrors };
   } catch (e) {
     Logger.log('Error: ' + e.message + ' stack: ' + e.stack);
     return { status: 'error', error: e.message };
+  } finally {
+    try { lock.releaseLock(); } catch (ignored) {}
   }
 }
 

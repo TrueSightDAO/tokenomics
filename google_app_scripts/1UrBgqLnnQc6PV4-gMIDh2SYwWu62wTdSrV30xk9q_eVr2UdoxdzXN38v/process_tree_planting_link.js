@@ -32,7 +32,8 @@ const TPL_PHOTO_COL = 17;                 // Column R (Tree Seedling Photo URL)
 const TPL_NOTIFICATION_SENT_COL = 27;     // Column AB (Tree Planted Notification Sent Date) — moved off column X (2026-08-20): live sheet col X is 'Review Click Through Date' (review workflow), so the stamp must not land there. AA/AB are free columns (grid max 28).
 
 // ----- Column indices (0-based) on "SunMint Tree Planting" -----
-const TPL_SUNMINT_MESSAGE_ID_COL = 3;     // Column D — Telegram Message ID (stable key)
+const TPL_SUNMINT_MESSAGE_ID_COL = 3;     // Column D — Telegram Message ID (LEGACY key; shifts on re-ingest)
+const TPL_SUNMINT_TXID_COL = 21;          // Column V — request_transaction_id (signed-request hash; PREFERRED key, stable across re-ingestion)
 const TPL_SUNMINT_STATUS_DATE_COL = 6;    // Column G — planting date (YYYYMMDD)
 const TPL_SUNMINT_PHOTO_COL = 8;          // Column I
 const TPL_SUNMINT_LATITUDE_COL = 10;      // Column K
@@ -246,6 +247,55 @@ function normalizeTreePlantingLinkMessage_(raw) {
 }
 
 /**
+ * Resolves the SunMint submission row for a link/reject event.
+ *
+ * PRIMARY key = request_transaction_id (col V) — the signed-request hash, which is stable
+ * across Telegram re-ingestion (col D "Telegram Message ID" is Edgar-assigned at ingest and
+ * can shift — e.g. live row 36 shows A=..._082 vs D=..._081, off by one). Gary, thread 35944.
+ *
+ * FALLBACK = Telegram Message ID (col D) for legacy events / when the picker hasn't yet been
+ * switched to emit a txid.
+ *
+ * txid is NOT unique on its own (double-ingested twins share it), so among txid hits we prefer
+ * the single non-INVALID row; if more than one is non-INVALID the key is ambiguous and we FAIL
+ * CLOSED rather than risk linking a sold bag to the wrong tree.
+ *
+ * @param {Array<Array>} sunmintData full values of "SunMint Tree Planting"
+ * @param {{sunmintTxid?:string, sunmintMessageId?:string}} parsed
+ * @return {{rowIndex:number, reason:string}} rowIndex is 1-based, or -1 when unresolvable
+ */
+function tplResolveSunmintRowIndex_(sunmintData, parsed) {
+  const txid = String((parsed && parsed.sunmintTxid) || '').trim();
+  const msgId = String((parsed && parsed.sunmintMessageId) || '').trim();
+  const statusOf = function (ri) {
+    return String((sunmintData[ri - 1] && sunmintData[ri - 1][TPL_SUNMINT_STATUS_COL]) || '').trim().toUpperCase();
+  };
+  if (txid) {
+    const hits = [];
+    for (let k = 1; k < sunmintData.length; k++) {
+      if (String((sunmintData[k] && sunmintData[k][TPL_SUNMINT_TXID_COL]) || '').trim() === txid) hits.push(k + 1);
+    }
+    if (hits.length === 1) return { rowIndex: hits[0], reason: '' };
+    if (hits.length > 1) {
+      const live = hits.filter(function (ri) { return statusOf(ri) !== 'INVALID'; });
+      if (live.length === 1) return { rowIndex: live[0], reason: '' };
+      return { rowIndex: -1, reason: live.length === 0
+        ? 'all rows sharing this transaction id are INVALID'
+        : 'ambiguous transaction id (multiple non-INVALID rows share it)' };
+    }
+    // no txid hit -> fall through to the message-id fallback (legacy event / cache lag)
+  }
+  if (msgId) {
+    for (let k2 = 1; k2 < sunmintData.length; k2++) {
+      if (String((sunmintData[k2] && sunmintData[k2][TPL_SUNMINT_MESSAGE_ID_COL]) || '').trim() === msgId) {
+        return { rowIndex: k2 + 1, reason: '' };
+      }
+    }
+  }
+  return { rowIndex: -1, reason: 'SunMint submission not found (txid and message id both unmatched)' };
+}
+
+/**
  * Parses a [TREE PLANTING LINK EVENT] message body.
  * Expected format:
  * [TREE PLANTING LINK EVENT]
@@ -263,7 +313,7 @@ function normalizeTreePlantingLinkMessage_(raw) {
  * @return {{qrCode: string, sunmintMessageId: string, updatedBy: string, publicSignature: string}}
  */
 function extractTreePlantingLinkInfo_(message) {
-  const result = { qrCode: '', sunmintMessageId: '', plotId: '', updatedBy: '', publicSignature: '', reason: '' };
+  const result = { qrCode: '', sunmintMessageId: '', sunmintTxid: '', plotId: '', updatedBy: '', publicSignature: '', reason: '' };
   try {
     const m = normalizeTreePlantingLinkMessage_(message);
 
@@ -272,6 +322,9 @@ function extractTreePlantingLinkInfo_(message) {
 
     const sunmintMatch = m.match(/-\s+SunMint Submission Message ID:\s*([^\n]+)/i);
     if (sunmintMatch) result.sunmintMessageId = sunmintMatch[1].trim();
+
+    const txidMatch = m.match(/-\s+SunMint Submission Transaction ID:\s*([^\n]+)/i);
+    if (txidMatch) result.sunmintTxid = txidMatch[1].trim();
 
     const plotMatch = m.match(/-\s+Plot ID:\s*([^\n]+)/i);
     if (plotMatch) result.plotId = plotMatch[1].trim();
@@ -746,7 +799,7 @@ function processTreePlantingLinksFromTelegramChatLogs() {
         ]);
       };
 
-      if (!parsed.qrCode || (!parsed.sunmintMessageId && !parsed.plotId)) {
+      if (!parsed.qrCode || (!parsed.sunmintMessageId && !parsed.sunmintTxid && !parsed.plotId)) {
         Logger.log(`Row ${rowNumber}: missing QR Code, or neither a SunMint Submission Message ID nor a Plot ID - skipping`);
         recordOutcome('REJECTED', 'Missing QR Code, or neither a SunMint Submission Message ID nor a Plot ID');
         result.rejected++;
@@ -778,7 +831,9 @@ function processTreePlantingLinksFromTelegramChatLogs() {
         for (let kr = 1; kr < sunmintRejectData.length; kr++) {
           const rejectColD = (sunmintRejectData[kr][TPL_SUNMINT_MESSAGE_ID_COL] || '').toString().trim();
           const rejectColA = (sunmintRejectData[kr][TELEGRAM_UPDATE_ID_COL] || '').toString().trim();
-          if (rejectColD === parsed.sunmintMessageId || rejectColA === parsed.sunmintMessageId) {
+          const rejectColV = (sunmintRejectData[kr][TPL_SUNMINT_TXID_COL] || '').toString().trim();
+          if (rejectColD === parsed.sunmintMessageId || rejectColA === parsed.sunmintMessageId ||
+              (parsed.sunmintTxid && rejectColV === parsed.sunmintTxid)) {
             sunmintRejectRowIndexes.push(kr + 1);
             // No break: invalidate EVERY row sharing this tree id. A duplicate NEW row
             // (double-ingestion) is exactly how a rejected tree 'came back on reload' -
@@ -949,16 +1004,11 @@ function processTreePlantingLinksFromTelegramChatLogs() {
 
       // Locate + validate the SunMint submission row.
       const sunmintData = sunmintSheet.getDataRange().getValues();
-      let sunmintRowIndex = -1;
-      for (let k = 1; k < sunmintData.length; k++) {
-        if ((sunmintData[k][TPL_SUNMINT_MESSAGE_ID_COL] || '').toString().trim() === parsed.sunmintMessageId) {
-          sunmintRowIndex = k + 1;
-          break;
-        }
-      }
+      const resolved = tplResolveSunmintRowIndex_(sunmintData, parsed);
+      const sunmintRowIndex = resolved.rowIndex;
       if (sunmintRowIndex === -1) {
-        Logger.log(`Row ${rowNumber}: SunMint submission "${parsed.sunmintMessageId}" not found`);
-        recordOutcome('REJECTED', 'SunMint submission not found');
+        Logger.log(`Row ${rowNumber}: SunMint submission unresolvable (txid="${parsed.sunmintTxid || '-'}", msgId="${parsed.sunmintMessageId || '-'}"): ${resolved.reason}`);
+        recordOutcome('REJECTED', 'SunMint submission not found: ' + resolved.reason);
         result.rejected++;
         continue;
       }

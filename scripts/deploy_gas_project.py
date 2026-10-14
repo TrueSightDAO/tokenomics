@@ -15,11 +15,14 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import atexit
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
+import tempfile
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -28,6 +31,42 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 PROJECTS = ROOT / "google_app_scripts"
 CLASPRC = Path(os.environ.get("CLASPRC_PATH") or os.path.expanduser("~/.clasprc.json"))
+
+_CLASP_HOME: Path | None = None
+_CLASP_HOME_SRC: str | None = None
+
+
+def clasp_credentials_env() -> dict[str, str] | None:
+    """Env for ``clasp`` subprocesses so they authenticate as the SAME account
+    the identity guard checked.
+
+    ``clasp`` reads ONLY ``$HOME/.clasprc.json`` and IGNORES ``CLASPRC_PATH``
+    (which ``resolve_clasp_identity`` points the guard at). Left unaligned, the
+    guard verifies one account while ``clasp push|version|deploy`` execute as
+    another -- a fail-OPEN mismatch that silently swaps the deployment's runtime
+    identity (``appsscript.json`` sets ``webapp.executeAs = USER_DEPLOYING``) and
+    its per-executing-identity trigger set.
+
+    When ``CLASPRC_PATH`` is set, hand clasp a private ``HOME`` whose
+    ``.clasprc.json`` IS that file (copied, 0600, one temp dir reused per run).
+    When it is unset, ``CLASPRC_PATH`` already defaults to ``~/.clasprc.json``
+    and clasp uses it too -- return ``None`` so the subprocess simply inherits
+    the ambient environment.
+    """
+    raw = os.environ.get("CLASPRC_PATH")
+    if not raw:
+        return None
+    src = Path(raw).expanduser()
+    if not src.is_file():
+        return None
+    global _CLASP_HOME, _CLASP_HOME_SRC
+    if _CLASP_HOME is None or _CLASP_HOME_SRC != str(src):
+        home = Path(tempfile.mkdtemp(prefix="clasp-home-"))
+        shutil.copyfile(src, home / ".clasprc.json")
+        os.chmod(home / ".clasprc.json", 0o600)
+        atexit.register(lambda d=str(home): shutil.rmtree(d, ignore_errors=True))
+        _CLASP_HOME, _CLASP_HOME_SRC = home, str(src)
+    return {**os.environ, "HOME": str(_CLASP_HOME)}
 
 
 # ── clasp identity resolution ──────────────────────────────────────────────
@@ -114,6 +153,7 @@ def run_clasp_push(project_dir: Path, dry_run: bool) -> bool:
         r = subprocess.run(
             ["clasp", "push", "--force"],
             cwd=project_dir,
+            env=clasp_credentials_env(),
             capture_output=True,
             text=True,
             check=False,
@@ -214,6 +254,7 @@ def repoint_deployment(
         r = subprocess.run(
             ["clasp", "version", description],
             cwd=project_dir,
+            env=clasp_credentials_env(),
             capture_output=True,
             text=True,
             check=False,
@@ -242,6 +283,7 @@ def repoint_deployment(
                 description,
             ],
             cwd=project_dir,
+            env=clasp_credentials_env(),
             capture_output=True,
             text=True,
             check=False,
@@ -885,6 +927,12 @@ def main() -> int:
             return 1
         elif args.push:
             print(f"\n! --allow-identity-mismatch set; pushing anyway:{msg}")
+            print(
+                "  !! WARNING: this CHANGES the web app's RUNTIME identity "
+                "(webapp.executeAs=USER_DEPLOYING) and its per-executing-identity\n"
+                "  !! trigger set — the deployment will run as the clasp account, "
+                "not owner_email. Only override when that is the intent."
+            )
         else:
             print(f"\n! identity mismatch (dry-run):{msg}")
 

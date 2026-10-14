@@ -4,6 +4,15 @@
 > 
 > This document provides a consolidated reference for all Google Sheets used across TrueSight DAO's Google Apps Scripts. Use this as a central schema reference when making code changes.
 
+## 📝 Recent Changes (2026-09-22)
+
+### **Ledger history** — column **P** (`Scoring Hash Key`) + idempotent transfers
+
+- **Column P header:** `Scoring Hash Key` — the origin `Scored Chatlogs` **column K** hash key for the submission that produced the row, copied verbatim at transfer time.
+- **Why:** the transfer GAS had no persisted dedup key. Column I (`Solana Transfer Hash`) is overwritten by airdrop processing, so it cannot carry the key. Column P is never overwritten.
+- **Transfer GAS** (`Code.js`): now (1) writes `hash_key` to ledger **column P** on append, (2) reads the dedup set from column P in addition to the txn-ID / content guards, and (3) wraps `processAllReviewedRows` in `LockService.getScriptLock()` so the 30s re-arm / cron / manual drain cannot overlap.
+- **Backfill:** column P was backfilled for 3,624 of ~12.5K ledger rows (those traceable to a `Scored Chatlogs` origin row); blank where the origin could not be resolved unambiguously.
+
 ## 📝 Recent Changes (2026-09-20)
 
 ### SunMint farmer-settlement + batch QR-tree linking — 3 new ledger literals, 2 new columns
@@ -26,7 +35,8 @@ see [Tree-Planting Ledger Literals](#tree-planting-ledger-literals) below):
 | Sheet | New column | Purpose |
 |-------|-----------|---------|
 | `Agroverse QR codes` | **AC — `Linked Plot ID`** | Plot-fallback link target (plan PR6). Blank for the existing tree-level link path. |
-| `SunMint Tree Planting` | **U — `Payment Event Ref`** | References the `[TREE PURCHASE EVENT]` / `[FARMER PAYMENT EVENT]` that funded this confirmed tree (its Telegram Update ID or `Asset Receipts` / `payouts` row ref). `Cost of Tree` (col P) records an amount only, not a reference. |
+| `SunMint Tree Planting` | **U — `Submission Source` (LIVE) / `Payment Event Ref` (PR3, PARKED) — conflict** | The **live** tab's col U header is `Submission Source`. The PARKED PR3 reconciliation treats U as `Payment Event Ref` (`SUNMINT_PAYMENT_EVENT_REF_COL = 20`). Reconcile before either writes U. |
+| `SunMint Tree Planting` | **V — `request_transaction_id`** | The signed `Request Transaction ID` — the canonical **dedup key** (do NOT key on the transport ids in cols A/D/H). Trailing column, located by header name so no column is reordered. Written by `process_tree_planting_telegram_logs.js`; backfill via `?action=backfillSunMintTreeTxIds&apply=1`. Convention: `agentic_ai_context/conventions/DEDUP_KEY_CONVENTION.md`. |
 
 **Also added below (first-time `SCHEMA.md` coverage of live tabs):** `SunMint Plots`, `Asset Receipts`,
 `payouts`; plus `SunMint Tree Planting`'s previously-undocumented `Plot ID` column.
@@ -1008,6 +1018,7 @@ source check (`SUNMINT_FARMER_SETTLEMENT_AND_BATCH_LINK_PLAN.md` §0.10).
 | M | Within past 90 days vesting | String | 90-day vesting status |
 | N | Within past 180 days | String | Recent 180-day activity indicator |
 | O | Within past 180 days vesting | Number | 180-day vesting amount |
+| P | Scoring Hash Key | String | Durable dedup key — copied from the origin `Scored Chatlogs` column K at transfer time. Unlike column I (`Solana Transfer Hash`, overwritten by airdrop), this column is never overwritten, so the transfer GAS can make ledger appends idempotent. |
 
 **Special Cells:**
 - **Cell E1:** Contains `voting_rights_circulated` total (sum of all TDG tokens issued)
@@ -1436,6 +1447,7 @@ source check (`SUNMINT_FARMER_SETTLEMENT_AND_BATCH_LINK_PLAN.md` §0.10).
 | S | HS Code | String | Harmonized System (HS) tariff heading for the SKU, e.g. `1801` (cocoa beans), `1803.1` (cocoa paste/mass), `1804` (cocoa butter, fat & oil), `1806.32` (chocolate bars), `2106.9` (other food preparations, e.g. cacao tea). Stored as **text** to preserve dotted subheadings. For Brazil-source lines the heading follows the NF-e's NCM (e.g. `NCM 1804.00.00` → HS `1804`). Use for customs/export docs. **Not** auto-populated by any ingest — set by hand / write. |
 | U | Tree Charge | Number | **Tree infra charge** — the per-tree amount charged to a managed ledger when one of its QRs is linked to a tree (the "cost to infrastructure users", plan Q7v5; **distinct** from col **B `Price in USD`** = retail/AUM price, and from `SunMint Tree Planting` col **P `Cost of Tree`** = what the DAO pays the farmer). Keyed by the tree literals (`Cacao Tree To Be Planted` / `Cacao Tree Planted`). Read by `process_tree_planting_link.js` (`tplResolveTreeCharge_`) at link time, which books `-U` on the QR's own ledger + `+U` on main when the QR is **not** already on main; **fails CLOSED** if the cell is absent or unparseable. Introduced by `SUNMINT_FARMER_SETTLEMENT_AND_BATCH_LINK_PLAN.md` PR5.3a/b; booked for both tree-level and (PR6.2) plot-level links. |
 | T | Source Documents | String | Provenance links for the SKU — the purchase/customs documents backing its cost. Either a single URL or a JSON array of URLs (e.g. purchase NF-e PDF, purchase agreement), using the same repo-URL style as col **O**. Sits **after** HS Code. **Not** auto-populated by any ingest today — populated by write (e.g. the `agroverse-ledger-manager` service account). Example — the Coopercabruca cacao-butter line (row 108) carries its purchase NF-e here. |
+| V | FDA Product Code | String | **FDA product code** used for U.S. FDA Prior Notice / border crossing (e.g. `34BHN05`). Taken from the filed Prior Notice's article codes (e.g. Prior Notice `F26X30142399`, shipment AWB `047-3175-3223`). Enables customs/FDA paperwork to be reproducible from the ledger. **Not** auto-populated by any ingest — set by hand / write (now writable via the `[CURRENCY DEFINITION EVENT]` `- FDA Product Code:` field). |
 
 **Used by:**
 - Product and pricing management

@@ -26,12 +26,17 @@ import gspread
 
 MAIN_LEDGER_ID = '1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU'
 LISTING_SHEET = 'Shipment Ledger Listing'
-OUTPUT_DIR = os.path.expanduser('~/Applications/treasury-cache/managed-ledgers')
-REPO_DIR = os.path.expanduser('~/Applications/treasury-cache')
+# Paths are env-overridable so the same script runs both on a workstation
+# (defaults below) and in CI (GitHub Actions points these at runner paths).
+OUTPUT_DIR = os.path.expanduser(os.environ.get(
+    'MANAGED_LEDGER_OUT_DIR', '~/Applications/treasury-cache/managed-ledgers'))
+REPO_DIR = os.path.expanduser(os.environ.get(
+    'MANAGED_LEDGER_REPO_DIR', '~/Applications/treasury-cache'))
 
-SERVICE_ACCOUNT_PATH = os.path.expanduser(
+SERVICE_ACCOUNT_PATH = os.path.expanduser(os.environ.get(
+    'MANAGED_LEDGER_CREDS_PATH',
     '~/Applications/sentiment_importer/config/cypher_defense_gdrive_key.json'
-)
+))
 
 SKIP_STATUSES = {'COMPLETED', 'SUSPENDED'}
 
@@ -248,6 +253,102 @@ def write_index(all_ledgers, dry_run=False):
     print(f'  Wrote {index_path} ({len(entries)} ledgers)')
 
 
+# --- Publishing -----------------------------------------------------------
+# Two publish back-ends: the GitHub Contents API (CI + anywhere a token is
+# available — no local clone needed) and the legacy git push (workstation with
+# an existing ~/Applications/treasury-cache checkout). The API path is used
+# whenever TREASURY_CACHE_TOKEN / GITHUB_TOKEN is set.
+
+TREASURY_CACHE_REPO = 'TrueSightDAO/treasury-cache'
+TREASURY_CACHE_BRANCH = 'main'
+
+
+def _github_token():
+    return (os.environ.get('TREASURY_CACHE_TOKEN')
+            or os.environ.get('GITHUB_TOKEN') or '').strip()
+
+
+def _stable_text(text):
+    """Drop the volatile generated_at line so unchanged ledgers don't spam commits."""
+    return '\n'.join(ln for ln in text.splitlines() if '"generated_at"' not in ln)
+
+
+def _get_existing(rel_path, headers):
+    """Return (sha, text) of an existing repo file, or (None, None)."""
+    import base64
+    import urllib.error
+    import urllib.request
+    url = f'https://api.github.com/repos/{TREASURY_CACHE_REPO}/contents/{rel_path}'
+    try:
+        req = urllib.request.Request(f'{url}?ref={TREASURY_CACHE_BRANCH}', headers=headers)
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            data = json.load(resp)
+        return data.get('sha'), base64.b64decode(data.get('content', '')).decode('utf-8', 'replace')
+    except (urllib.error.URLError, OSError, ValueError):
+        return None, None
+
+
+def publish_via_contents_api(files, dry_run=False):
+    """Publish generated JSON to treasury-cache via the Contents API.
+
+    `files` maps repo-relative path -> local path. Skips files whose content is
+    unchanged (ignoring generated_at). Returns True when every file published
+    (or on a dry run); False if the token is missing or a PUT failed.
+    """
+    import base64
+    import urllib.error
+    import urllib.request
+
+    token = _github_token()
+    if not token:
+        return False
+
+    api = f'https://api.github.com/repos/{TREASURY_CACHE_REPO}/contents'
+    headers = {
+        'Authorization': f'Bearer {token}',
+        'Accept': 'application/vnd.github+json',
+        'X-GitHub-Api-Version': '2022-11-28',
+    }
+    stamp = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M')
+    ok = True
+    for rel_path, local_path in files.items():
+        if dry_run:
+            print(f'  [dry-run] Would PUT {rel_path} via Contents API')
+            continue
+        with open(local_path, 'r', encoding='utf-8') as fh:
+            new_text = fh.read()
+        sha, existing = _get_existing(rel_path, headers)
+        if existing is not None and _stable_text(existing) == _stable_text(new_text):
+            print(f'  Unchanged {rel_path} — skipping')
+            continue
+        payload = {
+            'message': f'chore: snapshot managed ledgers {stamp} '
+                       f'({rel_path.rsplit("/", 1)[-1].replace(".json", "")})',
+            'content': base64.b64encode(new_text.encode('utf-8')).decode('ascii'),
+            'branch': TREASURY_CACHE_BRANCH,
+        }
+        if sha:
+            payload['sha'] = sha
+        req = urllib.request.Request(
+            f'{api}/{rel_path}', data=json.dumps(payload).encode('utf-8'),
+            headers=headers, method='PUT')
+        try:
+            with urllib.request.urlopen(req, timeout=30) as resp:
+                print(f'  Published {rel_path} (HTTP {resp.status})')
+        except (urllib.error.URLError, OSError) as e:
+            print(f'  ERROR publishing {rel_path}: {e}')
+            ok = False
+    return ok
+
+
+def publish(files, dry_run=False):
+    """Contents API when a token is set, else the legacy git push."""
+    if _github_token():
+        return publish_via_contents_api(files, dry_run=dry_run)
+    git_commit_and_push(dry_run=dry_run)
+    return True
+
+
 def git_commit_and_push(dry_run=False):
     """Commit and push changes to the treasury-cache repo."""
     if dry_run:
@@ -293,6 +394,7 @@ def main():
     print(f'Found {len(ledgers)} ledgers in Shipment Ledger Listing')
     exported = 0
     index_entries = []
+    published_files = {}
 
     for ledger in ledgers:
         lid = ledger['id']
@@ -327,6 +429,8 @@ def main():
             transactions = extract_transactions(tx_tab)
             data = build_ledger_json(lid, ledger, transactions)
             write_json(lid, data, dry_run=dry_run)
+            published_files[f'managed-ledgers/{lid}.json'] = os.path.join(
+                OUTPUT_DIR, f'{lid}.json')
             exported += 1
 
             # Track for the registry index — one row per successfully-snapshotted
@@ -349,9 +453,11 @@ def main():
         # index to a single entry and lose the others).
         if not single_ledger:
             write_index(index_entries, dry_run=dry_run)
+            published_files['managed-ledgers/_index.json'] = os.path.join(
+                OUTPUT_DIR, '_index.json')
         else:
             print(f'  (skipping _index.json regen — single-ledger run for {single_ledger})')
-        git_commit_and_push(dry_run=dry_run)
+        publish(published_files, dry_run=dry_run)
     else:
         print('No ledgers exported.')
 

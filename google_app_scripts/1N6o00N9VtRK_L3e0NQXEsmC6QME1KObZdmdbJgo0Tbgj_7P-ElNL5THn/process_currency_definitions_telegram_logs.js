@@ -93,6 +93,15 @@ function parseCurrencyDefinitionMessage(message) {
     unitWeightGrams: null,
     unitWeightOunces: null,
     skuProductId: null,
+    rawRequestText: null,
+    compositionJsonUrl: null,
+    inventoryType: null,
+    saleType: null,
+    gtin: null,
+    hsCode: null,
+    sourceDocuments: null,
+    treeCharge: null,
+    fdaProductCode: null,
     digitalSignature: null,
     requestTransactionId: null
   };
@@ -136,6 +145,36 @@ function parseCurrencyDefinitionMessage(message) {
 
     const skuProductIdMatch = message.match(/- SKU Product ID:[ \t]*([^\n]*)/i);
     if (skuProductIdMatch) details.skuProductId = skuProductIdMatch[1].trim();
+
+    // Conversion / repackaging provenance + trade metadata (cols N-V).
+    // All optional — a [CURRENCY DEFINITION EVENT] that omits them lands the
+    // same cols A-M as before, with N-V blank.
+    const rawRequestMatch = message.match(/- Raw Request Text:[ \t]*([^\n]*)/i);
+    if (rawRequestMatch) details.rawRequestText = rawRequestMatch[1].trim();
+
+    const compositionJsonMatch = message.match(/- Composition JSON:[ \t]*([^\n]*)/i);
+    if (compositionJsonMatch) details.compositionJsonUrl = compositionJsonMatch[1].trim();
+
+    const inventoryTypeMatch = message.match(/- Inventory Type:[ \t]*([^\n]*)/i);
+    if (inventoryTypeMatch) details.inventoryType = inventoryTypeMatch[1].trim();
+
+    const saleTypeMatch = message.match(/- Sale Type:[ \t]*([^\n]*)/i);
+    if (saleTypeMatch) details.saleType = saleTypeMatch[1].trim();
+
+    const gtinMatch = message.match(/- GTIN:[ \t]*([^\n]*)/i);
+    if (gtinMatch) details.gtin = gtinMatch[1].trim();
+
+    const hsCodeMatch = message.match(/- HS Code:[ \t]*([^\n]*)/i);
+    if (hsCodeMatch) details.hsCode = hsCodeMatch[1].trim();
+
+    const sourceDocumentsMatch = message.match(/- Source Documents:[ \t]*([^\n]*)/i);
+    if (sourceDocumentsMatch) details.sourceDocuments = sourceDocumentsMatch[1].trim();
+
+    const treeChargeMatch = message.match(/- Tree Charge:[ \t]*([0-9,]*\.?[0-9]+)/i);
+    if (treeChargeMatch) details.treeCharge = parseFloat(treeChargeMatch[1].replace(/,/g, ''));
+
+    const fdaProductCodeMatch = message.match(/- FDA Product Code:[ \t]*([^\n]*)/i);
+    if (fdaProductCodeMatch) details.fdaProductCode = fdaProductCodeMatch[1].trim();
 
     // Digital signature and request transaction ID
     const sigPattern = /My Digital Signature:\s*([\s\S]*?)(?:\n\s*Request Transaction ID:|$)/i;
@@ -204,6 +243,16 @@ function currencyDefinitionRecordExists(currencyName) {
  *   J = Year
  *   K = Unit Weight (grams)
  *   L = Unit Weight (ounces)
+ *   M = SKU Product ID
+ *   N = Raw Request Text
+ *   O = Composition JSON
+ *   P = Inventory Type
+ *   Q = Sale Type
+ *   R = GTIN
+ *   S = HS Code
+ *   T = Source Documents
+ *   U = Tree Charge
+ *   V = FDA Product Code
  *
  * @returns {boolean} true if the row was inserted
  */
@@ -229,7 +278,16 @@ function insertCurrencyDefinitionRecord(details) {
       details.year || '',
       details.unitWeightGrams || '',
       details.unitWeightOunces || '',
-      details.skuProductId || ''
+      details.skuProductId || '',
+      details.rawRequestText || '',
+      details.compositionJsonUrl || '',
+      details.inventoryType || '',
+      details.saleType || '',
+      details.gtin || '',
+      details.hsCode || '',
+      details.sourceDocuments || '',
+      details.treeCharge || '',
+      details.fdaProductCode || ''
     ];
 
     sheet.appendRow(newRow);
@@ -482,6 +540,10 @@ function testParseCurrencyDefinitionMessage() {
     '- Unit Weight (grams): 250\n' +
     '- Unit Weight (ounces): 8.82\n' +
     '- SKU Product ID: oscar-bahia-ceremonial-cacao-200g\n' +
+    '- Inventory Type: Cacao Mass\n' +
+    '- Sale Type: Retail ready\n' +
+    '- HS Code: 1803.1\n' +
+    '- FDA Product Code: 34BHN05\n' +
     '--------\n' +
     '\n' +
     'My Digital Signature: MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA...\n' +
@@ -504,6 +566,10 @@ function testParseCurrencyDefinitionMessage() {
   Logger.log('Unit Weight (grams): ' + details.unitWeightGrams);
   Logger.log('Unit Weight (ounces): ' + details.unitWeightOunces);
   Logger.log('SKU Product ID: ' + details.skuProductId);
+  Logger.log('Inventory Type: ' + details.inventoryType);
+  Logger.log('Sale Type: ' + details.saleType);
+  Logger.log('HS Code: ' + details.hsCode);
+  Logger.log('FDA Product Code: ' + details.fdaProductCode);
   Logger.log('Digital Signature: ' + (details.digitalSignature ? details.digitalSignature.substring(0, 50) + '...' : 'None'));
   Logger.log('Request Transaction ID: ' + details.requestTransactionId);
 }

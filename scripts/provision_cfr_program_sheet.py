@@ -73,6 +73,9 @@ TABS: dict[str, list[str]] = {
         "photo_url",
         "capture_source",
         "status",
+        # Trailing transaction key (Gary thread 35944) -- one telegram_update_id can
+        # map to multiple rows; the unique unit is a transaction.
+        "request_transaction_id",
     ],
     "tree monitoring": [
         "created_at_utc",

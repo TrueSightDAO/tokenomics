@@ -114,8 +114,11 @@ def test_dedup_layer2_business_key_bank_ref():
     assert "payoutEventCollectBankRefs_" in src
     assert "seenBankRefs" in src
     assert "DUPLICATE_BANK_REF" in src
-    assert re.search(r"if \(seenBankRefs\[base\.bank_ref\]\)", src), (
-        "no bank_ref dedup branch"
+    # PR #576 replaced bank_ref-only dedup with the composite (bank_ref, tree_planting_id)
+    # key so one transfer can settle N trees without the 2nd..Nth being rejected as dups.
+    assert "payoutEventDedupKey_" in src, "missing composite dedup key builder"
+    assert re.search(r"if \(seenBankRefs\[dedupKey\]\)", src), (
+        "no composite (bank_ref, tree_planting_id) dedup branch"
     )
 
 
@@ -227,6 +230,19 @@ def test_manifest_declares_trigger_scope():
         "https://www.googleapis.com/auth/script.external_request",
     ):
         assert required in scopes, f"missing scope {required}"
+
+
+def test_manifest_declares_documents_scope():
+    """Regression (2026-09-24): processBatch calls DocumentApp.openById, but the
+    manifest omitted the `documents` scope, so every live run failed with
+    "Specified permissions are not sufficient to call DocumentApp.openById"."""
+    import json
+
+    manifest = json.loads((PROJECT / "appsscript.json").read_text())
+    scopes = manifest.get("oauthScopes") or []
+    assert "https://www.googleapis.com/auth/documents" in scopes, (
+        "appsscript.json must declare the documents scope (processBatch uses DocumentApp)"
+    )
 
 
 def test_trigger_installer_reports_status():

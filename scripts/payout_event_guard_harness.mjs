@@ -143,11 +143,12 @@ t('PR4 committed cross-ledger = -cash on QR ledger, +cash/-TBP on main', ()=>{
   eq(legs[2].target,'main'); eq(legs[2].literal,'Cacao Tree - To Be Paid For'); eq(legs[2].amount,-1);
   if(legs.some(l=>l.literal==='Cacao Tree Planted - Unassigned')) throw new Error('phantom pool unit on a committed settlement');
 });
-t('PR4 committed when QR ledger IS main = 1 leg (two cash legs collapse)', ()=>{
+t('PR4 committed when QR ledger IS main = -cash + -TBPF on main (draws main cash down)', ()=>{
   const legs=fpeComputeLegs_({amount:150,currency:'BRL',contributor:'Paulo',committed:true,qrLedgerIsMain:true});
-  eq(legs.length,1);
-  eq(legs[0].target,'main'); eq(legs[0].amount,-1); eq(legs[0].kind,'inventory');
-  eq(legs[0].literal,'Cacao Tree - To Be Paid For');
+  eq(legs.length,2);
+  eq(legs[0].target,'main'); eq(legs[0].amount,-150); eq(legs[0].kind,'cash');
+  eq(legs[1].target,'main'); eq(legs[1].amount,-1); eq(legs[1].kind,'inventory');
+  eq(legs[1].literal,'Cacao Tree - To Be Paid For');
 });
 t('PR4 cash-out leg is not revenue', ()=>{
   const legs=fpeComputeLegs_({amount:1,currency:'BRL',committed:false});
@@ -185,15 +186,15 @@ t('PR4 committed cross-ledger: -cash on QR ledger, +cash/-TBP on main', ()=>{
   const tx=mainSheets['offchain transactions'].getDataRange().getValues();
   eq(tx.length,2); eq(tx[0][3],150); eq(tx[1][3],-1); eq(tx[1][4],'Cacao Tree - To Be Paid For');
 });
-t('PR4 committed when QR ledger IS main: 1 leg, no cash legs', ()=>{
+t('PR4 committed when QR ledger IS main: -cash + -TBPF on main', ()=>{
   reset();
   setOps('SunMint Tree Planting', sunmintGrid('T-MECH-3','2024OSCAR_2'));
   setMain('Agroverse QR codes', qrGrid('2024OSCAR_2','https://agroverse.shop/agl4'));
   setMain('offchain transactions', []);
   const res=fpeBookLedger_({amount:150,currency:'BRL',recipient_pk_hash:'pk-1',tree_planting_id:'T-MECH-3'});
-  eq(res.booked,true); eq(res.legs,1);
+  eq(res.booked,true); eq(res.legs,2);
   const tx=mainSheets['offchain transactions'].getDataRange().getValues();
-  eq(tx.length,1); eq(tx[0][3],-1); eq(tx[0][4],'Cacao Tree - To Be Paid For');
+  eq(tx.length,2); eq(tx[0][3],-150); eq(tx[0][4],'BRL'); eq(tx[1][3],-1); eq(tx[1][4],'Cacao Tree - To Be Paid For');
 });
 t('PR4 fails closed when no SunMint row joins - nothing written', ()=>{
   reset();

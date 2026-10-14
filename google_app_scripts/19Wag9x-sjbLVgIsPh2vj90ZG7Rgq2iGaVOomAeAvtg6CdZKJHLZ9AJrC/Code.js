@@ -392,13 +392,14 @@ function isGovernorByName_(contributorName) {
 
 /**
  * Scored Expense column N: authorized if Telegram Governor is YES, reporter matches DAO Member,
- * or reporter is a registered DAO governor.
+ * reporter is a registered DAO governor, or reporter is a registered Sentinel (who may file
+ * for ANY member as of the 2026-10-08 policy change).
  */
 function computeExpenseProcessingStatus_(telegramRow, reporterName, daoMemberName) {
   if (isTelegramGovernorYesFromRow_(telegramRow)) return 'authorized';
   if (authNamesMatchForExpense_(reporterName, daoMemberName)) return 'authorized';
   if (isGovernorByName_(reporterName)) return 'authorized';
-  if (isAgentFilingForGovernor_(reporterName, daoMemberName)) return 'authorized';
+  if (isSentinelFilingForMember_(reporterName, daoMemberName)) return 'authorized';
   return 'unauthorized';
 }
 
@@ -434,14 +435,26 @@ function isSentinelByName_(contributorName) {
 }
 
 /**
- * True when the reporter is a registered Sentinel (autopilot agent) filing on behalf
- * of a DAO member who is themselves a registered governor. Least-privilege: a sentinel
- * may only authorize expenses for governors who direct the agent, not for arbitrary
- * members. Replaces the old hardcoded DAO_AGENT_REPORTERS_ list.
+ * True when the reporter is a registered Sentinel (autopilot agent).
+ *
+ * Policy change 2026-10-08 (governor Gary Teh, thread 41062): sentinels may file
+ * inventory-expense events on behalf of ALL members, not only governors. The Sentinel
+ * registry flag ("Is Sentinel" = TRUE on "Contributors contact information") is the
+ * sole gate; the named DAO member is debited exactly as before. This supersedes the
+ * earlier least-privilege governor-only restriction and the even older hardcoded
+ * DAO_AGENT_REPORTERS_ list.
+ *
+ * The other authorization paths (Governor = YES on the source row, reporter == DAO
+ * Member, reporter is a registered governor) are unchanged.
+ *
+ * @param {string} reporterName - Reporter/contributor name to check.
+ * @param {string} daoMemberName - Named member being debited (kept for call-site
+ *   compatibility; no longer restricts authorization).
+ * @return {boolean} True when the reporter is a registry-backed Sentinel.
  */
-function isAgentFilingForGovernor_(reporterName, daoMemberName) {
+function isSentinelFilingForMember_(reporterName, daoMemberName) {
   if (!isSentinelByName_(reporterName)) return false;
-  return isGovernorByName_(daoMemberName);
+  return true;
 }
 
 function findContributorByDigitalSignature(digitalSignature) {
@@ -927,6 +940,30 @@ function InsertExpenseRecords(scoredRow, rowIndex) {
       ];
     }
 
+    // Idempotency guard 3 (2026-09-30, Sophia) -- DESTINATION-side, the authoritative check.
+    // Guards 1 and 2 act upstream on the Scored Expense Submissions sheet, but two overlapping
+    // runs can BOTH pass them (guard 2's read-then-append is not atomic across runs; the SES
+    // append can even collapse to one row while both runs still reach this function). So re-derive
+    // the hash from the scored row and refuse to write a SECOND ledger row when this hash is
+    // already present in THIS ledger. The hash is embedded in every inserted Description as
+    // "Edgar Scoring Hash Key: <hash>", so a column-B scan is authoritative and lock-independent.
+    const _destHashKey = String(scoredRow[DEST_HASH_KEY_COL] || '').trim();
+    if (_destHashKey) {
+      const _destMarker = `Edgar Scoring Hash Key: ${_destHashKey}`;
+      const _scanLastRow = targetSheet.getLastRow();
+      let _existingRow = -1;
+      if (_scanLastRow > 0) {
+        const _descCol = targetSheet.getRange(1, 2, _scanLastRow, 1).getValues();
+        for (let _r = 0; _r < _descCol.length; _r++) {
+          if (String(_descCol[_r][0] || '').indexOf(_destMarker) !== -1) { _existingRow = _r + 1; break; }
+        }
+      }
+      if (_existingRow > 0) {
+        Logger.log(`InsertExpenseRecords: hash ${_destHashKey} already present at row ${_existingRow} of "${targetSheetName}" -- skipping duplicate ledger insert (destination-side idempotency guard)`);
+        return _existingRow;
+      }
+    }
+
     const lastRow = targetSheet.getLastRow();
     Logger.log(`Target sheet "${targetSheetName}" last row: ${lastRow}, preparing to insert at row ${lastRow + 1}`);
     Logger.log(`Row data to insert (${rowToAppend.length} columns): ${JSON.stringify(rowToAppend)}`);
@@ -1053,18 +1090,24 @@ function parseDateFromYYYYMMDD(dateStr) {
 }
 
 function parseAndProcessTelegramLogs() {
-  // Idempotency guard 1 (2026-09-09 double-booking fix, Edgar_20260909124022_298): serialize
-  // overlapping runs so a second dispatch can't snapshot col K before the first run appends.
+  // Idempotency guard 1 (2026-09-09 double-booking fix, Edgar_20260909124022_298).
   //
-  // TEMP DISABLED 2026-09-12 (Gary): lock contention made every run abort after 30s
-  // ("could not acquire script lock within 30s"), stalling all expense processing. Flip
-  // _DISABLE_PROC_LOCK back to false to re-enable. Double-booking is still covered by
-  // Idempotency guard 2 below (fresh col-K re-read immediately before the append).
-  const _DISABLE_PROC_LOCK = true;
-  const _procLock = _DISABLE_PROC_LOCK ? null : LockService.getScriptLock();
-  if (_procLock && !_procLock.waitLock(30000)) {
-    Logger.log('parseAndProcessTelegramLogs: could not acquire script lock within 30s; aborting to avoid double-processing');
-    return { status: 'skipped_lock_contention' };
+  // 2026-09-30 (Sophia): the original guard used a BLOCKING waitLock(30000) and ABORTED the whole
+  // run on contention. The Telegram webhook fires on every message AND a cron also dispatches, so
+  // runs almost always overlapped -> the 30s abort stalled ALL expense processing, which is why it
+  // was disabled on 2026-09-12. That left only guard 2 below (a non-atomic read-then-append) that
+  // two overlapping runs can BOTH survive -> the ledger got double-written (incident: warehouse
+  // fumigation, 1 intake row -> 2 identical AGL16 rows, same hash and same Request Txn ID).
+  //
+  // Fixed two ways: (a) here, guard 1 becomes a NON-BLOCKING best-effort lock (tryLock, no wait) --
+  // it serializes when the lock is free and is simply skipped when busy, so it can NEVER stall or
+  // abort a run; and (b) guard 3 in InsertExpenseRecords re-checks the ACTUAL target ledger for the
+  // hash right before writing, which makes a duplicate ledger row impossible regardless of the
+  // lock state. Correctness no longer depends on the lock.
+  const _procLock = LockService.getScriptLock();
+  const _haveProcLock = _procLock.tryLock(0);
+  if (!_haveProcLock) {
+    Logger.log('parseAndProcessTelegramLogs: script lock busy; continuing without it (duplicate-safe via destination-side idempotency guard)');
   }
   try {
   try {
@@ -1281,7 +1324,7 @@ function parseAndProcessTelegramLogs() {
     throw e; // Re-throw to ensure error is visible
   }
   } finally {
-    if (_procLock) _procLock.releaseLock();
+    if (_haveProcLock) _procLock.releaseLock();
   }
 }
 
