@@ -66,10 +66,12 @@ def test_revenue_flags_cash_blank_inventory_n():
 def test_fails_closed_on_unresolved_plot():
     src = _src()
     assert "return { booked: false, reason: 'PLOT_NOT_FOUND' }" in src
-    assert "return { booked: false, reason: 'BAD_AMOUNT_TREE_COUNT_OR_CURRENCY' }" in src
+    assert (
+        "return { booked: false, reason: 'BAD_AMOUNT_TREE_COUNT_OR_CURRENCY' }" in src
+    )
 
 
-def test_never_overwrites_registry_contributor():
+def test_never_overwrites_registry_farmer():
     src = _src()
     assert "MISMATCH_EXISTING" in src
     assert "ALREADY_SET" in src
@@ -88,7 +90,7 @@ def test_routed_in_web_service():
 def test_no_second_row_appended_for_seed():
     """Seeding writes a single cell (col T), never an appended row."""
     src = _src()
-    seed = src.split("function pfSeedPlotContributor_")[1].split("function ")[0]
+    seed = src.split("function pfSeedPlotFarmer_")[1].split("function ")[0]
     assert "setValue(name)" in seed
     assert "appendRow" not in seed
 
