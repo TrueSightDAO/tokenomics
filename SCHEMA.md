@@ -1,6 +1,6 @@
 # TrueSight DAO - Google Sheets Schema Documentation
 
-> **Last Updated:** 2026-09-20
+> **Last Updated:** 2026-10-16
 > 
 > This document provides a consolidated reference for all Google Sheets used across TrueSight DAO's Google Apps Scripts. Use this as a central schema reference when making code changes.
 
@@ -1983,6 +1983,86 @@ Introduced/tracked by `SUNMINT_FARMER_SETTLEMENT_AND_BATCH_LINK_PLAN.md`.
 - Format: SHA-256 hash (16 characters)
 - Input: `{messageId}-{contributorName}-{date}`
 - Prevents duplicate processing
+
+---
+
+### Service Account → Sheet Access Matrix
+
+**Last verified:** 2026-10-16 (via Drive `permissions.list` + Sheets `protectedRanges`).
+
+DAOs service accounts (SAs) hold **Drive-level** roles on each workbook, and many tabs additionally
+carry a **range-level protection** whose editor list is the *authoritative* per-tab allowlist. Two rules:
+
+- **Drive `writer` ≠ tab write.** A protected range with an explicit editor list overrides the workbook
+  role — an SA that is a workbook `writer` but *not* in that range's editor list **cannot** write the tab
+  via API (`HTTP 400: protected cell`).
+- **Protected range with an empty editor list** = **owner-only** (no SA writes; governors other than the
+  owner also cannot write it via API).
+
+#### Main Ledger — `1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU`
+
+Workbook-level SA grants:
+
+| SA | Drive role |
+|----|-----------|
+| `cypher-defense@get-data-io.iam.gserviceaccount.com` | writer |
+| `tokenomics-schema@get-data-io.iam.gserviceaccount.com` | writer |
+| `agroverse-qr-code-manager@get-data-io.iam.gserviceaccount.com` | writer |
+| `agroverse-market-research@get-data-io.iam.gserviceaccount.com` | writer |
+| `agroverse-ledger-manager@get-data-io.iam.gserviceaccount.com` | writer |
+| `sunmint-ledger-manager@get-data-io.iam.gserviceaccount.com` | writer |
+| `sophia-truesight@get-data-io.iam.gserviceaccount.com` | writer |
+| `edgar-dapp-listener@get-data-io.iam.gserviceaccount.com` | writer |
+| `edgar-aws-billing-automation@get-data-io.iam.gserviceaccount.com` | writer |
+| `tdg-scoring-peer-reviewer@get-data-io.iam.gserviceaccount.com` | reader |
+| `butterfly-effect-club@get-data-io.iam.gserviceaccount.com` | reader |
+| `onaya-bionpack@get-data-io.iam.gserviceaccount.com` | reader |
+
+Per-tab protected ranges **with SA editors** (these SAs can write the tab):
+
+| Tab | SA editors |
+|-----|-----------|
+| `Contributors contact information` | `tokenomics-schema`, `agroverse-market-research`, `edgar-dapp-listener`, `edgar-aws-billing-automation`, `agroverse-ledger-manager`, `agroverse-qr-code-manager`, `sophia-truesight`, `cypher-defense` |
+| `Agroverse QR codes` | `tokenomics-schema`, `agroverse-market-research`, `edgar-dapp-listener`, `edgar-aws-billing-automation`, `agroverse-qr-code-manager`, `sophia-truesight`, `cypher-defense` |
+
+Protected tabs with an **empty editor list** (owner-only — no SA writes): `Contributors voting weight`,
+`Outstanding Airdrops`, `Contributors Digital Signatures`, `offchain asset location`,
+`off chain asset balance`, `Recurring Transactions`, `Governors`, `Intiatives Scoring Rubric`,
+`TRUESIGHT token details`, `Agroverse Active Contributors`, `States`, `Currencies`,
+`Recent Contributions - 180`, `Stripe Social Media Checkout ID`, `Shipment Ledger Listing`,
+`Agroverse SKUs`, `Agroverse News Letter Subscribers`, `Performance Statistics`,
+`Monthly Statistics`, `offchain assets in transit`.
+
+Unprotected tabs (any workbook `writer` can write): `Ledger history`, `offchain transactions`,
+`Consignments`, `Contribution submission`, `DAO Partners`, `Contributor Staking`,
+`Commodity Prices Exchange Rate`, `Agroverse Price Components`, `Agroverse Cacao Category Pricing`,
+`Agroverse Cacao Processing Cost`, `Agroverse News Letter Emails`, `Sheet51`, `Partner Check-ins`,
+`Subscription Fulfillment Queue`, `shipment_nfe`, `Governor Sync Log`.
+
+> **Note:** the offchain substrate (`offchain transactions`) is unprotected, but the **`offchain asset location`** / **`off chain asset balance`** tabs it feeds are **owner-only protected array-formula views** — book to the substrate, never the views.
+
+#### Telegram & Submissions — `1qbZZhf-_7xzmDTriaJVWj6OZshyQsFkdsAV8-pyzASQ`
+
+Workbook-level SA grants:
+
+| SA | Drive role |
+|----|-----------|
+| `agroverse-qr-code-manager@get-data-io.iam.gserviceaccount.com` | writer |
+| `edgar-dapp-listener@get-data-io.iam.gserviceaccount.com` | writer |
+| `agroverse-market-research@get-data-io.iam.gserviceaccount.com` | writer |
+| `agroverse-ledger-manager@get-data-io.iam.gserviceaccount.com` | writer |
+| `sunmint-ledger-manager@get-data-io.iam.gserviceaccount.com` | writer |
+
+All 37 tabs are **unprotected** — any workbook `writer` SA can append. Representative tabs:
+`Telegram Chat Logs`, `Inventory Movement`, `QR Code Sales`, `QR Code Generation`, `Asset Receipts`,
+`Currency Creation`, `Currency Conversion`, `Repackaging Settlement`, `Scored Expense Submissions`,
+`Warmup Sends`, `payouts`, `SunMint Tree Planting`, `SunMint Plots`, `Plot Financing`. (Full per-tab
+list is in the sheet sections above.)
+
+> **Maintenance:** regenerate this table with two calls —
+> `drive.permissions().list(fileId=…)` (workbook roles) and
+> `spreadsheets().get(fields='sheets(protectedRanges)')` (per-tab editor lists) — whenever an SA is
+> added/removed. Do **not** hand-maintain it.
 
 ---
 
