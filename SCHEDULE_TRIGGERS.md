@@ -341,6 +341,37 @@ All scheduled functions use hash keys for deduplication:
 
 ---
 
+## Programmatic Trigger Management (Convention)
+
+Time-driven triggers **cannot** be created via the Sheets/Drive API - only in the Apps Script editor UI or by the script itself (`ScriptApp`). Hand-adding them in the UI is error-prone (the "Minutes timer" defaults to **hourly**, not 30-min; the event source is easy to leave as "From spreadsheet"; and the trigger is lost when a project is copied/restored).
+
+**Convention: every GAS project that needs a schedule ships a `Triggers.gs` module and DECLARES its triggers in a `TRIGGER_SPECS` table; an operator runs `installTriggers()` once after authorizing.**
+
+Copy [`google_app_scripts/Triggers.template.gs`](./google_app_scripts/Triggers.template.gs) into the project as `Triggers.gs`, fill in `TRIGGER_SPECS`, then run from the editor:
+
+| Function | Purpose |
+|---|---|
+| `installTriggers()` | Create every trigger declared in `TRIGGER_SPECS`. **Idempotent** - deletes an existing trigger for a declared handler before (re)creating it, so re-running never stacks duplicates. |
+| `uninstallTriggers()` | Remove the triggers for declared handlers (symmetric with install) - the "pause the schedule" button. |
+| `listTriggers()` | Log + return the project's current triggers (verification). |
+
+`TRIGGER_SPECS` entry shape: `{ handler, kind: 'minutes' | 'hours' | 'days', every, atHour? }`.
+
+**Notes**
+
+- Triggers are owned by the identity that created them; `ScriptApp.getProjectTriggers()` returns only the **calling** identity's triggers - run `installTriggers()` / `uninstallTriggers()` as the same account.
+- For an on-demand run without waiting for the schedule, add a thin `runNow()` that calls the handler directly (see the seo example's `runWeeklyGscSnapshotNow`).
+- Precedent: [`go_to_market/google_app_scripts/seo_monitoring_gsc/Triggers.gs`](https://github.com/TrueSightDAO/go_to_market/blob/main/google_app_scripts/seo_monitoring_gsc/Triggers.gs) (`installWeeklyTrigger` / `installMonthlyDataForSeoTrigger`); this module generalizes it.
+
+### Adopting this for an existing project
+
+1. Add `Triggers.gs` (from the template) with the handler(s) declared in `TRIGGER_SPECS`.
+2. Run `installTriggers()` from the editor (grants OAuth if needed).
+3. Confirm with `listTriggers()`.
+4. Any pre-existing hand-added UI trigger for a declared handler is removed by `installTriggers()`; for other handlers, delete them manually.
+
+---
+
 ## Related Documentation
 
 - [API_ENDPOINTS.md](./API_ENDPOINTS.md) - Webhook endpoints and API documentation
