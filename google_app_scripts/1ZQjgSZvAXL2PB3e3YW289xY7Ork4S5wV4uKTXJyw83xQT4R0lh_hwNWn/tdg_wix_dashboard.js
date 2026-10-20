@@ -2345,12 +2345,42 @@ function isSaleTransaction(description, hasEquityMatch, hasLiabilityMatch) {
  *
  * Returns a valid Date, or null if the cell cannot be interpreted.
  */
+// A YYYYMMDD integer stamped into a cell that carries a DATE number format comes
+// back from getValues() as a real Date built from that integer AS A SERIAL — e.g.
+// 20261020 -> year 57372. Such a Date is meaningless as a date but the original
+// integer is recoverable, so recover it and re-parse as YYYYMMDD. Any genuine
+// date has a sane year and keeps the [object Date] path.
+var OFFCHAIN_MAX_SANE_YEAR = 9999;
+var OFFCHAIN_SHEETS_EPOCH_MS = Date.UTC(1899, 11, 30); // Google Sheets serial epoch
+
 function coerceOffchainDateCell(raw) {
   if (raw === null || raw === undefined || raw === '') {
     return null;
   }
   if (Object.prototype.toString.call(raw) === '[object Date]') {
-    return isNaN(raw.getTime()) ? null : raw;
+    if (isNaN(raw.getTime())) {
+      return null;
+    }
+    if (raw.getUTCFullYear() <= OFFCHAIN_MAX_SANE_YEAR) {
+      return raw; // a genuine date
+    }
+    // Absurd year => this Date is a YYYYMMDD integer misread as a serial.
+    var recoveredSerial = Math.round((raw.getTime() - OFFCHAIN_SHEETS_EPOCH_MS) / 86400000);
+    var recoveredStr = String(recoveredSerial);
+    if (recoveredStr.length !== 8) {
+      Logger.log("⚠️  Offchain date cell has unbounded year and no 8-digit serial to recover: '" + raw.toISOString() + "'");
+      return null;
+    }
+    var recYear = parseInt(recoveredStr.substring(0, 4), 10);
+    var recMonth = parseInt(recoveredStr.substring(4, 6), 10);
+    var recDay = parseInt(recoveredStr.substring(6, 8), 10);
+    if (isNaN(recYear) || isNaN(recMonth) || isNaN(recDay) ||
+        recMonth < 1 || recMonth > 12 || recDay < 1 || recDay > 31) {
+      Logger.log("⚠️  Recovered YYYYMMDD '" + recoveredStr + "' from a bogus Date is not a valid date");
+      return null;
+    }
+    var recovered = new Date(recYear, recMonth - 1, recDay);
+    return isNaN(recovered.getTime()) ? null : recovered;
   }
   var dateStr = String(raw).trim();
   if (dateStr.length < 8) {
@@ -2371,6 +2401,7 @@ function coerceOffchainDateCell(raw) {
 
 function extractCurrentMonthSalesFromOffchain(sheet, currentMonth) {
   var totalSales = 0;
+  var skippedRows = [];
   
   try {
     var lastRow = sheet.getLastRow();
@@ -2427,14 +2458,19 @@ function extractCurrentMonthSalesFromOffchain(sheet, currentMonth) {
           totalSales += amount;
         }
       } catch (e) {
-        // Skip invalid rows
+        // Do not fail silently: a row that cannot be parsed used to vanish without
+        // trace, which is exactly how the $0 monthly-sales defect stayed invisible.
+        skippedRows.push({ row: i + 4, reason: e.message });
+        Logger.log("⚠️  Skipped offchain row " + (i + 4) + ": " + e.message);
         continue;
       }
     }
   } catch (e) {
-    Logger.log("Error extracting sales from offchain transactions: " + e.message);
+    Logger.log("❌ Error extracting sales from offchain transactions: " + e.message);
+    throw e; // surface it — a swallowed failure here publishes a wrong number
   }
   
+  extractCurrentMonthSalesFromOffchain.lastSkipped = skippedRows;
   return totalSales;
 }
 
@@ -2650,8 +2686,10 @@ function calculateCurrentMonthSales() {
       }
     }
   } catch (e) {
+    // Returning 0 here made every hard failure look like a legitimate "no sales
+    // this month" and reported errors=0 to syncAllPerformanceStatistics.
     Logger.log("❌ Error calculating current month sales: " + e.message);
-    return 0;
+    throw e;
   }
   
   Logger.log("✅ Total current month sales: $" + totalSales.toFixed(2));
