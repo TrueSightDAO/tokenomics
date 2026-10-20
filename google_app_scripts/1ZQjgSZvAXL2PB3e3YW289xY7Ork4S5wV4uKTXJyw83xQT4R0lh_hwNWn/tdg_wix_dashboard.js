@@ -2627,6 +2627,48 @@ function calculateCurrentMonthSales() {
  * Update current month's statistics in the Monthly Statistics sheet
  * This function calculates the current month's sales and AUM, then updates the sheet
  */
+/**
+ * Return the row index at which the current month should be appended: one past
+ * the last row of the contiguous monthly data block.
+ *
+ * Do NOT use sheet.getLastRow() for this. getLastRow() returns the last row with
+ * content ANYWHERE in the tab, so a single stray value far below the data block
+ * (a formatted-but-empty cell, a note, or a previously stranded month row)
+ * inflates it to hundreds of rows past the real data. Appending at
+ * getLastRow()+1 then writes the new month to the bottom of the sheet, e.g. row
+ * 1000 of a 30-row table.
+ *
+ * readMonthlyStatistics() bounds its read at lastRow rows, so a month written
+ * below that bound is invisible to the chart even though it was written
+ * successfully - the chart shows $0 for the current month while the writer logs
+ * success. That is exactly how 2026-10 ended up stranded at row 1000 with
+ * monthlySales = 0.
+ *
+ * @param {Sheet} sheet - The Monthly Statistics sheet
+ * @return {number} 1-based row index to append at
+ */
+function findMonthlyAppendRow(sheet) {
+  var lastRow = sheet.getLastRow();
+  if (lastRow < 1) {
+    return 1;
+  }
+  var colA = sheet.getRange(1, 1, lastRow, 1).getValues();
+  // Walk DOWN from the header and stop at the first blank month label. The
+  // monthly table is appended strictly in sequence, so the table ends where the
+  // unbroken run of populated column-A labels ends. Anchoring on the LAST
+  // populated row instead would treat a stranded month (2026-10 at row 1000) as
+  // the end of the table and keep writing there forever, leaving the 970-row
+  // hole permanent.
+  var lastDataRow = 0;
+  for (var i = 0; i < colA.length; i++) {
+    if (String(colA[i][0] || '').trim() === '') {
+      break;
+    }
+    lastDataRow = i + 1; // 1-based
+  }
+  return lastDataRow + 1;
+}
+
 function updateCurrentMonthStatistics() {
   try {
     var spreadsheet = SpreadsheetApp.openById(ledgerDocId);
@@ -2667,7 +2709,36 @@ function updateCurrentMonthStatistics() {
     }
     
     // Find the row with this month (check all rows to handle duplicates)
-    var lastRow = monthlySheet.getLastRow();
+    // Anchor on the last row of the CONTIGUOUS data block, NOT getLastRow().
+    // The month-match scan, the cumulative-sales sum and the append position
+    // below all derive from this value and must agree on where the real data
+    // ends - otherwise the current month is appended to the bottom of the sheet
+    // where readMonthlyStatistics() never reads it. See findMonthlyAppendRow().
+    var lastRow = findMonthlyAppendRow(monthlySheet) - 1;
+
+    // Self-heal: a current-month row written by the old getLastRow()+1 logic can
+    // sit far below the data block (2026-10 was stranded at row 1000). Left in
+    // place it would surface as a SECOND, zero-valued data point for the same
+    // month, so remove any current-month row below the real block before
+    // deciding where this month belongs.
+    var strandedScanLast = monthlySheet.getLastRow();
+    if (strandedScanLast > lastRow) {
+      var tailCol = monthlySheet.getRange(lastRow + 1, 1, strandedScanLast - lastRow, 1).getValues();
+      var strandedRows = [];
+      for (var t = 0; t < tailCol.length; t++) {
+        if (String(tailCol[t][0] || '').trim() === currentMonth) {
+          strandedRows.push(lastRow + 1 + t);
+        }
+      }
+      strandedRows.sort(function (a, b) { return b - a; }); // bottom-up
+      for (var sr = 0; sr < strandedRows.length; sr++) {
+        monthlySheet.deleteRow(strandedRows[sr]);
+        Logger.log("Removed stranded row " + strandedRows[sr] + " for month " + currentMonth);
+      }
+      if (strandedRows.length > 0) {
+        lastRow = findMonthlyAppendRow(monthlySheet) - 1;
+      }
+    }
     var rowIndex = -1;
     var duplicateRowIndices = []; // Track duplicate rows to remove them
     
