@@ -1295,16 +1295,12 @@ function extract30DaysSalesFromOffchain(sheet, cutoffDate) {
       
       try {
         // Column A: Transaction Date (YYYYMMDD)
-        var dateStr = String(row[0]).trim();
-        if (!dateStr || dateStr.length < 8) {
+        // Column A is normally 8-digit YYYYMMDD, but a DATE number-format
+        // makes getValues() return a real Date object instead. Coerce both.
+        var date = coerceOffchainDateCell(row[0]);
+        if (!date) {
           continue;
         }
-        
-        // Parse date
-        var year = parseInt(dateStr.substring(0, 4));
-        var month = parseInt(dateStr.substring(4, 6));
-        var day = parseInt(dateStr.substring(6, 8));
-        var date = new Date(year, month - 1, day);
         
         // Only process transactions from past 30 days
         if (date < cutoffDate) {
@@ -2330,6 +2326,49 @@ function isSaleTransaction(description, hasEquityMatch, hasLiabilityMatch) {
  * @param {string} currentMonth - Current month in YYYY-MM format
  * @return {number} Total sales amount for the current month
  */
+/**
+ * Coerce an "offchain transactions" column-A cell into a Date.
+ *
+ * Column A is documented as Transaction Date (YYYYMMDD) and is normally a plain
+ * 8-digit string/number. But the sales pipeline sometimes stamps a DATE
+ * number-format on the cell, and in that case getValues() hands back a real
+ * Date object. The original parse did:
+ *
+ *     var dateStr = String(row[0]).trim();          // "Sat Oct 20 2026 ..."
+ *     parseInt(dateStr.substring(0, 4))             // parseInt("Sat ") -> NaN
+ *     new Date(NaN, NaN, NaN)                       // Invalid Date
+ *     Utilities.formatDate(InvalidDate, ...)        // THROWS
+ *
+ * The throw was swallowed by the per-row catch, so every DATE-formatted row was
+ * silently skipped (2026-10: all 18 rows / $137.00 of sales) and the month
+ * consolidated to $0.00 with no error surfaced anywhere.
+ *
+ * Returns a valid Date, or null if the cell cannot be interpreted.
+ */
+function coerceOffchainDateCell(raw) {
+  if (raw === null || raw === undefined || raw === '') {
+    return null;
+  }
+  if (Object.prototype.toString.call(raw) === '[object Date]') {
+    return isNaN(raw.getTime()) ? null : raw;
+  }
+  var dateStr = String(raw).trim();
+  if (dateStr.length < 8) {
+    return null;
+  }
+  var year = parseInt(dateStr.substring(0, 4), 10);
+  var month = parseInt(dateStr.substring(4, 6), 10);
+  var day = parseInt(dateStr.substring(6, 8), 10);
+  if (isNaN(year) || isNaN(month) || isNaN(day)) {
+    return null;
+  }
+  if (month < 1 || month > 12 || day < 1 || day > 31) {
+    return null;
+  }
+  var d = new Date(year, month - 1, day);
+  return isNaN(d.getTime()) ? null : d;
+}
+
 function extractCurrentMonthSalesFromOffchain(sheet, currentMonth) {
   var totalSales = 0;
   
@@ -2348,16 +2387,12 @@ function extractCurrentMonthSalesFromOffchain(sheet, currentMonth) {
       
       try {
         // Column A: Transaction Date (YYYYMMDD)
-        var dateStr = String(row[0]).trim();
-        if (!dateStr || dateStr.length < 8) {
+        // Column A is normally 8-digit YYYYMMDD, but a DATE number-format
+        // makes getValues() return a real Date object instead. Coerce both.
+        var date = coerceOffchainDateCell(row[0]);
+        if (!date) {
           continue;
         }
-        
-        // Parse date and get month
-        var year = parseInt(dateStr.substring(0, 4));
-        var month = parseInt(dateStr.substring(4, 6));
-        var day = parseInt(dateStr.substring(6, 8));
-        var date = new Date(year, month - 1, day);
         var monthKey = Utilities.formatDate(date, Session.getScriptTimeZone(), 'yyyy-MM');
         
         // Only process current month
