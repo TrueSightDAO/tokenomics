@@ -104,6 +104,13 @@
 
     <script>
         // Google Apps Script web service URL
+        // Primary: static cache republished daily by
+        // .github/workflows/publish-monthly-statistics-cache.yml, so the chart
+        // does not run Apps Script on every page load.
+        const MONTHLY_STATISTICS_CACHE_URL = 'https://raw.githubusercontent.com/TrueSightDAO/treasury-cache/main/monthly-statistics.json';
+
+        // Fallback: the live Apps Script deployment, used only when the cache is
+        // unreachable or empty. Identical response shape, so the parser is shared.
         const MONTHLY_STATISTICS_URL = 'https://script.google.com/macros/s/AKfycbzlfOBo9UqKOh7jIqGcmbPAMM1RxCbsJHb-UV_vM6VbvK_HSdT44KyGbbXIeo-_Ovfy/exec?type=monthly';
         
         let salesChart = null;
@@ -125,10 +132,28 @@
             return date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
         }
 
-        // Load monthly statistics from Google Apps Script
+        // Fetch the payload: static cache first, live Apps Script as fallback.
+        // Returns a Response-shaped object so callers use .ok/.json() unchanged.
+        async function fetchMonthlyStatistics() {
+            try {
+                const cached = await fetch(MONTHLY_STATISTICS_CACHE_URL, { cache: 'no-cache' });
+                if (cached.ok) {
+                    const payload = await cached.json();
+                    if (payload && Array.isArray(payload.data) && payload.data.length) {
+                        return { ok: true, json: async () => payload };
+                    }
+                }
+                console.warn('Monthly statistics cache empty; falling back to Apps Script');
+            } catch (e) {
+                console.warn('Monthly statistics cache unreachable; falling back to Apps Script:', e);
+            }
+            return await fetch(MONTHLY_STATISTICS_URL);
+        }
+
+        // Load monthly statistics
         async function loadMonthlyStatistics() {
             try {
-                const response = await fetch(MONTHLY_STATISTICS_URL);
+                const response = await fetchMonthlyStatistics();
                 
                 if (!response.ok) {
                     throw new Error(`HTTP error! status: ${response.status}`);

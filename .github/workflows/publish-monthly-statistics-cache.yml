@@ -1,0 +1,75 @@
+# Publishes the Monthly Statistics sheet as a static JSON cache to
+# TrueSightDAO/treasury-cache/monthly-statistics.json, so the monthly chart
+# stops calling the Google Apps Script web app on every page load.
+#
+# Background: ?type=monthly on the tdg_wix_dashboard web app rebuilds its
+# payload on every request by reading the "Monthly Statistics" tab. That put a
+# live Apps Script execution in the read path of a public chart -- slow,
+# quota-bound, and it silently returned $0 for October 2026 when DATE-formatted
+# cells defeated the offchain coercion (tokenomics #588/#589/#590/#592). Serving
+# a snapshot from raw.githubusercontent.com takes Apps Script out of the read
+# path entirely.
+#
+# Complements (does not replace) the GAS writer: updateCurrentMonthStatistics()
+# still owns the sheet, and this job simply mirrors whatever it wrote.
+#
+# Required repository secrets (tokenomics):
+#   GOOGLE_CREDENTIALS        -- service-account JSON with Sheets read on the Main
+#                                Ledger (same value other tokenomics workflows use).
+#   TREASURY_CACHE_PUSH_TOKEN -- fine-grained PAT with Contents: Read and write on
+#                                TrueSightDAO/treasury-cache. GITHUB_TOKEN cannot
+#                                push to a different repo, so a PAT is required.
+
+name: Publish monthly statistics cache
+
+on:
+  workflow_dispatch:
+  schedule:
+    # 07:00 UTC daily -- after the sibling inventory (06:15), managed-ledger
+    # (06:30) and currencies (06:45) jobs, to spread Google Sheets API bursts.
+    - cron: "0 7 * * *"
+
+concurrency:
+  group: monthly-statistics-cache
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout tokenomics
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install "gspread>=5.12" "google-auth>=2.23" "google-api-python-client>=2.100"
+
+      - name: Run unit tests
+        run: |
+          python -m pytest python_scripts/tdg_asset_management/test_publish_monthly_statistics_cache.py -q
+
+      - name: Write Google credentials
+        run: echo '${{ secrets.GOOGLE_CREDENTIALS }}' > google_credentials.json
+
+      - name: Build and publish monthly statistics cache
+        env:
+          MONTHLY_STATS_CREDS_PATH: ${{ github.workspace }}/google_credentials.json
+          TREASURY_CACHE_TOKEN: ${{ secrets.TREASURY_CACHE_PUSH_TOKEN }}
+        run: |
+          python3 python_scripts/tdg_asset_management/publish_monthly_statistics_cache.py
+
+      - name: Notify on failure
+        if: failure()
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const { context } = require('@actions/github');
+            console.log(`Workflow failed: ${context.job}`);
