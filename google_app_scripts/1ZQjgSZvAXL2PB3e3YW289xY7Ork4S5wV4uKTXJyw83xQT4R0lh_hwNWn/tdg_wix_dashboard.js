@@ -2853,6 +2853,38 @@ function findMonthlyAppendRow(sheet) {
   return lastDataRow + 1;
 }
 
+/**
+ * Normalise a Year-Month cell (column A of Monthly Statistics) to a 'yyyy-MM' key.
+ *
+ * Column A is written as text with an '@' number format, but a cell can still come
+ * back from getValues() as a real Date: a DATE number format turns a typed
+ * "2026-10" into 2026-10-01, and legacy values can be Dates outright. A strict
+ * string compare against currentMonth silently fails on such a row - which is how
+ * the stranded-row clean-up could miss the very row it exists to remove.
+ *
+ * Returns '' when the cell carries nothing interpretable.
+ */
+function monthKeyOfCell_(raw) {
+  if (raw === null || raw === undefined || String(raw).trim() === '') {
+    return '';
+  }
+  if (Object.prototype.toString.call(raw) === '[object Date]') {
+    if (isNaN(raw.getTime())) {
+      return '';
+    }
+    return Utilities.formatDate(raw, Session.getScriptTimeZone(), 'yyyy-MM');
+  }
+  var s = String(raw).trim();
+  var m = s.match(/^(\\d{4})[-\\/](\\d{2})/); // 2026-10, 2026-10-01, 2026/10/01
+  if (m) {
+    return m[1] + '-' + m[2];
+  }
+  if (/^\\d{8}$/.test(s)) { // 20261020
+    return s.substring(0, 4) + '-' + s.substring(4, 6);
+  }
+  return s;
+}
+
 function updateCurrentMonthStatistics() {
   try {
     var spreadsheet = SpreadsheetApp.openById(ledgerDocId);
@@ -2910,7 +2942,7 @@ function updateCurrentMonthStatistics() {
       var tailCol = monthlySheet.getRange(lastRow + 1, 1, strandedScanLast - lastRow, 1).getValues();
       var strandedRows = [];
       for (var t = 0; t < tailCol.length; t++) {
-        if (String(tailCol[t][0] || '').trim() === currentMonth) {
+        if (monthKeyOfCell_(tailCol[t][0]) === currentMonth) {
           strandedRows.push(lastRow + 1 + t);
         }
       }
@@ -2931,9 +2963,10 @@ function updateCurrentMonthStatistics() {
       var months = dataRange.getValues();
       
       for (var i = 0; i < months.length; i++) {
-        var monthValue = String(months[i][0] || '').trim();
-        // Normalize the month value for comparison (handle dates that might be formatted differently)
-        if (monthValue === currentMonth || monthValue.startsWith(currentMonth)) {
+        // Normalise first: a DATE-formatted cell comes back as a Date and a
+        // strict string compare would miss the row entirely.
+        var monthValue = monthKeyOfCell_(months[i][0]);
+        if (monthValue === currentMonth) {
           if (rowIndex === -1) {
             // First match - this is the row we'll update
             rowIndex = i + 2; // +2 because data starts at row 2
@@ -2951,8 +2984,9 @@ function updateCurrentMonthStatistics() {
           monthlySheet.deleteRow(duplicateRowIndices[d]);
           Logger.log("✅ Removed duplicate row " + duplicateRowIndices[d] + " for month " + currentMonth);
         }
-        // Recalculate lastRow after deletions
-        lastRow = monthlySheet.getLastRow();
+        // Re-anchor on the contiguous block. getLastRow() would re-acquire a
+        // stranded row sitting far below it.
+        lastRow = findMonthlyAppendRow(monthlySheet) - 1;
       }
     }
     
@@ -2972,8 +3006,13 @@ function updateCurrentMonthStatistics() {
     }
     
     if (rowIndex === -1) {
-      // Month not found - add new row
-      var newRowIndex = monthlySheet.getLastRow() + 1;
+      // Month not found - add new row directly below the contiguous block.
+      // getLastRow() + 1 is WRONG here: a stranded current-month row (2026-10 at
+      // row 1000) inflates getLastRow(), and since the sheet is only 1000 rows
+      // tall the write silently clamps back onto the last row - so the month can
+      // never escape and the append feeds on its own leftovers. Anchor on the
+      // block, exactly like the month scan above.
+      var newRowIndex = findMonthlyAppendRow(monthlySheet);
       monthlySheet.getRange(newRowIndex, 1).setValue(currentMonth); // Column A: Year-Month (as text)
       monthlySheet.getRange(newRowIndex, 1).setNumberFormat('@'); // Force text format
       monthlySheet.getRange(newRowIndex, 2).setValue(currentMonthSales); // Column B: Monthly Sales Volume
