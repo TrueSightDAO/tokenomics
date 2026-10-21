@@ -2626,17 +2626,12 @@ function extractCurrentMonthSalesFromOffchain(sheet, currentMonth) {
       var row = values[i];
       
       try {
-        // Column A: Transaction Date (YYYYMMDD)
-        var dateStr = String(row[0]).trim();
-        if (!dateStr || dateStr.length < 8) {
+        // Column A is DATE-formatted, so getValues() hands back a real Date
+        // rather than the YYYYMMDD integer (see coerceOffchainDateCell).
+        var date = coerceOffchainDateCell(row[0]);
+        if (!date) {
           continue;
         }
-        
-        // Parse date and get month
-        var year = parseInt(dateStr.substring(0, 4));
-        var month = parseInt(dateStr.substring(4, 6));
-        var day = parseInt(dateStr.substring(6, 8));
-        var date = new Date(year, month - 1, day);
         var monthKey = Utilities.formatDate(date, Session.getScriptTimeZone(), 'yyyy-MM');
         
         // Only process current month
@@ -2948,6 +2943,85 @@ function findMonthlyAppendRow(sheet) {
   return lastDataRow + 1;
 }
 
+var OFFCHAIN_MAX_SANE_YEAR = 9999;
+var OFFCHAIN_SHEETS_EPOCH_MS = Date.UTC(1899, 11, 30); // Google Sheets serial epoch
+
+// Normalise a Monthly Statistics column-A cell to 'yyyy-MM'.
+// The cell is DATE-formatted in the sheet, so getValues() returns a real Date
+// object, while older rows hold a plain text label. Comparing String(cell) to
+// 'yyyy-MM' therefore never matched a Date, so the month was treated as absent
+// and re-appended at the grid bottom instead of being updated in place.
+function monthKeyOfCell_(raw) {
+  if (raw === null || raw === undefined || String(raw).trim() === '') {
+    return '';
+  }
+  if (Object.prototype.toString.call(raw) === '[object Date]') {
+    if (isNaN(raw.getTime())) {
+      return '';
+    }
+    return Utilities.formatDate(raw, Session.getScriptTimeZone(), 'yyyy-MM');
+  }
+  var s = String(raw).trim();
+  var m = s.match(/^(\d{4})[-\/](\d{2})/); // 2026-10, 2026-10-01, 2026/10/01
+  if (m) {
+    return m[1] + '-' + m[2];
+  }
+  if (/^\d{8}$/.test(s)) { // 20261020
+    return s.substring(0, 4) + '-' + s.substring(4, 6);
+  }
+  return s;
+}
+
+// Recover an offchain-transactions column-A date cell. The cell is DATE
+// formatted, so a YYYYMMDD integer arrives as a Date whose serial is the
+// integer itself (e.g. 20261020 -> a Date in year 57xxx). Naively taking
+// String(row[0]).substring(4,6) hits letters and returns NaN, silently
+// skipping every row and reporting $0 for the month.
+function coerceOffchainDateCell(raw) {
+  if (raw === null || raw === undefined || raw === '') {
+    return null;
+  }
+  if (Object.prototype.toString.call(raw) === '[object Date]') {
+    if (isNaN(raw.getTime())) {
+      return null;
+    }
+    var y = raw.getUTCFullYear();
+    if (y > 1900 && y <= OFFCHAIN_MAX_SANE_YEAR) {
+      return raw; // a genuine date
+    }
+    // Absurd year => this Date is a YYYYMMDD integer misread as a serial.
+    var recoveredSerial = Math.round((raw.getTime() - OFFCHAIN_SHEETS_EPOCH_MS) / 86400000);
+    var recoveredStr = String(recoveredSerial);
+    if (recoveredStr.length !== 8) {
+      return null;
+    }
+    var recYear = parseInt(recoveredStr.substring(0, 4), 10);
+    var recMonth = parseInt(recoveredStr.substring(4, 6), 10);
+    var recDay = parseInt(recoveredStr.substring(6, 8), 10);
+    if (isNaN(recYear) || isNaN(recMonth) || isNaN(recDay) ||
+        recMonth < 1 || recMonth > 12 || recDay < 1 || recDay > 31) {
+      return null;
+    }
+    var recovered = new Date(recYear, recMonth - 1, recDay);
+    return isNaN(recovered.getTime()) ? null : recovered;
+  }
+  var dateStr = String(raw).trim();
+  if (dateStr.length < 8) {
+    return null;
+  }
+  var year = parseInt(dateStr.substring(0, 4), 10);
+  var month = parseInt(dateStr.substring(4, 6), 10);
+  var day = parseInt(dateStr.substring(6, 8), 10);
+  if (isNaN(year) || isNaN(month) || isNaN(day)) {
+    return null;
+  }
+  if (month < 1 || month > 12 || day < 1 || day > 31) {
+    return null;
+  }
+  var d = new Date(year, month - 1, day);
+  return isNaN(d.getTime()) ? null : d;
+}
+
 function updateCurrentMonthStatistics() {
   try {
     var spreadsheet = SpreadsheetApp.openById(ledgerDocId);
@@ -3026,9 +3100,11 @@ function updateCurrentMonthStatistics() {
       var months = dataRange.getValues();
       
       for (var i = 0; i < months.length; i++) {
-        var monthValue = String(months[i][0] || '').trim();
-        // Normalize the month value for comparison (handle dates that might be formatted differently)
-        if (monthValue === currentMonth || monthValue.startsWith(currentMonth)) {
+        // Column A may hold a real Date (DATE-formatted cell) or a text label.
+        // monthKeyOfCell_() normalises both to 'yyyy-MM' so a Date can never
+        // silently fail the compare and re-append the month at the grid bottom.
+        var monthValue = monthKeyOfCell_(months[i][0]);
+        if (monthValue === currentMonth) {
           if (rowIndex === -1) {
             // First match - this is the row we'll update
             rowIndex = i + 2; // +2 because data starts at row 2
@@ -3046,8 +3122,9 @@ function updateCurrentMonthStatistics() {
           monthlySheet.deleteRow(duplicateRowIndices[d]);
           Logger.log("✅ Removed duplicate row " + duplicateRowIndices[d] + " for month " + currentMonth);
         }
-        // Recalculate lastRow after deletions
-        lastRow = monthlySheet.getLastRow();
+        // Re-anchor on the contiguous data block after deletions (NOT
+        // getLastRow(), which a stranded row at the grid bottom would inflate).
+        lastRow = findMonthlyAppendRow(monthlySheet) - 1;
       }
     }
     
@@ -3068,7 +3145,11 @@ function updateCurrentMonthStatistics() {
     
     if (rowIndex === -1) {
       // Month not found - add new row
-      var newRowIndex = monthlySheet.getLastRow() + 1;
+      // Anchor on the first empty column A, NOT getLastRow()+1. getLastRow()
+      // includes stranded rows far below the table and can sit at the grid's
+      // final row, in which case +1 falls outside the grid and GAS silently
+      // grows the sheet, writing the month at row 1000 instead of row 31.
+      var newRowIndex = findMonthlyAppendRow(monthlySheet);
       monthlySheet.getRange(newRowIndex, 1).setValue(currentMonth); // Column A: Year-Month (as text)
       monthlySheet.getRange(newRowIndex, 1).setNumberFormat('@'); // Force text format
       monthlySheet.getRange(newRowIndex, 2).setValue(currentMonthSales); // Column B: Monthly Sales Volume
