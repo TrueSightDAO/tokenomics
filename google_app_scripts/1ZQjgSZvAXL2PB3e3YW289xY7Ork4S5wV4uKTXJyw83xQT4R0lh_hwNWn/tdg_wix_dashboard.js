@@ -2133,6 +2133,15 @@ function doGet(e) {
         .setMimeType(ContentService.MimeType.JSON);
     }
     
+    if (action === 'diagSales') {
+      return ContentService
+        .createTextOutput(JSON.stringify({
+          timestamp: new Date().toISOString(),
+          diagnostics: probeMonthlySalesDiagnostics()
+        }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+
     // Default: return all performance statistics
     var data = readPerformanceStatistics();
     
@@ -2353,6 +2362,107 @@ function isSaleTransaction(description, hasEquityMatch, hasLiabilityMatch) {
 var OFFCHAIN_MAX_SANE_YEAR = 9999;
 var OFFCHAIN_SHEETS_EPOCH_MS = Date.UTC(1899, 11, 30); // Google Sheets serial epoch
 
+// Last per-row skip list produced by extractCurrentMonthSalesFromOffchain().
+// Feeds report.skipped so the sync response carries real evidence instead of a
+// hardcoded empty array.
+var OFFCHAIN_LAST_SKIPPED = [];
+
+/**
+ * Describe a raw cell value from getValues() without interpreting it, so the
+ * actual type handed over by Apps Script is visible in the response.
+ * @param {*} raw
+ * @return {string}
+ */
+function describeOffchainRawDate(raw) {
+  if (raw === null || raw === undefined) {
+    return 'null/undefined';
+  }
+  if (Object.prototype.toString.call(raw) === '[object Date]') {
+    var valid = !isNaN(raw.getTime());
+    return 'Date(valid=' + valid + ', utcYear=' +
+      (valid ? raw.getUTCFullYear() : 'n/a') + ', iso=' +
+      (valid ? raw.toISOString() : 'n/a') + ')';
+  }
+  return Object.prototype.toString.call(raw) + '(' + String(raw) + ')';
+}
+
+/**
+ * Read-only diagnostic for the "monthly sales reads $0" defect. Reports the
+ * script timezone, the resolved current month, and — for every recent row of
+ * `offchain transactions` — the RAW value type, its coerced value and the
+ * resulting month key, plus the total the production predicate would produce.
+ * Performs no writes. Exposed as ?action=diagSales.
+ *
+ * @return {Object}
+ */
+function probeMonthlySalesDiagnostics() {
+  var tz = Session.getScriptTimeZone();
+  var now = new Date();
+  var currentMonth = Utilities.formatDate(now, tz, 'yyyy-MM');
+  var out = {
+    scriptTimeZone: tz,
+    nowIso: now.toISOString(),
+    currentMonth: currentMonth,
+    salsKeywordsCount: (typeof SALES_KEYWORDS !== 'undefined' ? SALES_KEYWORDS.length : null),
+    rows: [],
+    monthTally: {},
+    recomputedTotal: 0,
+    contributingRows: [],
+    errors: []
+  };
+  try {
+    var ss = SpreadsheetApp.openById(ledgerDocId);
+    var sheet = ss.getSheetByName('offchain transactions');
+    if (!sheet) {
+      out.errors.push('sheet "offchain transactions" not found');
+      return out;
+    }
+    var lastRow = sheet.getLastRow();
+    out.offchainLastRow = lastRow;
+    var span = 70;
+    var start = Math.max(4, lastRow - span + 1);
+    out.scannedFrom = start;
+    out.scannedTo = lastRow;
+    var values = sheet.getRange(start, 1, lastRow - start + 1, 7).getValues();
+    for (var i = 0; i < values.length; i++) {
+      try {
+        var row = values[i];
+        var raw = row[0];
+        var amount = parseFloat(row[3]) || 0;
+        var currency = String(row[4] || '').trim();
+        var isRevenue = row[6];
+        var isRevenueFlag = (isRevenue === true ||
+          String(isRevenue).toUpperCase() === 'TRUE' ||
+          String(isRevenue).trim() === '1');
+        var d = coerceOffchainDateCell(raw);
+        var monthKey = d ? Utilities.formatDate(d, tz, 'yyyy-MM') : null;
+        var rec = {
+          row: start + i,
+          raw: describeOffchainRawDate(raw),
+          coercedIso: d ? d.toISOString() : null,
+          monthKey: monthKey,
+          amount: amount,
+          currency: currency,
+          isRevenueFlag: isRevenueFlag
+        };
+        if (monthKey) {
+          out.monthTally[monthKey] = (out.monthTally[monthKey] || 0) + 1;
+        }
+        if (monthKey === currentMonth && currency === 'USD' && amount > 0 && isRevenueFlag) {
+          out.recomputedTotal += amount;
+          out.contributingRows.push(start + i);
+        }
+        out.rows.push(rec);
+      } catch (rowErr) {
+        out.errors.push('row ' + (start + i) + ': ' + rowErr.message);
+      }
+    }
+  } catch (e) {
+    out.errors.push(e.message);
+  }
+  return out;
+}
+
 function coerceOffchainDateCell(raw) {
   if (raw === null || raw === undefined || raw === '') {
     return null;
@@ -2471,6 +2581,7 @@ function extractCurrentMonthSalesFromOffchain(sheet, currentMonth) {
   }
   
   extractCurrentMonthSalesFromOffchain.lastSkipped = skippedRows;
+  OFFCHAIN_LAST_SKIPPED = skippedRows;
   return totalSales;
 }
 
@@ -3264,7 +3375,11 @@ function syncAllPerformanceStatistics() {
     
     // 9. Update current month's statistics in Monthly Statistics sheet
     try {
+      OFFCHAIN_LAST_SKIPPED = [];
       updateCurrentMonthStatistics();
+      for (var sk = 0; sk < OFFCHAIN_LAST_SKIPPED.length; sk++) {
+        report.skipped.push(OFFCHAIN_LAST_SKIPPED[sk]);
+      }
       Logger.log("✅ Updated current month statistics in Monthly Statistics sheet");
     } catch (e) {
       report.errors.push({ key: "MONTHLY_STATISTICS", error: e.message });
