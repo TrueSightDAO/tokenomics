@@ -866,13 +866,37 @@ function processInventoryReport(reportText) {
           };
         }
       } else {
-        // Assume currency is from offchain asset location
-        currencySource = {
-          spreadsheet_id: OFFCHAIN_SPREADSHEET_ID,
-          sheet_name: OFFCHAIN_ASSET_SHEET_NAME,
-          ledger_name: 'offchain',
-          ledger_url: `https://docs.google.com/spreadsheets/d/${OFFCHAIN_SPREADSHEET_ID}/edit`
-        };
+        // GUARD_MARKER: No [LEDGER_NAME] prefix present. Do NOT blindly assume offchain
+        // (OFFCHAIN_SPREADSHEET_ID is MAIN) -- ask the guard whether the item text names
+        // a known ledger. See resolveCurrencyLedger().
+        const guardConfigs = getLedgerConfigsFromWix();
+        const guardResult = resolveCurrencyLedger(currency, guardConfigs);
+
+        if (guardResult.action === 'route') {
+          Logger.log(`ROUTING GUARD: currency "${currency}" names ledger ${guardResult.ledger_name} ` +
+                     `without a [LEDGER] prefix - routing to ${guardResult.ledger_name} instead of defaulting to offchain`);
+          currencySource = {
+            spreadsheet_id: guardResult.ledger_url.match(/\/d\/([^\/]+)/)?.[1] || '',
+            sheet_name: DEFAULT_AGL_SHEET_NAME,
+            ledger_name: guardResult.ledger_name,
+            ledger_url: guardResult.ledger_url
+          };
+        } else if (guardResult.action === 'error') {
+          // Refuse loudly rather than book into the wrong ledger.
+          return {
+            error: `Routing guard: ${guardResult.reason}. Report: "${currency}". ` +
+                   `Fix the "- Inventory Item:" field (prefix the ledger as [AGL13] Currency, or remove the ledger suffix).`
+          };
+        } else {
+          // Genuinely offchain - prior behaviour preserved.
+          Logger.log(`Offchain (no ledger named): currency "${currency}"${guardResult.reason ? ' [' + guardResult.reason + ']' : ''}`);
+          currencySource = {
+            spreadsheet_id: OFFCHAIN_SPREADSHEET_ID,
+            sheet_name: OFFCHAIN_ASSET_SHEET_NAME,
+            ledger_name: 'offchain',
+            ledger_url: `https://docs.google.com/spreadsheets/d/${OFFCHAIN_SPREADSHEET_ID}/edit`
+          };
+        }
       }
     }
 
@@ -888,6 +912,70 @@ function processInventoryReport(reportText) {
     Logger.log('Error processing inventory report: ' + error.message);
     return { error: 'Error processing report: ' + error.message };
   }
+}
+
+
+// ===== ROUTING GUARD (GUARD_MARKER) =====
+// Root cause: when a movement report's "- Inventory Item:" carries no
+// "[LEDGER_NAME]" prefix the parser fell through to `offchain` -- and
+// OFFCHAIN_SPREADSHEET_ID is the MAIN book. A shipment-ledger quantity such as
+// "Cacao Nibs (Kilograms) Santos 20260213 - AGL13" was therefore silently booked
+// into MAIN instead of AGL13. That is how the Vivi pouch movement mislanded.
+//
+// We cannot reject every un-prefixed currency: legitimate offchain items
+// ("Cacao Nibs Kraft Pouch", "USD", "22 Litres Insulated Box") name no ledger and
+// must keep defaulting to offchain. The guard fires only when the text names a
+// KNOWN ledger token.
+//
+// Returns {action:'offchain'|'route'|'error', ledger_name?, ledger_url?, reason?}
+function resolveCurrencyLedger(currency, ledgerConfigs) {
+  const text = String(currency || '');
+  const configs = ledgerConfigs || [];
+
+  // Canonical token form: "AGL 13" / "agl13" / "AGL-13" -> agl13
+  const tokenRe = /\b(?:agl|sef|pp)[\s\-]*(\d+)\b/gi;
+  const found = [];
+  let m;
+  while ((m = tokenRe.exec(text)) !== null) {
+    found.push('agl' + m[1]);
+  }
+
+  if (found.length === 0) {
+    return { action: 'offchain', reason: 'no ledger token named' };
+  }
+
+  const named = configs.filter(function (c) {
+    const nm = String(c.ledger_name || '').toLowerCase().trim()
+      .match(/^(?:agl|sef|pp)[\s\-]*(\d+)$/);
+    if (!nm) return false;
+    return found.indexOf('agl' + nm[1]) !== -1;
+  });
+
+  if (named.length === 0) {
+    return { action: 'offchain', reason: 'ledger-like token not in Shipment Ledger Listing: ' + found.join(',') };
+  }
+
+  const byId = {};
+  named.forEach(function (c) { byId[String(c.ledger_name).toLowerCase().trim()] = c; });
+  const ids = Object.keys(byId);
+
+  if (ids.length > 1) {
+    return { action: 'error', reason: 'ambiguous: names multiple ledgers (' + ids.join(', ') + ') without a [LEDGER] prefix' };
+  }
+
+  const cfg = byId[ids[0]];
+  const name = String(cfg.ledger_name || '').trim();
+
+  // Preserve the long-standing explicit rule: AGL4 movements stay offchain.
+  if (name.toLowerCase() === 'agl4') {
+    return { action: 'offchain', reason: 'AGL4 retains its explicit offchain rule' };
+  }
+
+  if (!cfg.ledger_url) {
+    return { action: 'error', reason: 'ledger ' + name + ' named but no ledger_url configured' };
+  }
+
+  return { action: 'route', ledger_name: name, ledger_url: cfg.ledger_url };
 }
 
 /**
