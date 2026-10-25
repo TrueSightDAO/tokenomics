@@ -60,6 +60,14 @@ function doGet(e) {
     const exec = e?.parameter?.exec || '';
     const action = e?.parameter?.action || '';
 
+    // Pipeline diagnostics — read-only. Names why the scorer is stuck instead of
+    // requiring a guess between trigger / key / sheet-permission failure modes.
+    if (exec === 'diagnose') {
+      const result = diagnoseScoringPipeline();
+      return ContentService.createTextOutput(JSON.stringify(result, null, 2))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+
     // PR4 — review queue write-back
     if (exec === 'processApprovalRejections') {
       const result = processApprovalRejections();
@@ -85,7 +93,7 @@ function doGet(e) {
       status: 'ok',
       project: 'tdg_scoring',
       version: '1.0.0',
-      endpoints: ['processApprovalRejections', 'processTelegramChatLogs']
+      endpoints: ['processApprovalRejections', 'processTelegramChatLogs', 'diagnose']
     })).setMimeType(ContentService.MimeType.JSON);
 
   } catch (error) {
