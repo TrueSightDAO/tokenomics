@@ -25,7 +25,9 @@ const PIPELINE_HEALTH_HEADERS = ['Timestamp', 'Function', 'Outcome', 'Message', 
 
 const REQUIRED_SCRIPT_PROPERTIES = [
   'XAI_API_KEY',
+  'XAI_API_URL',
   'OPENAI_API_KEY',
+  'OPENAI_API_URL',
   'TELEGRAM_API_TOKEN',
   'TELEGRAM_SHEET_URL',
   'OUTPUT_SHEET_URL',
@@ -42,7 +44,12 @@ const REQUIRED_SCRIPT_PROPERTIES = [
 function logPipelineHealth_(fn, outcome, message, detail) {
   try {
     const url = getCredentials().OUTPUT_SHEET_URL;
-    if (!url) return;
+    if (!url) {
+      // Cannot reach the sheet, but must not vanish: the execution log still exists.
+      Logger.log('logPipelineHealth_: OUTPUT_SHEET_URL not set, health row dropped: ' +
+        (fn || '') + ' ' + (outcome || '') + ' ' + (message || ''));
+      return;
+    }
     const ss = SpreadsheetApp.openByUrl(url);
     let sheet = ss.getSheetByName(PIPELINE_HEALTH_SHEET);
     if (!sheet) {
@@ -81,10 +88,26 @@ function diagnoseScoringPipeline() {
   // 1. Script properties - presence only, never values.
   const sp = PropertiesService.getScriptProperties();
   const missing = REQUIRED_SCRIPT_PROPERTIES.filter(function (k) { return !sp.getProperty(k); });
-  out.checks.scriptProperties = { checked: REQUIRED_SCRIPT_PROPERTIES.length, missing: missing };
+  // Present-but-not-URL-shaped is its own failure mode: a whitespace-only or bare-host value
+  // still throws inside UrlFetchApp.fetch ('Attribute provided with no value: url') and
+  // SpreadsheetApp.openByUrl. Presence alone is not enough, so check the shape too.
+  const malformed = REQUIRED_SCRIPT_PROPERTIES.filter(function (k) {
+    if (k.indexOf('_URL') === -1) return false;
+    const v = sp.getProperty(k);
+    return !!v && !/^https?:\/\//i.test(v.trim());
+  });
+  out.checks.scriptProperties = {
+    checked: REQUIRED_SCRIPT_PROPERTIES.length,
+    missing: missing,
+    malformed: malformed
+  };
   if (missing.length > 0) {
     out.ok = false;
     out.findings.push('Script Properties missing: ' + missing.join(', '));
+  }
+  if (malformed.length > 0) {
+    out.ok = false;
+    out.findings.push('Script Properties present but not URL-shaped: ' + malformed.join(', '));
   }
 
   // 2. Triggers - is anything actually scheduling the scorer?
