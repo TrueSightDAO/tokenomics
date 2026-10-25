@@ -308,7 +308,10 @@ function buildScoredChatlogsHashSet_() {
 // Modified to send notification once per chatId
 function processTelegramChatLogs() {
   if (!XAI_API_KEY) {
-    Logger.log(`processTelegramChatLogs: Error: Please set XAI_API_KEY in Script Properties.`);
+    const noKeyMsg = 'XAI_API_KEY is not set in Script Properties — no row can be scored.';
+    Logger.log(`processTelegramChatLogs: Error: ` + noKeyMsg);
+    // Previously returned silently into the execution log; now leaves a visible trace.
+    logPipelineHealth_('processTelegramChatLogs', 'ERROR', noKeyMsg, 'Returned at first statement; backlog cannot drain.');
     return;
   }
 
@@ -316,7 +319,9 @@ function processTelegramChatLogs() {
   const telegramSheet = telegramSpreadsheet.getSheetByName("Telegram Chat Logs");
 
   if (!telegramSheet) {
-    Logger.log(`processTelegramChatLogs: Error: Sheet "Telegram Chat Logs" not found in ${TELEGRAM_SHEET_URL}`);
+    const noSheetMsg = `Sheet "Telegram Chat Logs" not found in the configured TELEGRAM_SHEET_URL.`;
+    Logger.log(`processTelegramChatLogs: Error: ` + noSheetMsg);
+    logPipelineHealth_('processTelegramChatLogs', 'ERROR', noSheetMsg, 'Check TELEGRAM_SHEET_URL and that the deploying identity can open it.');
     return;
   }
 
@@ -421,6 +426,12 @@ function processTelegramChatLogs() {
   });
 
   Logger.log(`processTelegramChatLogs: Processed ${totalMessages} new messages from Telegram Chat Logs`);
+  logPipelineHealth_(
+    'processTelegramChatLogs',
+    'OK',
+    `Processed ${totalMessages} new message(s); backfilled ${backfilled} status row(s).`,
+    `intake rows scanned: ${data.length - 1}`
+  );
 }
 
 function processWhatsappChatlogs() {
