@@ -13,6 +13,13 @@
  *           created_at, last_active_at }] }
  *       ]
  *     }
+ * - Also emits `public_keys/<sha256>.json` per-key files (content-addressed
+ *   point-lookup) plus `public_keys/_manifest.json`, written atomically with
+ *   `dao_members.json` in ONE commit via the Git Trees API.
+ *   RESTORED 2026-09-15: this emitter was dropped by migration commit 50999ec
+ *   (2026-06-16, "flatten clasp_mirrors/ ..."), which rewrote the repo to match
+ *   the then-deployed GAS state (the pre-PR1 script). The per-key store was
+ *   frozen from 2026-06-18 until this restore; see PUBLIC_KEY_LOOKUP_CACHE_PLAN.md.
  *
  * Schema v4 (current):
  *   - `discord_id` / `telegram_id` / `telegram_handle` — cross-interface identity
@@ -70,6 +77,18 @@ const DAO_MEMBERS_CACHE_REPO_NAME = 'treasury-cache';
 const DAO_MEMBERS_CACHE_REPO_PATH = 'dao_members.json';
 const DAO_MEMBERS_CACHE_BRANCH = 'main';
 const DAO_MEMBERS_CACHE_SCHEMA_VERSION = 4;
+
+// Per-key public key cache — content-addressed point-lookup store (PR1/tokenomics#359).
+// RESTORED 2026-09-15: the per-key emitter was dropped by migration commit 50999ec
+// ("flatten clasp_mirrors/ into google_app_scripts/<scriptId>/ folders", 2026-06-16),
+// which rewrote the repo to match the then-deployed GAS state (the pre-PR1 script).
+// The per-key store has been frozen since 2026-06-18 as a result.
+// See PUBLIC_KEY_LOOKUP_CACHE_PLAN.md §U5.
+// Schema version 1: { schema_version, sha256, public_key, contributor, roles,
+//                     status, created_at, last_active_at, generated_at }
+const PUBLIC_KEYS_CACHE_SCHEMA_VERSION = 1;
+const PUBLIC_KEYS_DIR = 'public_keys';
+const PUBLIC_KEYS_MANIFEST_PATH = PUBLIC_KEYS_DIR + '/_manifest.json';
 
 // assetVerify web app in tdg_asset_management — source of DAO-wide aggregates
 // (voting_rights_circulated, total_assets, asset_per_circulated_voting_right,
@@ -369,7 +388,79 @@ function publishDaoMembersCacheToGithub_(opts) {
     contributors: contributors,
   };
 
-  const content = JSON.stringify(snapshot, null, 2) + '\n';
+  // ----- Build per-key files for content-addressed point-lookup ----------
+  // Each ACTIVE public key gets its own file: public_keys/<sha256>.json
+  // No email in per-key files (privacy decision per PUBLIC_KEY_LOOKUP_CACHE_PLAN.md).
+  const currentKeys = {};  // sha256 -> { contributor, roles, status, created_at, last_active_at, public_key }
+  contributors.forEach(function (c) {
+    c.public_keys.forEach(function (keyEntry) {
+      if (keyEntry.status !== 'ACTIVE') return;
+      const pk = keyEntry.public_key;
+      const sha256 = computeSha256_(pk);
+      currentKeys[sha256] = {
+        public_key: pk,
+        contributor: c.name,
+        roles: c.roles,
+        status: 'ACTIVE',
+        created_at: keyEntry.created_at || null,
+        last_active_at: keyEntry.last_active_at || null,
+      };
+    });
+  });
+
+  // ----- Fetch current manifest for incremental diff ----------------------
+  const existingManifest = fetchCurrentManifest_(token);
+  const previousKeys = existingManifest.keys || {};  // sha256 -> blob_sha
+
+  const removedShas = {};  // sha256 -> true (was in manifest, no longer ACTIVE)
+  Object.keys(previousKeys).forEach(function (sha256) {
+    if (!currentKeys[sha256]) {
+      removedShas[sha256] = true;
+    }
+  });
+
+  const perKeyFiles = [];
+
+  // Write REVOKED files for keys that are gone
+  Object.keys(removedShas).forEach(function (sha256) {
+    const revokedFile = {
+      schema_version: PUBLIC_KEYS_CACHE_SCHEMA_VERSION,
+      sha256: sha256,
+      public_key: null,
+      contributor: null,
+      roles: null,
+      status: 'REVOKED',
+      created_at: null,
+      last_active_at: null,
+      generated_at: snapshot.generated_at,
+    };
+    perKeyFiles.push({
+      path: PUBLIC_KEYS_DIR + '/' + sha256 + '.json',
+      content: JSON.stringify(revokedFile, null, 2) + '\n',
+    });
+  });
+
+  // Write a per-key file for every ACTIVE key
+  Object.keys(currentKeys).forEach(function (sha256) {
+    const key = currentKeys[sha256];
+    const keyFile = {
+      schema_version: PUBLIC_KEYS_CACHE_SCHEMA_VERSION,
+      sha256: sha256,
+      public_key: key.public_key,
+      contributor: key.contributor,
+      roles: key.roles,
+      status: key.status,
+      created_at: key.created_at,
+      last_active_at: key.last_active_at,
+      generated_at: snapshot.generated_at,
+    };
+    perKeyFiles.push({
+      path: PUBLIC_KEYS_DIR + '/' + sha256 + '.json',
+      content: JSON.stringify(keyFile, null, 2) + '\n',
+    });
+  });
+
+  // ----- Build commit ----------------------------------------------------
   const commitMessage =
       'chore: refresh dao_members.json (' + snapshot.counts.contributors +
       ' contributors, ' + snapshot.counts.governors + ' governors, ' +
@@ -380,16 +471,36 @@ function publishDaoMembersCacheToGithub_(opts) {
       snapshot.counts.contributors_with_telegram_id + ' telegram, trigger=' +
       snapshot.trigger + ')';
 
-  const commit = commitJsonToGithub_({
+  const daoMembersContent = JSON.stringify(snapshot, null, 2) + '\n';
+
+  // dao_members.json + changed per-key files + manifest, all in ONE atomic commit
+  const allFiles = [
+    { path: DAO_MEMBERS_CACHE_REPO_PATH, content: daoMembersContent },
+  ].concat(perKeyFiles);
+
+  const manifestContent = {
+    schema_version: PUBLIC_KEYS_CACHE_SCHEMA_VERSION,
+    generated_at: snapshot.generated_at,
+    keys: {},
+  };
+  Object.keys(currentKeys).forEach(function (sha256) {
+    manifestContent.keys[sha256] = '';
+  });
+  allFiles.push({
+    path: PUBLIC_KEYS_MANIFEST_PATH,
+    content: JSON.stringify(manifestContent, null, 2) + '\n',
+  });
+
+  const commit = commitMultipleFilesToGithubViaTreeApi_({
     token: token,
     owner: DAO_MEMBERS_CACHE_REPO_OWNER,
     repo: DAO_MEMBERS_CACHE_REPO_NAME,
-    path: DAO_MEMBERS_CACHE_REPO_PATH,
     branch: DAO_MEMBERS_CACHE_BRANCH,
-    content: content,
+    files: allFiles,
     commitMessage: commitMessage,
     skipIfUnchanged: !o.force,
   });
+
 
   return {
     counts: snapshot.counts,
@@ -542,3 +653,242 @@ function toNumberOrNull_(value) {
   const n = typeof value === 'number' ? value : parseFloat(String(value).replace(/,/g, ''));
   return isFinite(n) ? n : null;
 }
+
+/**
+ * Write multiple files in ONE commit via the Git Trees API.
+ *
+ * Steps:
+ * 1. GET the current HEAD commit to get the base tree SHA.
+ * 2. Create a blob for each file via POST /git/blobs.
+ * 3. Build a tree with all blob entries via POST /git/trees.
+ * 4. Create a commit via POST /git/commits.
+ * 5. Update the branch ref via PATCH /git/refs/heads/<branch>.
+ *
+ * This is atomic — either all files land or none do.
+ */
+function commitMultipleFilesToGithubViaTreeApi_(args) {
+  const owner = args.owner;
+  const repo = args.repo;
+  const branch = args.branch;
+  const token = args.token;
+  const files = args.files;  // [{path, content}, ...]
+  const commitMessage = args.commitMessage;
+  const skipIfUnchanged = args.skipIfUnchanged !== false;
+
+  const headers = {
+    'Authorization': 'token ' + token,
+    'Accept': 'application/vnd.github+json',
+    'User-Agent': 'TrueSightDAO-tdg-identity-management/1.0',
+  };
+
+  const baseUrl = 'https://api.github.com/repos/' + owner + '/' + repo;
+
+  // 1. Get the current HEAD commit (to get base tree SHA)
+  const refUrl = baseUrl + '/git/refs/heads/' + encodeURIComponent(branch);
+  const refResp = UrlFetchApp.fetch(refUrl, {
+    method: 'get',
+    headers: headers,
+    muteHttpExceptions: true,
+  });
+  if (refResp.getResponseCode() !== 200) {
+    throw new Error('Failed to get ref (HTTP ' + refResp.getResponseCode() + '): ' +
+        refResp.getContentText().substring(0, 400));
+  }
+  const refData = JSON.parse(refResp.getContentText());
+  const headSha = refData.object.sha;
+
+  // 2. Get the current commit to find the base tree SHA
+  const commitUrl = baseUrl + '/git/commits/' + headSha;
+  const commitResp = UrlFetchApp.fetch(commitUrl, {
+    method: 'get',
+    headers: headers,
+    muteHttpExceptions: true,
+  });
+  if (commitResp.getResponseCode() !== 200) {
+    throw new Error('Failed to get commit (HTTP ' + commitResp.getResponseCode() + '): ' +
+        commitResp.getContentText().substring(0, 400));
+  }
+  const commitData = JSON.parse(commitResp.getContentText());
+  const baseTreeSha = commitData.tree.sha;
+
+  // 3. Create blobs for each file
+  const blobShas = [];
+  files.forEach(function (file) {
+    const blobUrl = baseUrl + '/git/blobs';
+    const blobPayload = {
+      content: file.content,
+      encoding: 'utf-8',
+    };
+    const blobResp = UrlFetchApp.fetch(blobUrl, {
+      method: 'post',
+      contentType: 'application/json',
+      headers: headers,
+      payload: JSON.stringify(blobPayload),
+      muteHttpExceptions: true,
+    });
+    if (blobResp.getResponseCode() < 200 || blobResp.getResponseCode() >= 300) {
+      throw new Error('Failed to create blob for ' + file.path + ' (HTTP ' +
+          blobResp.getResponseCode() + '): ' + blobResp.getContentText().substring(0, 400));
+    }
+    const blobData = JSON.parse(blobResp.getContentText());
+    blobShas.push({
+      path: file.path,
+      sha: blobData.sha,
+      mode: '100644',  // regular file
+      type: 'blob',
+    });
+  });
+
+  // 4. Create a tree with all blob entries
+  const treeUrl = baseUrl + '/git/trees';
+  const treePayload = {
+    base_tree: baseTreeSha,
+    tree: blobShas,
+  };
+  const treeResp = UrlFetchApp.fetch(treeUrl, {
+    method: 'post',
+    contentType: 'application/json',
+    headers: headers,
+    payload: JSON.stringify(treePayload),
+    muteHttpExceptions: true,
+  });
+  if (treeResp.getResponseCode() < 200 || treeResp.getResponseCode() >= 300) {
+    throw new Error('Failed to create tree (HTTP ' + treeResp.getResponseCode() + '): ' +
+        treeResp.getContentText().substring(0, 400));
+  }
+  const treeData = JSON.parse(treeResp.getContentText());
+  const newTreeSha = treeData.sha;
+
+  // No-op guard: when every file's content is byte-identical to what is already
+  // on the branch, GitHub's tree API returns the SAME tree SHA. Skip the commit
+  // so cron / Edgar re-pings don't create empty commits (parity with the
+  // previous contents-API path's stripVolatileFields_ check).
+  if (skipIfUnchanged && newTreeSha === baseTreeSha) {
+    return { status: 'unchanged', sha: headSha };
+  }
+
+  // 5. Create a commit
+  const newCommitUrl = baseUrl + '/git/commits';
+  const newCommitPayload = {
+    message: commitMessage,
+    tree: newTreeSha,
+    parents: [headSha],
+  };
+  const newCommitResp = UrlFetchApp.fetch(newCommitUrl, {
+    method: 'post',
+    contentType: 'application/json',
+    headers: headers,
+    payload: JSON.stringify(newCommitPayload),
+    muteHttpExceptions: true,
+  });
+  if (newCommitResp.getResponseCode() < 200 || newCommitResp.getResponseCode() >= 300) {
+    throw new Error('Failed to create commit (HTTP ' + newCommitResp.getResponseCode() + '): ' +
+        newCommitResp.getContentText().substring(0, 400));
+  }
+  const newCommitData = JSON.parse(newCommitResp.getContentText());
+  const newCommitSha = newCommitData.sha;
+
+  // 6. Update the branch ref
+  const updateRefUrl = baseUrl + '/git/refs/heads/' + encodeURIComponent(branch);
+  const updateRefPayload = {
+    sha: newCommitSha,
+    force: false,
+  };
+  const updateRefResp = UrlFetchApp.fetch(updateRefUrl, {
+    method: 'patch',
+    contentType: 'application/json',
+    headers: headers,
+    payload: JSON.stringify(updateRefPayload),
+    muteHttpExceptions: true,
+  });
+  if (updateRefResp.getResponseCode() < 200 || updateRefResp.getResponseCode() >= 300) {
+    throw new Error('Failed to update ref (HTTP ' + updateRefResp.getResponseCode() + '): ' +
+        updateRefResp.getContentText().substring(0, 400));
+  }
+
+  return {
+    status: 'committed',
+    sha: newCommitSha,
+    commit_url: newCommitData.html_url,
+    file_count: files.length,
+  };
+}
+
+/**
+ * Fetch the current _manifest.json from treasury-cache.
+ * Returns { schema_version, generated_at, keys: {sha256: blob_sha} } or
+ * { keys: {} } if the manifest doesn't exist yet (first run).
+ */
+
+/**
+ * Fetch the current _manifest.json from treasury-cache.
+ * Returns { schema_version, generated_at, keys: {sha256: blob_sha} } or
+ * { keys: {} } if the manifest doesn't exist yet (first run).
+ */
+function fetchCurrentManifest_(token) {
+  const url = 'https://api.github.com/repos/' +
+      DAO_MEMBERS_CACHE_REPO_OWNER + '/' +
+      DAO_MEMBERS_CACHE_REPO_NAME + '/contents/' +
+      PUBLIC_KEYS_MANIFEST_PATH + '?ref=' + encodeURIComponent(DAO_MEMBERS_CACHE_BRANCH);
+  const headers = {
+    'Authorization': 'token ' + token,
+    'Accept': 'application/vnd.github+json',
+    'User-Agent': 'TrueSightDAO-tdg-identity-management/1.0',
+  };
+  const resp = UrlFetchApp.fetch(url, {
+    method: 'get',
+    headers: headers,
+    muteHttpExceptions: true,
+  });
+  if (resp.getResponseCode() === 404) {
+    // First run — no manifest yet
+    return { keys: {} };
+  }
+  if (resp.getResponseCode() !== 200) {
+    Logger.log('fetchCurrentManifest_ HTTP ' + resp.getResponseCode() + ': ' +
+        resp.getContentText().substring(0, 400));
+    // Degrade gracefully — treat as empty manifest
+    return { keys: {} };
+  }
+  try {
+    const body = JSON.parse(resp.getContentText());
+    const decoded = Utilities.newBlob(
+        Utilities.base64Decode(body.content.replace(/\n/g, ''))
+    ).getDataAsString();
+    return JSON.parse(decoded);
+  } catch (err) {
+    Logger.log('fetchCurrentManifest_ parse error: ' + err);
+    return { keys: {} };
+  }
+}
+
+/**
+ * Compute SHA-256 hex digest of a string using Apps Script's built-in digest.
+ * Utilities.computeDigest returns an array of signed bytes; we convert to hex.
+ */
+
+/**
+ * Compute SHA-256 hex digest of a string using Apps Script's built-in digest.
+ * Utilities.computeDigest returns an array of signed bytes; we convert to hex.
+ */
+function computeSha256_(str) {
+  const digest = Utilities.computeDigest(
+      Utilities.DigestAlgorithm.SHA_256,
+      str,
+      Utilities.Charset.UTF_8
+  );
+  // Convert signed bytes to hex
+  var hex = '';
+  for (var i = 0; i < digest.length; i++) {
+    var byte = digest[i] & 0xff;
+    if (byte < 16) hex += '0';
+    hex += byte.toString(16);
+  }
+  return hex;
+}
+
+/**
+ * Fetches DAO-wide aggregates from the assetVerify web app. Returns null on
+ * any error so a degraded snapshot still publishes (dapp falls back to the
+ * GAS path in that case — same as the pre-cache world).
+ */
