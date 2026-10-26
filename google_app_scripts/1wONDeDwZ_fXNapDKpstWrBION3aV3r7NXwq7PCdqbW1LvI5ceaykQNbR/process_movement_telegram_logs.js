@@ -177,7 +177,7 @@ function isGovernorApproved_(approvedBy) {
 
 /**
  * Inventory Movement column N (STATUS): NEW if governor, sentinel, or ACTIVE signer matches warehouse manager,
- * signer is a registered DAO governor, or trusted agent submission approved by a governor;
+ * signer is a registered DAO governor/sentinel, or trusted agent submission approved by a governor;
  * unauthorized otherwise (Phase 2 skips non-NEW).
  */
 function inventoryMovementStatusFromTelegramRow_(telegramRow, contribution, warehouseManagerName) {
