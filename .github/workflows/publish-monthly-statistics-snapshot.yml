@@ -1,0 +1,71 @@
+# Publishes treasury-cache/monthly-statistics.json from the Main Ledger's
+# "Monthly Statistics" sheet.
+#
+# WHY: the tokenomics Monthly Statistics chart used to call the Apps Script
+# endpoint `.../exec?type=monthly` on EVERY page load -- each visitor paid a full
+# script execution to draw a chart, and the chart broke whenever the script was
+# redeployed or rate-limited. This job moves that read onto the CDN: the chart
+# now fetches a static JSON snapshot.
+#
+# PRECEDENCE: the Apps Script writer (updateCurrentMonthStatistics, run monthly
+# on the last day of the month ~19:50 Bahia, and on manual triggerSync) remains
+# the ONLY writer of the sheet. This script never writes to the sheet -- it reads
+# and republishes. Running daily keeps the snapshot within 24h while remaining
+# robust to the writer's own schedule drift.
+#
+# Required repository secrets (tokenomics):
+#   GOOGLE_CREDENTIALS        service-account JSON with Sheets read on the Main Ledger
+#   TREASURY_CACHE_PUSH_TOKEN fine-grained PAT, Contents: Read and write on
+#                             TrueSightDAO/treasury-cache (GITHUB_TOKEN cannot cross repos)
+
+name: Publish monthly-statistics snapshot
+
+on:
+  workflow_dispatch:
+  schedule:
+    # 06:20 UTC daily -- interleaved with the sibling treasury-cache jobs
+    # (inventory 06:15, managed ledgers 06:30, currencies 06:45) so Google
+    # Sheets API bursts stay spread out.
+    - cron: "20 6 * * *"
+
+concurrency:
+  group: monthly-statistics-snapshot
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout tokenomics
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install "gspread>=5.12" "google-auth>=2.23"
+
+      - name: Write Google credentials
+        run: echo '${{ secrets.GOOGLE_CREDENTIALS }}' > google_credentials.json
+
+      - name: Snapshot Monthly Statistics and publish to treasury-cache
+        env:
+          MONTHLY_STATS_OUT_DIR: ${{ runner.temp }}/monthly
+          MONTHLY_STATS_CREDS_PATH: ${{ github.workspace }}/google_credentials.json
+          TREASURY_CACHE_TOKEN: ${{ secrets.TREASURY_CACHE_PUSH_TOKEN }}
+        run: |
+          python3 python_scripts/tdg_asset_management/snapshot_monthly_statistics.py
+
+      - name: Upload snapshot artifact (debugging)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: monthly-statistics-snapshot
+          path: ${{ runner.temp }}/monthly/monthly-statistics.json
+          if-no-files-found: warn

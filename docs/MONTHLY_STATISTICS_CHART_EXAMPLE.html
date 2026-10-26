@@ -103,7 +103,15 @@
     </div>
 
     <script>
-        // Google Apps Script web service URL
+        // Primary source: static snapshot on the GitHub CDN, refreshed daily by
+        // .github/workflows/publish-monthly-statistics-snapshot.yml. Loading a
+        // CDN file instead of executing Apps Script per page view keeps the
+        // chart fast and immune to script quota/redeploy breakage.
+        const MONTHLY_STATISTICS_CACHE_URL = 'https://raw.githubusercontent.com/TrueSightDAO/treasury-cache/main/monthly-statistics.json';
+
+        // Fallback only: the Apps Script endpoint. Identical payload shape, so a
+        // cache miss/deploy gap degrades to the old behaviour instead of a
+        // blank chart.
         const MONTHLY_STATISTICS_URL = 'https://script.google.com/macros/s/AKfycbzlfOBo9UqKOh7jIqGcmbPAMM1RxCbsJHb-UV_vM6VbvK_HSdT44KyGbbXIeo-_Ovfy/exec?type=monthly';
         
         let salesChart = null;
@@ -125,22 +133,48 @@
             return date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
         }
 
-        // Load monthly statistics from Google Apps Script
+        // Fetch the pre-built snapshot; return null on any problem so the
+        // caller can fall back to Apps Script.
+        async function fetchMonthlyFromCache() {
+            try {
+                const response = await fetch(MONTHLY_STATISTICS_CACHE_URL, { cache: 'no-cache' });
+                if (!response.ok) {
+                    console.warn('Monthly cache miss (HTTP ' + response.status + ') - falling back to Apps Script');
+                    return null;
+                }
+                const payload = await response.json();
+                const rows = (payload && payload.data) || [];
+                if (rows.length === 0) {
+                    console.warn('Monthly cache empty - falling back to Apps Script');
+                    return null;
+                }
+                return rows;
+            } catch (err) {
+                console.warn('Monthly cache unavailable - falling back to Apps Script:', err);
+                return null;
+            }
+        }
+
+        async function fetchMonthlyFromAppsScript() {
+            const response = await fetch(MONTHLY_STATISTICS_URL);
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            const result = await response.json();
+            if (result.error) {
+                throw new Error(result.message || 'Unknown error from web service');
+            }
+            return result.data || [];
+        }
+
+        // Load monthly statistics: CDN snapshot first, Apps Script as fallback
         async function loadMonthlyStatistics() {
             try {
-                const response = await fetch(MONTHLY_STATISTICS_URL);
-                
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
+                let monthlyData = await fetchMonthlyFromCache();
+
+                if (monthlyData === null) {
+                    monthlyData = await fetchMonthlyFromAppsScript();
                 }
-                
-                const result = await response.json();
-                
-                if (result.error) {
-                    throw new Error(result.message || 'Unknown error from web service');
-                }
-                
-                const monthlyData = result.data || [];
                 
                 if (monthlyData.length === 0) {
                     throw new Error('No monthly statistics data available');
