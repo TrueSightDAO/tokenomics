@@ -1,0 +1,5 @@
+# Files in this folder that must NOT be pushed to the live GAS project.
+# Credentials.sample.js would duplicate getCredentials()/setApiKeys() live -> SyntaxError.
+Credentials.sample.js
+manifest.json
+DEPLOYMENT.md
