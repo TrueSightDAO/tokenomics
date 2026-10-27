@@ -164,6 +164,12 @@ function deriveTransactionRows_(decl, priceTable) {
     resolved.push({ currency: key, quantity: qty, price: price, value: lineValue });
   }
 
+  // Round once, to 6dp, BEFORE the value reaches a ledger row. Float
+  // accumulation gives 24.980000000000004 for 40x0.0705 + 40x0.554; writing
+  // that to a ledger is noise, and it would also make the balance assertion
+  // depend on floating-point ordering rather than arithmetic.
+  valueUsd = Math.round(valueUsd * 1000000) / 1000000;
+
   var sourceRows = [];
   var destRows = [];
   var a;
@@ -213,7 +219,7 @@ function deriveTransactionRows_(decl, priceTable) {
     source: { name: decl.source.name, url: decl.source.url, rows: sourceRows },
     destination: { name: decl.destination.name, url: decl.destination.url, rows: destRows }
   };
-  assertLedgerBalances_(result);
+  assertLedgerBalances_(result, priceTable);
   return result;
 }
 
@@ -228,23 +234,37 @@ function assertClaimPricedOne_(claimKey, priceTable) {
 }
 
 /**
- * Asserts Assets === Equity on EACH ledger independently.
- * The most valuable guard here: it catches any derivation bug BEFORE a row is
- * written, and would have caught the original two-row model that reduced the
- * origin's assets with no counterpart.
+ * Asserts Assets === Equity on EACH ledger independently, IN USD.
+ *
+ * CRITICAL: rows must be VALUED before summing. A ledger row is
+ * (amount x currency), and the mixed-unit case is the whole point of this
+ * event -- an injection's origin holds "-40 envelopes" and "+24.98 USD" in the
+ * SAME Assets section. Summing raw amounts yields -55.02, which is meaningless:
+ * 40 envelopes are not 40 dollars. Every row is converted to USD via the live
+ * price table before the identity is checked.
+ *
+ * This valuation step was missing in the first draft and the guard immediately
+ * failed the injection test with "Assets = -55.02, Equity = 0" -- exactly the
+ * derivation bug this assertion exists to catch BEFORE a row is written.
  */
-function assertLedgerBalances_(derivation) {
+function assertLedgerBalances_(derivation, priceTable) {
   ['source', 'destination'].forEach(function (side) {
     var rows = derivation[side].rows;
     var assetsTotal = 0, equityTotal = 0;
     for (var i = 0; i < rows.length; i++) {
-      if (rows[i][TX_COLS.CATEGORY] === ASSETS_CATEGORY) assetsTotal += rows[i][TX_COLS.AMOUNT];
-      if (rows[i][TX_COLS.CATEGORY] === EQUITY_CATEGORY) equityTotal += rows[i][TX_COLS.AMOUNT];
+      var amount = rows[i][TX_COLS.AMOUNT];
+      var key = rows[i][TX_COLS.CURRENCY];
+      var price = resolvePrice_(key, priceTable);
+      var usd = amount * price;
+      if (rows[i][TX_COLS.CATEGORY] === ASSETS_CATEGORY) assetsTotal += usd;
+      if (rows[i][TX_COLS.CATEGORY] === EQUITY_CATEGORY) equityTotal += usd;
     }
+    assetsTotal = Math.round(assetsTotal * 1000000) / 1000000;
+    equityTotal = Math.round(equityTotal * 1000000) / 1000000;
     var delta = Math.round((assetsTotal - equityTotal) * 1000000) / 1000000;
     if (delta !== 0) {
       throw new Error('UNBALANCED_LEDGER: ' + side + ' ("' + derivation[side].name + '") would '
-        + 'have Assets = ' + assetsTotal + ' but Equity = ' + equityTotal + ' (delta ' + delta
+        + 'have Assets = $' + assetsTotal + ' but Equity = $' + equityTotal + ' (delta ' + delta
         + '). Refusing to write.');
     }
   });
