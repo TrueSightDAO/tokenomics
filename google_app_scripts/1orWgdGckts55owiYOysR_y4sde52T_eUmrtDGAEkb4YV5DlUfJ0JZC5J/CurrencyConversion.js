@@ -708,18 +708,36 @@ function testProcessNewCurrencyConversions() {
  * the first deploy, then again after any handler-name change.
  */
 function installTimeTrigger() {
+  // Handlers swept on the same cadence. Currency conversion keeps its
+  // existing behaviour; managed ledger transactions ride along so the MLTE
+  // producer is reachable even when no webhook URL is configured
+  // (config/application.rb documents the GAS time trigger as the fallback).
+  var HANDLERS = [
+    'parseAndProcessCurrencyConversionLogs',
+    'parseAndProcessManagedLedgerTransactionLogs'
+  ];
+
   var removed = 0;
   ScriptApp.getProjectTriggers().forEach(function (t) {
-    if (t.getHandlerFunction() === 'parseAndProcessCurrencyConversionLogs') {
+    if (HANDLERS.indexOf(t.getHandlerFunction()) !== -1) {
       ScriptApp.deleteTrigger(t);
       removed++;
     }
   });
-  ScriptApp.newTrigger('parseAndProcessCurrencyConversionLogs')
-    .timeBased()
-    .everyMinutes(10)
-    .create();
-  return { removed_existing: removed, installed: 1, cadence_minutes: 10 };
+
+  HANDLERS.forEach(function (handler) {
+    ScriptApp.newTrigger(handler)
+      .timeBased()
+      .everyMinutes(10)
+      .create();
+  });
+
+  return {
+    removed_existing: removed,
+    installed: HANDLERS.length,
+    handlers: HANDLERS,
+    cadence_minutes: 10
+  };
 }
 
 function listTriggers() {
