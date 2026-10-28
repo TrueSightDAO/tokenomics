@@ -324,6 +324,175 @@ function appendRowsAtomically_(writes) {
  *
  * Asset lines are repeatable, formatted `<qty> | <currency key>`.
  */
+// ---------------------------------------------------------------------------
+// Producer: Telegram Chat Logs -> Managed Ledger Transactions
+// ---------------------------------------------------------------------------
+// The consumer (processNewManagedLedgerTransactions) only ever reads rows with
+// Status='NEW'. Until this producer existed NOTHING ever appended those rows, so
+// the tab stayed permanently empty and the engine was silently idle -- no error,
+// no data, no signal. Mirrors parseAndProcessCapitalInjectionLogs() in
+// capital_injection_processing.js, which this project already ships.
+
+/** @private true if this Telegram message was already queued. */
+function managedLedgerTransactionRecordExists_(telegramUpdateId, telegramMessageId) {
+  try {
+    var ss = SpreadsheetApp.openByUrl(TELEGRAM_LOGS_URL);
+    var sheet = ss.getSheetByName(MLTE_SHEET);
+    if (!sheet) return false;
+    var lastRow = sheet.getLastRow();
+    if (lastRow < 2) return false;
+    var values = sheet.getRange(2, 1, lastRow - 1, 2).getValues();
+    for (var i = 0; i < values.length; i++) {
+      if (String(values[i][0]) === String(telegramUpdateId) &&
+          String(values[i][1]) === String(telegramMessageId)) {
+        return true;
+      }
+    }
+    return false;
+  } catch (e) {
+    Logger.log('Error checking for duplicate MLTE: ' + e.message);
+    return false;
+  }
+}
+
+/**
+ * Appends one declaration to Managed Ledger Transactions with Status='NEW'.
+ * VALUE_USD is deliberately left blank -- the consumer derives it from the
+ * Currencies price table and writes it, so the price at queue time is never
+ * mistaken for the price at commit time.
+ */
+function insertManagedLedgerTransactionRecord_(updateId, messageId, logMessage, reporterName, decl) {
+  var ss = SpreadsheetApp.openByUrl(TELEGRAM_LOGS_URL);
+  var sheet = ss.getSheetByName(MLTE_SHEET);
+  if (!sheet) throw new Error(MLTE_SHEET + ' sheet not found');
+  if (managedLedgerTransactionRecordExists_(updateId, messageId)) {
+    Logger.log('⚠️ MLTE record already exists for update ' + updateId + ' / message ' + messageId);
+    return false;
+  }
+
+  var row = [];
+  row[MLTE_COL.UPDATE_ID] = updateId;
+  row[MLTE_COL.MESSAGE_ID] = messageId;
+  row[MLTE_COL.LOG_MESSAGE] = logMessage;
+  row[MLTE_COL.REPORTER] = reporterName;
+  row[MLTE_COL.SRC_NAME] = decl.source.name || '';
+  row[MLTE_COL.SRC_URL] = decl.source.url || '';
+  row[MLTE_COL.DST_NAME] = decl.destination.name || '';
+  row[MLTE_COL.DST_URL] = decl.destination.url || '';
+  row[MLTE_COL.TYPE] = decl.transactionType || '';
+  row[MLTE_COL.ASSETS] = JSON.stringify(decl.assets || []);
+  row[MLTE_COL.ASSETS_ENTITY] = decl.assetsEntity || '';
+  row[MLTE_COL.EQUITY_ENTITY] = decl.equityEntity || DEFAULT_EQUITY_ENTITY;
+  row[MLTE_COL.VALUE_USD] = '';
+  row[MLTE_COL.DATE] = decl.effectiveDate || '';
+  row[MLTE_COL.DESCRIPTION] = decl.description || '';
+  row[MLTE_COL.STATUS] = 'NEW';
+  row[MLTE_COL.LEDGER_LINES] = '';
+  for (var c = 0; c < 17; c++) {
+    if (row[c] === undefined || row[c] === null) row[c] = '';
+  }
+
+  sheet.appendRow(row);
+  Logger.log('✅ Inserted MLTE record at row ' + sheet.getLastRow());
+  return true;
+}
+
+/**
+ * Scans Telegram Chat Logs for [MANAGED LEDGER TRANSACTION EVENT] messages and
+ * queues each one into Managed Ledger Transactions, then runs the consumer so a
+ * webhook hit queues AND commits in a single call.
+ *
+ * Callable as doGet(?action=parseAndProcessManagedLedgerTransactionLogs).
+ */
+function parseAndProcessManagedLedgerTransactionLogs() {
+  var queued = 0;
+  var skipped = 0;
+  try {
+    var ss = SpreadsheetApp.openByUrl(TELEGRAM_LOGS_URL);
+    var logsSheet = ss.getSheetByName(TELEGRAM_LOGS_SHEET);
+    if (!logsSheet) {
+      Logger.log('ERROR: ' + TELEGRAM_LOGS_SHEET + ' sheet not found');
+      return { queued: 0, skipped: 0, error: TELEGRAM_LOGS_SHEET + ' not found' };
+    }
+
+    var data = logsSheet.getDataRange().getValues();
+    var headerRow = 2; // header is on row 2, matching parseAndProcessCapitalInjectionLogs
+
+    for (var i = headerRow; i < data.length; i++) {
+      var row = data[i];
+      var message = row[TELEGRAM_MESSAGE_COL];
+      if (!message || String(message).indexOf(MLTE_EVENT_MARKER) === -1) continue;
+
+      Logger.log('\n📝 Found MLTE message at row ' + (i + 1));
+
+      var decl;
+      try {
+        decl = parseManagedLedgerTransactionMessage(message);
+      } catch (parseErr) {
+        Logger.log('❌ Skipping: unparseable -- ' + parseErr.message);
+        skipped++;
+        continue;
+      }
+
+      // Required fields
+      if (!decl.source.name || !decl.source.url || !decl.destination.name ||
+          !decl.destination.url || !decl.transactionType) {
+        Logger.log('❌ Skipping: missing source/destination/type');
+        skipped++;
+        continue;
+      }
+      if (ALLOWED_TRANSACTION_TYPES.indexOf(decl.transactionType) === -1) {
+        Logger.log('❌ Skipping: unsupported type "' + decl.transactionType + '"');
+        skipped++;
+        continue;
+      }
+      if (!decl.assets || decl.assets.length === 0) {
+        Logger.log('❌ Skipping: no Asset lines');
+        skipped++;
+        continue;
+      }
+      if (!decl.digitalSignature) {
+        Logger.log('❌ Skipping: no digital signature');
+        skipped++;
+        continue;
+      }
+
+      var who = findContributorByDigitalSignature(decl.digitalSignature);
+      if (!who.contributorName) {
+        Logger.log('❌ Skipping: ' + who.error);
+        skipped++;
+        continue;
+      }
+
+      var updateId = row[TELEGRAM_UPDATE_ID_COL];
+      var messageId = row[TELEGRAM_MESSAGE_ID_COL];
+      if (managedLedgerTransactionRecordExists_(updateId, messageId)) {
+        Logger.log('⏭️ Skipping row ' + (i + 1) + ': already queued');
+        skipped++;
+        continue;
+      }
+
+      if (insertManagedLedgerTransactionRecord_(updateId, messageId, message, who.contributorName, decl)) {
+        queued++;
+      } else {
+        skipped++;
+      }
+    }
+
+    Logger.log('\n📊 Queued ' + queued + ' MLTE record(s), skipped ' + skipped);
+
+    if (queued > 0) {
+      Logger.log('\n🔄 Processing NEW managed ledger transactions...');
+      processNewManagedLedgerTransactions();
+    }
+    return { queued: queued, skipped: skipped };
+  } catch (e) {
+    Logger.log('ERROR in parseAndProcessManagedLedgerTransactionLogs: ' + e.message);
+    Logger.log('Stack: ' + (e.stack || 'none'));
+    return { queued: queued, skipped: skipped, error: e.message };
+  }
+}
+
 function parseManagedLedgerTransactionMessage(message) {
   if (!message || String(message).indexOf(MLTE_EVENT_MARKER) === -1) {
     throw new Error('Message does not contain ' + MLTE_EVENT_MARKER);
