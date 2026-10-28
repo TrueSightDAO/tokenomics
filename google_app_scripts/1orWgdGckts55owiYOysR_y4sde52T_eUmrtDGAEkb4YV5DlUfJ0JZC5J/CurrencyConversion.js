@@ -772,6 +772,22 @@ function doGet(e) {
     }
   }
 
+  if (action === 'parseAndProcessManagedLedgerTransactionLogs') {
+    try {
+      Logger.log('Webhook triggered: parseAndProcessManagedLedgerTransactionLogs');
+      var result = parseAndProcessManagedLedgerTransactionLogs();
+      Logger.log('Webhook processing completed');
+      return ContentService
+        .createTextOutput('✅ Managed ledger transaction logs: ' + JSON.stringify(result))
+        .setMimeType(ContentService.MimeType.TEXT);
+    } catch (err) {
+      Logger.log(`❌ Error in parseAndProcessManagedLedgerTransactionLogs: ${err.message}`);
+      return ContentService
+        .createTextOutput('❌ Error: ' + err.message)
+        .setMimeType(ContentService.MimeType.TEXT);
+    }
+  }
+
   if (action === 'installTimeTrigger') {
     try {
       var result = installTimeTrigger();
