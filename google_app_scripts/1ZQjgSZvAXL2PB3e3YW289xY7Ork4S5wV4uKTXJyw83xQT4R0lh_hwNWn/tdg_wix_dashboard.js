@@ -102,6 +102,12 @@ var MONTHLY_STATISTICS_SHEET_NAME = "Monthly Statistics";
 
 // Sheet name for Shipment Ledger Listing
 var SHIPMENT_LEDGER_SHEET_NAME = "Shipment Ledger Listing";
+// Column AD (1-based = 30) of "Shipment Ledger Listing" = "Is DAO Vehicle".
+// A ledger flagged TRUE is DAO-controlled (e.g. AGL15). When the equity leg
+// scans each AGL's Balance "Financier" column it counts the literal
+// "TrueSight DAO" rows AND rows financed by any DAO-vehicle ledger, so a
+// vehicle's downstream stakes roll up transitively. Inert until populated.
+var DAO_VEHICLE_FLAG_COL = 30; // column AD
 
 // Sheet name for Currencies (for currency conversion)
 var CURRENCIES_SHEET_NAME = "Currencies";
@@ -400,6 +406,7 @@ function getLedgerUrlsFromWix() {
  */
 function getTrueSightDAOEquityHoldings(ledgerUrls) {
   var balances = [];
+  var daoVehicleIds = getDaoVehicleIds(getLedgerUrlsWithIdsFromWix());
   
   Logger.log("Starting getTrueSightDAOEquityHoldings with " + ledgerUrls.length + " ledger URLs");
   Logger.log("Ledger URLs: " + JSON.stringify(ledgerUrls));
@@ -448,7 +455,7 @@ function getTrueSightDAOEquityHoldings(ledgerUrls) {
       // Find rows where Column A = "TrueSight DAO" and Column C = "USD"
       var foundTrueSightDAO = false;
       for (var i = 0; i < data.length; i++) {
-        if (data[i][0] === "TrueSight DAO" && data[i][2] === "USD") {
+        if (isDaoFinancier(data[i][0], daoVehicleIds) && data[i][2] === "USD") {
           foundTrueSightDAO = true;
           var balance = data[i][1]; // Column B value
           Logger.log(`Found TrueSight DAO row at index ${i}: balance=${balance}, type=${typeof balance}`);
@@ -484,6 +491,17 @@ function getTrueSightDAOEquityHoldings(ledgerUrls) {
  * The original getLedgerUrlsFromWix() is left intact — its callers only need
  * URLs and would break if the return shape changed.
  */
+function getDaoVehicleIds(ledgers) {
+  return (ledgers || [])
+    .filter(function (l) { return l && l.is_dao_vehicle; })
+    .map(function (l) { return l.ledger_id; });
+}
+
+function isDaoFinancier(name, daoVehicleIds) {
+  if (name === "TrueSight DAO") return true;
+  return (daoVehicleIds || []).indexOf(name) !== -1;
+}
+
 function getLedgerUrlsWithIdsFromWix() {
   try {
     var spreadsheet = SpreadsheetApp.openById(ledgerDocId);
@@ -494,7 +512,7 @@ function getLedgerUrlsWithIdsFromWix() {
     }
     var lastRow = shipmentSheet.getLastRow();
     if (lastRow < 2) return [];
-    var dataRange = shipmentSheet.getRange(2, 1, lastRow - 1, 28); // A to AB
+    var dataRange = shipmentSheet.getRange(2, 1, lastRow - 1, DAO_VEHICLE_FLAG_COL); // A to AD
     var data = dataRange.getValues();
     var ledgers = [];
     var seenUrls = {};
@@ -506,7 +524,9 @@ function getLedgerUrlsWithIdsFromWix() {
       if (seenUrls[resolvedUrl]) continue;
       seenUrls[resolvedUrl] = true;
       if (resolvedUrl.indexOf('docs.google.com/spreadsheets') === -1) continue;
-      ledgers.push({ ledger_id: shipmentId, url: resolvedUrl });
+      var isDaoVehicle = row[DAO_VEHICLE_FLAG_COL - 1] === true ||
+                         String(row[DAO_VEHICLE_FLAG_COL - 1]).trim().toUpperCase() === 'TRUE';
+      ledgers.push({ ledger_id: shipmentId, url: resolvedUrl, is_dao_vehicle: isDaoVehicle });
     }
     Logger.log("getLedgerUrlsWithIdsFromWix returning " + ledgers.length + " ledgers");
     return ledgers;
@@ -524,8 +544,9 @@ function getLedgerUrlsWithIdsFromWix() {
  * @param {Array<{ledger_id: string, url: string}>} ledgers
  * @return {Array<{ledger_id: string, dao_equity_usd: number}>}
  */
-function getTrueSightDAOEquityHoldingsWithIds(ledgers) {
+function getTrueSightDAOEquityHoldingsWithIds(ledgers, daoVehicleIds) {
   var results = [];
+  if (!daoVehicleIds) daoVehicleIds = getDaoVehicleIds(ledgers);
   ledgers.forEach(function (entry) {
     var ledgerId = entry.ledger_id;
     var url = entry.url;
@@ -539,14 +560,19 @@ function getTrueSightDAOEquityHoldingsWithIds(ledgers) {
       var balanceSheet = spreadsheet.getSheetByName("Balance");
       if (!balanceSheet) return;
       var data = balanceSheet.getDataRange().getValues();
+      var ledgerTotal = 0;
+      var ledgerSeen = false;
       for (var i = 0; i < data.length; i++) {
-        if (data[i][0] === "TrueSight DAO" && data[i][2] === "USD") {
+        if (isDaoFinancier(data[i][0], daoVehicleIds) && data[i][2] === "USD") {
           var balance = data[i][1];
           if (typeof balance === 'number' && !isNaN(balance)) {
-            results.push({ ledger_id: ledgerId, dao_equity_usd: balance });
+            ledgerTotal += balance;
+            ledgerSeen = true;
           }
-          break; // one DAO/USD row per ledger
         }
+      }
+      if (ledgerSeen) {
+        results.push({ ledger_id: ledgerId, dao_equity_usd: ledgerTotal });
       }
     } catch (e) {
       Logger.log("Error reading equity for " + ledgerId + ": " + e.message);
@@ -571,7 +597,8 @@ function computeTreasuryBreakdown() {
   var offChain = getOffChainAssetValue();
   var usdtVault = getUSDTBalanceInVault();
   var ledgers = getLedgerUrlsWithIdsFromWix();
-  var perLedger = getTrueSightDAOEquityHoldingsWithIds(ledgers);
+  var daoVehicleIds = getDaoVehicleIds(ledgers);
+  var perLedger = getTrueSightDAOEquityHoldingsWithIds(ledgers, daoVehicleIds);
   perLedger.sort(function (a, b) { return (b.dao_equity_usd || 0) - (a.dao_equity_usd || 0); });
   var aglEquityTotal = perLedger.reduce(function (s, e) { return s + (e.dao_equity_usd || 0); }, 0);
   // ledger_urls dict — exposes the resolved Google Sheets URL for every
