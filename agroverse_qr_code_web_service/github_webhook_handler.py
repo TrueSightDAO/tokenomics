@@ -21,10 +21,31 @@ import requests
 import subprocess
 from datetime import datetime
 from pathlib import Path
+from urllib.parse import urlparse
 
 import qrcode
 from qrcode.constants import ERROR_CORRECT_H
 from PIL import Image, ImageDraw, ImageFont
+
+
+def resolve_is_cacao(url):
+    """Derive cacao-vs-non-cacao from a row's landing_page (column B).
+
+    Single source of truth: both the single-QR path (get_product_data_from_sheet) and
+    the batch path (batch_webhook_handler imports this) use it, so the two can no
+    longer drift apart.
+
+    Netloc-based rather than a literal ``https://www.agroverse.shop`` prefix match: the
+    sheet's real landing_page values are written WITHOUT ``www.`` (e.g.
+    https://agroverse.shop/shipments/agl13/index.html), so a prefix check evaluates
+    False for every such row and silently routes cacao items to the non-cacao mark.
+    Mirrors ``lineage-assets/scripts/qr_generator/batch_compiler.py``.
+    """
+    if not url:
+        return False
+    netloc = urlparse(url).netloc.lower()
+    return netloc == 'agroverse.shop' or netloc.endswith('.agroverse.shop')
+
 
 # Configuration
 # Try to load local config first, then fall back to environment variables
@@ -189,8 +210,8 @@ def fetch_sheet_row(row_number: int):
         
 
         
-        # Determine if item is cacao based on landing page
-        is_cacao = landing_page.startswith('https://www.agroverse.shop')
+        # Determine if item is cacao from landing page (netloc-based, www-agnostic)
+        is_cacao = resolve_is_cacao(landing_page)
         
         return {
             'qr_code_value': qr_code_value,
