@@ -16,12 +16,34 @@ import tempfile
 import shutil
 from datetime import datetime
 from pathlib import Path
+from urllib.parse import urlparse
 
 # Add the current directory to Python path for imports
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from github_webhook_handler import GitHubWebhookHandler
 from digital_signature_processor import DigitalSignatureProcessor
+
+
+def resolve_is_cacao(url):
+    """Derive cacao-vs-non-cacao from the row's landing_page (column B).
+
+    Mirrors ``lineage-assets/scripts/qr_generator/batch_compiler.py``. This used to be
+    hardcoded ``is_cacao=True`` at the call site, which silently stamped the *cacao tree*
+    logo onto every row regardless of product line - column B was read into
+    ``row_data['landing_page']`` and then never consulted. Correct for cacao chocolate
+    bars (masking the bug); wrong for cacao-tea / any non-cacao SKU.
+
+    Netloc-based rather than a literal ``https://www.agroverse.shop`` prefix match: the
+    sheet's real landing_page values are consistently written WITHOUT ``www.``, so a
+    prefix check evaluates False for every such row and routes cacao items to the
+    non-cacao mark with no error.
+    """
+    if not url:
+        return False
+    netloc = urlparse(url).netloc.lower()
+    return netloc == 'agroverse.shop' or netloc.endswith('.agroverse.shop')
+
 
 class BatchWebhookHandler:
     def __init__(self, github_token=None):
@@ -192,7 +214,8 @@ class BatchWebhookHandler:
                 state=row_data['state'],
                 country=row_data['country'],
                 year=row_data['year'],
-                is_cacao=True,  # Default to cacao, could be determined from product data
+                # Derived from column B (landing_page) - NOT hardcoded. See resolve_is_cacao().
+                is_cacao=resolve_is_cacao(row_data.get('landing_page')),
                 auto_commit=True,
                 sheet_data=row_data
             )
