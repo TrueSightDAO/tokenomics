@@ -60,25 +60,34 @@ function soldByContributorForLedger_(row) {
  * and writing AGL ledger rows.
  */
 function doGet(e) {
+  const startedAt = new Date().getTime();
   const lock = LockService.getScriptLock();
-  const LOCK_WAIT_MS = 300000;
+  // Keep this well below the Apps Script /exec frontend timeout (~300s).
+  // At 300000 the exec client gave up first, so a contended lock produced a
+  // silent 0-byte response with no error text -- indistinguishable from a hang.
+  const LOCK_WAIT_MS = 10000;
+
+  Logger.log('doGet: entry, action=' + (e && e.parameter ? e.parameter.action : '(none)'));
 
   if (!lock.tryLock(LOCK_WAIT_MS)) {
-    Logger.log('doGet: script lock not acquired within ' + LOCK_WAIT_MS + 'ms; another processNonAgl4Transactions run in progress');
+    const waitedMs = new Date().getTime() - startedAt;
+    Logger.log('doGet: script lock not acquired after ' + waitedMs + 'ms (waited ' + LOCK_WAIT_MS + 'ms); another processNonAgl4Transactions run is in progress');
     return ContentService.createTextOutput(
       '⏳ busy: another non-AGL4 sales webhook run is in progress; retry later'
     );
   }
 
+  Logger.log('doGet: script lock acquired after ' + (new Date().getTime() - startedAt) + 'ms');
+
   try {
     const action = e.parameter?.action;
     if (action === 'processNonAgl4Transactions') {
       try {
-        Logger.log("Webhook triggered: processing Telegram logs");
+        Logger.log("Webhook triggered: processNonAgl4Transactions");
         processNonAgl4Transactions();
-        return ContentService.createTextOutput("✅ Telegram logs processed");
+        return ContentService.createTextOutput("✅ Non-AGL4 sales processed");
       } catch (err) {
-        Logger.log("Error in processTelegramLogs: " + err.message);
+        Logger.log("Error in processNonAgl4Transactions: " + err.message);
         return ContentService.createTextOutput("❌ Error: " + err.message);
       }
     }
