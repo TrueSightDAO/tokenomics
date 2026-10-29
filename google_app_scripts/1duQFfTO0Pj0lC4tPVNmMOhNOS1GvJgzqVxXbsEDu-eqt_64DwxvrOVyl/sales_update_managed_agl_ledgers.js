@@ -56,37 +56,60 @@ function soldByContributorForLedger_(row) {
 }
 
 /**
- * Serializes webhook GETs so concurrent runs cannot race while reading/updating "QR Code Sales"
- * and writing AGL ledger rows.
+ * Handles the non-AGL4 sales webhook.
+ *
+ * The script lock was REMOVED on purpose. It was held for the whole run and its
+ * wait exceeded the /exec frontend timeout, so a contended run returned a silent
+ * 0-byte response instead of a readable 'busy'. Duplicate protection now lives
+ * where it belongs: qrCodesBookedIn_() checks the destination ledger before
+ * appending, so two concurrent runs cannot double-post a QR's legs.
  */
 function doGet(e) {
-  const lock = LockService.getScriptLock();
-  const LOCK_WAIT_MS = 300000;
-
-  if (!lock.tryLock(LOCK_WAIT_MS)) {
-    Logger.log('doGet: script lock not acquired within ' + LOCK_WAIT_MS + 'ms; another processNonAgl4Transactions run in progress');
-    return ContentService.createTextOutput(
-      '⏳ busy: another non-AGL4 sales webhook run is in progress; retry later'
-    );
-  }
+  Logger.log('doGet: entry, action=' + (e && e.parameter ? e.parameter.action : '(none)'));
 
   try {
     const action = e.parameter?.action;
     if (action === 'processNonAgl4Transactions') {
       try {
-        Logger.log("Webhook triggered: processing Telegram logs");
+        Logger.log("Webhook triggered: processNonAgl4Transactions");
         processNonAgl4Transactions();
-        return ContentService.createTextOutput("✅ Telegram logs processed");
+        return ContentService.createTextOutput("✅ Non-AGL4 sales processed");
       } catch (err) {
-        Logger.log("Error in processTelegramLogs: " + err.message);
+        Logger.log("Error in processNonAgl4Transactions: " + err.message);
         return ContentService.createTextOutput("❌ Error: " + err.message);
       }
     }
 
     return ContentService.createTextOutput("ℹ️ No valid action specified");
-  } finally {
-    lock.releaseLock();
+  } catch (err) {
+    Logger.log('doGet: unexpected error: ' + err.message);
+    return ContentService.createTextOutput("\u274c Error: " + err.message);
   }
+}
+
+// Idempotency guard: which QR codes already have legs in a destination ledger.
+// Scans column B ('Value') for '... - Item: <qrCode>' blocks. Cached per ledger
+// URL so the whole-sheet scan happens at most once per run.
+var bookedQrCache_ = {};
+function qrCodesBookedIn_(destSheet, destSheetUrl) {
+  if (bookedQrCache_[destSheetUrl]) return bookedQrCache_[destSheetUrl];
+  var set = new Set();
+  try {
+    var lastRow = destSheet.getLastRow();
+    if (lastRow > 1) {
+      var msgs = destSheet.getRange(2, 2, lastRow - 1, 1).getValues();
+      for (var r = 0; r < msgs.length; r++) {
+        var m = msgs[r][0] ? msgs[r][0].toString() : '';
+        var match = m.match(/-\s*Item:\s*([^\s\n]+)/);
+        if (match) set.add(match[1].trim());
+      }
+    }
+    Logger.log('qrCodesBookedIn_: ' + set.size + ' QR codes already present in ' + destSheetUrl);
+  } catch (err) {
+    Logger.log('qrCodesBookedIn_: could not scan destination (' + err.message + ')');
+  }
+  bookedQrCache_[destSheetUrl] = set;
+  return set;
 }
 
 
@@ -341,6 +364,14 @@ function processNonAgl4Transactions() {
         continue;
       }
       
+      // Idempotency guard: never append legs that already exist for this QR.
+      const booked = qrCodesBookedIn_(destSheet, destSheetUrl);
+      if (qrCode && booked.has(qrCode)) {
+        Logger.log(`Row ${i + 1}: ${qrCode} already present in ${destSheetUrl}; skipping append and marking ACCOUNTED`);
+        sourceSheet.getRange(i + 1, TOKENIZED_STATUS_COL + 1).setValue('ACCOUNTED');
+        continue;
+      }
+
       // Append two rows to destination Transactions sheet
       const destLastRow = destSheet.getLastRow();
       const destInsertRow = destLastRow + 1;
