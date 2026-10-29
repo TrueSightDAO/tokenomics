@@ -329,6 +329,14 @@ function processTelegramChatLogs() {
   let totalMessages = 0;
   const chatPackets = {}; // Tracks chatId -> contributor Telegram handles
 
+  // Per-run safety budget. A GAS execution is killed at ~6 minutes WITHOUT a catchable
+  // exception, so a large Pending backlog can die mid-run and leave no trace. Stop cleanly
+  // BEFORE that ceiling so the health row at the end of this function always gets written.
+  const RUN_BUDGET_MS = 4 * 60 * 1000;
+  const runStartedAt = Date.now();
+  let rowsSkippedForBudget = 0;
+  let rowErrors = 0;
+
   Logger.log(`processTelegramChatLogs: Processing Telegram Chat Logs: Found ${data.length - 1} records`);
 
   // Backfill column J for rows that were processed under an older version of this script
@@ -355,6 +363,7 @@ function processTelegramChatLogs() {
     Logger.log(`processTelegramChatLogs: Backfilled column J on ${backfilled} previously-processed row(s)`);
   }
 
+  let budgetExhausted = false;
   for (let i = 1; i < data.length; i++) {
     const row = data[i];
     const status = row[9] ? row[9].toString().trim() : "";
@@ -362,21 +371,42 @@ function processTelegramChatLogs() {
     // (backfilled above) and date-filtered rows from prior runs in a single cheap cell read.
     if (status !== 'Pending') continue;
 
+    // Leave headroom under the hard execution ceiling so the health row below always runs.
+    if (Date.now() - runStartedAt > RUN_BUDGET_MS) {
+      budgetExhausted = true;
+      rowsSkippedForBudget++;
+      continue;
+    }
+
     Logger.log("\n\n\n");
     const dateStr = row[11] ? row[11].toString().trim() : "";
     const username = row[4] ? row[4].toString() : "Unknown";
     const message = row[6] ? row[6].toString().trim() : "";
     Logger.log(`processTelegramChatLogs: row ${i + 1}: processing Pending row`);
 
-    const { records, count } = processChatLogEntry({
-      message,
-      username,
-      statusDate: dateStr,
-      platform: "Telegram",
-      projectName: "telegram_chatlog",
-      rowIndex: i,
-      telegramSheet: telegramSheet
-    });
+    // Per-row isolation: one bad row must not kill the run. Previously a single throw here
+    // aborted the whole execution before the health write, making the outage invisible.
+    let records = [];
+    let count = 0;
+    try {
+      const result = processChatLogEntry({
+        message,
+        username,
+        statusDate: dateStr,
+        platform: "Telegram",
+        projectName: "telegram_chatlog",
+        rowIndex: i,
+        telegramSheet: telegramSheet
+      });
+      records = result.records;
+      count = result.count;
+    } catch (rowErr) {
+      rowErrors++;
+      const rowMsg = `row ${i + 1} threw during scoring: ${rowErr && rowErr.message ? rowErr.message : rowErr}`;
+      Logger.log(`processTelegramChatLogs: ${rowMsg}`);
+      logPipelineHealth_('processTelegramChatLogs', 'ERROR', rowMsg, `Row left Pending for retry. ${rowErrors} row error(s) so far this run.`);
+      continue;
+    }
 
     if (records.length > 0) {
       writeToGoogleSheet(records, "Telegram");
@@ -428,9 +458,11 @@ function processTelegramChatLogs() {
   Logger.log(`processTelegramChatLogs: Processed ${totalMessages} new messages from Telegram Chat Logs`);
   logPipelineHealth_(
     'processTelegramChatLogs',
-    'OK',
+    (rowErrors > 0 || budgetExhausted) ? 'ATTENTION' : 'OK',
     `Processed ${totalMessages} new message(s); backfilled ${backfilled} status row(s).`,
-    `intake rows scanned: ${data.length - 1}`
+    budgetExhausted
+      ? `PARTIAL RUN: stopped at the ${Math.round(RUN_BUDGET_MS / 1000)}s safety budget with ${rowsSkippedForBudget} Pending row(s) left for the next tick; ${rowErrors} row error(s). intake rows scanned: ${data.length - 1}`
+      : `intake rows scanned: ${data.length - 1}; ${rowErrors} row error(s)`
   );
 }
 
