@@ -305,8 +305,29 @@ function buildScoredChatlogsHashSet_() {
   }
 }
 
+// Top-level guard. The body below can throw in places that are NOT covered by the per-row
+// isolation (openByUrl, getDataRange, isContributionEvent in the backfill loop, quota errors).
+// Every one of those used to kill the execution before the health write, so the pipeline failed
+// mute for weeks. Now ANY abort leaves a Pipeline Health row naming the exception.
 // Modified to send notification once per chatId
 function processTelegramChatLogs() {
+  try {
+    return processTelegramChatLogs_();
+  } catch (err) {
+    const msg = `run aborted: ${err && err.message ? err.message : err}`;
+    Logger.log(`processTelegramChatLogs: ${msg}`);
+    logPipelineHealth_(
+      'processTelegramChatLogs',
+      'ERROR',
+      msg,
+      'Top-level catch: failed outside per-row isolation. Stack: ' +
+        (err && err.stack ? String(err.stack).slice(0, 800) : 'n/a')
+    );
+    throw err; // keep the trigger's own error reporting in GAS Executions
+  }
+}
+
+function processTelegramChatLogs_() {
   if (!XAI_API_KEY) {
     const noKeyMsg = 'XAI_API_KEY is not set in Script Properties — no row can be scored.';
     Logger.log(`processTelegramChatLogs: Error: ` + noKeyMsg);
