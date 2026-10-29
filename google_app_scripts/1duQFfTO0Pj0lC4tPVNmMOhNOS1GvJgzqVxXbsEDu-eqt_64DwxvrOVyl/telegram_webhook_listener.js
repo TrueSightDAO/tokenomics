@@ -173,17 +173,11 @@ function processTokenizedTransactions() {
   }
 }
 
-// AGL - Update sales records entry to the various AGL ledgers
-//     Script Location: https://script.google.com/home/projects/1duQFfTO0Pj0lC4tPVNmMOhNOS1GvJgzqVxXbsEDu-eqt_64DwxvrOVyl/edit
-function processNonAgl4Transactions() {
-  const processingServiceUrl = 'https://script.google.com/a/macros/agroverse.shop/s/AKfycbwh35n5hOLCTPFseDqfnbV93vCpdnCqdlQ2iHFZWw9YenJN0cPpc-EIoIDOnoqtdGUohg/exec?action=processNonAgl4Transactions';
-  try {
-    const response = UrlFetchApp.fetch(processingServiceUrl);
-    Logger.log("Log processor response: " + response.getContentText());
-  } catch (err) {
-    Logger.log("Error calling log processor: " + err.message);
-  }
-}
+// NOTE (2026-10-29): the UrlFetchApp wrapper previously defined here was REMOVED.
+// It shadowed the real implementation in sales_update_managed_agl_ledgers.js:305
+// (GAS loads files alphabetically, sales_* before telegram_*), and called a dead
+// /a/macros/agroverse.shop/ URL, so every invocation 404'd inside its own
+// try/catch and still returned "Non-AGL4 sales processed" while booking nothing.
 
 // TDG - scores contribution submissions via Telegram and notifies
 //       Script Location: https://script.google.com/home/projects/1BHAGZd_T1I5mQnqnAFqUJKX2x_N8Uv05n1O2OohRA908Ja8wVwVxaR7K/edit
