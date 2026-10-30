@@ -235,3 +235,32 @@ function installScoringTrigger(everyMinutes) {
   logPipelineHealth_('installScoringTrigger', 'INFO', 'installed ' + minutes + '-min trigger for ' + FN, 'removed ' + removed + ' old trigger(s)');
   return result;
 }
+
+/**
+ * TEMPORARY admin helper (removed in a follow-up push).
+ *
+ * Restores the three CONFIG Script Properties that the scoring pipeline requires.
+ * Values are the canonical URLs verified from two other GAS projects in tokenomics
+ * (1K1wcXFA.../Credentials.js and 1wONDeDw.../Credentials.js) and match the
+ * spreadsheets named in the governor's report. No secrets are written here.
+ *
+ * Idempotent and non-destructive: a property is only set when currently empty.
+ */
+function adminRestoreScoringConfig_() {
+  const CANON = {
+    TELEGRAM_SHEET_URL: 'https://docs.google.com/spreadsheets/d/1qbZZhf-_7xzmDTriaJVWj6OZshyQsFkdsAV8-pyzASQ/edit?gid=0#gid=0',
+    OUTPUT_SHEET_URL:   'https://docs.google.com/spreadsheets/d/1Tbj7H5ur_egQLRugdXUaSIhEYIKp0vvVv2IZ7WTLCUo/edit?gid=0#gid=0',
+    EXISTING_SHEET_URL: 'https://docs.google.com/spreadsheets/d/1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU/edit#gid=0'
+  };
+  const sp = PropertiesService.getScriptProperties();
+  const set = [], skipped = [];
+  Object.keys(CANON).forEach(function (k) {
+    if (sp.getProperty(k)) { skipped.push(k); return; }
+    sp.setProperty(k, CANON[k]);
+    set.push(k);
+  });
+  const result = { status: 'ok', set: set, alreadyPresent: skipped };
+  Logger.log('adminRestoreScoringConfig_: ' + JSON.stringify(result));
+  logPipelineHealth_('adminRestoreScoringConfig_', 'INFO', 'restored ' + set.length + ' config property(ies)', set.join(', '));
+  return result;
+}
