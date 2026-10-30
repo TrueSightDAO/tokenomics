@@ -28,7 +28,8 @@ function getCredentials() {
   return {
     // secrets
     GITHUB_API_TOKEN: g('GITHUB_API_TOKEN'),
-    TELEGRAM_API_TOKEN: g('TELEGRAM_API_TOKEN'),
+    // Accept either property name so a renamed Script Property still resolves.
+    TELEGRAM_API_TOKEN: g('TELEGRAM_API_TOKEN') || g('TELEGRAM_BOT_TOKEN'),
     OPENAI_API_KEY: g('OPENAI_API_KEY'),
     XAI_API_KEY: g('XAI_API_KEY'),
     // config (not secrets)
