@@ -68,6 +68,12 @@ function doGet(e) {
         .setMimeType(ContentService.MimeType.JSON);
     }
 
+    // TEMPORARY: restore the three CONFIG Script Properties (removed in follow-up).
+    if (exec === 'adminRestoreConfig') {
+      return ContentService.createTextOutput(JSON.stringify(adminRestoreScoringConfig_(), null, 2))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+
     // PR4 — review queue write-back
     if (exec === 'processApprovalRejections') {
       const result = processApprovalRejections();
