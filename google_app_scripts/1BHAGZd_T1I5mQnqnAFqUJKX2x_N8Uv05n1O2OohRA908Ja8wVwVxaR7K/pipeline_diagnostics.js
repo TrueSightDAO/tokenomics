@@ -29,7 +29,15 @@ const REQUIRED_SCRIPT_PROPERTIES = [
   'TELEGRAM_API_TOKEN',
   'TELEGRAM_SHEET_URL',
   'OUTPUT_SHEET_URL',
-  'EXISTING_SHEET_URL'
+  'EXISTING_SHEET_URL',
+  // The scoring path passes these straight into UrlFetchApp.fetch():
+  //   grok_scoring...logs.js L734  UrlFetchApp.fetch(XAI_API_URL, options)
+  //   grok_scoring...logs.js L1097 UrlFetchApp.fetch(OPENAI_API_URL, options)
+  // Neither is validated anywhere in the scoring file, and fetch(undefined)
+  // throws. Omitting them here let diagnoseScoringPipeline() return ok:true
+  // ("checked: 6", missing:[]) while every real run died at the first API call.
+  'XAI_API_URL',
+  'OPENAI_API_URL'
 ];
 
 /**
@@ -194,6 +202,10 @@ function diagnoseScoringPipeline() {
   // 6. Plain-language verdict, most specific cause first.
   if (missing.indexOf('XAI_API_KEY') !== -1) {
     out.verdict = 'processTelegramChatLogs returns at its first line: XAI_API_KEY is not set in Script Properties, so no row is ever scored.';
+  } else if (missing.indexOf('XAI_API_URL') !== -1 || missing.indexOf('OPENAI_API_URL') !== -1) {
+    out.verdict = 'The scoring API URL is not set (' + missing.filter(function (k) {
+      return k === 'XAI_API_URL' || k === 'OPENAI_API_URL';
+    }).join(', ') + '): every run dies at the first UrlFetchApp.fetch() with an uncatchable TypeError, before the run ever reaches its health-log line.';
   } else if (!scoringTriggerInstalled) {
     out.verdict = 'No trigger for processTelegramChatLogs. Nothing schedules the scorer, so the backlog never drains. Run installScoringTrigger().';
   } else if (!out.ok) {
