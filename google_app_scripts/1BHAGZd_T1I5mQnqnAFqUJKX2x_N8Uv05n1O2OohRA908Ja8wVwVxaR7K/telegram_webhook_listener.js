@@ -60,17 +60,17 @@ function doGet(e) {
     const exec = e?.parameter?.exec || '';
     const action = e?.parameter?.action || '';
 
+    // TEMPORARY: restore the three CONFIG Script Properties (removed in follow-up).
+    if (exec === 'adminRestoreConfig') {
+      return ContentService.createTextOutput(JSON.stringify(adminRestoreScoringConfig_(), null, 2))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+
     // Pipeline diagnostics — read-only. Names why the scorer is stuck instead of
     // requiring a guess between trigger / key / sheet-permission failure modes.
     if (exec === 'diagnose') {
       const result = diagnoseScoringPipeline();
       return ContentService.createTextOutput(JSON.stringify(result, null, 2))
-        .setMimeType(ContentService.MimeType.JSON);
-    }
-
-    // TEMPORARY: restore the three CONFIG Script Properties (removed in follow-up).
-    if (exec === 'adminRestoreConfig') {
-      return ContentService.createTextOutput(JSON.stringify(adminRestoreScoringConfig_(), null, 2))
         .setMimeType(ContentService.MimeType.JSON);
     }
 
