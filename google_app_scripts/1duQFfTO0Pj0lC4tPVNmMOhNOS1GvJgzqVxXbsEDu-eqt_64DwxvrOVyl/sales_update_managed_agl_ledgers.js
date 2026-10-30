@@ -24,7 +24,7 @@ const creds = getCredentials();
 const TELEGRAM_TOKEN = creds.TELEGRAM_API_TOKEN;
 
 // Configuration Variables
-const SOURCE_SHEET_URL = 'docs.google.com/spreadsheets/d/1qbZZhf-_7xzmDTriaJVWj6OZshyQsFkdsAV8-pyzASQ/edit?gid=1003674539#gid=1003674539';
+const SOURCE_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1qbZZhf-_7xzmDTriaJVWj6OZshyQsFkdsAV8-pyzASQ/edit?gid=1003674539#gid=1003674539';
 const SOURCE_SHEET_NAME = 'QR Code Sales';
 const OFFCHAIN_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU/edit?gid=995916231#gid=995916231';
 const OFFCHAIN_SHEET_NAME = 'offchain transactions';
@@ -421,8 +421,15 @@ function processNonAgl4Transactions() {
       sourceSheet.getRange(i + 1, TOKENIZED_STATUS_COL + 1).setValue('ACCOUNTED');
       
       // Send Telegram notification for completed non-agl4 transaction
+      // Best-effort only: the ledger legs and ACCOUNTED status are already
+      // written above, so a notification failure must never abort the loop
+      // and strand later rows unbooked.
       if (qrCode) {
-        sendNonAgl4TransactionNotification(qrCode, cashContributorName, aglContractName, destSheetUrl);
+        try {
+          sendNonAgl4TransactionNotification(qrCode, cashContributorName, aglContractName, destSheetUrl);
+        } catch (notifyErr) {
+          Logger.log(`Row ${i + 1}: notification failed for ${qrCode} (booking already committed): ${notifyErr.message}`);
+        }
       } else {
         Logger.log(`No QR code found for row ${i + 1}, skipping notification`);
       }
