@@ -1,0 +1,39 @@
+{
+  "scriptId": "1wmgYPwfRDxpiboa8OH-C6Ndovklf8HaJY305n7dhRzs7BmUBQg7fL_sZ",
+  "name": "TBC \u2014 confirm display name in GAS UI for 1wmgYPwfRDxp\u2026",
+  "owner_email": "garyjob@agroverse.shop",
+  "post_push_hooks": [],
+  "candidate_cache_refresh_hooks": [
+    {
+      "handler_functions": [
+        "notifyTreasuryCachePublisher_"
+      ],
+      "action_strings": [],
+      "mirror_code_path": "google_app_scripts/1wmgYPwfRDxpiboa8OH-C6Ndovklf8HaJY305n7dhRzs7BmUBQg7fL_sZ/Code.js",
+      "consumer_callers_with_known_url": []
+    }
+  ],
+  "deployments": {
+    "head": "TBC \u2014 list every /exec URL for this scriptId in pre-flight",
+    "probe_hrnbSXdQ": {
+      "url": "https://script.google.com/macros/s/AKfycbyBmjwmFhR8nQ5ZCtdqQwr-OgC5-htdFnMeXOKLD-Z-NWvNpLGvi7nPbMQVvnhrnbSXdQ/exec",
+      "status_code": 200,
+      "final_url": "https://script.googleusercontent.com/macros/echo?user_content_key=AUkAhnQbU21BkURDUlRLTDHlK2BsACpzY2Xellf5vimPLQSIjEASKWLArlXRXd7P6yAguR4TOKErx6Ifnv-YKdTWkcN_mKqYeswyJD5RJB-Fy1eL0XNZZiaY9fsdF1af4AUf_czVRbfzJIjGNmiqfxdxrjtpnGADUrDutVxrfcCx8NczZn2WM4CVBlqFEbXxR3juz4lISf4PeBkNZf_4TLuCLxhtO5qmZcvO0rIbk5K9x4o7P6kvgd1uTRYT_sPLpF3-_EoJSvCLCzA2PZFvxPYnzUmZvhtKVw&lib=MLogN0fBre8_vewQCW-8NTY7EDSP_SR0z",
+      "content_type": "application/json; charset=utf-8",
+      "body_peek": "{\"ok\":true,\"service\":\"treasury-cache-publisher\",\"schema_version\":1,\"hint\":\"GET ?action=publish&token=<secret>&trigger=movement|cron|manual to regenerate and commit the treasury snapshot.\"}",
+      "probed_at": "2026-05-28T21:48:00.298443+00:00"
+    },
+    "probe_IgMggWGA": {
+      "url": "https://script.google.com/macros/s/AKfycbyVeNZdBngZodsyDzPQS1yUGYaaaDUd3DwbFx05KsOs9vwAtAFQoV1I5qf_B6IgMggWGA/exec",
+      "status_code": 200,
+      "final_url": "https://script.googleusercontent.com/macros/echo?user_content_key=AUkAhnRJi60dg1qVqhOEgSLK8eIe2p9GYebzHUFZNqpl9EVG6rJSXwhYZXnzdpHpAjWY58613rLJDbHe79atngOwyKDtgbrRXjFduagdIGI9V9yfIt-dG8weaIPZAkP2MSUNiZhJ-J5reewIChjGmHG0TqTwiYmSPzZkOvLtaTHvNYpZvW_wgb4E7-JzKy8e2mH0jnN-i-qFtLKQ5u4YLWYsDcmLU0wlzkN2WPOPecBbpDTb3BM_thnfdstgR51Bge9TvVytDy2_THH5ghxi3B6SNJu0nJMn9w&lib=MXxnzKMldaXaV3jt__6nn2I7EDSP_SR0z",
+      "content_type": "text/plain; charset=utf-8",
+      "body_peek": "\u2139\ufe0f No valid action specified",
+      "probed_at": "2026-05-28T21:48:03.525491+00:00"
+    }
+  },
+  "source_files": [
+    "telegram_webhook_listener.gs",
+    "sales_update_main_dao_offchain_ledger.gs"
+  ]
+}

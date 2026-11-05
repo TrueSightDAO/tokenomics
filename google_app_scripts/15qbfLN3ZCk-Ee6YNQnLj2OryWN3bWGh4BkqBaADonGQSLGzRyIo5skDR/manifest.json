@@ -1,0 +1,21 @@
+{
+  "scriptId": "15qbfLN3ZCk-Ee6YNQnLj2OryWN3bWGh4BkqBaADonGQSLGzRyIo5skDR",
+  "name": "TBC \u2014 confirm display name in GAS UI for 15qbfLN3ZCk-\u2026",
+  "owner_email": "garyjob@agroverse.shop",
+  "post_push_hooks": [],
+  "candidate_cache_refresh_hooks": [],
+  "deployments": {
+    "head": "TBC \u2014 list every /exec URL for this scriptId in pre-flight",
+    "probe_tk54drfg": {
+      "url": "https://script.google.com/macros/s/AKfycbwauCMu-3Es0s4rB7Cr-fsP2JuEnebyPS8W-ecXG6RUi_zhqpLfG71bramoEwtk54drfg/exec",
+      "status_code": 200,
+      "final_url": "https://script.googleusercontent.com/macros/echo?user_content_key=AUkAhnSR1iozKmLGKFxFVImDXEDhXMkk_YahbvJuvHvIbxtVAMQcgYhSw69QaWhs7ZHHja-j7Sm5mk87-YGs59SQM6K2sVF63opUhHQc7YipEwiLW7cwfk0dJaCriwtev_AQ4paogRHWYLDiVc0SMk7aNjpiG6oRKkgLY5swThfPjE0IRobr7_trWiMcDvYEpxwTGyKE7Hn7iIMOVXjqKil2rFWPWkyrbsgxwFWj4yUQUSHygYzgyKA3giDIvZb-fTzxZijAErh11IWendhInhJ37HEsysTrnQ&lib=M5-9XE52y5rPzBZbtVjXVxo7EDSP_SR0z",
+      "content_type": "application/json; charset=utf-8",
+      "body_peek": "{\"status\":\"ok\",\"message\":\"Stripe sync completed\"}",
+      "probed_at": "2026-05-28T21:47:39.600311+00:00"
+    }
+  },
+  "source_files": [
+    "stripe_sales_sync.gs"
+  ]
+}

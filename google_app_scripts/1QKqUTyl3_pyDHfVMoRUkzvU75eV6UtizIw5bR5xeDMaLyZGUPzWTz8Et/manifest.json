@@ -1,0 +1,13 @@
+{
+  "scriptId": "1QKqUTyl3_pyDHfVMoRUkzvU75eV6UtizIw5bR5xeDMaLyZGUPzWTz8Et",
+  "name": "TBC \u2014 confirm display name in GAS UI for 1QKqUTyl3_py\u2026",
+  "owner_email": "garyjob@agroverse.shop",
+  "post_push_hooks": [],
+  "candidate_cache_refresh_hooks": [],
+  "deployments": {
+    "head": "TBC \u2014 list every /exec URL for this scriptId in pre-flight"
+  },
+  "source_files": [
+    "tdg_wallet_balance_check.gs"
+  ]
+}

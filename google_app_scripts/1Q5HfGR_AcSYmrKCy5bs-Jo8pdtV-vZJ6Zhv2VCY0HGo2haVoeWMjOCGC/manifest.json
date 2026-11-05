@@ -1,0 +1,22 @@
+{
+  "scriptId": "1Q5HfGR_AcSYmrKCy5bs-Jo8pdtV-vZJ6Zhv2VCY0HGo2haVoeWMjOCGC",
+  "name": "TBC \u2014 confirm display name in GAS UI for 1Q5HfGR_AcSY\u2026",
+  "owner_email": "garyjob@agroverse.shop",
+  "post_push_hooks": [],
+  "candidate_cache_refresh_hooks": [],
+  "deployments": {
+    "head": "TBC \u2014 list every /exec URL for this scriptId in pre-flight",
+    "probe_lCVrM1ft": {
+      "url": "https://script.google.com/macros/s/AKfycbw6Pgl5a1FqX58EWyCEIi1rG_NuI4P34R6SBtdsCP-0INjcSE8HH8apvTCZlCVrM1ft/exec",
+      "status_code": 200,
+      "final_url": "https://script.googleusercontent.com/macros/echo?user_content_key=AUkAhnSyHfVENGGL768YXlR3eMcHx14K16mqt3O432ejGyKABwALkAfd1WbLqJkTWbD5Laq5pvoS_MLq2-Z1fdLISqp81pcUn125Fvq9S-LHChVlALXGx6teF1qoMyWLmwdKR4zJ8NbYieFsr8-1KgtCoqipuIbsikwOCJHVhjZxS9cNWKZkKKXGlLBMNv336Y9bzOnDILECww295y4EKziGRmeCMmyY2Pn23mr213VStd44ZnaRy5xI6NA3GIUk-Ai4bqgo0mu5RI7jh9pvMzcgrOOiAsLcEw&lib=MgRAXjRzD-PYjYq2FLiA_prCelqghh4iM",
+      "content_type": "text/plain; charset=utf-8",
+      "body_peek": "\u2139\ufe0f No valid action specified",
+      "probed_at": "2026-05-28T21:47:36.105731+00:00"
+    }
+  },
+  "source_files": [
+    "telegram_webhook_listener.gs",
+    "importer_telegram_chatlogs_to_google_sheet.gs"
+  ]
+}

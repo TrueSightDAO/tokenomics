@@ -1,0 +1,684 @@
+/**
+ * File: google_app_scripts/<scriptId>/process_cfr_program_submission_telegram_logs.js
+ * Repository: https://github.com/TrueSightDAO/tokenomics
+ * Apps Script project: 1MnAsIQAxcSfZO_hALOtMFJ4y1k4OnqeXKMwYs6xev600rPNUYepqcXsT
+ *
+ * Description: Async scanner that mirrors CFR-origin (Submission Source host
+ *   `cfr.truesight.me`) tree-planting / growth-monitoring / plot-boundary
+ *   submissions from the canonical Telegram Chat Logs intake into the PRIVATE,
+ *   governor-only `cfr program` spreadsheet (CRF_ANAPU_SUNMINT_COHORT_PROPOSAL.md
+ *   SS11.3 / SS11.5).
+ *
+ *   SS11.5 (Gary 2026-09-17): "CFR submissions should still follow the same route
+ *   as SunMint.truesight submission routes. It is just that the DoGet triggered
+ *   needs to also populate the private governor's accessible only sheet."
+ *
+ *   The PAYOUT half of SS11 was shipped (process_payout_registration_telegram_logs.js
+ *   writes `payout registrations`). The tree-planting / monitoring / plot half of the
+ *   four-tab schema was PROVISIONED (headers only, by provision_cfr_program_sheet.py)
+ *   but had NO writer -- so `tree planting`, `tree monitoring`, `plot registrations`
+ *   stayed permanently empty. This file is that writer (gap closed 2026-09-24).
+ *
+ *   Tabs written (SS11.3):
+ *     [TREE PLANTING EVENT]           -> `tree planting`
+ *     [TREE GROWTH MONITORING EVENT]  -> `tree monitoring`
+ *     [FARM BOUNDARY EVIDENCE EVENT]  -> `plot registrations`
+ *   The `payout registrations` tab is written ONLY by the sibling scanner; this
+ *   file never touches it (and never touches `payout events`).
+ *
+ *   PRIVACY POSTURE -- privacy by LOCATION, not encryption (SS11.2): these events
+ *   carry no raw PII. The only identity column is a DERIVED pk_hash (a one-way hash
+ *   of the signer's public key, same derivation as the payout scanner and the
+ *   credentialing endpoint), which is what lets a tree submission join to the
+ *   student's later `[PAYOUT REGISTRATION]` row (SS11.1). The public intake workbook
+ *   is READ ONLY -- it is publicly republished, so this scanner never writes back.
+ *
+ *   Idempotent: dedup keyed on Telegram Update ID (SS11.3). Serialized via
+ *   LockService. A self-installing hourly safety-net cron catches anything a webhook
+ *   missed. Sharing the global scope of its project, it REUSES
+ *   payoutRegCfrProgramSpreadsheet_() / ensurePayoutRegistrationsSheet_ /
+ *   ensurePayoutRegTab_ / PAYOUT_REG_TABS from
+ *   process_payout_registration_telegram_logs.js rather than redeclaring them
+ *   (a top-level `const` redeclared across files in one GAS project is a hard error).
+ *
+ *   Source-only: no clasp deploy, no live effect from this file merely existing.
+ */
+
+/** Canonical Telegram intake workbook -- READ ONLY (it is publicly republished). */
+var CFRSUB_TELEGRAM_SPREADSHEET_ID = '1qbZZhf-_7xzmDTriaJVWj6OZshyQsFkdsAV8-pyzASQ';
+var CFRSUB_TELEGRAM_SHEET = 'Telegram Chat Logs';
+
+/** Telegram Chat Logs cols (zero-based) -- declared here so this file is self-contained. */
+var CFRSUB_TC_UPDATE_ID_COL = 0;
+var CFRSUB_TC_MESSAGE_ID_COL = 3;
+var CFRSUB_TC_MESSAGE_COL = 6;
+
+/** Per-fire scan window. Matches the payout-registration / program-registration scanners. */
+var CFRSUB_SCAN_BATCH = 200;
+
+/** Only submissions whose Submission Source host is THIS are mirrored (SS11.5 attribution). */
+var CFRSUB_ORIGIN_HOST = 'cfr.truesight.me';
+
+var CFRSUB_TREE_TAG = '[TREE PLANTING EVENT]';
+var CFRSUB_MON_TAG = '[TREE GROWTH MONITORING EVENT]';
+var CFRSUB_PLOT_TAG = '[FARM BOUNDARY EVIDENCE EVENT]';
+
+/** The three private `cfr program` tabs this scanner writes (SS11.3). */
+var CFRSUB_TREE_TAB = 'tree planting';
+var CFRSUB_MON_TAB = 'tree monitoring';
+var CFRSUB_PLOT_TAB = 'plot registrations';
+
+/**
+ * Normalise a `- Field: value` label into a canonical snake_case key, folding the
+ * human-readable aliases a payload may use into the canonical names.
+ */
+function cfrSubNormKey_(key) {
+  var k = String(key || '').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+  var alias = {
+    'measurement_time': 'measured_at',
+    'measured_at': 'measured_at',
+    'plot_id': 'plot_ref',
+    'farm_name': 'farm_name',
+    'extracted_gps': 'geometry_ref',
+    'close_up_photo_url': 'photo_url',
+    'photo_url': 'photo_url'
+  };
+  return alias[k] || k;
+}
+
+/**
+ * Parse `- Field: value` lines plus the trailing `My Digital Signature:` /
+ * `Request Transaction ID:` lines from a signed payload. Generic over field names;
+ * mirrors parsePayoutRegistrationEventText_ in the sibling scanner.
+ */
+function cfrSubParseFields_(body) {
+  var result = {};
+  var lines = String(body || '').split(/\r?\n/);
+  var lastKey = null;
+  for (var i = 0; i < lines.length; i++) {
+    if (lines[i] == null) continue;
+    var line = lines[i].trim();
+    if (!line) continue;
+    // The payload terminator: STOP accumulating the previous field here, so the
+    // trailing `My Digital Signature:` / `Request Transaction ID:` / footer prose
+    // (which are NOT `- Field:` lines) are never folded into the last real field.
+    if (line === '--------') { lastKey = null; continue; }
+    var isField = line.charAt(0) === '-';
+    var probe = isField ? line.substring(1).trim() : line;
+    var m = probe.match(/^([A-Za-z][A-Za-z0-9_\s\/\-()]*):\s*(.*)$/);
+    if (m && isField) {
+      var key = cfrSubNormKey_(m[1]);
+      result[key] = m[2].trim();
+      lastKey = key;
+    } else if (lastKey && !isField) {
+      result[lastKey] = (result[lastKey] ? result[lastKey] + ' ' : '') + line;
+    }
+  }
+  var sigMatch = String(body || '').match(/My Digital Signature:\s*([^\n]+)/i);
+  result.public_signature = sigMatch ? sigMatch[1].trim() : '';
+  var txMatch = String(body || '').match(/Request Transaction ID:\s*([^\n]+)/i);
+  result.request_transaction_id = txMatch ? txMatch[1].trim() : '';
+  return result;
+}
+
+/**
+ * One-shot, IDEMPOTENT migration: populate `request_transaction_id` on EXISTING
+ * `tree planting` rows by joining each row's telegram_update_id back to its intake
+ * message. Needed because transaction-level dedup can only see a txid that is STORED;
+ * rows written before the column existed carry none. Writes ONLY to the private
+ * `cfr program` sheet -- never to the read-only public intake. (Gary thread 35944.)
+ */
+function backfillCfrTreeTxIds(dryRun) {
+  // dryRun: preview what WOULD change without writing (gate-friendly).
+  // Returns counts only -- never txid strings -- so a preview leaks no data.
+  var apply = !dryRun;
+  try {
+    var intake = SpreadsheetApp.openById(CFRSUB_TELEGRAM_SPREADSHEET_ID);
+    var tcSheet = intake.getSheetByName(CFRSUB_TELEGRAM_SHEET);
+    if (!tcSheet) throw new Error('Telegram Chat Logs sheet not found');
+    var lastRow = tcSheet.getLastRow();
+    if (lastRow < 2) return { success: true, dryRun: !apply, checked: 0, changed: 0, unmatched: 0, distinctTxIds: 0, duplicateRows: 0 };
+    var lastCol = Math.max(tcSheet.getLastColumn(), CFRSUB_TC_MESSAGE_COL + 1);
+    var tcVals = tcSheet.getRange(2, 1, lastRow - 1, lastCol).getValues();
+    var txByUpdateId = {};
+    for (var i = 0; i < tcVals.length; i++) {
+      var uid = String(tcVals[i][CFRSUB_TC_UPDATE_ID_COL] || '').trim();
+      if (!uid) continue;
+      var f = cfrSubParseFields_(tcVals[i][CFRSUB_TC_MESSAGE_COL]);
+      var t = cfrSubCleanValue_(f.request_transaction_id);
+      if (t) txByUpdateId[uid] = t;
+    }
+
+    var cfr = payoutRegCfrProgramSpreadsheet_();
+    var tabs = cfrSubEnsureTabs_(cfr);
+    var sheet = tabs[CFRSUB_TREE_TAB];
+    var values = sheet.getDataRange().getValues();
+    if (values.length < 2) return { success: true, dryRun: !apply, checked: 0, changed: 0, unmatched: 0, distinctTxIds: 0, duplicateRows: 0 };
+    var header = values[0].map(function (h) { return String(h || '').trim(); });
+    var uCol = header.indexOf('telegram_update_id');
+    var txCol = header.indexOf('request_transaction_id');
+    if (uCol < 0 || txCol < 0) {
+      throw new Error('tree planting row 1 must carry telegram_update_id and request_transaction_id');
+    }
+    var checked = 0, changed = 0, unmatched = 0;
+    var txCount = {};   // distinct txid -> row count, so the caller can verify the collapse
+    for (var p = 1; p < values.length; p++) {
+      var pre = String(values[p][txCol] == null ? '' : values[p][txCol]).trim();
+      if (pre) txCount[pre] = (txCount[pre] || 0) + 1;
+    }
+    for (var r = 1; r < values.length; r++) {
+      checked++;
+      var existing = String(values[r][txCol] == null ? '' : values[r][txCol]).trim();
+      if (existing) continue;  // already populated -- idempotent
+      var txid = txByUpdateId[String(values[r][uCol] || '').trim()];
+      if (!txid) { unmatched++; continue; }
+      if (apply) sheet.getRange(r + 1, txCol + 1).setValue(txid);
+      txCount[txid] = (txCount[txid] || 0) + 1;
+      changed++;
+    }
+    var distinctTxIds = 0, duplicateRows = 0;
+    for (var k in txCount) { distinctTxIds++; if (txCount[k] > 1) duplicateRows += txCount[k] - 1; }
+    return { success: true, dryRun: !apply, checked: checked, changed: changed,
+             unmatched: unmatched, distinctTxIds: distinctTxIds, duplicateRows: duplicateRows };
+  } catch (err) {
+    Logger.log('backfillCfrTreeTxIds error: ' + (err && err.message ? err.message : err));
+    return { success: false, error: (err && err.message ? err.message : String(err)) };
+  }
+}
+
+/**
+ * True when a tree row carries evidence of a QR/plot LINKAGE and therefore must
+ * NEVER be removed by a dedup/collapse (Gary, thread 35944: "make sure the trees
+ * already associated with QR code don't get dedup away").
+ *
+ * Detects either:
+ *   (a) a linkage column - any header matching /linked/i (e.g. "Linked QR Code",
+ *       "Linked Plot ID", "Linked At") holding a NON-EMPTY value, or
+ *   (b) a status column (header "status"/"Status") whose value is a linked state
+ *       (LINKED / ASSIGNED_TO_TREE - see SCHEMA.md's Agroverse QR status enum).
+ *
+ * Fails safe: a row with no linkage evidence returns false, so ordinary rows
+ * collapse exactly as before.
+ */
+function cfrSubIsLinkedRow_(header, row) {
+  for (var c = 0; c < header.length; c++) {
+    var name = String(header[c] || '').trim();
+    var val = String((row && row[c]) || '').trim();
+    if (!val) continue;
+    if (/linked/i.test(name)) return true;
+    if (/^status$/i.test(name) && /^(linked|assigned_to_tree)$/i.test(val)) return true;
+  }
+  return false;
+}
+
+/**
+ * One-shot, IDEMPOTENT lever (Gary thread 35944): COLLAPSE pre-existing duplicate
+ * `tree planting` rows that share a Request Transaction ID -- keeping the FIRST
+ * occurrence of each. `backfillCfrTreeTxIds` only POPULATES the txid column; this
+ * removes the duplicate rows that the txid dedupe prevents going forward, so the
+ * tab actually TRACKS UNIQUE ROWS rather than merely labelling them.
+ *
+ * Destructive (deletes rows from the PRIVATE ledger), so the router is
+ * preview-by-default: the live path requires `?apply=1`. Counts only, never txids.
+ */
+function collapseCfrTreeTxDuplicates(dryRun) {
+  var apply = !dryRun;
+  var lock = LockService.getScriptLock();
+  if (!lock.tryLock(180000)) return { success: false, error: 'busy' };
+  try {
+    var cfr = payoutRegCfrProgramSpreadsheet_();
+    var tabs = cfrSubEnsureTabs_(cfr);
+    var sheet = tabs[CFRSUB_TREE_TAB];
+    var values = sheet.getDataRange().getValues();
+    if (values.length < 2) {
+      return { success: true, dryRun: !apply, checked: 0, collapsed: 0, distinctTxIds: 0, untxRow: 0, grafted: 0, linkedProtected: 0 };
+    }
+    var header = values[0].map(function (h) { return String(h || '').trim(); });
+    var txCol = header.indexOf('request_transaction_id');
+    if (txCol < 0) throw new Error('tree planting row 1 must carry request_transaction_id');
+
+    // ---- Linkage-aware collapse (Gary, thread 35944). --------------------------
+    // Rule (a): the FIRST occurrence of a txid survives; later rows sharing it are
+    // duplicates. If a duplicate about to be removed CARRIES a QR/plot link and the
+    // surviving row does NOT, we RE-POINT that link onto the survivor (graft the
+    // linkage columns - linked-*, plot id AND status, so the survivor is
+    // self-consistent) before deleting, so the QR association follows the canonical
+    // record instead of being lost. If BOTH rows carry a link we leave the duplicate
+    // in place (ambiguous; never silently drop a linkage).
+    var linkCols = [];
+    for (var c = 0; c < header.length; c++) {
+      var nm = header[c];
+      if (/linked/i.test(nm) || /^status$/i.test(nm) || /^plot id$/i.test(nm)) linkCols.push(c);
+    }
+
+    var seen = {};         // txid -> surviving 1-based sheet row
+    var toDelete = [];     // duplicate 1-based sheet rows
+    var grafts = [];       // {target, source} 1-based rows
+    var distinct = 0, untx = 0, linkedProtected = 0;
+    for (var r = 1; r < values.length; r++) {
+      var k = cfrSubTreeTxKey_(values[r][txCol]);
+      if (!k) { untx++; continue; }                 // un-txid'd rows are never collapsed
+      if (seen[k]) {
+        var keptRow = seen[k];
+        var keptLinked = cfrSubIsLinkedRow_(header, values[keptRow - 1]);
+        var dupLinked = cfrSubIsLinkedRow_(header, values[r]);
+        if (dupLinked && keptLinked) { linkedProtected++; continue; }   // ambiguous: keep both
+        if (dupLinked) { grafts.push({ target: keptRow, source: r + 1 }); linkedProtected++; }
+        toDelete.push(r + 1);
+        continue;
+      }
+      seen[k] = r + 1; distinct++;
+    }
+    if (apply) {
+      // Graft linkage onto the survivor FIRST, then delete duplicates bottom-up.
+      for (var g = 0; g < grafts.length; g++) {
+        var srcRow = values[grafts[g].source - 1];
+        for (var lc = 0; lc < linkCols.length; lc++) {
+          var ci = linkCols[lc];
+          if (!String(srcRow[ci] || '').trim()) continue;
+          sheet.getRange(grafts[g].target, ci + 1).setValue(srcRow[ci]);
+        }
+      }
+      for (var d = toDelete.length - 1; d >= 0; d--) sheet.deleteRow(toDelete[d]);
+    }
+    return { success: true, dryRun: !apply, checked: values.length - 1,
+             collapsed: toDelete.length, distinctTxIds: distinct, untxRow: untx,
+             grafted: grafts.length, linkedProtected: linkedProtected };
+  } catch (err) {
+    Logger.log('collapseCfrTreeTxDuplicates error: ' + (err && err.message ? err.message : err));
+    return { success: false, error: (err && err.message ? err.message : String(err)) };
+  } finally {
+    try { lock.releaseLock(); } catch (e) {}
+  }
+}
+
+/** The event tag: the first non-empty line's bracketed token, or '' when none. */
+function cfrSubTag_(message) {
+  var lines = String(message || '').split(/\r?\n/);
+  for (var i = 0; i < lines.length; i++) {
+    var t = lines[i].trim();
+    if (!t) continue;
+    if (t.charAt(0) !== '[') return '';
+    var close = t.indexOf(']');
+    return close > 0 ? t.substring(0, close + 1) : '';
+  }
+  return '';
+}
+
+/** Extract the host from a Submission Source value; '' when absent. */
+function cfrSubOriginHost_(submissionSource) {
+  var s = String(submissionSource || '').trim();
+  if (!s) return '';
+  var m = s.match(/^[a-zA-Z][a-zA-Z0-9+.\-]*:\/\/([^\/\s]+)/);
+  if (!m) return s.split('/')[0].toLowerCase();
+  return String(m[1]).toLowerCase().replace(/:\d+$/, '');
+}
+
+/** True only when this event is a CFR-origin submission (SS11.5 attribution). */
+function cfrSubIsCfrOrigin_(fields) {
+  return cfrSubOriginHost_(fields.submission_source) === CFRSUB_ORIGIN_HOST;
+}
+
+/** Trim, and treat the "(pending …)" / "N/A" placeholders as empty. */
+function cfrSubCleanValue_(v) {
+  var s = String(v == null ? '' : v).trim();
+  if (!s) return '';
+  if (/^\(pending[^)]*\)$/i.test(s) || /^n\/a$/i.test(s)) return '';
+  return s;
+}
+
+/**
+ * Canonical pk-hash derivation -- MUST match the browser + Python + credentialing
+ * implementations (paDerivePkHash in program_admin_endpoint.gs):
+ *   pk-<hash> = 'pk-' + first 12 chars of base64url(SHA-256(base64-decoded pubkey bytes))
+ * Returns '' on any error (never throws) so a malformed signature cannot break ingest.
+ */
+function cfrSubDerivePkHash_(publicKeyB64) {
+  try {
+    var key = String(publicKeyB64 || '').trim();
+    if (!key) return '';
+    var decoded = Utilities.base64Decode(key);
+    var digest = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, decoded);
+    var b64 = Utilities.base64EncodeWebSafe(digest).replace(/=+$/, '');
+    return 'pk-' + b64.substring(0, 12);
+  } catch (e) {
+    Logger.log('cfrSubDerivePkHash_ failed: ' + (e && e.message ? e.message : e));
+    return '';
+  }
+}
+
+/** Ensure the three tabs exist (idempotent, header-only) and return { tabName: sheet }. */
+function cfrSubEnsureTabs_(cfr) {
+  var map = {};
+  var names = [CFRSUB_TREE_TAB, CFRSUB_MON_TAB, CFRSUB_PLOT_TAB];
+  for (var i = 0; i < names.length; i++) {
+    var headers = PAYOUT_REG_TABS[names[i]];
+    map[names[i]] = ensurePayoutRegTab_(cfr, names[i], headers);
+  }
+  return map;
+}
+
+/**
+ * The `tree planting` TRANSACTION key (Gary thread 35944). The unique unit is a
+ * transaction, not a transport update id: the SAME tree may be re-posted under a NEW
+ * telegram update id (15 such cases live), so keying only on the update id
+ * double-counts it.
+ *
+ * The `Request Transaction ID` is itself globally unique per tree -- verified over all
+ * 265 live rows: 172 distinct txids, ZERO appearing under more than one signer or more
+ * than one tree content. So the txid ALONE is the key; scoping by pk_hash adds no
+ * discriminating power (and the signature is already stored as pk_hash for lineage).
+ * Returns '' when the payload carries no txid, in which case only the update id dedups.
+ */
+function cfrSubTreeTxKey_(requestTransactionId) {
+  return String(requestTransactionId || '').trim();
+}
+
+/** Read the processed transaction keys for one tab (transaction-level dedup ledger). */
+function cfrSubSeenRequestTxKeys_(sheet) {
+  var keys = {};
+  try {
+    var values = sheet.getDataRange().getValues();
+    if (values.length < 2) return keys;
+    var header = values[0].map(function (h) { return String(h || '').trim(); });
+    var txCol = header.indexOf('request_transaction_id');
+    if (txCol < 0) return keys;
+    for (var r = 1; r < values.length; r++) {
+      var k = cfrSubTreeTxKey_(values[r][txCol]);
+      if (k) keys[k] = true;
+    }
+  } catch (e) {
+    Logger.log('cfrSubSeenRequestTxKeys_ error: ' + (e && e.message ? e.message : e));
+  }
+  return keys;
+}
+
+/** Read the processed Telegram update ids for one tab (dedup ledger). */
+function cfrSubSeenUpdateIds_(sheet) {
+  var seen = {};
+  try {
+    var values = sheet.getDataRange().getValues();
+    if (values.length < 2) return seen;
+    var header = values[0].map(function (h) { return String(h || '').trim(); });
+    var col = header.indexOf('telegram_update_id');
+    if (col < 0) return seen;
+    for (var r = 1; r < values.length; r++) {
+      var id = String(values[r][col] || '').trim();
+      if (id) seen[id] = true;
+    }
+  } catch (e) {
+    Logger.log('cfrSubSeenUpdateIds_ error: ' + (e && e.message ? e.message : e));
+  }
+  return seen;
+}
+
+/** Append a row in the exact SS11.3 `tree planting` column order. */
+function appendCfrSubTreeRow_(sheet, p) {
+  sheet.appendRow([
+    new Date().toISOString(),
+    String(p.telegram_update_id || ''),
+    String(p.pk_hash || ''),
+    String(p.tree_id || ''),
+    String(p.species || ''),
+    String(p.lat || ''),
+    String(p.lng || ''),
+    String(p.photo_url || ''),
+    String(p.capture_source || ''),
+    String(p.status || ''),
+    String(p.request_transaction_id || '')
+  ]);
+}
+
+/** Append a row in the exact SS11.3 `tree monitoring` column order. */
+function appendCfrSubMonRow_(sheet, p) {
+  sheet.appendRow([
+    new Date().toISOString(),
+    String(p.telegram_update_id || ''),
+    String(p.tree_id_qr || ''),
+    String(p.species || ''),
+    String(p.dbh_cm || ''),
+    String(p.co2e_kg || ''),
+    String(p.measured_at || ''),
+    String(p.photo_url || ''),
+    String(p.status || '')
+  ]);
+}
+
+/** Append a row in the exact SS11.3 `plot registrations` column order. */
+function appendCfrSubPlotRow_(sheet, p) {
+  sheet.appendRow([
+    new Date().toISOString(),
+    String(p.telegram_update_id || ''),
+    String(p.pk_hash || ''),
+    String(p.plot_ref || ''),
+    String(p.geometry_ref || ''),
+    String(p.captured_at || ''),
+    String(p.status || '')
+  ]);
+}
+
+/**
+ * The CANONICAL per-tree id: the `Edgar_*`-shaped value among the intake's col A
+ * (telegram UPDATE id) and col D (telegram MESSAGE id), preferring col D. Col A is
+ * systematically +1 vs the canonical id on Edgar-direct rows, so the DApp tree picker
+ * (which selects col D ids) could never join `getTreeRecipientMap`'s tree_id output.
+ * Older Telegram-native rows carry neither shape and keep col A. (Gary thread 35944.)
+ */
+function cfrSubCanonicalTreeId_(updateId, messageId) {
+  var a = String(updateId == null ? '' : updateId).trim();
+  var d = String(messageId == null ? '' : messageId).trim();
+  if (/^Edgar_/.test(d)) return d;
+  if (/^Edgar_/.test(a)) return a;
+  return a || d;
+}
+
+/**
+ * Build the tab-specific row payload from the parsed fields. Returns null when the
+ * event does not map to one of the three CFR tabs.
+ */
+function cfrSubBuildRow_(tab, updateId, fields, messageId) {
+  var pkHash = cfrSubDerivePkHash_(fields.public_signature);
+  if (tab === CFRSUB_TREE_TAB) {
+    return {
+      tab: tab, updateId: updateId, append: appendCfrSubTreeRow_,
+      data: {
+        telegram_update_id: updateId,
+        pk_hash: pkHash,
+        // tree_id: the CANONICAL per-tree id (intake col D), so `getTreeRecipientMap`
+        // returns ids the DApp tree picker actually selects. Falls back to col A for
+        // Telegram-native rows that carry no Edgar_ id.
+        tree_id: cfrSubCanonicalTreeId_(updateId, messageId),
+        species: cfrSubCleanValue_(fields.species),
+        lat: cfrSubCleanValue_(fields.latitude),
+        lng: cfrSubCleanValue_(fields.longitude),
+        photo_url: cfrSubCleanValue_(fields.photo_url),
+        capture_source: cfrSubCleanValue_(fields.submission_source),
+        request_transaction_id: cfrSubCleanValue_(fields.request_transaction_id),
+        status: 'RECORDED'
+      }
+    };
+  }
+  if (tab === CFRSUB_MON_TAB) {
+    return {
+      tab: tab, updateId: updateId, append: appendCfrSubMonRow_,
+      data: {
+        telegram_update_id: updateId,
+        tree_id_qr: cfrSubCleanValue_(fields.tree_id),
+        species: cfrSubCleanValue_(fields.species),
+        dbh_cm: cfrSubCleanValue_(fields.dbh_cm),
+        // co2e_kg is not in the submission payload (derived later from DBH); left blank.
+        co2e_kg: cfrSubCleanValue_(fields.co2e_kg),
+        measured_at: cfrSubCleanValue_(fields.measured_at),
+        photo_url: cfrSubCleanValue_(fields.photo_url || fields.close_up_photo_url),
+        status: 'RECORDED'
+      }
+    };
+  }
+  if (tab === CFRSUB_PLOT_TAB) {
+    return {
+      tab: tab, updateId: updateId, append: appendCfrSubPlotRow_,
+      data: {
+        telegram_update_id: updateId,
+        pk_hash: pkHash,
+        plot_ref: cfrSubCleanValue_(fields.plot_ref || fields.farm_name),
+        geometry_ref: cfrSubCleanValue_(fields.geometry_ref),
+        captured_at: cfrSubCleanValue_(fields.captured_at),
+        status: 'RECORDED'
+      }
+    };
+  }
+  return null;
+}
+
+/**
+ * HTTP / time-driven entry point. Triggered by Edgar after a CFR-origin tree /
+ * monitoring / plot submission lands on Telegram Chat Logs, plus an hourly
+ * safety-net cron. Mirrors processPayoutRegistrationsFromTelegramChatLogs().
+ */
+function processCfrProgramSubmissionsFromTelegramChatLogs() {
+  var lock = LockService.getScriptLock();
+  if (!lock.tryLock(180000)) {
+    Logger.log('processCfrProgramSubmissionsFromTelegramChatLogs: another run in progress; skipping.');
+    return { success: false, error: 'busy' };
+  }
+  try {
+    try {
+      ensureCfrSubHourlyTriggerInstalled_();
+    } catch (triggerErr) {
+      Logger.log('ensureCfrSubHourlyTriggerInstalled_: ' +
+        (triggerErr && triggerErr.message ? triggerErr.message : triggerErr) + ' - proceeding with scan.');
+    }
+
+    // Intake: canonical Telegram Chat Logs (read-only; publicly republished).
+    var intake = SpreadsheetApp.openById(CFRSUB_TELEGRAM_SPREADSHEET_ID);
+    var tcSheet = intake.getSheetByName(CFRSUB_TELEGRAM_SHEET);
+    if (!tcSheet) throw new Error('Telegram Chat Logs sheet not found');
+
+    // Output: the private, governor-only `cfr program` spreadsheet (SS11.2/SS11.3).
+    var cfr = payoutRegCfrProgramSpreadsheet_();
+    var tabs = cfrSubEnsureTabs_(cfr);
+
+    var seen = {};
+    seen[CFRSUB_TREE_TAB] = cfrSubSeenUpdateIds_(tabs[CFRSUB_TREE_TAB]);
+    seen[CFRSUB_MON_TAB] = cfrSubSeenUpdateIds_(tabs[CFRSUB_MON_TAB]);
+    seen[CFRSUB_PLOT_TAB] = cfrSubSeenUpdateIds_(tabs[CFRSUB_PLOT_TAB]);
+
+    // Transaction-level ledger for `tree planting` ONLY (Gary thread 35944).
+    var seenTx = {};
+    seenTx[CFRSUB_TREE_TAB] = cfrSubSeenRequestTxKeys_(tabs[CFRSUB_TREE_TAB]);
+
+    var lastRow = tcSheet.getLastRow();
+    if (lastRow < 2) return { success: true, recorded: 0, skipped: 0, errors: 0 };
+    var startRow = Math.max(2, lastRow - CFRSUB_SCAN_BATCH + 1);
+    var numRows = lastRow - startRow + 1;
+    var lastCol = Math.max(tcSheet.getLastColumn(), CFRSUB_TC_MESSAGE_COL + 1);
+    var rows = tcSheet.getRange(startRow, 1, numRows, lastCol).getValues();
+
+    var recorded = 0, skipped = 0, errors = 0;
+
+    for (var i = 0; i < rows.length; i++) {
+      var message = String(rows[i][CFRSUB_TC_MESSAGE_COL] || '');
+      var tag = cfrSubTag_(message);
+      var tab = '';
+      if (tag === CFRSUB_TREE_TAG) tab = CFRSUB_TREE_TAB;
+      else if (tag === CFRSUB_MON_TAG) tab = CFRSUB_MON_TAB;
+      else if (tag === CFRSUB_PLOT_TAG) tab = CFRSUB_PLOT_TAB;
+      if (!tab) continue;  // not one of the three CFR event families
+
+      var updateId = String(rows[i][CFRSUB_TC_UPDATE_ID_COL] || '').trim();
+      if (!updateId) { skipped++; continue; }
+      if (seen[tab][updateId]) continue;  // dedup: never process the same update twice
+
+      try {
+        var fields = cfrSubParseFields_(message);
+        // Attribution gate (SS11.5): only submissions that came through cfr.truesight.me.
+        if (!cfrSubIsCfrOrigin_(fields)) { seen[tab][updateId] = true; skipped++; continue; }
+
+        // Transaction-level dedup for `tree planting` (Gary thread 35944): the same tree
+        // may be re-posted under a NEW update id, so keying only on the update id
+        // double-counts one transaction.
+        var txKey = (tab === CFRSUB_TREE_TAB)
+          ? cfrSubTreeTxKey_(fields.request_transaction_id)
+          : '';
+        if (txKey && seenTx[tab] && seenTx[tab][txKey]) { skipped++; continue; }
+
+        var built = cfrSubBuildRow_(tab, updateId, fields, rows[i][CFRSUB_TC_MESSAGE_ID_COL]);
+        if (!built) { skipped++; continue; }
+        built.append(tabs[tab], built.data);
+        seen[tab][updateId] = true;
+        if (txKey) seenTx[tab][txKey] = true;
+        recorded++;
+      } catch (rowErr) {
+        Logger.log('processCfrProgramSubmissionsFromTelegramChatLogs row error: ' +
+          (rowErr && rowErr.message ? rowErr.message : rowErr));
+        errors++;
+      }
+    }
+
+    return { success: true, recorded: recorded, skipped: skipped, errors: errors };
+  } catch (err) {
+    Logger.log('processCfrProgramSubmissionsFromTelegramChatLogs error: ' +
+      (err && err.message ? err.message : err));
+    return { success: false, error: (err && err.message ? err.message : String(err)) };
+  } finally {
+    try { lock.releaseLock(); } catch (e) {}
+  }
+}
+
+function ensureCfrSubHourlyTriggerInstalled_() {
+  var fn = 'processCfrProgramSubmissionsFromTelegramChatLogs';
+  var triggers = ScriptApp.getProjectTriggers();
+  for (var i = 0; i < triggers.length; i++) {
+    if (triggers[i].getHandlerFunction() === fn) return;
+  }
+  ScriptApp.newTrigger(fn).timeBased().everyHours(1).create();
+}
+
+/**
+ * One-shot operator lever. The `tree planting` tab historically stored `tree_id` = the
+ * intake Telegram UPDATE id (col A), but the canonical per-tree id is the MESSAGE id
+ * (col D) -- col A is systematically +1 on Edgar-direct rows, so `getTreeRecipientMap`
+ * returned ids the DApp picker never selects and recipient auto-fill silently no-op'd.
+ * This rewrites each row's `tree_id` to the `Edgar_*`-shaped value among
+ * {col A, col D}, preferring col D. Idempotent. Exposed as `?action=backfillCfrTreeIds`.
+ */
+function backfillCfrTreeIds() {
+  var lock = LockService.getScriptLock();
+  if (!lock.tryLock(180000)) return { success: false, error: 'busy' };
+  try {
+    var intake = SpreadsheetApp.openById(CFRSUB_TELEGRAM_SPREADSHEET_ID);
+    var tc = intake.getSheetByName(CFRSUB_TELEGRAM_SHEET);
+    if (!tc) throw new Error('Telegram Chat Logs sheet not found');
+    var tv = tc.getDataRange().getValues();
+    var msgById = {};
+    for (var r = 1; r < tv.length; r++) {
+      var uid = String(tv[r][CFRSUB_TC_UPDATE_ID_COL] || '').trim();
+      var mid = String(tv[r][CFRSUB_TC_MESSAGE_ID_COL] || '').trim();
+      if (uid && !msgById[uid]) msgById[uid] = mid;
+    }
+    var cfr = payoutRegCfrProgramSpreadsheet_();
+    var sheet = cfr.getSheetByName(CFRSUB_TREE_TAB);
+    if (!sheet) return { success: true, checked: 0, changed: 0 };
+    var v = sheet.getDataRange().getValues();
+    if (v.length < 2) return { success: true, checked: 0, changed: 0 };
+    var header = v[0].map(function (h) { return String(h || '').trim(); });
+    var idCol = header.indexOf('tree_id');
+    var upCol = header.indexOf('telegram_update_id');
+    if (idCol < 0) return { success: true, checked: 0, changed: 0 };
+    var changed = 0;
+    for (var r2 = 1; r2 < v.length; r2++) {
+      var cur = String(v[r2][idCol] == null ? '' : v[r2][idCol]).trim();
+      var u = upCol >= 0 ? String(v[r2][upCol] == null ? '' : v[r2][upCol]).trim() : '';
+      var canonical = cfrSubCanonicalTreeId_(cur, msgById[u] || '');
+      if (canonical && canonical !== cur) {
+        sheet.getRange(r2 + 1, idCol + 1).setValue(canonical);
+        changed++;
+      }
+    }
+    return { success: true, checked: v.length - 1, changed: changed };
+  } catch (err) {
+    return { success: false, error: (err && err.message ? err.message : String(err)) };
+  } finally {
+    try { lock.releaseLock(); } catch (e) {}
+  }
+}

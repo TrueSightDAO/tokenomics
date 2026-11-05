@@ -1,0 +1,19 @@
+{
+  "success": true,
+  "batch_info": {
+    "start_row": 710,
+    "end_row": 713,
+    "total_generated": 4,
+    "zip_file_name": "real_data_batch.zip",
+    "zip_file_url": "https://raw.githubusercontent.com/TrueSightDAO/qr_codes/main/batch_files/real_data_batch.zip"
+  },
+  "generated_codes": [
+    "2024_20241201_710",
+    "2024_20241201_711",
+    "2024_20241201_712",
+    "2024_20241201_713"
+  ],
+  "email_sent": false,
+  "email_message": "Error processing notification: 'NoneType' object has no attribute 'get'",
+  "timestamp": "2025-08-31T14:04:26.846840"
+}

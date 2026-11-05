@@ -1,0 +1,6 @@
+Code.js
+manifest.json
+# NOTICE 2026-09-18 (Gary): the Credentials.* entries that used to live here were
+# removed. This project has no Credentials file, and listing one is what would let a
+# future `clasp push` delete it (push replaces the whole remote file set). See the
+# rule in the repo-root .gitignore.

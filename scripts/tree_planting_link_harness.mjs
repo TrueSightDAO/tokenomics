@@ -1,0 +1,378 @@
+// Behavioral harness for process_tree_planting_link.js (PR5, plan 1.3/1.4).
+// Stubs the Apps Script globals so the link handler's real leg logic runs under node.
+// Usage: node scripts/tree_planting_link_harness.mjs <path-to-link-handler.js>
+import fs from 'fs';
+const src = fs.readFileSync(process.argv[2], 'utf8');
+
+// ---- minimal GAS stubs -----------------------------------------------------
+let mainSheets = {}, managedSheets = {}, sourceSheets = {};
+const MAIN_URL = 'https://docs.google.com/spreadsheets/d/1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU/edit';
+const MANAGED_URL = 'https://docs.google.com/spreadsheets/d/MANAGED_LEDGER_XYZ/edit';
+const SOURCE_URL = 'https://docs.google.com/spreadsheets/d/1qbZZhf-_7xzmDTriaJVWj6OZshyQsFkdsAV8-pyzASQ/edit?gid=0#gid=0';
+
+function makeSheet(name, grid) {
+  let g = grid ? grid.map(r => r.slice()) : [];
+  return {
+    getName(){ return name; },
+    getLastRow(){ return g.length; },
+    getLastColumn(){ return g.reduce((m,r)=>Math.max(m,r.length),0); },
+    getDataRange(){ return { getValues(){ return g.map(r=>r.slice()); } }; },
+    getRange(r,c,nr,nc){
+      if (nr === undefined) nr = 1;
+      if (nc === undefined) nc = 1;
+      return {
+        getValues(){ const out=[]; for(let i=0;i<nr;i++){ const rr=g[r-1+i]||[]; out.push(rr.slice(c-1,c-1+nc)); } return out; },
+        getValue(){ const rr=g[r-1]||[]; return rr[c-1]===undefined?'':rr[c-1]; },
+        setValue(v){ const ri=r-1; g[ri]=g[ri]||[]; g[ri][c-1]=v; },
+        setValues(v){ for(let i=0;i<v.length;i++){ const ri=r-1+i; g[ri]=g[ri]||[]; for(let j=0;j<v[i].length;j++) g[ri][c-1+j]=v[i][j]; } }
+      };
+    },
+    appendRow(a){ g.push(a.slice()); },
+    insertSheet(){ return this; }
+  };
+}
+
+globalThis.SpreadsheetApp = {
+  openByUrl(url){
+    const u = String(url||'');
+    if (u.indexOf('1GE7PUq-UT6x2rBN') >= 0) {
+      return { getSheetByName(n){ return mainSheets[n] || null; } };
+    }
+    if (u.indexOf('MANAGED_LEDGER_XYZ') >= 0) {
+      return { getSheetByName(n){ return managedSheets[n] || null; } };
+    }
+    if (u.indexOf('1qbZZhf-_7xzmDTriaJVWj6OZshyQsFkdsAV8-pyzASQ') >= 0) {
+      return { getSheetByName(n){ return sourceSheets[n] || null; } };
+    }
+    throw new Error('unexpected spreadsheet url: ' + u);
+  },
+  openById(id){ return this.openByUrl(id); }
+};
+globalThis.Logger = { log(){} };
+globalThis.Sheet = {};
+// ---------------------------------------------------------------------------
+
+// The link handler reuses process_qr_code_updates.js's SOURCE_SHEET_URL (shared GAS scope); expose it.
+globalThis.SOURCE_SHEET_URL = SOURCE_URL;
+// UrlFetchApp stub for the plot-media fetch (PR6) - overridden per-test via setMediaJson/.
+let __mediaResp = { code: 200, text: JSON.stringify({ plots: {} }) };
+globalThis.UrlFetchApp = { fetch(){ return { getResponseCode(){ return __mediaResp.code; }, getContentText(){ return __mediaResp.text; } }; } };
+
+// eval source + export in the SAME indirect eval, so the source's top-level consts are in scope
+const EXPORTS = ['tplComputeLegs_','tplResolveSource_','tplWriteLegs_','appendTreePlantingLedgerFulfillment_','tplNormalizeAmount_','tplResolveTreeCharge_','TPL_TREE_CHARGE_COL','TPL_CURRENCIES_TAB',
+  'TPL_MAIN_DAO_LEDGER_URL','TPL_MAIN_DAO_OFFCHAIN_TAB','TPL_TRANSACTIONS_TAB','TPL_POOL_LITERAL',
+  'TPL_CUSTOMER_LIABILITY_LITERAL','TPL_TRANSFER_CURRENCY','TPL_MAIN_LEDGER_LEDGER_URLS',
+  'tplResolvePlotFarmer_','tplPickPlotImage_','tplResolvePlotImage_','tplIsPlotStatusInvalid_',
+  'TPL_PLOTS_TAB','TPL_PLOTS_FARMER_COL','TPL_LINKED_PLOT_ID_COL',
+  'tplResolveSunmintRowIndex_','TPL_SUNMINT_TXID_COL','TPL_SUNMINT_MESSAGE_ID_COL','TPL_SUNMINT_STATUS_COL'];
+(0, eval)(src + "\n;Object.assign(globalThis, {" + EXPORTS.join(',') + "});");
+
+const tplComputeLegs_ = globalThis.tplComputeLegs_;
+const tplResolveSource_ = globalThis.tplResolveSource_;
+const tplWriteLegs_ = globalThis.tplWriteLegs_;
+const appendTreePlantingLedgerFulfillment_ = globalThis.appendTreePlantingLedgerFulfillment_;
+const TPL_POOL_LITERAL = globalThis.TPL_POOL_LITERAL;
+const TPL_CUSTOMER_LIABILITY_LITERAL = globalThis.TPL_CUSTOMER_LIABILITY_LITERAL;
+const tplResolvePlotFarmer_ = globalThis.tplResolvePlotFarmer_;
+const tplPickPlotImage_ = globalThis.tplPickPlotImage_;
+const tplResolvePlotImage_ = globalThis.tplResolvePlotImage_;
+const tplIsPlotStatusInvalid_ = globalThis.tplIsPlotStatusInvalid_;
+const TPL_PLOTS_FARMER_COL = globalThis.TPL_PLOTS_FARMER_COL;
+const TPL_LINKED_PLOT_ID_COL = globalThis.TPL_LINKED_PLOT_ID_COL;
+const tplResolveSunmintRowIndex_ = globalThis.tplResolveSunmintRowIndex_;
+const TPL_SUNMINT_TXID_COL = globalThis.TPL_SUNMINT_TXID_COL;
+const TPL_SUNMINT_MESSAGE_ID_COL = globalThis.TPL_SUNMINT_MESSAGE_ID_COL;
+const TPL_SUNMINT_STATUS_COL = globalThis.TPL_SUNMINT_STATUS_COL;
+const tplNormalizeAmount_ = globalThis.tplNormalizeAmount_;
+const tplResolveTreeCharge_ = globalThis.tplResolveTreeCharge_;
+const TPL_TREE_CHARGE_COL = globalThis.TPL_TREE_CHARGE_COL;
+let TREE_CHARGE = 1.5;
+
+let pass=0, fail=0;
+function t(name, fn){ try{ fn(); pass++; console.log('  ok  '+name); }catch(e){ fail++; console.log('FAIL  '+name+'\n      '+e.message); } }
+function eq(a,b,m){ if(a!==b) throw new Error((m||'')+' expected '+JSON.stringify(b)+' got '+JSON.stringify(a)); }
+
+function reset(){ mainSheets={}; managedSheets={}; sourceSheets={}; __mediaResp={ code:200, text: JSON.stringify({ plots:{} }) }; }
+function setSource(n,g){ sourceSheets[n]=makeSheet(n,g); }
+function setMedia(m){ __mediaResp={ code:200, text: JSON.stringify(m) }; }
+function setMediaCode(c){ __mediaResp={ code:c, text:'{}' }; }
+function plotsGrid(){ return [['Plot ID','Farm ID','Plot Name','Hectares','Status','Boundary Authority','Plot Type','Owner','Region','Verified At','Media','Notes','Coordinates','Latitude','Longitude','Invalidated By','','Invalidated At','Invalidated Reason','Contributor Name']]; }
+function setMain(n,g){ mainSheets[n]=makeSheet(n,g); }
+function setManaged(n,g){ managedSheets[n]=makeSheet(n,g); }
+function mainRows(){ return mainSheets['offchain transactions'] ? mainSheets['offchain transactions'].getDataRange().getValues() : []; }
+function managedRows(){ return managedSheets['Transactions'] ? managedSheets['Transactions'].getDataRange().getValues() : []; }
+function currenciesGrid(charge){
+  return [['Currencies','Price in USD','a','b','c','d','e','f','g','h','i','j','k','l','m','n','o','p','q','r','s','t','u'],
+          [TPL_CUSTOMER_LIABILITY_LITERAL, 1.5, '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', charge]];
+}
+function poolGrid(farmer, amt){ return [['Date','Desc','Fund Handler','Amount','Currency'],
+  ['', '', farmer, amt, TPL_POOL_LITERAL]]; }
+
+console.log('== tplComputeLegs_ (pure) ==');
+t('committed / managed: 3 legs (liability + PR5.3b cash transfer), category Liability', () => {
+  const legs = tplComputeLegs_({ customerContributor:'Gov', farmerContributor:'F1', source:'committed', amount:1.5, qrRoutesToMain:false });
+  eq(legs.length, 3, 'legs');
+  eq(legs[0].target, 'qr'); eq(legs[0].amount, -1);
+  eq(legs[0].literal, TPL_CUSTOMER_LIABILITY_LITERAL); eq(legs[0].category, 'Liability');
+  const cash = legs.filter(l=>l.kind==='cash');
+  eq(cash.length, 2, 'cash legs (Q1: cash moves QR->main at link)');
+  eq(cash[0].target,'qr'); eq(cash[0].amount,-1.5);
+  eq(cash[1].target,'main'); eq(cash[1].amount,1.5);
+});
+t('committed / main: 1 leg, category blank (7-col Is Revenue N)', () => {
+  const legs = tplComputeLegs_({ customerContributor:'Gov', farmerContributor:'F1', source:'committed', amount:0.01, qrRoutesToMain:true });
+  eq(legs.length, 1); eq(legs[0].target, 'main'); eq(legs[0].category, '');
+});
+t('pool / same-ledger-as-main: 2 legs, NO transfer', () => {
+  const legs = tplComputeLegs_({ customerContributor:'Gov', farmerContributor:'F1', source:'pool', amount:5, qrRoutesToMain:true });
+  eq(legs.length, 2); eq(legs[0].target,'main'); eq(legs[1].target,'main');
+  eq(legs[1].literal, TPL_POOL_LITERAL); eq(legs[1].amount, -1);
+  eq(legs.filter(l=>l.kind==='cash').length, 0, 'no cash leg');
+});
+t('pool / cross-ledger: 4 legs incl. reimbursement transfer', () => {
+  const legs = tplComputeLegs_({ customerContributor:'Gov', farmerContributor:'F1', source:'pool', amount:1.5, qrRoutesToMain:false });
+  eq(legs.length, 4);
+  const cash = legs.filter(l=>l.kind==='cash');
+  eq(cash.length, 2);
+  eq(cash[0].target,'qr'); eq(cash[0].amount,-1.5); eq(cash[0].literal, globalThis.TPL_TRANSFER_CURRENCY);
+  eq(cash[1].target,'main'); eq(cash[1].amount,1.5);
+});
+t('PR5.3b: cross-ledger unbookable amount -> [] (fail CLOSED, nothing booked)', () => {
+  eq(tplComputeLegs_({ customerContributor:'Gov', farmerContributor:'F1', source:'pool', amount:'', qrRoutesToMain:false }).length, 0);
+  eq(tplComputeLegs_({ customerContributor:'Gov', farmerContributor:'F1', source:'committed', amount:'N/A', qrRoutesToMain:false }).length, 0);
+});
+t('PR5.3b: null amount = no transfer intended (plot path), inventory legs still book', () => {
+  const legs = tplComputeLegs_({ customerContributor:'Gov', farmerContributor:'F1', source:'pool', amount:null, qrRoutesToMain:false });
+  eq(legs.length, 2, 'liability + pool, no cash');
+  eq(legs.filter(l=>l.kind==='cash').length, 0);
+});
+t('PR5.3a: normalizer parses currency-suffixed strings', () => {
+  eq(tplNormalizeAmount_('1.5 BRL'), 1.5);
+  eq(tplNormalizeAmount_('1 USD'), 1);
+  eq(tplNormalizeAmount_('1,234.50'), 1234.5);
+  eq(tplNormalizeAmount_(2.25), 2.25);
+  eq(isNaN(tplNormalizeAmount_('N/A')), true);
+  eq(isNaN(tplNormalizeAmount_('')), true);
+  eq(isNaN(tplNormalizeAmount_('   ')), true);
+});
+t('PR5.3a: tree charge resolved from Currencies col U (case-insensitive)', () => {
+  reset(); setMain('Currencies', currenciesGrid(1.5));
+  eq(tplResolveTreeCharge_('Cacao Tree To Be Planted'), 1.5);
+  eq(tplResolveTreeCharge_('cacao tree to be planted'), 1.5);
+  reset(); setMain('Currencies', currenciesGrid('2 BRL'));
+  eq(tplResolveTreeCharge_('Cacao Tree To Be Planted'), 2);
+});
+t('PR5.3a: tree charge fails closed on missing tab / blank cell / unknown literal', () => {
+  reset(); eq(isNaN(tplResolveTreeCharge_('Cacao Tree To Be Planted')), true);
+  reset(); setMain('Currencies', currenciesGrid('')); eq(isNaN(tplResolveTreeCharge_('Cacao Tree To Be Planted')), true);
+  reset(); setMain('Currencies', currenciesGrid(1.5)); eq(isNaN(tplResolveTreeCharge_('Other')), true);
+});
+t('PR5.3a: Currencies tree charge is column U (index 20)', () => { eq(TPL_TREE_CHARGE_COL, 20); });
+t('missing contributors -> [] (fail closed)', () => {
+  eq(tplComputeLegs_({ customerContributor:'', farmerContributor:'F1', source:'pool', amount:1, qrRoutesToMain:false }).length, 0);
+  eq(tplComputeLegs_({ customerContributor:'Gov', farmerContributor:'', source:'pool', amount:1, qrRoutesToMain:false }).length, 0);
+});
+
+console.log('== tplResolveSource_ ==');
+t('open pool unit (>=1) -> pool', () => {
+  reset(); setMain('offchain transactions', poolGrid('F1', 1));
+  eq(tplResolveSource_('F1'), 'pool');
+});
+t('zero balance -> committed', () => {
+  reset(); setMain('offchain transactions', poolGrid('F1', 0));
+  eq(tplResolveSource_('F1'), 'committed');
+});
+t('unknown farmer -> committed', () => {
+  reset(); setMain('offchain transactions', poolGrid('F1', 3));
+  eq(tplResolveSource_('Other'), 'committed');
+});
+t('missing tab -> committed (never throws)', () => {
+  reset();
+  eq(tplResolveSource_('F1'), 'committed');
+});
+
+console.log('== tplWriteLegs_ ==');
+t('partial: main tab missing -> written 0, error NO_MAIN_TAB', () => {
+  reset();
+  const legs = tplComputeLegs_({ customerContributor:'Gov', farmerContributor:'F1', source:'pool', amount:1, qrRoutesToMain:true });
+  const res = tplWriteLegs_(legs, { description:'d', transactionsSpreadsheetUrl:MANAGED_URL });
+  eq(res.written, 0); eq(res.error, 'NO_MAIN_TAB');
+});
+
+console.log('== appendTreePlantingLedgerFulfillment_ (end to end) ==');
+t('pool cross-ledger: books 2 managed + 2 main rows, returns true', () => {
+  reset();
+  setMain('offchain transactions', poolGrid('F1', 1));
+  setManaged('Transactions', [['Date','Desc','Contributor','Amount','Currency','Type']]);
+  const ok = appendTreePlantingLedgerFulfillment_(MANAGED_URL, 'msg', 'Gov', 'https://truesight.me/sunmint/bec', 'F1', 1.5);
+  eq(ok, true);
+  const m = managedRows(), mn = mainRows();
+  eq(m.length, 3, 'managed rows');   // header + customer leg + cash leg
+  eq(mn.length, 4, 'main rows');     // header + setup pool row + pool leg + cash leg
+  eq(m[1][4], TPL_CUSTOMER_LIABILITY_LITERAL); eq(m[1][3], -1);
+  eq(m[2][4], globalThis.TPL_TRANSFER_CURRENCY); eq(m[2][3], -1.5);
+  eq(mn[2][4], TPL_POOL_LITERAL); eq(mn[2][3], -1);   // the new pool-consumption leg
+  eq(mn[3][3], 1.5);                                   // the new reimbursement cash leg
+});
+t('PR5.3b e2e: committed on a managed ledger books 3 legs (Q1)', () => {
+  reset();
+  setMain('offchain transactions', [['Date','Desc','Fund Handler','Amount','Currency','a','b']]);
+  setManaged('Transactions', [['Date','Desc','Contributor','Amount','Currency','Type']]);
+  const ok = appendTreePlantingLedgerFulfillment_(MANAGED_URL, 'msg', 'Gov', 'https://truesight.me/sunmint/bec', 'F1', 1.5);
+  eq(ok, true);
+  const m = managedRows(), mn = mainRows();
+  eq(m.length, 3, 'managed rows');   // header + customer liability + cash-out
+  eq(mn.length, 2, 'main rows');     // header + cash-in
+  eq(mn[1][3], 1.5);
+});
+t('PR5.3b e2e: unbookable charge on a managed ledger books nothing, returns false', () => {
+  reset();
+  setMain('offchain transactions', [['Date','Desc','Fund Handler','Amount','Currency','a','b']]);
+  setManaged('Transactions', [['Date','Desc','Contributor','Amount','Currency','Type']]);
+  const ok = appendTreePlantingLedgerFulfillment_(MANAGED_URL, 'msg', 'Gov', 'https://truesight.me/sunmint/bec', 'F1', '');
+  eq(ok, false);
+  eq(managedRows().length, 1, 'no managed rows written');
+  eq(mainRows().length, 1, 'no main rows written');
+});
+t('committed on a main-routed ledger: books 1 main row, returns true', () => {
+  reset();
+  setMain('offchain transactions', [['Date','Desc','Fund Handler','Amount','Currency','a','b']]);
+  const ok = appendTreePlantingLedgerFulfillment_(MAIN_URL, 'msg', 'Gov', 'https://agroverse.shop/agl4', 'F1', 0.01);
+  eq(ok, true);
+  const mn = mainRows(); eq(mn.length, 2);
+  eq(mn[1][2], 'SunMint Tree Planting Contract - agl4');
+  eq(mn[1][4], TPL_CUSTOMER_LIABILITY_LITERAL); eq(mn[1][3], -1);
+});
+t('farmer name falls back to governor when SunMint col J is blank', () => {
+  reset();
+  setMain('offchain transactions', poolGrid('Gov', 1));
+  setManaged('Transactions', [['Date','Desc','Contributor','Amount','Currency','Type']]);
+  const ok = appendTreePlantingLedgerFulfillment_(MANAGED_URL, 'msg', 'Gov', 'https://truesight.me/sunmint/bec', '', 0.01);
+  eq(ok, true);
+  eq(managedRows()[1][4], TPL_CUSTOMER_LIABILITY_LITERAL);
+});
+
+console.log('== PR6 tplPickPlotImage_ ==');
+t('image preferred over video', () => {
+  const mj = { plots: { 'P1': { media: [ {kind:'video',url:'v',thumbnail:'t'}, {kind:'image',url:'img'} ] } } };
+  eq(tplPickPlotImage_(mj,'P1'), 'img');
+});
+t('video thumbnail fallback when no stills', () => {
+  const mj = { plots: { 'V-06-29': { media: [ {kind:'video',url:'v',thumbnail:'thumb.jpg'} ] } } };
+  eq(tplPickPlotImage_(mj,'V-06-29'), 'thumb.jpg');
+});
+t('unknown plot -> empty', () => { eq(tplPickPlotImage_({plots:{}}, 'ZZ'), ''); });
+t('no media -> empty', () => { eq(tplPickPlotImage_({plots:{'P1':{media:[]}}}, 'P1'), ''); });
+t('malformed -> empty (never throws)', () => { eq(tplPickPlotImage_(null, 'P1'), ''); });
+
+console.log('== PR6 tplResolvePlotFarmer_ ==');
+t('registered farmer -> resolved', () => {
+  reset();
+  const g = plotsGrid(); g.push(['FC-P1','fazenda-clara-bahia','', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', 'Fernando Soller Gimenez']);
+  setSource(TPL_PLOTS_TAB, g);
+  const r = tplResolvePlotFarmer_('FC-P1');
+  eq(r.farmer, 'Fernando Soller Gimenez'); eq(r.plotId, 'FC-P1');
+});
+t('blank farmer -> null (fail closed)', () => {
+  reset();
+  const g = plotsGrid(); g.push(['PL-002','fazenda-bom-sucesso']);
+  setSource(TPL_PLOTS_TAB, g);
+  eq(tplResolvePlotFarmer_('PL-002'), null);
+});
+t('unknown plot -> null', () => {
+  reset(); setSource(TPL_PLOTS_TAB, plotsGrid());
+  eq(tplResolvePlotFarmer_('NOPE'), null);
+});
+t('missing registry tab -> null (never throws)', () => {
+  reset(); eq(tplResolvePlotFarmer_('FC-P1'), null);
+});
+t('empty plot id -> null', () => { eq(tplResolvePlotFarmer_(''), null); });
+
+console.log('== PR6.2 tplIsPlotStatusInvalid_ ==');
+t('PR6.2: status invalid detection is trimmed + case-insensitive', () => {
+  eq(tplIsPlotStatusInvalid_('invalid'), true);
+  eq(tplIsPlotStatusInvalid_('Invalid '), true);
+  eq(tplIsPlotStatusInvalid_('INVALID'), true);
+  eq(tplIsPlotStatusInvalid_(''), false);
+  eq(tplIsPlotStatusInvalid_(null), false);
+  eq(tplIsPlotStatusInvalid_('active'), false);
+});
+t('PR6.2: an invalidated plot is NOT linkable (fail closed)', () => {
+  reset();
+  const g = plotsGrid(); g.push(['FC-P1','fazenda-clara-bahia','','','invalid','','','','','','','','','','','','','','','Fernando Soller Gimenez']);
+  setSource(TPL_PLOTS_TAB, g);
+  eq(tplResolvePlotFarmer_('FC-P1'), null);
+});
+t('PR6.2: a non-invalidated plot with a farmer IS linkable', () => {
+  reset();
+  const g = plotsGrid(); g.push(['FC-P1','fazenda-clara-bahia','','','active','','','','','','','','','','','','','','','Fernando Soller Gimenez']);
+  setSource(TPL_PLOTS_TAB, g);
+  const r = tplResolvePlotFarmer_('FC-P1');
+  eq(r && r.farmer, 'Fernando Soller Gimenez');
+});
+
+console.log('== PR6 tplResolvePlotImage_ ==');
+t('fetch 200 -> picks image url', () => {
+  setMedia({ plots: { 'FC-P1': { media: [ {kind:'image',url:'https://x/a.jpg'} ] } } });
+  eq(tplResolvePlotImage_('FC-P1'), 'https://x/a.jpg');
+});
+t('fetch non-200 -> empty (fail closed)', () => {
+  setMediaCode(500); eq(tplResolvePlotImage_('FC-P1'), '');
+});
+
+console.log('== PR6 constants ==');
+t('Linked Plot ID is column AC (index 28)', () => { eq(TPL_LINKED_PLOT_ID_COL, 28); });
+t('plot farmer is column T (index 19)', () => { eq(TPL_PLOTS_FARMER_COL, 19); });
+
+console.log('== tplResolveSunmintRowIndex_ (txid-primary, msgId fallback; Gary, thread 35944) ==');
+const SM_MAX = 22;
+function smRow(o){
+  const r = new Array(SM_MAX).fill('');
+  r[0]  = o.a || '';
+  r[3]  = o.msgId || '';
+  r[12] = o.status || '';
+  r[21] = o.txid || '';
+  return r;
+}
+function smGrid(rows){ return [new Array(SM_MAX).fill('h')].concat(rows); }
+
+t('txid-primary: resolves by col V even when col D differs (the col-D drift case)', () => {
+  const g = smGrid([ smRow({ a:'U-1', msgId:'Edgar_..._081', status:'NEW', txid:'TX_A' }) ]);
+  const r = tplResolveSunmintRowIndex_(g, { sunmintTxid:'TX_A', sunmintMessageId:'Edgar_..._082' });
+  eq(r.rowIndex, 2); eq(r.reason, '');
+});
+t('txid not unique but ONE non-INVALID twin -> resolves to that live row (fail-closed tie-break)', () => {
+  const g = smGrid([
+    smRow({ msgId:'m1', status:'NEW',     txid:'TX_A' }),
+    smRow({ msgId:'m2', status:'INVALID', txid:'TX_A' }),
+  ]);
+  eq(tplResolveSunmintRowIndex_(g, { sunmintTxid:'TX_A' }).rowIndex, 2);
+});
+t('txid ambiguous (TWO non-INVALID rows) -> -1 + reason (never guess)', () => {
+  const g = smGrid([
+    smRow({ msgId:'m1', status:'NEW', txid:'TX_A' }),
+    smRow({ msgId:'m2', status:'NEW', txid:'TX_A' }),
+  ]);
+  const r = tplResolveSunmintRowIndex_(g, { sunmintTxid:'TX_A' });
+  eq(r.rowIndex, -1); eq(/ambiguous/.test(r.reason), true);
+});
+t('lone INVALID txid hit resolves to its row; the downstream NEW-gate then rejects it', () => {
+  const g = smGrid([ smRow({ msgId:'m1', status:'INVALID', txid:'TX_A' }) ]);
+  eq(tplResolveSunmintRowIndex_(g, { sunmintTxid:'TX_A' }).rowIndex, 2);
+});
+t('legacy event (no txid) falls back to col D message id', () => {
+  const g = smGrid([ smRow({ msgId:'Edgar_20260903083532_007', status:'NEW', txid:'TX_Z' }) ]);
+  eq(tplResolveSunmintRowIndex_(g, { sunmintMessageId:'Edgar_20260903083532_007' }).rowIndex, 2);
+});
+t('txid present but unmatched falls through to a matching message id', () => {
+  const g = smGrid([ smRow({ msgId:'m9', status:'NEW', txid:'TX_OTHER' }) ]);
+  eq(tplResolveSunmintRowIndex_(g, { sunmintTxid:'TX_NOPE', sunmintMessageId:'m9' }).rowIndex, 2);
+});
+t('neither key matches -> -1 (rejected, not guessed)', () => {
+  const g = smGrid([ smRow({ msgId:'m1', status:'NEW', txid:'TX_A' }) ]);
+  eq(tplResolveSunmintRowIndex_(g, { sunmintTxid:'TX_X', sunmintMessageId:'mY' }).rowIndex, -1);
+});
+t('col V constant is 21 (column V)', () => { eq(TPL_SUNMINT_TXID_COL, 21); });
+
+console.log('\n' + pass + ' passed, ' + fail + ' failed');
+process.exit(fail ? 1 : 0);
