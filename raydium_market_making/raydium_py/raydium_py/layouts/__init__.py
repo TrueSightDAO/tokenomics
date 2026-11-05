@@ -1,3 +1,0 @@
-"""
-Layout definitions for raydium.
-"""
