@@ -8,16 +8,16 @@
  *  register_member_digital_signatures_email.js calls setApiKeys() and getCredentials()
  *  at global scope. `clasp push` REPLACES the remote file set, so any remote file not
  *  present in this mirror folder is DELETED live. This accessor was absent from BOTH
- *  git (blocked by the blanket Credentials.js ignore rule under google_app_scripts) and
- *  the remote, which made every 5-minute trigger run of processEmailSignatureEvents fail
- *  with "ReferenceError: setApiKeys is not defined" (271 failures on the 2026-11-07
- *  report, ongoing since 2026-10-26). A secret-free accessor must be TRACKED and PUSHED
- *  -- never .claspignore'd.
+ *  git (the blanket Credentials ignore rule under google_app_scripts silently excluded
+ *  it) and the remote, which made every 5-minute trigger run of
+ *  processEmailSignatureEvents fail with "ReferenceError: setApiKeys is not defined"
+ *  (271 failures on the 2026-11-07 report, ongoing since 2026-10-26). A secret-free
+ *  accessor must be TRACKED and PUSHED -- never .claspignore'd.
  *
- *  NOTE ON THE HEADER: do not write a glob containing a star-star-slash sequence
- *  inside this block comment. The glob that originally appeared here closed the
- *  comment early and broke parsing outright (node --check reported a SyntaxError on
- *  the word clasp). Keep globs and path patterns out of block comments in this file.
+ *  NOTE: never write the glob for this ignore rule inside a block comment -- the
+ *  closing sequence of a JSDoc opener followed by the glob's parent traversal ends the
+ *  comment early and turns the rest of the header into JavaScript. That is a real bug
+ *  caught by `node --check` on this very file.
  *
  *  Secrets live in Project Settings -> Script properties (set 2026-09-18):
  *    OPENAI_API_KEY, XAI_API_KEY, TELEGRAM_API_TOKEN
