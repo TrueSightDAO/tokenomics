@@ -59,6 +59,14 @@ broken the ANYONE_ANONYMOUS doGet inventory webhook (@v14) with
 # have DELETED the live accessor and the live file was the only copy of those secrets.
 # Both services are retired. Restored as a tracked, secret-free accessor 2026-09-18.
 !google_app_scripts/1y6JVYwqdrFD4zHT4zyIfU762RRsW7GgZKPVuzorpwUS61mDnFQZ65Qsz/Credentials.js
+# 1zKgMwd6 (TDG - Email Identity Management, CANONICAL project -- documented in the file
+# header and owner of the /exec web app): never had a tracked accessor, so the remote never
+# received Credentials.js while register_member_digital_signatures_email.js calls
+# setApiKeys()/getCredentials() at global scope. Result: every 5-minute run of
+# processEmailSignatureEvents failed with "ReferenceError: setApiKeys is not defined"
+# (271 failures on the 2026-11-07 report, ongoing since 2026-10-26). The 2026-09-18 fix
+# landed only in the DUPLICATE project 1K1wcXFA, which is why this one stayed broken.
+!google_app_scripts/1zKgMwd6KJFjoWkRH6OobgFvtVzrXVuEKfxVbgixgnfcp4TZTjrsfNKq0/Credentials.js
 
 # Schema validation output
 python_scripts/schema_validation/discovered_headers.json
