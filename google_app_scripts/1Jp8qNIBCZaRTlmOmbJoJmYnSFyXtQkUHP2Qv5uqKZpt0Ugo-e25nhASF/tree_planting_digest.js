@@ -105,8 +105,15 @@ function treeDigestSummarize_(rows) {
   const byCapture = {};
   const species = {};
   let noCoords = 0, statusNew = 0, linked = 0;
+  let photoMissing = 0;
   rows.forEach(function (r) {
-    const key = treeDigestTimemark_(r.photoUrl) || ('sheetRow-' + r.sheetRow);
+    const mark = treeDigestTimemark_(r.photoUrl);
+    // A row whose photo URL yields no identifier cannot be deduped against
+    // anything. It still counts as its own capture (one row = one submitted
+    // tree), but it is tallied separately so "Distinct trees" is never
+    // silently propped up by unverifiable rows.
+    if (!mark) photoMissing += 1;
+    const key = mark || ('sheetRow-' + r.sheetRow);
     if (!byCapture[key]) byCapture[key] = { species: r.species || 'Unknown', count: 0, first: r };
     byCapture[key].count += 1;
     const sp = r.species || 'Unknown';
@@ -121,6 +128,7 @@ function treeDigestSummarize_(rows) {
     distinctCaptures: captures.length,
     duplicateRows: rows.length - captures.length,
     noCoords: noCoords,
+    photoMissing: photoMissing,
     statusNew: statusNew,
     linked: linked,
     species: species,
@@ -140,6 +148,10 @@ function treeDigestRenderBody_(summary, fromDate, toDate, sheetLink) {
   L.push('  Duplicate re-ingests : ' + summary.duplicateRows +
          (summary.rawRows ? '  (' + Math.round(100 * summary.duplicateRows / summary.rawRows) + '% of rows)' : ''));
   L.push('  Missing coordinates  : ' + summary.noCoords);
+  if (summary.photoMissing) {
+    L.push('  Rows w/o photo id    : ' + summary.photoMissing +
+           '  (unverifiable, may overstate distinct trees)');
+  }
   L.push('  Status NEW (unlinked): ' + summary.statusNew);
   L.push('  Already linked to QR : ' + summary.linked);
   L.push('');
@@ -243,6 +255,7 @@ function sendDailyTreePlantingDigest(opts) {
     distinctCaptures: summary.distinctCaptures,
     duplicateRows: summary.duplicateRows,
     noCoords: summary.noCoords,
+    photoMissing: summary.photoMissing,
     statusNew: summary.statusNew,
     linked: summary.linked,
     recipients: recipients,
