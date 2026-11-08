@@ -14,10 +14,10 @@
  *  report, ongoing since 2026-10-26). A secret-free accessor must be TRACKED and PUSHED
  *  -- never .claspignore'd.
  *
- *  NOTE ON THE HEADER: no `**/` sequence may appear inside this block comment. The glob
- *  that originally appeared here closed the comment early and broke parsing outright
- *  (node --check: "SyntaxError: Unexpected identifier 'clasp'"). Keep globs out of
- *  block comments in this file.
+ *  NOTE ON THE HEADER: do not write a glob containing a star-star-slash sequence
+ *  inside this block comment. The glob that originally appeared here closed the
+ *  comment early and broke parsing outright (node --check reported a SyntaxError on
+ *  the word clasp). Keep globs and path patterns out of block comments in this file.
  *
  *  Secrets live in Project Settings -> Script properties (set 2026-09-18):
  *    OPENAI_API_KEY, XAI_API_KEY, TELEGRAM_API_TOKEN
