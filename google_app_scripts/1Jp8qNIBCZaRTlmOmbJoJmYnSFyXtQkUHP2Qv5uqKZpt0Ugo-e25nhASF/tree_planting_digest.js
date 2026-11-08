@@ -19,15 +19,19 @@
  * planting by roughly 4x. Surfacing both keeps the email honest.
  *
  * Configuration is via Script Properties -- no code change needed to retarget:
- *   TREE_DIGEST_RECIPIENTS     comma-separated list. Default: garyjob@agroverse.shop
+ *   TREE_DIGEST_RECIPIENTS     comma-separated list.
+ *                              Default: garyjob@agroverse.shop,admin@truesight.me
  *   TREE_DIGEST_LAST_RUN_DATE  managed automatically (yyyyMMdd watermark)
  */
 
 const TREE_DIGEST_RECIPIENTS_PROPERTY = 'TREE_DIGEST_RECIPIENTS';
 const TREE_DIGEST_LAST_RUN_PROPERTY = 'TREE_DIGEST_LAST_RUN_DATE';
-const TREE_DIGEST_DEFAULT_RECIPIENTS = 'garyjob@agroverse.shop';
+const TREE_DIGEST_DEFAULT_RECIPIENTS = 'garyjob@agroverse.shop,admin@truesight.me';
 const TREE_DIGEST_TZ = 'America/Los_Angeles';
 const TREE_DIGEST_MAX_LISTED = 50;
+// A single photo submitted this many times is either duplicate spam or one photo
+// documenting a seedbed. One capture != one tree until a human/VLM looks at it.
+const TREE_DIGEST_BATCH_SUSPECT = 5;
 const TREE_DIGEST_DEFAULT_LOOKBACK_DAYS = 1;
 
 /** Today as yyyyMMdd in the DAO's operating timezone. */
@@ -50,6 +54,21 @@ function treeDigestAddDays_(yyyymmdd, delta) {
  * (Agroverse convention, e.g. 20261022213237_MIIBIjANBgkqhkiG9w0B.jpg).
  * Falls back to the bare filename when the code is missing.
  */
+/**
+ * Capture key for dedup. Uses the FULL photo filename, not the 14-digit
+ * timemark prefix: timemarks are NOT unique across submissions (one photograph
+ * was submitted 44 times under a single timemark, and 132 of 382 timemarks are
+ * shared), so keying on the timemark silently merges genuinely different
+ * photographs into one tree. The filename carries seconds resolution plus the
+ * signature suffix, which is what actually distinguishes captures.
+ */
+function treeDigestCaptureKey_(photoUrl) {
+  const u = String(photoUrl || '').trim();
+  if (!u) return '';
+  const parts = u.split('?')[0].split('/');
+  return parts[parts.length - 1] || u;
+}
+
 function treeDigestTimemark_(photoUrl) {
   const s = String(photoUrl || '');
   const m = s.match(/\/(\d{14})_[^\/]*$/);
@@ -106,7 +125,7 @@ function treeDigestSummarize_(rows) {
   const species = {};
   let noCoords = 0, statusNew = 0, linked = 0;
   rows.forEach(function (r) {
-    const key = treeDigestTimemark_(r.photoUrl) || ('sheetRow-' + r.sheetRow);
+    const key = treeDigestCaptureKey_(r.photoUrl) || ('sheetRow-' + r.sheetRow);
     if (!byCapture[key]) byCapture[key] = { species: r.species || 'Unknown', count: 0, first: r };
     byCapture[key].count += 1;
     const sp = r.species || 'Unknown';
@@ -155,6 +174,7 @@ function treeDigestRenderBody_(summary, fromDate, toDate, sheetLink) {
     const flags = [];
     if (!r.latitude || !r.longitude) flags.push('NO GPS');
     if (c.count > 1) flags.push('x' + c.count);
+    if (c.count >= TREE_DIGEST_BATCH_SUSPECT) flags.push('VERIFY: batch photo?');
     if (r.plotId) flags.push('plot ' + r.plotId);
     L.push('  ' + k + '  ' + (c.species || 'Unknown') +
            '  row ' + r.sheetRow +
@@ -162,6 +182,19 @@ function treeDigestRenderBody_(summary, fromDate, toDate, sheetLink) {
   });
   if (summary.captureKeys.length > keys.length) {
     L.push('  ... and ' + (summary.captureKeys.length - keys.length) + ' more');
+  }
+  const suspects = summary.captureKeys.filter(function (k) {
+    return summary.byCapture[k].count >= TREE_DIGEST_BATCH_SUSPECT;
+  });
+  if (suspects.length) {
+    L.push('');
+    L.push('VERIFY (' + suspects.length + ' capture(s) submitted ' + TREE_DIGEST_BATCH_SUSPECT + '+ times):');
+    suspects.forEach(function (k) {
+      L.push('  ' + k + '  x' + summary.byCapture[k].count +
+             '  row ' + summary.byCapture[k].first.sheetRow);
+    });
+    L.push('  Each may be duplicate spam (1 tree) or one photo of a seedbed (many).');
+    L.push('  Distinct-capture is NOT reliable for these until the image is inspected.');
   }
   if (summary.rawRows !== summary.distinctCaptures) {
     L.push('');
@@ -244,6 +277,7 @@ function sendDailyTreePlantingDigest(opts) {
     duplicateRows: summary.duplicateRows,
     noCoords: summary.noCoords,
     statusNew: summary.statusNew,
+    batchSuspects: summary.captureKeys.filter(function (k) { return summary.byCapture[k].count >= TREE_DIGEST_BATCH_SUSPECT; }).length,
     linked: summary.linked,
     recipients: recipients,
     subject: subject,
