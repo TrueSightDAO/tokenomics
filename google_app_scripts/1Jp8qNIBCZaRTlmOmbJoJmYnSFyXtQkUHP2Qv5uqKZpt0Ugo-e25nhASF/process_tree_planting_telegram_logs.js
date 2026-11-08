@@ -884,6 +884,58 @@ function doGet(e) {
     }
   }
 
+  // ---- Daily tree-planting email digest (tree_planting_digest.js) ----
+  if (action === 'sendDailyTreePlantingDigest') {
+    // Governor-only: the rendered body lists submission rows, gate like list_new.
+    if (!isAuthorizedGovernorReadRequest_(e)) {
+      return ContentService.createTextOutput(JSON.stringify({ status: 'error', message: 'Unauthorized: missing or invalid governor_key' }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+    try {
+      const res = sendDailyTreePlantingDigest({
+        dryRun: String((e.parameter && e.parameter['dry_run']) || '') === '1',
+        force: String((e.parameter && e.parameter['force']) || '') === '1',
+        lookbackDays: Number((e.parameter && e.parameter['lookback_days']) || 1)
+      });
+      return ContentService.createTextOutput(JSON.stringify(res)).setMimeType(ContentService.MimeType.JSON);
+    } catch (err) {
+      Logger.log(`doGet(sendDailyTreePlantingDigest) error: ${err.message}`);
+      return ContentService.createTextOutput(JSON.stringify({ status: 'error', message: err.message }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+  }
+
+  if (action === 'installTreePlantingDigestTrigger') {
+    if (!isAuthorizedGovernorReadRequest_(e)) {
+      return ContentService.createTextOutput(JSON.stringify({ status: 'error', message: 'Unauthorized: missing or invalid governor_key' }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+    try {
+      const hr = Number((e.parameter && e.parameter['hour']));
+      const res = installTreePlantingDigestTrigger(isNaN(hr) ? undefined : hr);
+      return ContentService.createTextOutput(JSON.stringify(res)).setMimeType(ContentService.MimeType.JSON);
+    } catch (err) {
+      Logger.log(`doGet(installTreePlantingDigestTrigger) error: ${err.message}`);
+      return ContentService.createTextOutput(JSON.stringify({ status: 'error', message: err.message }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+  }
+
+  if (action === 'treePlantingDigestStatus') {
+    if (!isAuthorizedGovernorReadRequest_(e)) {
+      return ContentService.createTextOutput(JSON.stringify({ status: 'error', message: 'Unauthorized: missing or invalid governor_key' }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+    try {
+      return ContentService.createTextOutput(JSON.stringify(getTreePlantingDigestStatus()))
+        .setMimeType(ContentService.MimeType.JSON);
+    } catch (err) {
+      Logger.log(`doGet(treePlantingDigestStatus) error: ${err.message}`);
+      return ContentService.createTextOutput(JSON.stringify({ status: 'error', message: err.message }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+  }
+
   if (action === 'collapseSunMintTreeTxDuplicates') {
     // One-shot, IDEMPOTENT cleanup: COLLAPSE pre-existing duplicate rows sharing a Request
     // Transaction ID (col V), keeping the FIRST, grafting any QR/plot linkage onto the survivor
