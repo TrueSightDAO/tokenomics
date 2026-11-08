@@ -1828,7 +1828,30 @@ function testLedgerFetching() {
 /* Configurable Variables */
 const SUBSCRIPTION_NOTIFICATION_WORKBOOK_URL = "https://docs.google.com/spreadsheets/d/1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU/edit"; // Google Sheet URL
 const SHEET_NAME = "Agroverse QR codes"; // Sheet name
-const GOOGLE_DOC_ID = "1VDPblYlWIpirqH9o3eoiL8pKHv8E3oea99c6DJQGA3k"; // Replace with your Google Doc ID
+const GOOGLE_DOC_ID = "1VDPblYlWIpirqH9o3eoiL8pKHv8E3oea99c6DJQGA3k"; // Source Doc; kept for re-wiring (see EMAIL_BODY_TEMPLATE note)
+
+/* Onboarding email copy -- INLINED, no longer read from the Google Doc at runtime.
+ *
+ * WHY: processBatch() and sendEmailForQRCode() used DocumentApp.openById(GOOGLE_DOC_ID)
+ * to fetch this copy, which threw "Specified permissions are not sufficient to call
+ * DocumentApp.openById. Required permissions: ...auth/documents" on 23 consecutive
+ * hourly runs. The scope IS declared in appsscript.json -- but adding a scope to the
+ * manifest does NOT re-consent an already-authorised time-based trigger, so the trigger
+ * kept running on the older grant. A DriveApp getAs() rewrite would need
+ * ...auth/drive.readonly and hit the same re-consent wall.
+ *
+ * So the copy is inlined: zero additional OAuth scopes, no Docs round-trip inside the
+ * hourly batch, and the wording is now git-versioned and code-reviewed rather than
+ * living in a Doc only admins can open.
+ *
+ * The source Doc is untouched. To re-wire back to it: open this project, run any
+ * function and accept the documents scope (that re-consents the trigger), then restore
+ * the DocumentApp calls.
+ *
+ * {{TRACKING_LINK}} is the placeholder replaced per recipient.
+ */
+const EMAIL_SUBJECT = "Track Your Agroverse Tree Planting Journey";
+const EMAIL_BODY_TEMPLATE = "Dear Agroverse Supporter,\n\nGlad you have scanned your unique QR code! We\u2019re thrilled to have you join our mission to plant trees in the Amazon rainforest.\n\nYou\u2019ve successfully submitted your email to stay informed about your tree. We\u2019ll notify you when your tree is planted and provide updates on its growth.\n\nIn the meantime, you can track the status of your tree here:\n{{TRACKING_LINK}}\n\nThank you for supporting our efforts to reforest the Amazon rainforest!\n\n\nBest regards,\nThe Agroverse Team";
 const TEST_QR_CODE = "2025BF_20250521_PROPANE_1"; // QR code for testing
 const EMAIL_COLUMN = 12; // Column L (1-based index)
 const TIMESTAMP_COLUMN = 13; // Column M (1-based index)
@@ -1884,8 +1907,7 @@ function processBatch() {
     }
   }
 
-  const doc = DocumentApp.openById(GOOGLE_DOC_ID);
-  const subject = doc.getName();
+  const subject = EMAIL_SUBJECT;
 
   const failures = [];
   let sentCount = 0;
@@ -1893,7 +1915,7 @@ function processBatch() {
 
   for (const email in pendingByEmail) {
     const items = pendingByEmail[email];
-    let body = doc.getBody().getText();
+    let body = EMAIL_BODY_TEMPLATE;
 
     // Build one tracking link per QR code; join with line break for multiple items
     const trackingLinksHtml = items
@@ -2043,9 +2065,8 @@ function sendEmailForQRCode(qrCode) {
       const notificationDate = data[i][TIMESTAMP_COLUMN - 1]; // Column M
 
       if (emailRegex.test(email) && !notificationDate) {
-        const doc = DocumentApp.openById(GOOGLE_DOC_ID);
-        const subject = doc.getName(); // Get document title as email subject
-        let body = doc.getBody().getText();
+        const subject = EMAIL_SUBJECT;
+        let body = EMAIL_BODY_TEMPLATE;
         const trackingLink = `${data[i][1]}?qr_code=${encodeURIComponent(qrCode)}`; // Use column B (index 1) for base URL
         body = body.replace("{{TRACKING_LINK}}", trackingLink);
 
