@@ -68,6 +68,22 @@ broken the ANYONE_ANONYMOUS doGet inventory webhook (@v14) with
 # landed only in the DUPLICATE project 1K1wcXFA, which is why this one stayed broken.
 !google_app_scripts/1zKgMwd6KJFjoWkRH6OobgFvtVzrXVuEKfxVbgixgnfcp4TZTjrsfNKq0/Credentials.js
 
+# 2026-11-09 SYSTEMIC SWEEP: the blanket rule above silently starves ANY project whose
+# accessor file was removed by an earlier push. Five more projects were found failing at
+# global scope with "ReferenceError: setApiKeys is not defined" -- the TDG - Notarization
+# report (2026-11-08/09, processTelegramLogs) exposed a THIRD instance, proving the
+# 1zKgMwd6 fix was per-project and never addressed the class. Each of these projects calls
+# setApiKeys()/getCredentials() at top level and does NOT define either function as of
+# 2026-11-09, so a shared secret-free accessor is safe: setApiKeys() only fills EMPTY
+# properties and can never overwrite a live token. Audited comment-stripped so a
+# commented-out definition cannot mask a real gap. The projects that still work
+# (1Y8sJ22lZu, 1ZQjgSZvAX, 1rLl94jQ9t) each define getCredentials inline -- luck, not design.
+!google_app_scripts/1vC3p_WfKQT-fl5tHZ9-E3aotYon3gQdOiFVLmyVElMqB-hi_FT3rcB8W/Credentials.js
+!google_app_scripts/1Q5HfGR_AcSYmrKCy5bs-Jo8pdtV-vZJ6Zhv2VCY0HGo2haVoeWMjOCGC/Credentials.js
+!google_app_scripts/1m2sQONdMGw6HbxIVP0H0JJJ1aYrYLSRRlHb2MIplrDDsKhm8-IwKBntk/Credentials.js
+!google_app_scripts/1QKqUTyl3_pyDHfVMoRUkzvU75eV6UtizIw5bR5xeDMaLyZGUPzWTz8Et/Credentials.js
+!google_app_scripts/1_3D4o2RdHdPuu5EHCUwkMQe8sFJBqXWqCiE-wpwME2Gdr6_oTt3VBAVC/Credentials.js
+
 # Schema validation output
 python_scripts/schema_validation/discovered_headers.json
 schema_output.txt
