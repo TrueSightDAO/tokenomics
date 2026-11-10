@@ -1909,6 +1909,119 @@ function getLedgerConfigsFromWix() {
 
 ---
 
+### 5. Content Marketing Schedule (Instagram / Blog / LinkedIn / Newsletter)
+**Spreadsheet ID:** `1ghZXeMqFq97Vl6yLKrtDmMQdQkd-4EN5yQs34NA_sBQ`
+
+**URL:** https://docs.google.com/spreadsheets/d/1ghZXeMqFq97Vl6yLKrtDmMQdQkd-4EN5yQs34NA_sBQ/edit
+
+**Title:** `20250924 - Instagram Content Marketing Schedule`
+
+**Purpose:** The multi-channel **content marketing calendar** — one row per scheduled post/article, forward-planned to Jul 2027. It is the *demand* side of the content pipeline: it says what content should exist and when. The Media Archives Pipeline (`agentic_ai_context/MEDIA_ARCHIVE_PIPELINE.md`) is the *supply* side (what real media we hold); `agentic_ai_context/sops/GENERATED_MEDIA_SOP.md` governs generating derivatives from that supply.
+
+**Custodian / service account:** **`agroverse_ledger_manager`** — key on the autopilot box at `/opt/truesight_autopilot/config/google/agroverse_ledger_manager_gdrive_key.json`. ⚠️ This SA is **not** in the `read_google_sheet` tool's `service_account_name` list (tool gap — see `agentic_ai_context/OPEN_FOLLOWUPS.md`); read it over `ssh_run` with the key path above, or via the box's venv + `googleapiclient`.
+
+#### Tabs
+
+| Tab | gid | Header? | Purpose |
+|-----|-----|---------|---------|
+| `Instagram Content Schedule` | 1682511679 | yes | Primary tab — 314 data rows, 14 cols (A–N) |
+| `Agroverse Blog Content Schedule` | 1735486924 | yes | 16 data rows, 16 cols (Wix Draft IDs) |
+| `TrueSight Blog Content Schedule` | 534758277 | yes | 2 data rows, 17 cols (adds Markdown Source) |
+| `Linkedin Content Schedule` | 480257671 | **no (empty)** | Reserved — header not yet written |
+| `Email Newsletter` | 1613728523 | **no (empty)** | Reserved — header not yet written |
+| `Feedback on Content` | 497764730 | yes | 18 rows — community feedback on published content |
+| `Hashtag suggestions` | 0 | yes | Hashtag database tab |
+| `Sample target profiles` | 1457421718 | yes | Audience research |
+| `Configuration` | 814523764 | yes (9 frozen rows) | Status vocabulary + companion URLs |
+
+#### Sheet: `Instagram Content Schedule` — header row (row 1)
+
+Frozen: 1 row, 2 cols.
+
+| Col | Name | Type | Description |
+|-----|------|------|-------------|
+| A | `primary_key` | String | 8-hex content hash — the **stable row identity**; `sync_content_schedule.py` matches on this and never overwrites B |
+| B | `status` | Enum | `PLANNED` → `CRAFTING` → `SCHEDULED` (per the `Configuration` tab) |
+| C | `Week` | String | `Week 61` — monotonic counter, not ISO week |
+| D | `Date Range` | String | `Nov 05-Nov 11, 2026` — display only |
+| E | `Theme Focus` | String | Weekly umbrella theme (e.g. `Sustainable Cacao & Community`) |
+| F | `Post Day` | String | **`YYYYMMDD`** — e.g. `20261110` (**not** a date type; sort/compare as string) |
+| G | `Day of Week` | String | `Tuesday` — denormalised from F |
+| H | `Post Type` | Enum | `Reel` (235) · `Carousel` (79) |
+| I | `Theme` | Enum | `Behind-the-Scenes` · `Recipes & Rituals` · `Regenerative Farming` · `Cacao Education` · `Community Impact` |
+| J | `Description` | String | Post brief — ⚠️ largely templated (112 unique of 314; top 3 templates repeat 51× each) |
+| K | `Caption` | String | Draft caption (314/314 populated) |
+| L | `Hashtags` | String | Space-separated tag block |
+| M | `CTA` | String | Call to action |
+| N | `Tool Suggestions` | String | **Pre-generation vocabulary** — uniformly `CapCut…; Canva…; Instagram Native for scheduling`. Predates `GENERATED_MEDIA_SOP.md`; does not yet name Seedance/Seedream |
+
+**No media column exists.** Columns O+ are unused. This is the single largest structural gap between the calendar and MAP — see *Media linkage* below.
+
+#### Sheet: `Agroverse Blog Content Schedule` — 16 cols
+
+A `primary_key` · B `status` · C `Wix Draft ID` · D `Week` · E `Date Range` · F `Publish Date` · G `Day of Week` · H `Blog Title` · I `Theme` · J `Target Word Count` · K `SEO Keywords` · L `Content Outline` · M `Instagram Tie-In` · N `CTA` · O `Internal Links` · P `Tool Suggestions`
+
+`Wix Draft ID` (col C) is the publish-side binding — the blog analogue of MAP's `yt_id`.
+
+#### Sheet: `TrueSight Blog Content Schedule` — 17 cols
+
+As above shifted by one (A `primary_key` · B `Wix Draft ID` · C `status` …) plus **Q `Markdown Source`** — the in-repo source path for the `truesight.me/blog` render.
+
+#### Sheet: `Feedback on Content` — 4 cols
+
+A `Feedback` · B `Status` · C `Time Submitted` · D `Submitter's Digital Siganture` *(sic — misspelling is in the real header; do not "fix" it without migrating rows)*
+
+Note D is a **DApp public key**, not a free-text name — same signed-feedback pattern as other GAS endpoints.
+
+#### `Configuration` tab — status vocabulary & companion URLs
+
+| Key | Value |
+|-----|-------|
+| `Grok Context` | Grok conversation URL used to seed generation |
+| `Automation` | `https://agroverse.shop/content-schedule/bot` |
+| `Schedule` | `https://agroverse.shop/content-schedule/` |
+| `Usage recommendations` | General `3 - 5` / Targeted `7 - 10` (hashtags per post) |
+| `Instagram Reel Status` | `PLANNED` · `CRAFTING` · `SCHEDULED` |
+
+#### Written by
+
+- **`go_to_market/online_content/agroverse_shop/social_media/sync_content_schedule.py`** — one-way CSV → sheet sync. Source of record on the repo side: `online_content/agroverse_shop/social_media/agroverse_schedule_till_easter_cleaned.csv` (741 lines). Matches rows on `primary_key` and **preserves column B** so manual status edits survive a re-sync.
+- Companion scripts in the same directory: `sync_hashtags.py`, `sync_feedback.py`, `schedule_post.py`, `process_feedback.py`, `content_creator.py`, `grok_content_generator.py`, `hybrid_content_workflow.py`, plus `voice_feedback_capture.gs` (Google Apps Script, voice feedback capture).
+- The `sync_content_schedule.py` script expects `google_credentials.json` **in that directory**; the autopilot-side equivalent is the `agroverse_ledger_manager` key above. Do not confuse the two.
+
+#### Media linkage — how the calendar should consume MAP (proposed, not yet built)
+
+Per `agentic_ai_context/MEDIA_ARCHIVE_PIPELINE.md`: *"Distribution ≠ archive — Instagram/TikTok/shop-page posting are **consumers of the archive**, not the pipeline itself."* This spreadsheet **is** that consumer, but the seam is currently a human with `CapCut`/`Canva` (col N).
+
+Proposed additive columns (O–T) so a row names its source media instead of describing an intention:
+
+| Col | Name | Values |
+|-----|------|--------|
+| O | `media_ref` | MAP manifest item — `<entity-id>§<basename>` or manifest item `sha256` |
+| P | `lane` | `A` / `B` / *(blank = real capture, no generation)* |
+| Q | `derived_from` | sha256 of the source frame/photo (Lane A only) |
+| R | `asset_class` | `photo` · `ai_edit` · `illustration` |
+| S | `gate_result` | `PASS` / `WARN` / `FAIL` — output of `verify_newsletter_images.py` logic |
+| T | `cost_usd` | Per-generation cost, so the calendar can show a monthly spend roll-up |
+
+Constraint that makes this worth doing: **the calendar must not be able to schedule a Reel whose media does not exist.** With `media_ref` populated, a pre-flight check can fail a row rather than let it reach its publish date unbacked.
+
+#### Supply reality check (as of 2026-11-10)
+
+Verified against `farm_media_manifests`: **21 manifests, 1,107 items, but only 108 items carry a `preview_url` and 80 carry `s3_url` + `duration_s`** — i.e. only ~10% of the archive yields the hot-S3 preview frame that Lane A image-to-video needs as input. 18 of 21 manifests are legacy and also lack `entity_type` (noted as a known gap in `MEDIA_ARCHIVE_PIPELINE.md`). The three modern ones: `fazenda-clara-bahia` (58 items), `facility-black-king-warehouse` (40), `founderhaus` (10, `entity_type: partner`).
+
+**Consequence:** generation is *not* the binding constraint on this calendar — **preview-frame coverage is**. 117 future rows (87 Reels + 30 Carousels) vs 108 usable preview frames is ~1:1 only by luck, and the frames are not distributed across the four future themes (`Recipes & Rituals` ×30, `Community Impact` ×29, `Regenerative Farming` ×29, `Cacao Education` ×29). Backfilling `preview_url` on the 18 legacy manifests is a higher-leverage task than adding any image/video model.
+
+#### Cross-references
+
+- `agentic_ai_context/MEDIA_ARCHIVE_PIPELINE.md` — MAP (supply; preview frames; manifests; `yt_id` binding)
+- `agentic_ai_context/sops/GENERATED_MEDIA_SOP.md` — Lane A/B policy for Seedance/Seedream derivatives
+- `agentic_ai_context/sops/AGROVERSE_NEWSLETTER_WORKFLOW.md` — the email channel's workflow
+- `agentic_ai_context/conventions/EDITORIAL_TONE.md` — voice for cols K/L/M
+- `go_to_market/online_content/agroverse_shop/social_media/README.md` — social-media tooling overview
+
+---
+
 ## 🔍 Common Patterns & Constants
 
 ### Column Index Patterns (0-based)
