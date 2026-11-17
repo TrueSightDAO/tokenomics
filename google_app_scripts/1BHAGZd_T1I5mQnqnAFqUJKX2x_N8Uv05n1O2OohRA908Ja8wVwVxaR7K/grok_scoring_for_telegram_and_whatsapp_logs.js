@@ -189,7 +189,14 @@ function processChatLogEntry({ message, username, statusDate, platform, projectN
   // Use explicit contributors from contributionDetails if available, otherwise fall back to getContributorsFromMessage
   let contributors = [];
   if (platform === "Telegram" && contributionDetails && contributionDetails.contributors) {
-    contributors = contributionDetails.contributors.split(',').map(c => c.trim()).filter(c => c);
+    // Strip a trailing contact-email annotation, e.g.
+    //   "Sophia Truesight (admin+sophia@truesight.me)" -> "Sophia Truesight".
+    // The annotation is submission metadata, not part of the person's name, and leaving it in
+    // corrupts isExistingRecord()'s `contributor|contribution` dedupe key downstream.
+    contributors = contributionDetails.contributors
+      .split(',')
+      .map(c => c.replace(/\s*\([^)]*@[^)]*\)\s*$/, '').trim())
+      .filter(c => c);
     Logger.log(`processChatLogEntry: Using explicit contributors from contributionDetails: ${contributors.join(', ') || 'none'}`);
   } else {
     contributors = getContributorsFromMessage(message, username, platform).split(';').filter(c => c);
@@ -460,12 +467,24 @@ function processTelegramChatLogs_() {
         Logger.log(`processTelegramChatLogs: row ${i + 1} is not a [CONTRIBUTION EVENT]; leaving Status untouched for its dedicated handler`);
         continue;
       }
-      Logger.log(`processTelegramChatLogs: Updated row ${i + 1} Column N with hash even though no contributors were found`);
-      telegramSheet.getRange(i + 1, 14).setValue(generateUniqueHash(username, message, dateStr));
-      // Mark as Successfully Completed so the J="Pending" filter skips it on future runs.
-      // Covers the date-filtered and no-contributor-match cases for genuine contribution rows.
-      // The precise reason is derivable from absence of the hash in Scored Chatlogs.
-      telegramSheet.getRange(i + 1, 10).setValue('Successfully Completed');
+      // A genuine [CONTRIBUTION EVENT] that produced ZERO records is a FAILURE, never a success.
+      // The previous code stamped 'Successfully Completed' here, which meant:
+      //   - operators were told the row was done when nothing had been scored,
+      //   - the row became invisible to the J="Pending" filter forever (no retry ever),
+      //   - and no error was written anywhere, so the pipeline failed mute.
+      //
+      // Concrete instance (2026-11-17): two reel contributions were submitted with '- Amount:'
+      // before '- Type:' and with no '- TDG Issued:'. They produced zero records because the
+      // field parser required fixed ordering plus a mandatory TDG field, were stamped
+      // 'Successfully Completed', and never reached Scored Chatlogs.
+      //
+      // Column N (the processed marker) is deliberately LEFT EMPTY and J is set to a
+      // clearly non-terminal state, so the row stands out and can be reset to "Pending" for
+      // retry once the underlying cause is fixed.
+      const noRecordReason = 'no records produced -- inspect Executions log for the parser, contributor or Grok failure on this row';
+      Logger.log(`processTelegramChatLogs: row ${i + 1} produced NO records -> SCORING FAILED`);
+      telegramSheet.getRange(i + 1, 10).setValue('SCORING FAILED');
+      logPipelineHealth_('processTelegramChatLogs', 'ERROR', `row ${i + 1}: scoring produced no records`, noRecordReason);
     }
   }
 
@@ -753,7 +772,7 @@ function checkTdgIssued(message, sender, platform) {
 }
 
 function getContributorsFromMessage(message, reporter, platform) {
-  const payload = `From the following ${platform} message by ${reporter}: "${message}", identify all individuals explicitly mentioned as contributors. Treat the reporter (${reporter}) as a Telegram handle and include it as a contributor only if the message explicitly states they performed an action contributing to the work (e.g., "I worked", "I spent time", "I created", "I spent $607"), using the exact handle "${reporter}" as provided. Exclude the reporter if the message only indicates reporting on behalf of others (e.g., "Reporting on behalf of John") without their own contribution. Extract Telegram handles (with or without @, e.g., "@user123" or "user123") or single-word names (e.g., "June") from phrases like "I worked with June and @kirsten" or "Me and @557391090002 spent 12 minutes". Exclude full names with spaces (e.g., "Gary Teh" unless it’s a valid handle), generic terms like "team", "group", and URLs. Return ONLY a semicolon-separated list of handles or single-word names (e.g., "${reporter};June;@557391090002") or an empty string ('') if no valid contributors are found. Do not include any explanatory text, backticks, or additional formatting.`;
+  const payload = `From the following ${platform} message by ${reporter}: "${message}", identify all individuals explicitly mentioned as contributors. Treat the reporter (${reporter}) as a Telegram handle and include it as a contributor only if the message explicitly states they performed an action contributing to the work (e.g., "I worked", "I spent time", "I created", "I spent $607"), using the exact handle "${reporter}" as provided. Exclude the reporter if the message only indicates reporting on behalf of others (e.g., "Reporting on behalf of John") without their own contribution. Extract Telegram handles (with or without @, e.g., "@user123" or "user123") or single-word names (e.g., "June") from phrases like "I worked with June and @kirsten" or "Me and @557391090002 spent 12 minutes". Include full names containing spaces exactly as written (e.g., "Gary Teh", "Sophia Truesight", "Kirsten Ritschel"); NEVER drop a person because their name has a space. Exclude only generic non-person terms like "team", "group", and URLs. Return ONLY a semicolon-separated list of handles or single-word names (e.g., "${reporter};June;@557391090002") or an empty string ('') if no valid contributors are found. Do not include any explanatory text, backticks, or additional formatting.`;
 
   const headers = {
     "Authorization": `Bearer ${XAI_API_KEY}`,
@@ -781,9 +800,13 @@ function getContributorsFromMessage(message, reporter, platform) {
   if (status === 200) {
     const json = JSON.parse(result);
     const content = json.choices[0].message.content.trim();
-    const validPattern = platform === "Telegram" 
-      ? /^([@a-zA-Z0-9]+|[a-zA-Z0-9]+)(;([@a-zA-Z0-9]+|[a-zA-Z0-9]+))*$/ 
-      : /^([@0-9a-zA-Z]+|[a-zA-Z0-9]+)(;([@0-9a-zA-Z]+|[a-zA-Z0-9]+))*$/;
+    // A contributor token is either a Telegram handle (@kirsten) or a full display name
+    // ("Gary Teh", "Sophia Truesight"). The old pattern admitted only [@a-zA-Z0-9] with no
+    // whitespace, so every full name failed validation, and the salvage filter below dropped
+    // it a second time. An empty contributor list means zero records, which the caller then
+    // stamped "Successfully Completed" -- a silent data loss. Spaces, apostrophes, dots and
+    // hyphens are now legal inside a token.
+    const validPattern = /^([@a-zA-Z0-9][@a-zA-Z0-9 .'-]*)(;([@a-zA-Z0-9][@a-zA-Z0-9 .'-]*))*$/;
     
     if (content === '' || content.match(validPattern)) {
       Logger.log(`getContributorsFromMessage: Successful response: ${content}`);
@@ -791,7 +814,7 @@ function getContributorsFromMessage(message, reporter, platform) {
     } else {
       Logger.log(`getContributorsFromMessage: Unexpected contributor response format: ${content}`);
       const parts = content.split(';').map(part => part.trim());
-      const salvaged = parts.filter(part => part.match(/^[@a-zA-Z0-9]+$|^[a-zA-Z0-9]+$/)).join(';');
+      const salvaged = parts.filter(part => part.match(/^[@a-zA-Z0-9][@a-zA-Z0-9 .'-]*$/)).join(';');
       if (salvaged) {
         Logger.log(`getContributorsFromMessage: Salvaged valid contributors: ${salvaged}`);
         return salvaged;
@@ -1375,7 +1398,12 @@ function extractContributionDetails(message) {
     }
     
     // Check if all required fields were found
-    if (contributionDetails.type && contributionDetails.amount !== null && contributionDetails.description && contributionDetails.contributors && contributionDetails.tdgIssued) {
+    // REQUIRED: type, amount, description, contributors. OPTIONAL: tdgIssued, attachments.
+    // Gating on tdgIssued here is what silently discarded a whole class of valid rows: the
+    // autopilot and dapp submission forms omit '- TDG Issued:', so the line scanner below parsed
+    // every field correctly and then threw the result away for want of an optional field.
+    // When tdgIssued is absent, processChatLogEntry falls back to the Grok-suggested amount.
+    if (contributionDetails.type && contributionDetails.amount !== null && contributionDetails.description && contributionDetails.contributors) {
       Logger.log(`extractContributionDetails: Fallback parsing succeeded: ${JSON.stringify(contributionDetails)}`);
       return contributionDetails;
     }
