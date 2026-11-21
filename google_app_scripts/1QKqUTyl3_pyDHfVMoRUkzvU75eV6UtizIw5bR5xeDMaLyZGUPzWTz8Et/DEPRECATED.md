@@ -2,6 +2,57 @@
 
 `TDG - update balance in wallets on Ledger`
 
+---
+
+## ⚠ STATUS UPDATE — 2026-11-21: STILL FIRING, ROOT CAUSE IDENTIFIED
+
+**This project is deprecated in the repo but its trigger is still live and still
+emailing a failure every day at 00:16 PST.**
+
+Inbox check (25 messages, one per ~day) — most recent
+`Sat, 21 Nov 2026 00:16:42 -0800` = **2026-11-21 08:16 UTC**, roughly 11 days after
+the deprecation merged. Deprecation stopped deploys; it did not stop the trigger.
+
+### The error changed after #623 — the credential fix worked
+
+| Period | Error |
+|---|---|
+| Before #623 | `ReferenceError: getCredentials is not defined` |
+| After #623 | `Exception: Address unavailable: https://side-clean-replica.solana-mainnet.quiknode.pro//` |
+
+So `Credentials.js` is now present and loading. The fault simply moved to the next
+layer — which is why the failure persisted after the earlier fix looked successful.
+
+### Root cause: the QuickNode API key resolves to empty
+
+The failing URL ends in `//`, i.e. the key segment expanded to nothing:
+
+```js
+var SOLANA_API_KEY = creds.QUICKNODE_API_KEY;
+var SOLANA_RPC_URL = "https://side-clean-replica.solana-mainnet.quiknode.pro/" + SOLANA_API_KEY + "/";
+```
+
+`Credentials.js` seeds only a placeholder, and only when the property is unset:
+
+```js
+QUICKNODE_API_KEY: 'REPLACE_ME',
+...
+if (!props.getProperty(k)) { props.setProperty(k, seed[k]); }
+```
+
+So either the Script Property was never set on this project, or it holds the literal
+string `REPLACE_ME`. Either way the host is unroutable and every run throws.
+
+**Cleared, not the cause:** the same QuickNode host is referenced by `1ZQjgSZvAXL2PB`,
+`1rLl94jQ9tDYdR` and `177OJC0tVytZfS`, none of which have a `Credentials.js` in the
+repo at all. A host-wide outage or a shared-credential break therefore **cannot** be
+inferred from this project's error alone — do not conclude the other three are broken
+without checking their own triggers and properties.
+
+This is consistent with the original deprecation rationale: with column **D**
+(Solana wallet addresses) empty on every row, the lookup could never have succeeded,
+so the script was doomed whether or not the key was set.
+
 - scriptId `1QKqUTyl3_pyDHfVMoRUkzvU75eV6UtizIw5bR5xeDMaLyZGUPzWTz8Et`
 - owner `garyjob@agroverse.shop`
 - Deprecated by decision of Gov. Gary Teh: *"I think deprecate this"*.
@@ -54,13 +105,28 @@ longer in the deploy set and cannot be pushed by tooling again.
 
 The source file is **kept** for history and rollback.
 
-## Still to do — not achievable from the repo
+## Still to do — not achievable from the repo (CONFIRMED STILL OUTSTANDING 2026-11-21)
 
 **Failure emails continue until the trigger is deleted on Google's side.** Removing
-`.clasp.json` stops deploys; it does not touch the Apps Script trigger.
+`.clasp.json` stops deploys; it does not touch the Apps Script trigger. GitHub cannot
+delete a GAS trigger, and the Scripts API v1 has no `script.triggers` endpoint — the
+credential available exposes `script.projects` only. A human must act in the UI.
 
-- Delete the trigger in the GAS UI → *Triggers* panel, or delete the project.
-- The Scripts API exposes no trigger-deletion endpoint on the credentials available here.
+### Exact click-path (owner `garyjob@agroverse.shop`)
+
+1. Open the project:
+   `https://script.google.com/home/projects/1QKqUTyl3_pyDHfVMoRUkzvU75eV6UtizIw5bR5xeDMaLyZGUPzWTz8Et/edit`
+   (must be signed in as **garyjob@agroverse.shop** — Sophia's credentials are not the owner)
+2. Left sidebar → **Triggers** (clock icon).
+3. Find the `time-based` trigger calling **`getTdgWalletBalance`**, running **daily ~00:16**.
+4. Right-click the row → **Delete trigger**. (Or three-dot menu → *Delete trigger*.)
+5. Confirm the list no longer contains it. Emails stop after the next scheduled window; the
+   last one may already be batched — allow one day.
+
+Alternative: **delete the whole project** (three-dot menu → *Remove*). Safe once the source
+is preserved here in the repo, which it is.
+
+Verify afterwards: no failure email for this script dated later than the deletion day.
 
 ## To revive
 
