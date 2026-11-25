@@ -926,7 +926,7 @@ source check (`SUNMINT_FARMER_SETTLEMENT_AND_BATCH_LINK_PLAN.md` §0.10).
 | W | Is Sentinel | String | **`TRUE`** / blank — marks a sentinel (AI agent) contributor. Referenced by the ledger's column T (`Is Sentinel`), which caches this flag at ingest. |
 | X | Telegram ID | String | Numeric Telegram ID (distinct from the handle in column H) |
 | Y | Notes | String | Free-text notes |
-| Z | JIRA ID | String | Jira username / account handle (e.g. `jerry9b`) used to assign tickets. **Added 2026-11-25** — preferred over display name, which is unreliable on this tenant. |
+| Z | JIRA ID | String | **Atlassian `accountId`** of the contributor (e.g. `712020:eda65df9-72f8-46e0-85ba-ea2246463069`), the join key used to assign Jira tickets. **Added 2026-11-25.** One accountId per cell — the contributor *is* that Atlassian user (1:1); do not comma-separate a list (it breaks programmatic joins) — use a cell comment instead. **Never infer this from a display name:** display names bear no resemblance to this tab's `Name` column, so name search silently returns nothing. Live examples — `ewong` (Elizabeth Wong), `jerry9b` (Jerrie Huang), `陈超达` (Peter Da), `admin+sophia` (Sophia Truesight). Resolve by **email** at invite time and store the returned accountId. Blank = no Atlassian account: only **4 contributor** accounts existed at backfill time (all other Atlassian accounts in the tenant are integration bots, which must not be added here). |
 
 **Used by:**
 - [`grok_scoring_for_telegram_and_whatsapp_logs.gs`](https://github.com/TrueSightDAO/tokenomics/blob/main/google_app_scripts/tdg_grok_scoring/grok_scoring_for_telegram_and_whatsapp_logs.gs) - Validates contributors when scoring
