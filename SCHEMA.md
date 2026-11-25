@@ -897,7 +897,7 @@ source check (`SUNMINT_FARMER_SETTLEMENT_AND_BATCH_LINK_PLAN.md` §0.10).
 
 **Sheet URL:** https://docs.google.com/spreadsheets/d/1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU/edit#gid=1460794618
 
-**Header Row:** 4
+**Header Row:** 3
 
 | Column | Name | Type | Description |
 |--------|------|------|-------------|
@@ -908,7 +908,7 @@ source check (`SUNMINT_FARMER_SETTLEMENT_AND_BATCH_LINK_PLAN.md` §0.10).
 | E | Address | String | Physical address |
 | F | Phone / WhatsApp | String | Phone number |
 | G | Discord ID | String | Discord username |
-| H | Telegram ID | String | Telegram username |
+| H | Telegram Handle | String | Telegram handle |
 | I | Twitter | String | Twitter handle |
 | J | Projects  | String | Associated projects (note trailing space) |
 | K | LinkedIn | String | LinkedIn profile |
@@ -921,6 +921,12 @@ source check (`SUNMINT_FARMER_SETTLEMENT_AND_BATCH_LINK_PLAN.md` §0.10).
 | R | Digital Signature | String | Public key (legacy location) |
 | S | TikTok | String | TikTok handle (NEW - added 2025-12-26) |
 | T | Is Store Manager | String | Store manager flag (NEW - added 2025-12-26) |
+| U | Mailing Address | String | Postal / mailing address |
+| V | Venmo | String | Venmo handle |
+| W | Is Sentinel | String | **`TRUE`** / blank — marks a sentinel (AI agent) contributor. Referenced by the ledger's column T (`Is Sentinel`), which caches this flag at ingest. |
+| X | Telegram ID | String | Numeric Telegram ID (distinct from the handle in column H) |
+| Y | Notes | String | Free-text notes |
+| Z | JIRA ID | String | Jira username / account handle (e.g. `jerry9b`) used to assign tickets. **Added 2026-11-25** — preferred over display name, which is unreliable on this tenant. |
 
 **Used by:**
 - [`grok_scoring_for_telegram_and_whatsapp_logs.gs`](https://github.com/TrueSightDAO/tokenomics/blob/main/google_app_scripts/tdg_grok_scoring/grok_scoring_for_telegram_and_whatsapp_logs.gs) - Validates contributors when scoring
