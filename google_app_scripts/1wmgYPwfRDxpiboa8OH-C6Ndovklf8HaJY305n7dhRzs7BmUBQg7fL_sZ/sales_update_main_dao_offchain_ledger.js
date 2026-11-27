@@ -133,6 +133,36 @@ function sendTransactionCompletionNotification(qrCode, contributorName) {
   }
 }
 
+/**
+ * Normalizes the shipment URL that lands in "QR Code Sales" column G to its
+ * canonical short form.
+ *
+ * WHY (2026-11-27): the sales site began emitting deep-link URLs instead of the
+ * canonical ledger URL. The gate below used to be a strict `===` match against
+ * 'https://agroverse.shop/agl4', so every sale after that URL change was
+ * SILENTLY SKIPPED: column J was never set, no offchain rows were written, and
+ * nothing logged an error. Six real sales sat un-tokenized (rows 681/682/697 =
+ * shipments/agl4, rows 685/686/696 = shipments/agl13/index.html).
+ *
+ *   https://agroverse.shop/agl4                       -> https://agroverse.shop/agl4
+ *   https://agroverse.shop/shipments/agl4             -> https://agroverse.shop/agl4
+ *   https://agroverse.shop/shipments/agl13/index.html -> https://agroverse.shop/agl13
+ *   https://agroverse.shop/agl4/?utm_source=telegram  -> https://agroverse.shop/agl4
+ *   ''  or  'NA'                                      -> ''
+ *
+ * Booking a sale to the WRONG ledger is worse than skipping it, so this only
+ * maps a URL to the ledger it actually names; agl13 still normalizes to agl13
+ * and therefore still does NOT match the agl4 gate below (it belongs to the
+ * managed agl13 ledger, handled by sales_update_managed_agl_ledgers.js).
+ */
+function normalizeAgroverseUrl_(raw) {
+  const s = (raw == null ? '' : String(raw)).trim().toLowerCase();
+  if (!s || s === 'na') return '';
+  const m = s.match(/agroverse\.shop\/(?:shipments\/)?([a-z]+\d+)/);
+  if (!m) return s;
+  return 'https://agroverse.shop/' + m[1];
+}
+
 // Function to process Scored Chatlogs and update offchain transactions
 function processTokenizedTransactions() {
   // Get source and destination spreadsheets
@@ -152,8 +182,8 @@ function processTokenizedTransactions() {
     const agroverseValue = sourceData[i][AGROVERSE_VALUE_COL];
     const tokenizedStatus = sourceData[i][TOKENIZED_STATUS_COL];
     
-    // Check if Column G is "https://agroverse.shop/agl4" and Column J is empty
-    if (agroverseValue === 'https://agroverse.shop/agl4' && (!tokenizedStatus || tokenizedStatus === '')) {
+    // Check if Column G names the agl4 ledger (canonical or deep-link form) and Column J is empty
+    if (normalizeAgroverseUrl_(agroverseValue) === 'https://agroverse.shop/agl4' && (!tokenizedStatus || tokenizedStatus === '')) {
       // Update Column J to "PROCESSING"
       sourceSheet.getRange(i + 1, TOKENIZED_STATUS_COL + 1).setValue('PROCESSING');
       
