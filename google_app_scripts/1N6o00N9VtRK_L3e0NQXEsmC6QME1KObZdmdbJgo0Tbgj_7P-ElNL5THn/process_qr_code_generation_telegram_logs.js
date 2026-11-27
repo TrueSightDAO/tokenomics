@@ -674,6 +674,19 @@ function createQRCodeRecordsInAgroverse(currencyName, quantity, contributorName,
     if (!currencyData) {
       throw new Error(`Currency not found: ${currencyName}`);
     }
+
+    // Fail closed on a bad Ledger. Col C must resolve to a ledger listed in
+    // Shipment Ledger Listing col L, otherwise the mint produces SOLD-with-no-legs
+    // rows that cannot be routed to a shipment. See AGROVERSE_QR_LEDGER_COLUMN.md.
+    const validLedgerIds = loadValidLedgerIdsFromShipmentLedger_(spreadsheet);
+    const ledgerProblem = validateLedgerUrl_(currencyData.ledger, validLedgerIds);
+    if (ledgerProblem) {
+      throw new Error(
+        'Refusing to mint "' + currencyName + '": Currencies col F (ledger) is invalid - ' +
+        ledgerProblem + '. Point that Currencies row at a ledger listed in ' +
+        SHIPMENT_LEDGER_LISTING_TAB_ + ' col L before generating QR codes.'
+      );
+    }
     
     // Use the zip file name provided by the frontend instead of generating our own
     const zipFileName = expectedZipFileName || generateZipFileName(currencyName, generateBatchId());
@@ -721,6 +734,84 @@ function createQRCodeRecordsInAgroverse(currencyName, quantity, contributorName,
       error: error.message
     };
   }
+}
+
+// ===== Shipment Ledger Listing guard (Agroverse QR codes col C = ledger) =====
+//
+// Col C must reference a shipment ledger that actually exists in the
+// Shipment Ledger Listing tab col L. It used to be written as a copy of the
+// landing page, which silently produced MINTED rows whose sales had no ledger
+// to route to. See AGROVERSE_QR_LEDGER_COLUMN.md.
+
+var SHIPMENT_LEDGER_LISTING_TAB_ = 'Shipment Ledger Listing';
+
+/**
+ * Extract a ledger id from a ledger/landing-page URL.
+ * @param {string} url
+ * @return {string} upper-cased ledger id, or '' when none can be derived
+ */
+function extractLedgerId_(url) {
+  var s = url ? String(url).trim() : '';
+  if (!s) return '';
+  var m = s.match(/\/shipments\/([A-Za-z0-9_-]+)/i);
+  if (m) return m[1].toUpperCase();
+  m = s.match(/\/agl([0-9]+)/i);
+  if (m) return ('AGL' + m[1]).toUpperCase();
+  m = s.match(/\/sunmint\/([A-Za-z0-9_-]+)/i);
+  if (m) return m[1].toUpperCase();
+  var tail = s.replace(/[?#].*$/, '').replace(/\/+$/, '').split('/').pop();
+  return tail ? tail.toUpperCase() : '';
+}
+
+/**
+ * Load the set of valid ledger ids from Shipment Ledger Listing col L.
+ *
+ * Deliberately FAILS OPEN (returns null => callers skip validation) when the
+ * reference tab cannot be read: blocking every QR mint because a reference tab
+ * is missing would be a worse failure than the defect being guarded.
+ *
+ * @param {Spreadsheet} spreadsheet
+ * @return {Object<string,boolean>|null} id map, or null when the guard is disabled
+ */
+function loadValidLedgerIdsFromShipmentLedger_(spreadsheet) {
+  var ids = {};
+  try {
+    var sheet = spreadsheet.getSheetByName(SHIPMENT_LEDGER_LISTING_TAB_);
+    if (!sheet) {
+      Logger.log('loadValidLedgerIdsFromShipmentLedger_: tab "' +
+                 SHIPMENT_LEDGER_LISTING_TAB_ + '" not found - ledger guard disabled');
+      return null;
+    }
+    var lastRow = sheet.getLastRow();
+    if (lastRow < 2) return ids;
+    var colL = sheet.getRange(2, 12, lastRow - 1, 1).getValues();
+    for (var i = 0; i < colL.length; i++) {
+      var id = extractLedgerId_(colL[i][0]);
+      if (id) ids[id] = true;
+    }
+  } catch (e) {
+    Logger.log('loadValidLedgerIdsFromShipmentLedger_ failed - guard disabled: ' + e.message);
+    return null;
+  }
+  return ids;
+}
+
+/**
+ * @param {string} ledgerUrl candidate ledger value
+ * @param {Object<string,boolean>|null} validLedgerIds from loadValidLedgerIdsFromShipmentLedger_
+ * @return {string|null} null when valid (or guard disabled), else a reason string
+ */
+function validateLedgerUrl_(ledgerUrl, validLedgerIds) {
+  if (validLedgerIds === null) return null; // guard disabled (see helper note)
+  var raw = ledgerUrl ? String(ledgerUrl).trim() : '';
+  if (!raw) return 'it is blank';
+  var id = extractLedgerId_(raw);
+  if (!id) return 'cannot parse a ledger id from "' + raw + '"';
+  if (!validLedgerIds[id]) {
+    return '"' + raw + '" resolves to ledger "' + id + '", which is not listed in ' +
+           SHIPMENT_LEDGER_LISTING_TAB_ + ' col L';
+  }
+  return null;
 }
 
 // Helper function to find currency in Agroverse Currencies sheet
@@ -919,7 +1010,7 @@ function createQRCodeRow(qrCodeValue, currencyData, batchId, zipFileName, contri
   return [
     qrCodeValue, // Column A: QR Code value
     currencyData.landing_page, // Column B: Landing page
-    currencyData.landing_page, // Column C: Ledger
+    currencyData.ledger, // Column C: Ledger - NEVER landing_page. See AGROVERSE_QR_LEDGER_COLUMN.md
     'MINTED', // Column D: Status
     currencyData.farm_name, // Column E: Farm name
     currencyData.state, // Column F: State
@@ -1838,6 +1929,7 @@ function handleRegisterSingleQRCode(params) {
   var currency = params.currency ? String(params.currency).trim() : '';
   var manager = params.manager ? String(params.manager).trim() : '';
   var creationDate = params.creation_date ? String(params.creation_date).trim() : '';
+  var ledgerParam = params.ledger ? String(params.ledger).trim() : '';
   
   var status = params.status ? String(params.status).trim().toUpperCase() : 'SAMPLE';
   if (REGISTER_QR_VALID_STATUSES.indexOf(status) === -1) {
@@ -1873,10 +1965,28 @@ function handleRegisterSingleQRCode(params) {
   var qrCodeLocation = 'https://github.com/TrueSightDAO/tokenomics/tree/main/python_scripts/agroverse_qr_code_generator/package_qr_codes/compiled_' + 
     sanitizeFilename_(farmName) + '_' + qrCode + '.png';
   
+  // Ledger (col C) must never be a copy of the landing page. Resolve it from the
+  // request, else from the Currencies row, and validate against Shipment Ledger
+  // Listing col L. See AGROVERSE_QR_LEDGER_COLUMN.md.
+  var validLedgerIds = loadValidLedgerIdsFromShipmentLedger_(spreadsheet);
+  var resolvedLedger = ledgerParam;
+  if (!resolvedLedger && currency) {
+    var currencyRow = findCurrencyInAgroverse(spreadsheet.getSheetByName('Currencies'), currency);
+    if (currencyRow) resolvedLedger = currencyRow.ledger;
+  }
+  var ledgerProblem = validateLedgerUrl_(resolvedLedger, validLedgerIds);
+  if (ledgerProblem) {
+    return jsonResponse_({
+      status: 'error',
+      message: 'Invalid ledger - ' + ledgerProblem +
+               '. Pass a ledger URL that appears in ' + SHIPMENT_LEDGER_LISTING_TAB_ + ' col L.'
+    }, 400);
+  }
+
   var newRow = [
     qrCode,
     landingPage,
-    landingPage,
+    resolvedLedger,
     status,
     farmName,
     state,
