@@ -38,6 +38,7 @@ function doPost(e) {
     scoreTelegramChatLogsToAwardTDG();
     processVaultExpenses();
     parseQrCodes();
+    // Real AGL4 processor, defined in sales_update_main_dao_offchain_ledger.js.
     processTokenizedTransactions();
     processNonAgl4Transactions();
 
@@ -161,9 +162,20 @@ function parseQrCodes() {
   }
 }
 
-// AGL - process sales transactions for our on our main ledger
+// AGL - fan out to every processor.
 //     Script Location: https://script.google.com/home/projects/1wmgYPwfRDxpiboa8OH-C6Ndovklf8HaJY305n7dhRzs7BmUBQg7fL_sZ/edit
-function processTokenizedTransactions() {
+//
+// DO NOT name this processTokenizedTransactions(). GAS merges every project file
+// into ONE global namespace and a later-loaded file silently overwrites an
+// earlier one; files load alphabetically, and this file
+// (telegram_webhook_listener.js) loads AFTER
+// sales_update_main_dao_offchain_ledger.js. The forwarding stub that used to
+// live here therefore shadowed that file's real AGL4 processor, so
+// doGet(?action=processTokenizedTransactions) executed this proxy instead of the
+// real work -- while still returning "Telegram logs processed". Symptom: every
+// sale row stayed at blank Status / Ledger-Lines-Number and no offchain
+// transactions were ever written. See docs/GAS_FUNCTION_NAME_COLLISIONS.md.
+function runFullSalesProcessingChain() {
   const processingServiceUrl = 'https://script.google.com/macros/s/AKfycbzc15gptNmn8Pm726cfeXDnBxbxZ1L31MN6bkfBH7ziiz4gxl87vJXEhAAJJhZ5uAxq/exec?action=processTokenizedTransactions';
   try {
     const response = UrlFetchApp.fetch(processingServiceUrl);
