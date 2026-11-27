@@ -37,6 +37,8 @@ const CONTRIBUTORS_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1GE7PUq-U
 const CONTRIBUTORS_SHEET_NAME = 'Contributors contact information';
 const AGROVERSE_QR_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1GE7PUq-UT6x2rBN-Q2ksogbWpgyuh2SaxJyG_uEK6PU/edit?gid=472328231#gid=472328231';
 const AGROVERSE_QR_SHEET_NAME = 'Agroverse QR codes';
+const SHIPMENT_LEDGER_SHEET_NAME = 'Shipment Ledger Listing';
+const SHIPMENT_LEDGER_URL_COL = 11; // Column L (0-based) - the ONLY valid AGL Ledger URLs
 /** Main ledger tab: Session ID column C, Shipping Provider column M, Tracking column N, Agroverse QR column P */
 const STRIPE_CHECKOUT_SHEET_NAME = 'Stripe Social Media Checkout ID';
 const STRIPE_COL_SESSION = 3; // C
@@ -371,6 +373,54 @@ function getReporterName(telegramHandle, contributorName) {
   }
 }
 
+/**
+ * Valid AGL Ledger URLs, read from "Shipment Ledger Listing" column L.
+ * These are the ONLY values permitted in "QR Code Sales" column G.
+ * Cached per execution so a full parser run does not re-read the tab per row.
+ */
+var VALID_LEDGER_URL_CACHE_ = null;
+
+function getValidLedgerUrlSet_() {
+  if (VALID_LEDGER_URL_CACHE_) return VALID_LEDGER_URL_CACHE_;
+  const set = {};
+  try {
+    const ss = SpreadsheetApp.openByUrl(CONTRIBUTORS_SHEET_URL); // same spreadsheet as Shipment Ledger Listing
+    const sh = ss.getSheetByName(SHIPMENT_LEDGER_SHEET_NAME);
+    if (!sh) {
+      Logger.log('WARN: sheet "' + SHIPMENT_LEDGER_SHEET_NAME + '" not found; ledger URL gate has no allow-list');
+      return set;
+    }
+    const data = sh.getDataRange().getValues();
+    for (let i = 1; i < data.length; i++) {
+      const u = (data[i][SHIPMENT_LEDGER_URL_COL] || '').toString().trim();
+      if (u) set[u] = true;
+    }
+    VALID_LEDGER_URL_CACHE_ = set; // cache only on a successful read
+  } catch (e) {
+    Logger.log('WARN: could not load valid ledger URLs: ' + e.message);
+  }
+  return set;
+}
+
+/**
+ * Gate for "QR Code Sales" column G. Returns the URL only when it is a member of
+ * "Shipment Ledger Listing" column L; otherwise logs and returns '' so an invalid
+ * or blank URL is never written. FAIL CLOSED by design.
+ */
+function validLedgerUrlOrBlank_(rawUrl, qrCode) {
+  const url = (rawUrl || '').toString().trim();
+  if (!url) {
+    Logger.log('LEDGER-URL GATE: ' + qrCode + ' has no ledger URL on "Agroverse QR codes" col C - column G left blank');
+    return '';
+  }
+  const valid = getValidLedgerUrlSet_();
+  if (!valid[url]) {
+    Logger.log('LEDGER-URL GATE: ' + qrCode + ' resolved to invalid ledger URL "' + url + '" (not in "' + SHIPMENT_LEDGER_SHEET_NAME + '" col L) - column G left blank');
+    return '';
+  }
+  return url;
+}
+
 // Function to get value from Agroverse QR codes sheet based on QR code
 function getAgroverseValue(qrCode) {
   try {
@@ -381,7 +431,7 @@ function getAgroverseValue(qrCode) {
     // Skip header row
     for (let i = 1; i < agroverseData.length; i++) {
       if (agroverseData[i][QR_CODE_COL] === qrCode) {
-        return agroverseData[i][VALUE_COL] || '';
+        return validLedgerUrlOrBlank_(agroverseData[i][VALUE_COL], qrCode);
       }
     }
     return ''; // Return empty string if no match found
@@ -442,6 +492,21 @@ function normalizeSalesEventOptionalField(raw) {
   const t = (raw || '').toString().trim();
   if (!t || /^(\(none\)|none)$/i.test(t)) return '';
   return t;
+}
+
+/**
+ * Extract an OPTIONAL single-line "[SALES EVENT]" field.
+ *
+ * The value group must never match a newline. Using \s* after the colon lets the
+ * match slide past the end of an EMPTY line and consume the NEXT line's text, so an
+ * omitted/blank field (e.g. a bare "- Owner email:" on a cash sale with no buyer
+ * email) silently captured the following line instead. Only horizontal whitespace
+ * (space / tab) is permitted between the colon and the value.
+ */
+function matchOptionalSalesField_(message, label) {
+  const re = new RegExp('- ' + label + ':[^\\S\\n]*([^\\n]*)', 'i');
+  const m = (message || '').match(re);
+  return normalizeSalesEventOptionalField(m ? m[1] : '');
 }
 
 /** Update Agroverse QR codes column L (owner email) when the sale payload includes it */
@@ -529,16 +594,14 @@ function parseSalesEvent(message) {
     const priceMatch = message.match(/- Sales price:\s*\$?([0-9]+\.?[0-9]*)/i);
     const salePrice = priceMatch ? parseFloat(priceMatch[1]) : '';
 
-    const ownerLine = message.match(/- Owner email:\s*([^\n]+)/i);
-    const stripeLine = message.match(/- Stripe Session ID:\s*([^\n]+)/i);
-    const shipProvLine = message.match(/- Shipping Provider:\s*([^\n]+)/i);
-    const trackLine = message.match(/- Tracking number:\s*([^\n]+)/i);
+    // Optional fields use matchOptionalSalesField_ so an EMPTY value cannot swallow the next line.
+    const ownerEmail = matchOptionalSalesField_(message, 'Owner email');
+    const stripeSessionId = matchOptionalSalesField_(message, 'Stripe Session ID');
+    const shippingProvider = matchOptionalSalesField_(message, 'Shipping Provider');
+    const trackingNumber = matchOptionalSalesField_(message, 'Tracking number');
     const soldByLine = message.match(/- Sold by:\s*([^\n]+)/i);
     const cashProceedsLine = message.match(/- Cash proceeds collected by:\s*([^\n]+)/i);
-    const ownerEmail = normalizeSalesEventOptionalField(ownerLine ? ownerLine[1] : '');
-    const stripeSessionId = normalizeSalesEventOptionalField(stripeLine ? stripeLine[1] : '');
-    const shippingProvider = normalizeSalesEventOptionalField(shipProvLine ? shipProvLine[1] : '');
-    const trackingNumber = normalizeSalesEventOptionalField(trackLine ? trackLine[1] : '');
+    // (ownerEmail / stripeSessionId / shippingProvider / trackingNumber are parsed above)
     const soldBy = (soldByLine ? soldByLine[1] : '').toString().trim();
     const cashProceedsCollectedBy = (cashProceedsLine ? cashProceedsLine[1] : '').toString().trim();
     
