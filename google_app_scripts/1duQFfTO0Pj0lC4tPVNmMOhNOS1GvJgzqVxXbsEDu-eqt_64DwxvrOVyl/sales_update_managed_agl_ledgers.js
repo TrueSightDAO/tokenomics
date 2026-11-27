@@ -246,17 +246,52 @@ function resolveRedirect(url) {
   }
 }
 
-// Function to extract AGL contract name from URL
+// Function to extract AGL contract name from URL.
+//
+// Column G of 'QR Code Sales' holds either a canonical contract URL
+// (https://agroverse.shop/agl4) or, since the sales site began emitting
+// deep links, a landing-page URL
+// (https://agroverse.shop/shipments/agl13/index.html).
+//
+// A plain "strip the prefix" implementation turns the deep-link form into
+// "shipments/agl13/index.html", which then flows into the ledger as
+// "SunMint Tree Planting Contract - shipments/agl13/index.html" -- a corrupted
+// liability row. Parsing the path is the fix; returning a name that is not a
+// bare identifier is treated as "unparseable" so the caller skips the row
+// loudly instead of writing garbage.
 function extractAglContractName(url) {
-  const prefix_type_1 = 'https://agroverse.shop/';
-  const prefix_type_2 = 'https://truesight.me/sunmint/';
-  if (url.startsWith(prefix_type_1)) {
-    return url.slice(prefix_type_1.length);
-
-  } else if(url.startsWith(prefix_type_2)) {
-    return url.slice(prefix_type_2.length);
+  const prefixes = ['https://agroverse.shop/', 'https://truesight.me/sunmint/'];
+  if (typeof url !== 'string') return '';
+  let rest = null;
+  for (let i = 0; i < prefixes.length; i++) {
+    if (url.startsWith(prefixes[i])) {
+      rest = url.slice(prefixes[i].length);
+      break;
+    }
   }
-  return '';
+  if (rest === null) return '';
+
+  // Drop query string / fragment, then leading and trailing slashes.
+  rest = rest.split('#')[0].split('?')[0];
+  const parts = rest.split('/').filter(function (seg) { return seg.length > 0; });
+  if (parts.length === 0) return '';
+
+  // Canonical form is the whole path (e.g. 'agl4'). Deep-link form is
+  // ['shipments', '<name>', 'index.html'] -- take the contract segment.
+  let name = parts[0];
+  if (parts.length > 1) {
+    const idx = parts[0].toLowerCase() === 'shipments' ? 1 : 0;
+    name = parts[idx] || '';
+  }
+
+  // Tolerate an explicit index.html on the bare form.
+  name = name.replace(/\.html?$/i, '');
+
+  // Contract names are bare identifiers (agl4, pp1, sef1). Anything else --
+  // 'index', 'NA', a stray path fragment -- is unparseable, not a contract.
+  if (!/^[A-Za-z0-9_]+$/.test(name)) return '';
+  if (name.toLowerCase() === 'index') return '';
+  return name;
 }
 
 // Function to send Telegram notification for completed non-agl4 transactions
@@ -320,8 +355,12 @@ function processNonAgl4Transactions() {
     const agroverseValue = sourceData[i][AGROVERSE_VALUE_COL];
     const tokenizedStatus = sourceData[i][TOKENIZED_STATUS_COL];
     
-    // Check if Column G is not "https://agroverse.shop/agl4" and Column J is empty
-    if (agroverseValue !== 'https://agroverse.shop/agl4' && agroverseValue && (!tokenizedStatus || tokenizedStatus === '')) {
+    // Check if Column G is not the agl4 contract and Column J is empty.
+    // Compare on the *parsed* contract name, not the raw string: a deep-linked
+    // agl4 URL (https://agroverse.shop/shipments/agl4/index.html) is handled by
+    // sales_update_main_dao_offchain_ledger.js, so a raw string compare would
+    // fail to exclude it and double-book the sale here.
+    if (agroverseValue && extractAglContractName(agroverseValue) !== 'agl4' && (!tokenizedStatus || tokenizedStatus === '')) {
       // Extract AGL contract name
       const aglContractName = extractAglContractName(agroverseValue);
       if (!aglContractName) {
