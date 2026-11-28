@@ -97,11 +97,24 @@ function qrCodesBookedIn_(destSheet, destSheetUrl) {
   try {
     var lastRow = destSheet.getLastRow();
     if (lastRow > 1) {
-      var msgs = destSheet.getRange(2, 2, lastRow - 1, 1).getValues();
+      // Read description (col B) AND amount (col D) together. A row whose
+      // description names the QR but which carries NO amount is a marker row,
+      // not a booked leg. Counting markers as "booked" made this guard skip the
+      // real legs and mark the source row ACCOUNTED with no money movement
+      // (observed on 2025_20261025_42, 2026-11-28).
+      var msgs = destSheet.getRange(2, 2, lastRow - 1, 3).getValues();
+      var markerRows = 0;
       for (var r = 0; r < msgs.length; r++) {
         var m = msgs[r][0] ? msgs[r][0].toString() : '';
         var match = m.match(/-\s*Item:\s*([^\s\n]+)/);
-        if (match) set.add(match[1].trim());
+        if (!match) continue;
+        var amtRaw = msgs[r][2];
+        var amt = (amtRaw === '' || amtRaw === null) ? NaN : Number(amtRaw);
+        if (isNaN(amt) || amt === 0) { markerRows++; continue; }
+        set.add(match[1].trim());
+      }
+      if (markerRows > 0) {
+        Logger.log('qrCodesBookedIn_: ignored ' + markerRows + ' marker row(s) with no amount in ' + destSheetUrl);
       }
     }
     Logger.log('qrCodesBookedIn_: ' + set.size + ' QR codes already present in ' + destSheetUrl);
