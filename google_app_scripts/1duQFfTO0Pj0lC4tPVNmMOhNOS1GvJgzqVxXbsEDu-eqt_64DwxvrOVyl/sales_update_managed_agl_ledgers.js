@@ -306,9 +306,13 @@ function extractAglContractName(url) {
   // Tolerate an explicit index.html on the bare form.
   name = name.replace(/\.html?$/i, '');
 
-  // Contract names are bare identifiers (agl4, pp1, sef1). Anything else --
-  // 'index', 'NA', a stray path fragment -- is unparseable, not a contract.
-  if (!/^[A-Za-z0-9_]+$/.test(name)) return '';
+  // Contract names are identifiers: agl4, pp1, sef1, sunmint-01. Hyphens are
+  // legal as INTERNAL separators (governor Gary Teh, 2026-11-28: 'We should
+  // allow hyphens') but not as a leading/trailing character, and not doubled --
+  // those forms are typos or path debris, not contract names.
+  // Anything else -- 'index', 'NA', a stray path fragment -- is unparseable,
+  // not a contract.
+  if (!/^[A-Za-z0-9_]+(?:-[A-Za-z0-9_]+)*$/.test(name)) return '';
   if (name.toLowerCase() === 'index') return '';
   return name;
 }
@@ -328,6 +332,12 @@ function testExtractAglContractName() {
     ['https://agroverse.shop/agl13', 'agl13'],
     ['  https://agroverse.shop/agl13/  ', 'agl13'],
     ['https://truesight.me/sunmint/agl7', 'agl7'],
+    ['https://truesight.me/sunmint/sunmint-01', 'sunmint-01'],
+    ['https://agroverse.shop/agl-13', 'agl-13'],
+    ['https://agroverse.shop/shipments/sunmint-01/index.html', 'sunmint-01'],
+    ['https://agroverse.shop/-agl4', ''],
+    ['https://agroverse.shop/agl4-', ''],
+    ['https://agroverse.shop/agl--4', ''],
     ['', ''],
     ['not a url', '']
   ];
