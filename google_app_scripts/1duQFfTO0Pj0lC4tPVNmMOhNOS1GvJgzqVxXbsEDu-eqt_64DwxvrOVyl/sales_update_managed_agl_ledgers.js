@@ -390,8 +390,10 @@ function processNonAgl4Transactions() {
         continue;
       }
       
-      // Update Column J to "PROCESSING"
-      sourceSheet.getRange(i + 1, TOKENIZED_STATUS_COL + 1).setValue('PROCESSING');
+      // NOTE: the PROCESSING stamp is applied *after* the destination sheet is
+      // resolved (see below). Stamping before every failure path is handled
+      // strands the row forever, because the selection filter only accepts a
+      // blank status.
       
       // Get values for transactions
       const salesDate = sourceData[i][SALES_DATE_COL] || '';
@@ -415,6 +417,11 @@ function processNonAgl4Transactions() {
         Logger.log(`Error accessing destination spreadsheet ${destSheetUrl}: ${e.message}`);
         continue;
       }
+
+      // Stamp PROCESSING only now that the destination is reachable: every
+      // earlier failure path has already been handled, so this stamp cannot be
+      // orphaned by a `continue` above it.
+      sourceSheet.getRange(i + 1, TOKENIZED_STATUS_COL + 1).setValue('PROCESSING');
       
       // Idempotency guard: never append legs that already exist for this QR.
       const booked = qrCodesBookedIn_(destSheet, destSheetUrl);
@@ -458,7 +465,15 @@ function processNonAgl4Transactions() {
         ]
       ];
       
-      destSheet.getRange(destInsertRow, 1, 3, destRowsToInsert[0].length).setValues(destRowsToInsert);
+      try {
+        destSheet.getRange(destInsertRow, 1, 3, destRowsToInsert[0].length).setValues(destRowsToInsert);
+      } catch (writeErr) {
+        // Nothing was committed, so clearing PROCESSING is safe and lets the
+        // next run retry this row instead of it being invisible forever.
+        sourceSheet.getRange(i + 1, TOKENIZED_STATUS_COL + 1).setValue('');
+        Logger.log(`Row ${i + 1}: leg write failed for ${sourceData[i][QR_CODE_COL]}: ${writeErr.message}; status reset to blank for retry`);
+        continue;
+      }
       
       // Get row numbers (1-based) for the inserted rows
       const rowNumbers = [destInsertRow, destInsertRow + 1, destInsertRow + 2].join(',');
