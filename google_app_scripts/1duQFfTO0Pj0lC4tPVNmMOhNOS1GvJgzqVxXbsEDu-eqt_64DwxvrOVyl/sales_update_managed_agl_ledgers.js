@@ -275,10 +275,16 @@ function resolveRedirect(url) {
 function extractAglContractName(url) {
   const prefixes = ['https://agroverse.shop/', 'https://truesight.me/sunmint/'];
   if (typeof url !== 'string') return '';
+  // Sheets cells routinely carry stray leading/trailing whitespace (hand
+  // paste, IMPORTRANGE, CSV round-trips). Without this trim a perfectly valid
+  // '  https://agroverse.shop/agl13/  ' fails every startsWith below and the
+  // row is skipped as unparseable -- silently, which is the worst failure mode
+  // for a money path.
+  const trimmed = url.trim();
   let rest = null;
   for (let i = 0; i < prefixes.length; i++) {
-    if (url.startsWith(prefixes[i])) {
-      rest = url.slice(prefixes[i].length);
+    if (trimmed.startsWith(prefixes[i])) {
+      rest = trimmed.slice(prefixes[i].length);
       break;
     }
   }
@@ -305,6 +311,42 @@ function extractAglContractName(url) {
   if (!/^[A-Za-z0-9_]+$/.test(name)) return '';
   if (name.toLowerCase() === 'index') return '';
   return name;
+}
+
+// Self-test for extractAglContractName. There is no GAS test runner and no JS
+// CI for this project, so run this from the Apps Script editor (select the
+// function, Run, then View > Logs) after editing the parser and before
+// deploying. Returns a one-line summary so it is easy to eyeball.
+function testExtractAglContractName() {
+  const cases = [
+    ['https://agroverse.shop/agl4', 'agl4'],
+    ['https://agroverse.shop/agl4/', 'agl4'],
+    ['https://agroverse.shop/agl4/?utm_source=telegram', 'agl4'],
+    ['https://agroverse.shop/shipments/agl4', 'agl4'],
+    ['https://agroverse.shop/shipments/agl13/index.html', 'agl13'],
+    ['https://agroverse.shop/shipments/agl13', 'agl13'],
+    ['https://agroverse.shop/agl13', 'agl13'],
+    ['  https://agroverse.shop/agl13/  ', 'agl13'],
+    ['https://truesight.me/sunmint/agl7', 'agl7'],
+    ['', ''],
+    ['not a url', '']
+  ];
+  let failed = 0;
+  cases.forEach(function (testCase) {
+    const input = testCase[0];
+    const want = testCase[1];
+    const got = extractAglContractName(input);
+    if (got !== want) {
+      failed++;
+      Logger.log('FAIL extractAglContractName(' + JSON.stringify(input) + ') = ' +
+        JSON.stringify(got) + ', want ' + JSON.stringify(want));
+    }
+  });
+  const summary = failed === 0
+    ? 'ALL ' + cases.length + ' extractAglContractName cases PASS'
+    : failed + ' of ' + cases.length + ' extractAglContractName cases FAILED';
+  Logger.log(summary);
+  return summary;
 }
 
 // Function to send Telegram notification for completed non-agl4 transactions
